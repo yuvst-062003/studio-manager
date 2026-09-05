@@ -215,6 +215,26 @@ class EnrollmentUpdate(BaseModel):
     attends_weekdays: list[Weekday] | None = Field(default=None, min_length=1)
 
 
+class PendingReviewOut(BaseModel):
+    """Task 4a's manager queue: one row per pending `Enrollment` -- a child the join
+    wizard flagged, whose enrollment is not yet active and was never charged."""
+
+    enrollment_id: uuid.UUID
+    student_id: uuid.UUID
+    student_name: str
+    group_name: str
+    plan_name: str | None
+    monthly_amount_agorot: int | None
+    #: How many health questions this family answered yes. A COUNT -- the answers
+    #: themselves stay behind the health permission boundary, where a manager reads them
+    #: through the declaration screen that checks their grant.
+    answers_yes: int
+    #: The guardian to ring. The "contact" action is a phone call, not a write.
+    guardian_name: str | None
+    guardian_phone: str | None
+    started_on: date
+
+
 class EnrollmentMoveIn(BaseModel):
     """Staff 9c's move: the target group, and optionally the effective date."""
 

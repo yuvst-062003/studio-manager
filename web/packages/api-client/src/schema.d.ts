@@ -1037,6 +1037,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/enrollments/pending-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Pending Review
+         * @description Task 4a's manager queue -- every hold the join wizard's health gate created,
+         *     oldest first. Manager-or-owner, and never `coach`: the shape carries money, and
+         *     invariant 3 checks the field names a coach-tagged route returns.
+         */
+        get: operations["list_pending_review_api_v1_enrollments_pending_review_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/enrollments/weekday-options": {
         parameters: {
             query?: never;
@@ -1072,6 +1094,27 @@ export interface paths {
         head?: never;
         /** Update Enrollment */
         patch: operations["update_enrollment_api_v1_enrollments__enrollment_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/enrollments/{enrollment_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Enrollment
+         * @description Task 4a -- the manager's decision on a hold the join wizard's health gate
+         *     created. Manager-or-owner, never `coach` -- see `list_pending_review`.
+         */
+        post: operations["approve_enrollment_api_v1_enrollments__enrollment_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/enrollments/{enrollment_id}/move": {
@@ -9397,6 +9440,42 @@ export interface components {
             reason: string;
         };
         /**
+         * PendingReviewOut
+         * @description Task 4a's manager queue: one row per pending `Enrollment` -- a child the join
+         *     wizard flagged, whose enrollment is not yet active and was never charged.
+         */
+        PendingReviewOut: {
+            /** Answers Yes */
+            answers_yes: number;
+            /**
+             * Enrollment Id
+             * Format: uuid
+             */
+            enrollment_id: string;
+            /** Group Name */
+            group_name: string;
+            /** Guardian Name */
+            guardian_name: string | null;
+            /** Guardian Phone */
+            guardian_phone: string | null;
+            /** Monthly Amount Agorot */
+            monthly_amount_agorot: number | null;
+            /** Plan Name */
+            plan_name: string | null;
+            /**
+             * Started On
+             * Format: date
+             */
+            started_on: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Student Name */
+            student_name: string;
+        };
+        /**
          * PeriodWindowOut
          * @description The window the server actually reported on, echoed back.
          *
@@ -14124,6 +14203,26 @@ export interface operations {
             };
         };
     };
+    list_pending_review_api_v1_enrollments_pending_review_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingReviewOut"][];
+                };
+            };
+        };
+    };
     weekday_options_api_v1_enrollments_weekday_options_get: {
         parameters: {
             query: {
@@ -14172,6 +14271,40 @@ export interface operations {
                 "application/json": components["schemas"]["EnrollmentUpdate"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrollmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_enrollment_api_v1_enrollments__enrollment_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                enrollment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

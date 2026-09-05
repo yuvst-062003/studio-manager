@@ -37,8 +37,9 @@ from app.models.person import Guardian, Person
 from app.services.audit import AuditService
 from app.services.billing.catalogue import plan_for_volume
 from app.services.billing.run import BillingRunService, _Tally
+from app.services.health.flags import answered_yes_count
 from app.services.people.attendance_pattern import weekly_volume
-from app.services.people.enrollments import EnrollmentService
+from app.services.people.enrollments import PENDING_REVIEW_ACTION, EnrollmentService
 from app.services.people.errors import DuplicateStudentError, NotFoundError, RefusedError
 from app.services.people.group_days import ScheduleReader
 from app.services.people.matching import duplicate_student
@@ -199,9 +200,20 @@ class OnboardingService:
         schedule: ScheduleReader,
         billing_run: BillingRunService | None = None,
         tally: _Tally | None = None,
+        needs_review: bool = False,
     ) -> uuid.UUID:
         """One child: the person, the student, the guardian link, the enrollments, the
         price and the first charge. Returns the student id.
+
+        **`needs_review` (task 4a) — the join wizard's own screen already tells a family
+        a flagged child will not be charged and will wait for a manager.** `register`
+        computes this per child, from `answered_yes_count` over that child's submitted
+        health answers, BEFORE calling here (§8.1's rule: any `true`, not `derive_flags`'s
+        narrower coach-badge set — see `app/services/health/flags.py`). When true, every
+        `Enrollment` this call creates is written `pending` instead of `active` and
+        `charge_first_month` is never called for this child. `student.price_plan_id` is
+        still assigned regardless: the plan is what the manager's approval charges, and an
+        approved child left unpriced would be a second bug hiding behind the first.
 
         **Both doors run this, and that is the point** (owner decision, 2026-08-30). A
         family used to meet two different policies a week apart: the join link created
@@ -277,24 +289,41 @@ class OnboardingService:
         )
 
         volume_pairs = []
+        created_enrollments: list[Enrollment] = []
         for group_id in group_ids:
             # One rule on every self-service door, and it lives in `EnrollmentService` so
             # the trial-to-member join reaches the same check rather than restating it.
             weekdays = EnrollmentService.self_service_weekdays(
                 session, group_id=group_id, since=today, schedule=schedule
             )
-            session.add(
-                Enrollment(
-                    studio_id=studio_id,
-                    student_id=student.id,
-                    group_id=group_id,
-                    status="active",
-                    started_on=today,
-                    attends_weekdays=None,
-                )
+            enrollment = Enrollment(
+                studio_id=studio_id,
+                student_id=student.id,
+                group_id=group_id,
+                status="pending" if needs_review else "active",
+                started_on=today,
+                attends_weekdays=None,
             )
+            session.add(enrollment)
+            created_enrollments.append(enrollment)
             volume_pairs.append((None, weekdays))
         session.flush()
+
+        if needs_review:
+            # G7 -- a count and a code, never the answers. `health` is guaranteed present:
+            # `register` only ever passes `needs_review=True` when it computed a positive
+            # count from THIS child's own `health["answers"]`.
+            answers_yes = answered_yes_count((child.get("health") or {}).get("answers") or {})
+            for enrollment in created_enrollments:
+                AuditService.record(
+                    session,
+                    action=PENDING_REVIEW_ACTION,
+                    entity_type="enrollment",
+                    entity_id=enrollment.id,
+                    studio_id=studio_id,
+                    actor_person_id=parent.id,
+                    diff={"reason": "health_answered_yes", "answers_yes": answers_yes},
+                )
 
         volume = weekly_volume(volume_pairs)
         plan: PricePlan | None
@@ -328,8 +357,11 @@ class OnboardingService:
         if plan is not None:
             student.price_plan_id = plan.id
             session.flush()
-            run = billing_run if billing_run is not None else BillingRunService(session)
-            run.charge_first_month(studio_id, student.id, plan.id, on=today, tally=tally)
+            # A flagged child is priced but NOT charged -- the manager's approval
+            # (`EnrollmentService.approve`) raises the first month once the hold clears.
+            if not needs_review:
+                run = billing_run if billing_run is not None else BillingRunService(session)
+                run.charge_first_month(studio_id, student.id, plan.id, on=today, tally=tally)
         return student.id
 
     @staticmethod
@@ -555,6 +587,15 @@ class OnboardingService:
         tenant_session = cast(TenantSession, session)
 
         for child in children:
+            # §8.1's gate, computed PER CHILD before `add_child` runs -- one family, one
+            # call, and one child's "yes" must never suspend a sibling's whose declaration
+            # was clean. The declaration itself is still submitted below, after
+            # `add_child`: it needs the `student_id` that call creates. §1's rule is
+            # `answered_yes_count`, deliberately wider than `derive_flags` (the coach
+            # roster's narrower flag set) -- a child the wizard showed at ₪0 must not be
+            # charged because their "yes" fell outside that narrower set.
+            health = child.get("health")
+            needs_review = health is not None and answered_yes_count(health["answers"]) > 0
             try:
                 student_id = OnboardingService.add_child(
                     session,
@@ -565,6 +606,7 @@ class OnboardingService:
                     schedule=schedule,
                     billing_run=billing_run,
                     tally=tally,
+                    needs_review=needs_review,
                 )
             except DuplicateStudentError as exc:
                 # A no-op, not a refusal, and only on THIS door. A parent resubmitting the
@@ -593,7 +635,6 @@ class OnboardingService:
                 student_ids.append(student_id)
                 applied_pairs.append((child, student_id))
 
-            health = child.get("health")
             if health is not None:
                 HealthDeclarationService.submit(
                     tenant_session,

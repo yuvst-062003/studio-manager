@@ -89,3 +89,22 @@ def derive_flags(
             )
         flags[question_id] = answer
     return flags
+
+
+def answered_yes_count(answers: Mapping[str, Any]) -> int:
+    """How many questions this declaration answers YES.
+
+    §8.1's review rule, and deliberately WIDER than `derive_flags`: that one covers only
+    the questions a schema marks `flag: true`, which is what a coach sees on a roster. The
+    review gate asks a different question -- "did this family tell us anything at all" --
+    and the wizard's own screen already flags on any `true`, so a narrower rule here would
+    show a family ₪0 and then charge them.
+
+    Counts booleans only. The submitted `answers` map also carries the health fund, the
+    emergency contact and the free-text notes, none of which is a `bool`, and the notes
+    field is explicitly not a trigger.
+
+    **G7 — a COUNT, never a name and never an answer.** What comes back may be logged and
+    put in an audit diff; the answers themselves may not.
+    """
+    return sum(1 for value in answers.values() if value is True)

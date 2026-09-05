@@ -1781,3 +1781,158 @@ def test_self_register_requires_an_active_studio(client, fake_provider):
         },
     )
     assert response.status_code == 401, response.text
+
+
+# -- task 4a: the manager review gate, backend half ----------------------------
+#
+# The wizard's step 2/3/4 already draw an amber badge, a struck-through ₪0 and a promise
+# of manager contact for a child whose declaration answers `true` to anything. These
+# tests are the backend half: `register`/`add_child` must actually withhold the charge
+# and hold the enrollment, per child, in the same one-transaction submission that also
+# writes a clean sibling active and charged.
+def test_a_flagged_child_is_pending_and_uncharged_while_a_clean_sibling_is_charged(
+    tenant_session, app_session, studio, a_group, twice_weekly, a_live_plan
+):
+    """One family, one `register` call, two children -- the case that breaks if
+    `needs_review` were computed once for the whole submission instead of per child
+    (§8.1's own wording via the brief: 'this is the case that breaks if the flag is
+    computed once for the whole submission instead of per child')."""
+    from app.models.audit import AuditLog
+    from app.services.people.enrollments import PENDING_REVIEW_ACTION
+    from app.services.structure.health_templates import ensure_full_template
+
+    template = ensure_full_template(app_session, studio.id, at=T0)
+    app_session.commit()
+
+    # A `true` boolean answer implies clause 2 (`limited`), not clause 1 -- `verify_clause`
+    # refuses a submission that answers yes to a medical question and still confirms "no
+    # limitations of any kind". That check is orthogonal to §8.1's review gate; it is just
+    # a fact the answers here must also satisfy to reach `add_child` at all.
+    flagged_answers = {**_HEALTH_ANSWERS, "asthma": True, "clause_confirmed": "limited"}
+    _, _student_ids, charged, child_student_ids = OnboardingService.register(
+        tenant_session,
+        studio_id=studio.id,
+        identity_id=None,
+        first_name="שירה",
+        last_name="לוי",
+        phone=None,
+        email=None,
+        children=[
+            {
+                "first_name": "נועה",
+                "last_name": "לוי",
+                "birthdate": None,
+                "group_ids": [a_group],
+                "self": False,
+                "health": {
+                    "template_id": str(template.id),
+                    "answers": flagged_answers,
+                    "signature_image_base64": _ONE_PIXEL_PNG_B64,
+                },
+            },
+            {
+                "first_name": "איתן",
+                "last_name": "לוי",
+                "birthdate": None,
+                "group_ids": [a_group],
+                "self": False,
+                "health": {
+                    "template_id": str(template.id),
+                    "answers": _HEALTH_ANSWERS,
+                    "signature_image_base64": _ONE_PIXEL_PNG_B64,
+                },
+            },
+        ],
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+
+    flagged_student_id, clean_student_id = child_student_ids
+    assert charged == 1  # only the clean sibling
+
+    flagged_enrollment = tenant_session.execute(
+        select(Enrollment).where(Enrollment.student_id == flagged_student_id)
+    ).scalar_one()
+    assert flagged_enrollment.status == "pending"
+    flagged_student = tenant_session.get(Student, flagged_student_id)
+    # Still priced -- the plan is what the manager's approval will charge.
+    assert flagged_student.price_plan_id == a_live_plan.id
+    assert (
+        tenant_session.execute(
+            select(func.count()).select_from(Charge).where(Charge.student_id == flagged_student_id)
+        ).scalar_one()
+        == 0
+    )
+
+    clean_enrollment = tenant_session.execute(
+        select(Enrollment).where(Enrollment.student_id == clean_student_id)
+    ).scalar_one()
+    assert clean_enrollment.status == "active"
+    assert (
+        tenant_session.execute(
+            select(func.count()).select_from(Charge).where(Charge.student_id == clean_student_id)
+        ).scalar_one()
+        == 1
+    )
+
+    # G7 -- a reason CODE and a COUNT, never a question id and never an answer.
+    audit_row = tenant_session.execute(
+        select(AuditLog).where(
+            AuditLog.entity_type == "enrollment",
+            AuditLog.entity_id == flagged_enrollment.id,
+            AuditLog.action == PENDING_REVIEW_ACTION,
+        )
+    ).scalar_one()
+    assert audit_row.diff == {"reason": "health_answered_yes", "answers_yes": 1}
+    assert set(audit_row.diff) == {"reason", "answers_yes"}
+
+
+def test_a_yes_to_a_question_the_schema_does_not_mark_flag_still_triggers_the_gate(
+    tenant_session, app_session, studio, a_group, twice_weekly, a_live_plan
+):
+    """§1's whole reason to exist: `chronic_illness` is a real boolean question in the
+    bundled full schema and is NOT one of `FULL_FLAG_QUESTIONS` -- `derive_flags` never
+    counts it. A gate built on `derive_flags` would let this child through active and
+    charged after the wizard already showed the family ₪0."""
+    from app.services.health.flags import derive_flags
+    from app.services.structure.health_templates import ensure_full_template
+
+    template = ensure_full_template(app_session, studio.id, at=T0)
+    app_session.commit()
+
+    answers = {**_HEALTH_ANSWERS, "chronic_illness": True, "clause_confirmed": "limited"}
+    assert "chronic_illness" not in derive_flags(answers, template.schema)
+
+    _, student_ids, charged, _ = OnboardingService.register(
+        tenant_session,
+        studio_id=studio.id,
+        identity_id=None,
+        first_name="שירה",
+        last_name="לוי",
+        phone=None,
+        email=None,
+        children=[
+            {
+                "first_name": "נועה",
+                "last_name": "לוי",
+                "birthdate": None,
+                "group_ids": [a_group],
+                "self": False,
+                "health": {
+                    "template_id": str(template.id),
+                    "answers": answers,
+                    "signature_image_base64": _ONE_PIXEL_PNG_B64,
+                },
+            }
+        ],
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+
+    assert charged == 0
+    enrollment = tenant_session.execute(
+        select(Enrollment).where(Enrollment.student_id == student_ids[0])
+    ).scalar_one()
+    assert enrollment.status == "pending"

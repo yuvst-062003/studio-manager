@@ -30,12 +30,24 @@ from datetime import date, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.models.audit import AuditLog
+from app.models.billing import PricePlan
 from app.models.people import Enrollment, Student
+from app.models.person import Guardian, Person
 from app.models.structure import Group
 from app.services.audit import AuditService
+from app.services.billing.run import BillingRunService
 from app.services.people.attendance_pattern import weekly_volume
 from app.services.people.errors import ConflictError, NotFoundError, RefusedError
 from app.services.people.group_days import ScheduleReader, training_weekdays
+
+#: Task 4a's manager review gate. `OnboardingService.add_child` writes this action on
+#: every `Enrollment` it puts into "pending" (§8.1 -- any health answer of `true`), with
+#: `diff={"reason": "health_answered_yes", "answers_yes": <count>}` and NOTHING else --
+#: G7 forbids a question id or an answer in an audit `diff`. `pending_review` below reads
+#: it back for the queue's `answers_yes`. One constant, so the writer and the reader
+#: cannot silently drift onto two different action strings.
+PENDING_REVIEW_ACTION = "enrollment.pending_review"
 
 
 @dataclass(frozen=True)
@@ -43,6 +55,22 @@ class WeekdayOptions:
     group_id: uuid.UUID
     group_name: str
     training_weekdays: list[int]
+
+
+@dataclass(frozen=True)
+class PendingReviewRow:
+    """One pending `Enrollment`, with what the manager's queue needs to decide it."""
+
+    enrollment_id: uuid.UUID
+    student_id: uuid.UUID
+    student_name: str
+    group_name: str
+    plan_name: str | None
+    monthly_amount_agorot: int | None
+    answers_yes: int
+    guardian_name: str | None
+    guardian_phone: str | None
+    started_on: date
 
 
 class EnrollmentService:
@@ -313,3 +341,126 @@ class EnrollmentService:
             )
         ]
         return weekly_volume(patterns)
+
+    # -- task 4a: the manager review gate ---------------------------------------
+    @staticmethod
+    def pending_review(session: Session) -> list[PendingReviewRow]:
+        """§8.1's queue: every `Enrollment` the join wizard's health gate put on hold,
+        oldest first -- a review that has waited longest is the one that most needs
+        deciding.
+
+        **`answers_yes` is read back from the audit row `add_child` wrote
+        (`PENDING_REVIEW_ACTION`), not recomputed from the declaration's current
+        answers.** Two reasons. First, this screen's question is "why is THIS hold still
+        open", which is what was true the moment the hold was created -- a declaration
+        resubmitted afterwards must not quietly change the reason a manager is looking at
+        an already-open row. Second, it costs no second decrypt of
+        `HealthDeclaration.answers_encrypted` on a list a manager may reload often;
+        `derived_flags` is the narrower, coach-facing set and is never read here (§1: it
+        would show a count smaller than the one the wizard promised the family).
+        """
+        rows = session.execute(
+            select(Enrollment, Student, Person, Group)
+            .join(Student, Student.id == Enrollment.student_id)
+            .join(Person, Person.id == Student.person_id)
+            .join(Group, Group.id == Enrollment.group_id)
+            .where(Enrollment.status == "pending")
+            .order_by(Enrollment.created_at)
+        ).all()
+
+        result: list[PendingReviewRow] = []
+        for enrollment, student, person, group in rows:
+            plan = (
+                session.get(PricePlan, student.price_plan_id)
+                if student.price_plan_id is not None
+                else None
+            )
+            guardian = session.execute(
+                select(Person.first_name, Person.last_name, Person.phone)
+                .select_from(Guardian)
+                .join(Person, Person.id == Guardian.person_id)
+                .where(Guardian.student_id == student.id)
+                .order_by(Guardian.is_primary.desc(), Person.first_name)
+                .limit(1)
+            ).first()
+            # AuditLog carries no TenantMixin (append-only by grant, §11.2), so unlike
+            # every other read in this method it is not filtered by the active studio
+            # automatically -- filtered here explicitly against THIS enrollment's own
+            # studio_id.
+            diff = session.execute(
+                select(AuditLog.diff)
+                .where(
+                    AuditLog.studio_id == enrollment.studio_id,
+                    AuditLog.entity_type == "enrollment",
+                    AuditLog.entity_id == enrollment.id,
+                    AuditLog.action == PENDING_REVIEW_ACTION,
+                )
+                .order_by(AuditLog.created_at.desc())
+                .limit(1)
+            ).scalar_one_or_none()
+            answers_yes = int((diff or {}).get("answers_yes") or 0)
+            result.append(
+                PendingReviewRow(
+                    enrollment_id=enrollment.id,
+                    student_id=student.id,
+                    student_name=f"{person.first_name} {person.last_name}",
+                    group_name=group.name,
+                    plan_name=plan.name if plan is not None else None,
+                    monthly_amount_agorot=(
+                        plan.monthly_amount_agorot if plan is not None else None
+                    ),
+                    answers_yes=answers_yes,
+                    guardian_name=(
+                        f"{guardian[0]} {guardian[1]}" if guardian is not None else None
+                    ),
+                    guardian_phone=guardian[2] if guardian is not None else None,
+                    started_on=enrollment.started_on,
+                )
+            )
+        return result
+
+    @staticmethod
+    def approve(
+        session: Session,
+        *,
+        enrollment_id: uuid.UUID,
+        at: datetime,
+        actor_person_id: uuid.UUID | None,
+        billing_run: BillingRunService | None = None,
+    ) -> Enrollment:
+        """§8.1's manager decision on a held enrollment: it is real, it is priced, and its
+        first month is owed.
+
+        **`on=enrollment.started_on`, not today.** The family owes the month they
+        registered in, not a month prorated from whenever the manager got round to
+        approving it -- these holds are expected to close fast, and prorating costs more
+        in reconciliation than it returns to the family. If a hold ever starts sitting for
+        days rather than hours, this decision needs revisiting: charging `started_on`
+        charges a family for days their child was not actually allowed to train.
+        """
+        row = session.get(Enrollment, enrollment_id)
+        if row is None:
+            raise NotFoundError(str(enrollment_id))
+        if row.status != "pending":
+            raise ConflictError(f"enrollment is {row.status}, not pending")
+        student = session.get(Student, row.student_id)
+        if student is None:  # pragma: no cover -- the FK makes this unreachable in practice
+            raise NotFoundError(str(row.student_id))
+
+        row.status = "active"
+        run = billing_run if billing_run is not None else BillingRunService(session)
+        run.charge_first_month(row.studio_id, student.id, student.price_plan_id, on=row.started_on)
+
+        AuditService.record(
+            session,
+            action="enrollment.approved",
+            entity_type="enrollment",
+            entity_id=row.id,
+            studio_id=row.studio_id,
+            actor_person_id=actor_person_id,
+            # Code-not-content, same discipline as PENDING_REVIEW_ACTION: a status change
+            # and nothing about why the child was held in the first place.
+            diff={"status": "active"},
+        )
+        session.flush()
+        return row

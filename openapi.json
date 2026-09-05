@@ -8762,6 +8762,96 @@
         "title": "PaymentReversalIn",
         "type": "object"
       },
+      "PendingReviewOut": {
+        "description": "Task 4a's manager queue: one row per pending `Enrollment` -- a child the join\nwizard flagged, whose enrollment is not yet active and was never charged.",
+        "properties": {
+          "answers_yes": {
+            "title": "Answers Yes",
+            "type": "integer"
+          },
+          "enrollment_id": {
+            "format": "uuid",
+            "title": "Enrollment Id",
+            "type": "string"
+          },
+          "group_name": {
+            "title": "Group Name",
+            "type": "string"
+          },
+          "guardian_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guardian Name"
+          },
+          "guardian_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guardian Phone"
+          },
+          "monthly_amount_agorot": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly Amount Agorot"
+          },
+          "plan_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Name"
+          },
+          "started_on": {
+            "format": "date",
+            "title": "Started On",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "student_name": {
+            "title": "Student Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "enrollment_id",
+          "student_id",
+          "student_name",
+          "group_name",
+          "plan_name",
+          "monthly_amount_agorot",
+          "answers_yes",
+          "guardian_name",
+          "guardian_phone",
+          "started_on"
+        ],
+        "title": "PendingReviewOut",
+        "type": "object"
+      },
       "PeriodWindowOut": {
         "description": "The window the server actually reported on, echoed back.\n\nEchoed for the reason `AttendanceReportOut` echoes its range: a client should render\nwhat it received rather than what it asked for. Here it matters more, because\n`season` resolves against a row the client has never seen.",
         "properties": {
@@ -18208,6 +18298,32 @@
         ]
       }
     },
+    "/api/v1/enrollments/pending-review": {
+      "get": {
+        "description": "Task 4a's manager queue -- every hold the join wizard's health gate created,\noldest first. Manager-or-owner, and never `coach`: the shape carries money, and\ninvariant 3 checks the field names a coach-tagged route returns.",
+        "operationId": "list_pending_review_api_v1_enrollments_pending_review_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PendingReviewOut"
+                  },
+                  "title": "Response List Pending Review Api V1 Enrollments Pending Review Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Pending Review",
+        "tags": [
+          "people"
+        ]
+      }
+    },
     "/api/v1/enrollments/weekday-options": {
       "get": {
         "description": "C12's checkboxes. Every enrolment form asks this before it draws the day list.",
@@ -18321,6 +18437,69 @@
           }
         },
         "summary": "Update Enrollment",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/enrollments/{enrollment_id}/approve": {
+      "post": {
+        "description": "Task 4a -- the manager's decision on a hold the join wizard's health gate\ncreated. Manager-or-owner, never `coach` -- see `list_pending_review`.",
+        "operationId": "approve_enrollment_api_v1_enrollments__enrollment_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "enrollment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Enrollment Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollmentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Enrollment",
         "tags": [
           "people"
         ]

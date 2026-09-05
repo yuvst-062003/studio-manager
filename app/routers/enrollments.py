@@ -33,6 +33,7 @@ from app.schemas.people import (
     EnrollmentOut,
     EnrollmentUpdate,
     EnrollmentWeekdayOptionsOut,
+    PendingReviewOut,
 )
 from app.services.events.rsvp import RsvpService
 from app.services.people.enrollments import EnrollmentService
@@ -84,6 +85,28 @@ def _out(enrollment: Enrollment, group: Group) -> EnrollmentOut:
         ended_on=enrollment.ended_on,
         attends_weekdays=enrollment.attends_weekdays,
     )
+
+
+@router.get("/enrollments/pending-review", response_model=list[PendingReviewOut])
+def list_pending_review(_: ManagerOrOwner, session: TenantSessionDep) -> list[PendingReviewOut]:
+    """Task 4a's manager queue -- every hold the join wizard's health gate created,
+    oldest first. Manager-or-owner, and never `coach`: the shape carries money, and
+    invariant 3 checks the field names a coach-tagged route returns."""
+    return [
+        PendingReviewOut(
+            enrollment_id=row.enrollment_id,
+            student_id=row.student_id,
+            student_name=row.student_name,
+            group_name=row.group_name,
+            plan_name=row.plan_name,
+            monthly_amount_agorot=row.monthly_amount_agorot,
+            answers_yes=row.answers_yes,
+            guardian_name=row.guardian_name,
+            guardian_phone=row.guardian_phone,
+            started_on=row.started_on,
+        )
+        for row in EnrollmentService.pending_review(session)
+    ]
 
 
 @router.get("/enrollments/weekday-options", response_model=EnrollmentWeekdayOptionsOut, tags=COACH)
@@ -266,6 +289,36 @@ def move_enrollment(
         ) from exc
     except NotImplementedError as exc:
         raise _schedule_unavailable() from exc
+    session.commit()
+    group = session.get(Group, row.group_id)
+    assert group is not None
+    return _out(row, group)
+
+
+@router.post("/enrollments/{enrollment_id}/approve", response_model=EnrollmentOut)
+def approve_enrollment(
+    _: ManagerOrOwner,
+    enrollment_id: uuid.UUID,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> EnrollmentOut:
+    """Task 4a -- the manager's decision on a hold the join wizard's health gate
+    created. Manager-or-owner, never `coach` -- see `list_pending_review`."""
+    try:
+        row = EnrollmentService.approve(
+            session,
+            enrollment_id=enrollment_id,
+            at=now(),
+            actor_person_id=getattr(request.state, "person_id", None),
+        )
+    except NotFoundError as exc:
+        raise _not_found("enrollment") from exc
+    except ConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "not_pending", "message": str(exc)},
+        ) from exc
     session.commit()
     group = session.get(Group, row.group_id)
     assert group is not None

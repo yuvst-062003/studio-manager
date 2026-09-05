@@ -12,7 +12,7 @@ and are about nobody.
 from __future__ import annotations
 
 import pytest
-from app.services.health.flags import derive_flags, flag_question_ids
+from app.services.health.flags import answered_yes_count, derive_flags, flag_question_ids
 from app.services.structure.health_templates import (
     FULL_FLAG_QUESTIONS,
     FULL_TEMPLATE_SCHEMA,
@@ -128,3 +128,51 @@ def test_flag_ids_are_returned_in_schema_order():
         ]
     }
     assert flag_question_ids(schema) == ("b", "a", "c")
+
+
+# -- §8.1: answered_yes_count, deliberately wider than derive_flags ------------
+def test_answered_yes_count_counts_only_true_booleans():
+    """No schema involved at all -- every `True`-valued entry counts, whether or not a
+    schema would ever have marked that question `flag: True`."""
+    assert (
+        answered_yes_count(
+            {
+                "asthma": True,
+                "chronic_illness": True,  # a real boolean question, never marked `flag: True`
+                "allergy": False,
+                "epilepsy": True,
+            }
+        )
+        == 3
+    )
+
+
+def test_answered_yes_count_ignores_strings_and_false_and_absent_keys():
+    """`health_fund`, `emergency_contact` and `clause_confirmed` are strings on a real
+    declaration and must contribute nothing; `False` and a question never asked (absent)
+    are both "no" and must not be miscounted as a "yes"."""
+    assert (
+        answered_yes_count(
+            {
+                "asthma": False,
+                "health_fund": "מכבי",
+                "emergency_contact": "050-0000000",
+                "clause_confirmed": "none",
+            }
+        )
+        == 0
+    )
+
+
+def test_the_free_text_notes_field_is_not_a_trigger_even_when_long():
+    """§8.1's whole point: 'wears glasses during fitness training' must not suspend a
+    registration. A long free-text sentence in `special_notes` is a string, never a
+    `bool`, so it contributes nothing regardless of length or content."""
+    answers = {
+        "asthma": False,
+        "special_notes": (
+            "התלמיד/ה עונד/ת משקפיים בזמן פעילות גופנית ומעדיף/ה לשבת בקצה המזרן "
+            "בזמן חימום כדי להימנע מהתנגשויות, אין בכך שום מגבלה רפואית של ממש"
+        ),
+    }
+    assert answered_yes_count(answers) == 0
