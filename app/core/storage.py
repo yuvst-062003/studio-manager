@@ -134,6 +134,23 @@ def studio_landing_photo_key(studio_id: uuid.UUID, photo_id: str, content_type: 
     return f"studios/{studio_id}/landing/{photo_id}.{extension}"
 
 
+def product_image_key(studio_id: uuid.UUID, product_id: uuid.UUID, content_type: str) -> str:
+    """`studios/{studio_id}/products/{product_id}.{ext}` -- the catalogue item's photo.
+
+    Same contract as the logo's and the landing gallery's: constructed here from ids the
+    server already holds, never from anything a client sent, and named by the *sniffed*
+    content type rather than the declared one.
+
+    One object per product, keyed by the product's own id, so replacing a photo overwrites
+    in place when the format is unchanged and `store_product_image` deletes the stale object
+    when it is not -- the same dance `logo.py` documents.
+    """
+    extension = IMAGE_EXTENSIONS.get(content_type)
+    if extension is None:
+        raise UnsupportedImageError(f"not a storable image type: {content_type!r}")
+    return f"studios/{studio_id}/products/{product_id}.{extension}"
+
+
 # -- what the bytes must be ----------------------------------------------------
 def sniff_image_type(data: bytes) -> str | None:
     """The first bytes, and nothing else. Returns None for anything not allowed.

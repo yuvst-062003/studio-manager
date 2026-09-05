@@ -347,6 +347,16 @@ export const billing: Bundle = {
   'product.forWhom': 'למי',
   'product.size': 'מידה',
   'product.colour': 'צבע',
+  // 2026-09-06 — the catalogue gained a photo per item. Absent is ORDINARY, not an error:
+  // the parent app draws its default tile, which is what `photoNone` says out loud.
+  'product.photo': 'תמונת הפריט',
+  'product.photoAdd': 'הוספת תמונה',
+  'product.photoReplace': 'החלפת תמונה',
+  'product.photoRemove': 'הסרת התמונה',
+  'product.photoNone': 'אין תמונה — יוצג ריבוע ברירת מחדל',
+  'product.photoUnsupported': 'התמונה חייבת להיות PNG, JPEG או WebP',
+  'product.photoTooLarge': 'הקובץ גדול מדי',
+  'product.photoFailed': 'העלאת התמונה נכשלה',
   'product.handOutPolicy': 'מחיר הפריט אינו מוצג למאמן',
   'dialog.cancel': 'ביטול',
   'planChange.queueTitle': 'שינויי מסלול לטיפול',

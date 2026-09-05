@@ -36,7 +36,7 @@ from app.core.clock import now
 from app.core.tenancy import TenantSessionDep, require_current_studio_id
 from app.models.billing import Product
 from app.services.audit import AuditService
-from app.services.billing import BillingService
+from app.services.billing import BillingService, product_images
 from app.services.billing.catalogue import MAX_SIZE_LABEL
 
 router = APIRouter(tags=["billing"])
@@ -53,6 +53,10 @@ class ShopProductOut(BaseModel):
     #: Empty means the item has no sizes and the parent is asked for none. One price covers
     #: every size -- there is no per-size amount to redact or reveal here.
     sizes: list[str] = Field(default_factory=list)
+    #: Where to fetch the manager's photo of this item, or `None` when there is not one --
+    #: which the shop draws as its own default tile rather than as a broken image. A route
+    #: and not an object key; see `ProductOut.image_url`.
+    image_url: str | None = None
 
 
 class ShopProductListOut(BaseModel):
@@ -150,6 +154,7 @@ def my_products(request: Request, session: TenantSessionDep) -> ShopProductListO
                 description=row.description,
                 price_agorot=row.price_agorot,
                 sizes=list(row.sizes or ()),
+                image_url=product_images.image_url(row),
             )
             for row in rows
         ]

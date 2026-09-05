@@ -123,6 +123,11 @@ class ProductOut(BaseModel):
     #: a size picker with nothing in it. One price covers every size (§5.10): a size is what
     #: the club hands over, not what the family is charged.
     sizes: list[str] = Field(default_factory=list)
+    #: Where to fetch this product's photo, or `None` when the manager has not uploaded one
+    #: -- which every client draws as its own placeholder rather than a broken image. A route
+    #: and not an object key: the key names a file on a volume, and putting it on the wire
+    #: would tie the store's layout to the API's surface.
+    image_url: str | None = None
 
 
 # -- charges ------------------------------------------------------------------

@@ -28,13 +28,21 @@ from datetime import date
 from enum import Enum
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.core.auth_context import AnyStaff, ManagerOrOwner
 from app.core.clock import now
+from app.core.storage import UnsupportedImageError
 from app.core.tenancy import TenantSessionDep, require_current_studio_id
+from app.core.uploads import (
+    ImageUpload,
+    ObjectStoreDep,
+    actor,
+    read_capped,
+    refuse_obviously_oversize,
+)
 from app.models.billing import (
     BillingRun,
     Charge,
@@ -67,7 +75,7 @@ from app.schemas.billing import (
     UpayIpnRecordPage,
 )
 from app.services.audit import AuditService
-from app.services.billing import BillingService
+from app.services.billing import BillingService, product_images
 from app.services.billing.catalogue import MAX_SIZES, CatalogueService, unpriced_students
 from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
 from app.services.billing.orders import OrderService
@@ -178,6 +186,7 @@ def _product_out(product: Product) -> ProductOut:
         price_agorot=product.price_agorot,
         is_active=product.is_active,
         sizes=list(product.sizes or ()),
+        image_url=product_images.image_url(product),
     )
 
 
@@ -472,6 +481,101 @@ def update_product(
         raise _refused(exc) from exc
     session.commit()
     return _product_out(product)
+
+
+# -- a product's photo ---------------------------------------------------------
+#
+# The catalogue had no image column, so the parent app's shop drew the same placeholder on
+# every card. The manager sets one here; a product without one is not an error, it is the
+# default tile — which is what `image_url: None` tells every client.
+
+
+@router.post("/products/{product_id}/image", response_model=ProductOut)
+async def upload_product_image(
+    _: ManagerOrOwner,
+    product_id: uuid.UUID,
+    request: Request,
+    session: TenantSessionDep,
+    file: ImageUpload,
+    store: ObjectStoreDep,
+) -> ProductOut:
+    refuse_obviously_oversize(request, what="a product photo")
+    studio_id = require_current_studio_id()
+    person_id, identity_id = actor(request)
+    data = await read_capped(file, what="a product photo")
+    try:
+        product_images.store_image(
+            session,
+            store,
+            studio_id=studio_id,
+            product_id=product_id,
+            data=data,
+            actor_person_id=person_id,
+            actor_identity_id=identity_id,
+        )
+    except product_images.UnknownProductError as exc:
+        raise _not_found("product") from exc
+    except UnsupportedImageError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail={
+                # Named explicitly. "Invalid image" sends a manager back to the same file.
+                "code": "unsupported_image",
+                "message": (
+                    "a product photo must be a PNG, a JPEG or a WebP. SVG is never accepted."
+                ),
+            },
+        ) from exc
+    session.commit()
+    return _product_out(product_images.product_for_out(session, product_id))
+
+
+@router.get("/products/{product_id}/image", tags=COACH)
+def read_product_image(
+    product_id: uuid.UUID, session: TenantSessionDep, store: ObjectStoreDep
+) -> Response:
+    """Any signed-in member of the studio — **guardians included**.
+
+    Deliberately not `ManagerOrOwner`: this is the image the PARENT app's shop renders, and
+    a catalogue a parent can read while its pictures 403 would be enforcing a rule about
+    writes by breaking a read. The same reasoning `GET /studio/logo` records.
+    """
+    try:
+        data, content_type = product_images.read_image(session, store, product_id=product_id)
+    except (product_images.NoImageError, product_images.UnknownProductError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "not_found", "message": "this product has no photo"},
+        ) from exc
+    # `private`: the response is tenant-scoped, so a shared cache must never hold it.
+    return Response(
+        content=data, media_type=content_type, headers={"Cache-Control": "private, max-age=300"}
+    )
+
+
+@router.delete("/products/{product_id}/image", status_code=status.HTTP_204_NO_CONTENT)
+def delete_product_image(
+    _: ManagerOrOwner,
+    product_id: uuid.UUID,
+    request: Request,
+    session: TenantSessionDep,
+    store: ObjectStoreDep,
+) -> Response:
+    """Idempotent — a DELETE on a product with no photo is a 204, not a 404."""
+    person_id, identity_id = actor(request)
+    try:
+        product_images.delete_image(
+            session,
+            store,
+            studio_id=require_current_studio_id(),
+            product_id=product_id,
+            actor_person_id=person_id,
+            actor_identity_id=identity_id,
+        )
+    except product_images.UnknownProductError as exc:
+        raise _not_found("product") from exc
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # -- charges ------------------------------------------------------------------

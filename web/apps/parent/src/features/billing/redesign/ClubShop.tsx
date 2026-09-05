@@ -28,6 +28,7 @@ type ProductRow = {
   description?: string | null
   price_agorot: number
   sizes?: string[]
+  image_url?: string | null
 }
 
 export function ClubShop({ locale }: { locale: Locale }) {
@@ -56,6 +57,10 @@ export function ClubShop({ locale }: { locale: Locale }) {
             // field for it, so the manager's own words never reached a parent.
             description: row.description ?? null,
             priceAgorot: row.price_agorot,
+            // `null` is the ordinary state of a product nobody has photographed, and the
+            // card draws its default tile for it. Never a placeholder URL: a broken image
+            // and an absent one look different and mean different things.
+            imageUrl: row.image_url ?? null,
             sizes: row.sizes ?? [],
           })),
         )

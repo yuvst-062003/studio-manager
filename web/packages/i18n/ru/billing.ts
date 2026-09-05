@@ -273,6 +273,15 @@ export const billing: Bundle = {
   'product.forWhom': 'Для кого',
   'product.size': 'Размер',
   'product.colour': 'Цвет',
+  // 2026-09-06 — the catalogue gained a photo per item.
+  'product.photo': 'Фото товара',
+  'product.photoAdd': 'Добавить фото',
+  'product.photoReplace': 'Заменить фото',
+  'product.photoRemove': 'Удалить фото',
+  'product.photoNone': 'Без фото — показывается плитка по умолчанию',
+  'product.photoUnsupported': 'Фото должно быть PNG, JPEG или WebP',
+  'product.photoTooLarge': 'Файл слишком большой',
+  'product.photoFailed': 'Не удалось загрузить фото',
   'product.handOutPolicy': 'Цена товара не показывается тренерам',
   'dialog.cancel': 'Отмена',
 

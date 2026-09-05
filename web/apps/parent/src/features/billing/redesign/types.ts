@@ -8,8 +8,12 @@
 // The prototype's `ProductItem` also carries `image`, `category`, `tag`, `tagColor`,
 // `isBelt` and a list of belt `colors`. None of those exists here, and none can be guessed:
 //
-//  - NO PHOTOGRAPHS. There is no image column and no upload anywhere in the manager. A
-//    stock photo of somebody else's גי is a picture of a product this club does not sell.
+//  - PHOTOGRAPHS: SOLVED, 2026-09-06. There was no image column; the owner's answer was
+//    "when a manager adds an item he can put an image, if not a default image". So
+//    `Product.image_object_key` and `POST /products/{id}/image` now exist, `/me/products`
+//    returns `image_url`, and a product WITHOUT one renders the default tile rather than a
+//    broken image. `imageUrl: null` is the ordinary state of a catalogue nobody has
+//    photographed yet, not an error.
 //  - NO CATEGORIES. The prototype's chips (חגורות · ג׳ודוגי · ביגוד) filter on a field the
 //    catalogue has no equivalent of. Deriving one from the product's NAME — "does it contain
 //    the word חגורה" — would be a guess about somebody else's supplier, which the model's own
@@ -30,6 +34,9 @@ export type ShopProduct = {
   description: string | null
   /** Integer agorot. Never divided outside a formatter. */
   priceAgorot: number
+  /** The manager's photo, or `null` for the default tile. A ROUTE, not an object key —
+   *  the key names a file on a volume and would tie the store's layout to this screen. */
+  imageUrl: string | null
   /** Empty means the item HAS no sizes — a חגורה — which is a different thing from a size
    *  picker nobody has answered yet. There is deliberately no `hasSizes` flag beside it. */
   sizes: readonly string[]

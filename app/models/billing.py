@@ -206,6 +206,13 @@ class Product(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     sizes: Mapped[list[str]] = mapped_column(
         JSONB, nullable=False, default=list, server_default="[]"
     )
+    #: Where this product's photo lives in `app/core/storage.py`, or NULL for "the manager
+    #: has not uploaded one" -- which the parent app draws as the default tile rather than a
+    #: broken image. A KEY and not a URL, exactly as `Studio.logo_object_key` is: the URL is
+    #: whatever the app serves the bytes at today, and storing one would freeze this table's
+    #: rows against a routing decision. The object is deleted with the row's own service, not
+    #: by a cascade -- the store is not the database.
+    image_object_key: Mapped[str | None] = mapped_column(String(500))
 
 
 class Charge(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):

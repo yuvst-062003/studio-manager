@@ -109,13 +109,25 @@ export function ShopScreen({
                   className="product-item-card bg-white rounded-2xl p-2.5 shadow-xs border border-slate-100 flex flex-col justify-between transition-all hover:shadow-md cursor-pointer active:scale-[0.98]"
                 >
                   <div>
-                    <div
-                      role="img"
-                      aria-label={SHOP.noPhoto}
-                      className="relative w-full aspect-square rounded-xl overflow-hidden bg-slate-50 mb-2.5 flex items-center justify-center"
-                    >
-                      <ShoppingBag className="w-8 h-8 text-slate-300" aria-hidden="true" />
-                    </div>
+                    {/* The manager's photo when there is one, the default tile when there
+                        is not — which is the ordinary state of a catalogue nobody has
+                        photographed yet, not an error. */}
+                    {product.imageUrl ? (
+                      <img
+                        src={product.imageUrl}
+                        alt=""
+                        loading="lazy"
+                        className="relative w-full aspect-square rounded-xl overflow-hidden bg-slate-50 mb-2.5 object-cover"
+                      />
+                    ) : (
+                      <div
+                        role="img"
+                        aria-label={SHOP.noPhoto}
+                        className="relative w-full aspect-square rounded-xl overflow-hidden bg-slate-50 mb-2.5 flex items-center justify-center"
+                      >
+                        <ShoppingBag className="w-8 h-8 text-slate-300" aria-hidden="true" />
+                      </div>
+                    )}
                     <h3 className="font-black text-[15px] text-[#0A1938] leading-tight mb-1 line-clamp-1 text-start">
                       {product.name}
                     </h3>
@@ -267,13 +279,21 @@ export function ShopScreen({
             <div className="p-5 overflow-y-auto space-y-4 no-scrollbar flex-1">
               {/* Item Info Box */}
               <div className="flex gap-3.5 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
-                <div
-                  role="img"
-                  aria-label={SHOP.noPhoto}
-                  className="w-20 h-20 rounded-xl border border-slate-100 shrink-0 bg-slate-50 flex items-center justify-center"
-                >
-                  <ShoppingBag className="w-8 h-8 text-slate-300" aria-hidden="true" />
-                </div>
+                {selectedProduct.imageUrl ? (
+                  <img
+                    src={selectedProduct.imageUrl}
+                    alt=""
+                    className="w-20 h-20 rounded-xl border border-slate-100 shrink-0 bg-slate-50 object-cover"
+                  />
+                ) : (
+                  <div
+                    role="img"
+                    aria-label={SHOP.noPhoto}
+                    className="w-20 h-20 rounded-xl border border-slate-100 shrink-0 bg-slate-50 flex items-center justify-center"
+                  >
+                    <ShoppingBag className="w-8 h-8 text-slate-300" aria-hidden="true" />
+                  </div>
+                )}
                 <div className="flex flex-col justify-between py-0.5">
                   <div>
                     <h3 className="font-black text-base text-[#0A1938] leading-snug">
