@@ -12,10 +12,11 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { t } from '@studio/i18n'
 import type { BillingClient, ChargeOut } from '../../billing/billingClient'
 import type { StandingOrderLink } from '../../billing/PaymentSetup'
 import { toWizardGroup, toWizardPlan } from './adapters'
-import { step1Copy, step2Copy, step3Copy, step4Copy, studentFormCopy } from './copy'
+import { step1Copy, step2Copy, step3Copy, step4Copy, studentFormCopy, wizardFlowCopy } from './copy'
 import { Step1Agreements } from './Step1Agreements'
 import { Step3Payment } from './Step3Payment'
 import type { RegisterResult, SubmitJoinResult } from './submitJoin'
@@ -881,5 +882,68 @@ describe('Step1Agreements -- the club terms version (gap 2)', () => {
     )
 
     expect(screen.queryByText(new RegExp(STEP1_COPY.termsVersion))).toBeNull()
+  })
+})
+
+// A failed READ has a way out of it. Before 2026-09-06 neither of these two failures had
+// one: each rendered a red sentence and nothing else, so a family whose first request lost
+// the connection was left on a dead screen with a join link behind them -- and a browser
+// refresh is not the escape it looks like, because this app registers a service worker that
+// can serve the same failure from cache. `tools/__tests__/load-failed-recovery.test.ts` is
+// the file-level guard for this rule; these are the behaviours it cannot see.
+describe('JoinWizard -- a failed read is recoverable, not a dead end', () => {
+  it('offers a retry when the studio read fails, and the retry re-reads and recovers', async () => {
+    const user = userEvent.setup()
+    const loadStudio = vi
+      .fn<JoinWizardSource['loadStudio']>()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValue(STUDIO)
+    renderWizard({ source: fakeSource({ loadStudio }) })
+
+    // The failure, and the way out of it beside the message.
+    const retry = await screen.findByTestId('wizard-load-retry')
+    expect(screen.getByRole('alert')).toHaveTextContent(wizardFlowCopy('he').loadFailed)
+
+    await user.click(retry)
+
+    // A real re-fetch, not a reload: the same source is asked again and step 1 renders.
+    await screen.findByTestId('join-welcome')
+    expect(loadStudio).toHaveBeenCalledTimes(2)
+    expect(screen.queryByTestId('wizard-load-failed')).toBeNull()
+  })
+
+  it('offers a retry when step 2\'s catalogue read fails, and the retry recovers into the form', async () => {
+    const user = userEvent.setup()
+    const loadCatalogue = vi
+      .fn<JoinWizardSource['loadCatalogue']>()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValue(CATALOGUE)
+    renderWizard({ source: fakeSource({ loadCatalogue }) })
+
+    await screen.findByTestId('join-welcome')
+    await user.click(screen.getByLabelText(STEP1_COPY.agree))
+    await user.click(screen.getByRole('button', { name: STEP1_COPY.continue }))
+
+    await user.click(await screen.findByTestId('wizard-load-retry'))
+
+    await screen.findByTestId('join-family-step')
+    expect(loadCatalogue).toHaveBeenCalledTimes(2)
+  })
+
+  it('says the family is offline rather than that the club could not be reached', async () => {
+    // P8's second item, and the other half `@studio/ui`'s LoadFailed carries: a parent in a
+    // dojo doorway with no signal was being told the club was broken. `navigator.onLine`
+    // is the browser's own answer and the only one available here.
+    const onLine = vi.spyOn(globalThis.navigator, 'onLine', 'get').mockReturnValue(false)
+    try {
+      renderWizard({
+        source: fakeSource({ loadStudio: vi.fn(async () => Promise.reject(new Error('x'))) }),
+      })
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent(t('he', 'common.loadFailed.offline'))
+      expect(alert).not.toHaveTextContent(t('he', 'people.joinWizard.flow.loadFailed'))
+    } finally {
+      onLine.mockRestore()
+    }
   })
 })

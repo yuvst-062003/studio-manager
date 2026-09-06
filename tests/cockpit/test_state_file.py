@@ -17,7 +17,10 @@ def test_every_wave_in_the_milestone_plan_is_present():
     # W8C is the 2026-08-27 completion run — the four surface-completion specs
     # (dashboard F, parent P, staff S, landing L) tracked as one wave.
     # W9D is the 2026-08-31 parent-app redesign: eight screens, one per piece.
-    assert ids == ["W0", "W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8C", "W9D"]
+    # W9E is the 2026-09-03 dashboard-screens redesign, opened after this literal was
+    # last written — which is the whole reason the literal is here rather than a length
+    # check: a wave added to state.yaml has to be acknowledged by a person.
+    assert ids == ["W0", "W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8C", "W9D", "W9E"]
 
 
 def test_the_parallel_waves_name_their_two_lanes():

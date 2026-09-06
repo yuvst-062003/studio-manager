@@ -12,6 +12,7 @@ import uuid
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
+from app.core.clock import now
 from app.models.billing import Charge, PricePlan
 from app.models.people import Enrollment, Student, TrialBooking
 from app.models.person import Guardian, Person
@@ -23,9 +24,39 @@ from tests.people.conftest import T0, make_session
 
 SUNDAY = T0.replace(hour=14)
 
+#: How far past the calendar's own present the fake weeks run. `training_weekdays` looks
+#: four weeks ahead (`OBSERVATION_WEEKS`); eight leaves room for a test that starts its
+#: window a little later without this becoming load-bearing arithmetic.
+_FAKE_WEEKS_AHEAD = 8
+
 
 @pytest.fixture
 def twice_weekly(fake_schedule, studio, a_group, a_training_year):
+    """A group that really does train twice a week -- every week, from before T0 until well
+    past today.
+
+    **The range is the fix for a test that failed on a date rather than on a change.** This
+    used to be exactly two sessions, on T0 and T0+3. Every test that drives the service
+    directly passes `at=T0`, so those looked at a four-week window starting 2026-09-02 and
+    found them forever. The three tests that go through HTTP do not: the router passes
+    `at=now()`, so their window starts on the day the suite runs, and the moment the wall
+    clock walked past 2026-09-05 all three began failing with `no group <id>` -- which
+    reads like a tenancy or a fixture-scoping bug and is a calendar. They were green on
+    2026-09-05 and red on 2026-09-06 with nothing between them.
+
+    So the fixture now means what its name says. A weekly group is generated across a span
+    that contains both clocks, and no test has to know which one its code path uses.
+    `app.core.clock.now()` and not `datetime.now()`, so a suite run under a shifted clock
+    generates the weeks that clock will ask for.
+    """
+    first = SUNDAY - timedelta(weeks=1)
+    last = max(SUNDAY, now().astimezone(UTC).replace(hour=14, minute=0, second=0, microsecond=0))
+    last += timedelta(weeks=_FAKE_WEEKS_AHEAD)
+    moments = []
+    week = first
+    while week <= last:
+        moments.extend((week, week + timedelta(days=3)))
+        week += timedelta(weeks=1)
     fake_schedule.sessions[a_group] = [
         make_session(
             studio_id=studio.id,
@@ -33,7 +64,7 @@ def twice_weekly(fake_schedule, studio, a_group, a_training_year):
             training_year_id=a_training_year,
             starts_at=moment,
         )
-        for moment in (SUNDAY, SUNDAY + timedelta(days=3))
+        for moment in moments
     ]
     return fake_schedule
 

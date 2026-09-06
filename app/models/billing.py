@@ -268,6 +268,15 @@ class Charge(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
         ),
         # The debt escalation ladder scans by due date.
         Index("ix_charge_studio_id_due_date", "studio_id", "due_date"),
+        # The parent app's "ההזמנות שלי": this payer's charges that came from the shop.
+        # G9's shape -- the read runs inside a tenant filter, so the studio leads.
+        #
+        # **Declared here because 0022 creates it.** It was not, and `alembic check` had
+        # been reporting a `remove_index` ever since: autogenerate compared a database that
+        # had the index against a model that did not, and concluded the index should go.
+        # The next `alembic revision --autogenerate` would have written exactly that
+        # migration and silently dropped the index this row exists for.
+        Index("ix_charge_studio_id_product_id", "studio_id", "product_id"),
     )
 
     #: G15 -- the id, never the name. Non-null: a charge nobody owes is not a charge.

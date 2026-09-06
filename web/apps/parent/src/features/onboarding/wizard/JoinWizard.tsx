@@ -58,6 +58,50 @@ type CatalogueState =
   | { status: 'failed' }
   | { status: 'ready'; plans: WizardPlan[]; schema: TemplateSchema; templateId: string }
 
+/**
+ * What a failed read looks like here: the message, and a way out of it.
+ *
+ * **Both halves, because the message alone was a dead end.** Until 2026-09-06 each of the
+ * two failures below rendered as a bare red paragraph. A family whose first request lost
+ * the connection had a join link, a sign-in behind them and nothing to press -- and a
+ * browser refresh is not the escape it looks like, because this app registers a service
+ * worker that may hand back the same failure from cache. That is exactly the class
+ * `tools/__tests__/load-failed-recovery.test.ts` exists to stop, and it had been reporting
+ * it: the guard names `copy.ts`, the file where the string lives, and the defect was here,
+ * where the string is drawn.
+ *
+ * Not `@studio/ui`'s `LoadFailed` primitive, for the reason `features/shell/loadFailed.ts`
+ * records for the four redesigned tabs: it draws an `Alert` and a design-system `Button`,
+ * and dropping either into a Tailwind port puts a panel from another design in the middle
+ * of a screen the owner approved from a prototype. The two things the primitive carries
+ * that a bare paragraph did not -- the retry, and the offline wording -- are both here.
+ */
+function WizardLoadFailed({
+  message,
+  retryLabel,
+  onRetry,
+}: {
+  message: string
+  retryLabel: string
+  onRetry: () => void
+}) {
+  return (
+    <div className="flex flex-col items-center gap-4" data-testid="wizard-load-failed">
+      <p className="text-[14px] text-[#ba1a1a] font-medium text-center" role="alert">
+        {message}
+      </p>
+      <button
+        className="rounded-full border border-[#001849] px-5 py-2 text-[14px] font-bold text-[#001849] dark:border-blue-400 dark:text-blue-400"
+        data-testid="wizard-load-retry"
+        onClick={onRetry}
+        type="button"
+      >
+        {retryLabel}
+      </button>
+    </div>
+  )
+}
+
 export type JoinWizardProps = {
   locale: Locale
   /** What this door reads and writes. See `wizardSources.ts`. The effects below key on
@@ -105,6 +149,22 @@ export function JoinWizard({
   //: needs it and step 3 does not call `submitJoin` itself.
   const [alreadyArranged, setAlreadyArranged] = useState(false)
   const [submitResult, setSubmitResult] = useState<SubmitJoinResult | null>(null)
+  //: Bumped by `WizardLoadFailed`'s retry. The effect below keys on it as well as on
+  //: `source`, which is what turns two one-shot reads into two retryable ones -- a counter
+  //: rather than a hand-rolled re-fetch, so the retry path is the SAME code as the first
+  //: attempt and cannot drift from it.
+  const [reloads, setReloads] = useState(0)
+  //: Both states go back to `loading` HERE and not at the top of the effect, which is where
+  //: this was first written: `react-hooks/set-state-in-effect` refuses a synchronous
+  //: setState in an effect body, and it is right to -- a handler is where a press belongs,
+  //: and the effect stays a pure reaction to `reloads` changing. Without the reset the
+  //: button looked broken: the failure it was pressed on stayed on screen until the
+  //: network answered.
+  const retry = useCallback(() => {
+    setStudio({ status: 'loading' })
+    setCatalogue({ status: 'loading' })
+    setReloads((n) => n + 1)
+  }, [])
 
   //: Door C's "one row pre-filled" (§3): the manager's stub name, split into the two
   //: fields `StudentDraft` actually stores. `undefined` on every door but C, so
@@ -144,7 +204,9 @@ export function JoinWizard({
     return () => {
       live = false
     }
-  }, [source])
+    //: `reloads` is the retry. `source` is the door -- see its prop docstring for why this
+    //: keys on its identity.
+  }, [source, reloads])
 
   //: Forward navigation from the header pills obeys the same gate the buttons do. The
   //: prototype's pills navigate unconditionally, which walks straight past step 1's
@@ -204,9 +266,7 @@ export function JoinWizard({
   if (studio.status === 'failed') {
     return (
       <div className="tw-scope min-h-screen bg-[#faf8ff] flex items-center justify-center p-6">
-        <p className="text-[14px] text-[#ba1a1a] font-medium" role="alert">
-          {copy.loadFailed}
-        </p>
+        <WizardLoadFailed message={copy.loadFailed} onRetry={retry} retryLabel={copy.retry} />
       </div>
     )
   }
@@ -251,9 +311,16 @@ export function JoinWizard({
           <p className="text-[14px] text-[#444650] py-8 text-center">{copy.loadingCatalogue}</p>
         ) : null}
         {step === 2 && catalogue.status === 'failed' ? (
-          <p className="text-[14px] text-[#ba1a1a] font-medium py-8 text-center" role="alert">
-            {copy.catalogueFailed}
-          </p>
+          //: Retrying re-reads the studio too. Both are cheap, the family is stuck on this
+          //: screen either way, and one button that fixes whichever request failed beats
+          //: two that each fix one and leave the other to guess at.
+          <div className="py-8">
+            <WizardLoadFailed
+              message={copy.catalogueFailed}
+              onRetry={retry}
+              retryLabel={copy.retry}
+            />
+          </div>
         ) : null}
         {step === 2 && catalogue.status === 'ready' ? (
           <Step2Trainees

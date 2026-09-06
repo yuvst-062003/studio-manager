@@ -65,6 +65,11 @@ RELOADABLE = (
     # now reads .ENV off a module-scope `settings` binding like the entries above it.
     # Freezing that binding would send a staging sign-in home to a development host.
     "app.routers.identity",
+    # 2026-09-05 -- the trial follow-up builds the invitation LINK it emails with
+    # app_origin("parent", settings.ENV), so followups.py reads .ENV off a module-scope
+    # `settings` binding like the entries above it. Freezing that binding would send a
+    # staging trial family a link to a development host, in an email that has already left.
+    "app.workers.followups",
     # §19.4's sign-in route made the refresh cookie's `Secure` attribute environment
     # dependent -- Safari refuses a Secure cookie over the plain http:// that local
     # development is served on, so it is set everywhere EXCEPT development. That check

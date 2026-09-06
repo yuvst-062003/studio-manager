@@ -173,7 +173,14 @@ def test_recompute_derived_flags_refuses_rather_than_returning_nothing():
 def test_create_charge_takes_the_five_facts_a_charge_cannot_exist_without():
     """Plan W4 seam, verbatim. `studio_id` is explicit rather than read from the request
     context because the billing run is a **worker** (§5.10) -- there is no request, so
-    `TenantSession` has nothing to infer from and the tenant has to be passed."""
+    `TenantSession` has nothing to infer from and the tenant has to be passed.
+
+    `product_id` joined the keyword-only tail on 2026-09-06, for the parent app's purchase
+    history: a shop order and a manager's ad-hoc credit both write `kind='manual'`, and
+    nothing on the row said which was which. It is additive -- keyword-only with a default
+    -- so it changes no existing call, and the five positional facts this test is named for
+    are untouched. It is listed here anyway because the list is the seam: a parameter that
+    can appear without a person editing this file is a parameter nobody reviewed."""
 
     assert _resolved_signature(_CREATE_CHARGE)["order"] == [
         "self",
@@ -184,18 +191,24 @@ def test_create_charge_takes_the_five_facts_a_charge_cannot_exist_without():
         "due_date",
         "student_id",
         "event_id",
+        "product_id",
     ]
 
 
 def test_student_and_event_are_keyword_only():
-    """The reason this is asserted rather than left to style. Both are `UUID | None` in
+    """The reason this is asserted rather than left to style. All three are `UUID | None` in
     adjacent positions, so positionally `create_charge(..., event_id)` binds an event to
     `student_id` and type checking cannot see it -- the annotations are identical. M7's
     event fees are a pure caller of this method (plan W4), which makes M7 exactly the lane
-    that would hit it. Keyword-only makes the mistake unspellable."""
+    that would hit it. Keyword-only makes the mistake unspellable.
+
+    `product_id` is held to the same rule, and the argument got STRONGER when it arrived
+    rather than merely longer: three interchangeable `UUID | None` in a row is six ways to
+    mis-bind a pair instead of two, and a shop charge filed against a student id is a
+    purchase history that quietly names the wrong thing."""
 
     signature = _resolved_signature(_CREATE_CHARGE)
-    for name in ("student_id", "event_id"):
+    for name in ("student_id", "event_id", "product_id"):
         assert signature["kinds"][name] == "KEYWORD_ONLY", name
         assert signature["defaults"][name] == repr(None), name
 

@@ -17,6 +17,11 @@
 // `t()` once per leaf.
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+// P8's offline distinction, shared with the four redesigned tabs. "We could not load the
+// club" and "you have no signal" are different messages and only one of them is the club's
+// fault -- a family standing in a dojo doorway on a join link was being told the club was
+// broken. `features/shell/loadFailed.ts` carries the reasoning.
+import { resolveLoadFailedText } from '../../shell/loadFailed'
 
 export type DocumentKey = 'terms' | 'privacy' | 'payments'
 
@@ -421,9 +426,15 @@ export function athleteCardCopy(locale: Locale) {
 export function wizardFlowCopy(locale: Locale) {
   return {
     loading: t(locale, 'people.joinWizard.flow.loading'),
-    loadFailed: t(locale, 'people.joinWizard.flow.loadFailed'),
+    //: The two READ failures resolve through `resolveLoadFailedText`, so an offline family
+    //: is told they are offline rather than that the club could not be reached. The retry
+    //: beside them lives in `JoinWizard` -- see `WizardLoadFailed` there.
+    loadFailed: resolveLoadFailedText(locale, 'people.joinWizard.flow.loadFailed'),
     loadingCatalogue: t(locale, 'people.joinWizard.flow.loadingCatalogue'),
-    catalogueFailed: t(locale, 'people.joinWizard.flow.catalogueFailed'),
+    catalogueFailed: resolveLoadFailedText(locale, 'people.joinWizard.flow.catalogueFailed'),
+    //: NOT resolved that way, and deliberately: a submit that failed is not a read, and
+    //: `submitJoin`'s own error path already tells the family what to do with it.
     submitFailed: t(locale, 'people.joinWizard.flow.submitFailed'),
+    retry: t(locale, 'common.loadFailed.retry'),
   } as const
 }
