@@ -152,6 +152,9 @@ export const schedule: Bundle = {
   // §6.2 of the staff app redesign — a small marker, not the text itself: "do not render
   // the text on a list." The briefing itself lives on the attendance screen.
   'session.hasBriefing': 'יש תדריך',
+  // C5 (2026-09-07) — the marker became a button, and its accessible name has to say what
+  // tapping it DOES, distinct from `attendance.briefing.add`'s "there is none yet".
+  'session.openBriefing': 'פתיחת התדריך למפגש',
   'session.cancel': 'ביטול שיעור',
   'session.cancelReason': 'סיבת הביטול',
   'session.cancelReasonRequired': 'יש לציין סיבה לביטול',

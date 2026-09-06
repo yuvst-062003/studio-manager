@@ -549,6 +549,11 @@ export default function App() {
               // and precisely the one neither of them can see: a prop, not a component.
               eventsClient={eventsClient}
               peopleClient={peopleClient}
+              // §6.2's marker-becomes-a-button pass (2026-09-07) — the same client and the
+              // same permission `RosterScreen` already receives below, so the schedule
+              // card's briefing sheet reads and writes the identical rule decision 16 states.
+              attendanceClient={attendanceClient}
+              canWritePlan={viewerCanWritePlan}
               hash={hash}
               today={today}
               viewerPersonId={membership?.person_id}

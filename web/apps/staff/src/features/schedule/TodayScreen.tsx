@@ -90,6 +90,25 @@
 // `renderTrigger`, the same escape hatch `AccessibilityMenu` already has, so the panel and
 // its three rules (a missing number gets a sentence, nothing claims delivery, no new
 // exposure) stay in exactly one place.
+//
+// **Fifth pass (C5, 2026-09-07): the briefing marker stops being decoration.** Until now
+// `schedule.session.hasBriefing` was a read-only badge — the only way to WRITE a session's
+// briefing was to open the register, which does not exist until the class has already
+// happened once (§5.7 is M5's, and a manager planning Tuesday from Sunday has no register
+// to open yet). Tapping the marker now opens the same editor (`SessionPlanCard`,
+// `../briefing`) in a dialog: read it as any staff role, edit it as `owner`/`manager`/
+// `lead_coach` — decision 16, unchanged. `SessionPlanCard` itself moved out of
+// `attendance/RosterScreen.tsx` rather than being rewritten here a second time — two
+// editors for one field is exactly how `PaymentStrip` drifted before it was deleted.
+// `plans` (below) changed shape with it: the marker's old boolean became the cached TEXT
+// (nullable), because the sheet needs something to show and the rule stays "cache only,
+// never a fetch" — the briefing rides down with its session on `GET /sync/bootstrap`
+// precisely so the schedule tab keeps working with no signal. Saving is the one part of
+// this that DOES need the network (`attendanceClient.addSessionNote`), and a failed save
+// keeps the sheet open and says so, exactly as `SessionPlanCard` already does on the
+// register — the dialog itself is `useModalDialog`, the same contract
+// `ContactFamiliesButton`'s panel already gives this app (focus trapped, Escape closes,
+// focus returns to whatever opened it).
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import {
@@ -105,8 +124,9 @@ import {
   Trophy,
   User,
   Users,
+  X,
 } from 'lucide-react'
-import { EmptyState, LoadFailed } from '@studio/ui'
+import { EmptyState, LoadFailed, useModalDialog } from '@studio/ui'
 import {
   formatDateInStudioZone,
   formatTimeInStudioZone,
@@ -125,8 +145,10 @@ import { confirmationCounts, mergeTimeline, timelineStates } from './timeline'
 import type { DotState, TimelineItem } from './timeline'
 import type { EventOut, StaffEventsClient } from '../events/client'
 import type { StaffPeopleClient } from '../people'
+import type { StaffAttendanceClient } from '../attendance/client'
 import { ContactFamiliesButton } from '../contact'
 import type { ContactFamily } from '../contact'
+import { SessionPlanCard } from '../briefing'
 import './schedule.css'
 
 const DAY_MS = 86_400_000
@@ -323,11 +345,13 @@ export function TodayScreen({
   client,
   eventsClient,
   peopleClient,
+  attendanceClient,
   today,
   initialDay = null,
   coaches = [],
   viewerPersonId,
   viewerIsCoach = false,
+  canWritePlan = false,
 }: {
   locale: Locale
   client: StaffScheduleClient
@@ -340,6 +364,11 @@ export function TodayScreen({
    *  either). `peopleClient.student(id)` is the same call the students tab already makes;
    *  optional for the same reason `eventsClient` is. */
   peopleClient?: StaffPeopleClient
+  /** §6.2's marker-becomes-a-button pass (2026-09-07) — the sheet's save needs the network,
+   *  and this is where it reaches it: `RosterScreen`'s own `StaffAttendanceClient`, optional
+   *  for the same reason `eventsClient`/`peopleClient` are. Never used to READ the
+   *  briefing — that stays cache-only (see the `plans` effect below) — only to write it. */
+  attendanceClient?: StaffAttendanceClient
   /** An ISO instant. A prop, not `new Date()` — every assertion here fixes the day. */
   today: string
   /** A day picked in 9b. The strip anchors here and the screen opens on it; `חזרה להיום`
@@ -353,6 +382,11 @@ export function TodayScreen({
    * serves both, which is what "מסנן מאמן במקום פיצול מסכים" means.
    */
   viewerIsCoach?: boolean
+  /** §6.2, decision 16 — `owner`/`manager`/`lead_coach`, the exact trio `RosterScreen`'s own
+   *  prop of the same name already gates the identical rule on. Defaults to false: a caller
+   *  that has not wired this yet gets an assistant coach's view of the marker — read-only,
+   *  never a false editor. */
+  canWritePlan?: boolean
 }) {
   const todayKey = useMemo(() => studioDayKey(today), [today])
   const [day, setDay] = useState(initialDay ?? todayKey)
@@ -371,11 +405,13 @@ export function TodayScreen({
   // fetched again: keyed by session id so each card's counts travel from THIS session's
   // own cached roster, not a shared one.
   const [rosters, setRosters] = useState<Record<string, RosterRow[] | undefined>>({})
-  // §6.2 of the staff app redesign — "a session carrying a briefing shows that it has
-  // one." The briefing text itself rides in the same bootstrap cache `rosters` above
-  // already reads from; this keeps only the boolean the card's marker needs, never the
-  // text — "a small marker; do not render the text on a list."
-  const [plans, setPlans] = useState<Record<string, boolean>>({})
+  // §6.2 of the staff app redesign, updated 2026-09-07 — the marker stopped being
+  // decoration and became the door onto the briefing, so this now holds the TEXT
+  // (nullable), not a boolean: the sheet the marker opens needs something to show, and it
+  // must come from the cache, not a further fetch — the whole point of the briefing riding
+  // down with its session on `GET /sync/bootstrap`. The LIST itself still never renders
+  // this string, only the sheet does; "do not render the text on a list" still holds.
+  const [plans, setPlans] = useState<Record<string, string | null>>({})
   // S11 — a failed read distinguishes offline from broken (S5's network state).
   const networkMode = useNetworkMode()
   const strip = useMemo(() => stripAround(initialDay ?? todayKey), [initialDay, todayKey])
@@ -471,10 +507,12 @@ export function TodayScreen({
     }
   }, [onThisDay])
 
-  // §6.2 — the same cache, read the same way as the roster above, for whether THIS session
-  // carries a briefing. `GET /sessions` (this screen's live fetch, `client.listSessions`)
-  // never carries `plan` at all — only `build_bootstrap` fills it — so the marker has no
-  // live-fetch source to read from and is cache-only exactly like the confirmation counts.
+  // §6.2 — the same cache, read the same way as the roster above, for the briefing TEXT
+  // this session's marker and sheet both need (a boolean was enough while the marker was
+  // decoration; it is a door now — see this file's own C5 header note). `GET /sessions`
+  // (this screen's live fetch, `client.listSessions`) never carries `plan` at all — only
+  // `build_bootstrap` fills it — so this has no live-fetch source to read from and is
+  // cache-only exactly like the confirmation counts.
   useEffect(() => {
     let live = true
     const store = offlineStore()
@@ -483,7 +521,7 @@ export function TodayScreen({
       setPlans((current) => {
         const next = { ...current }
         onThisDay.forEach((session, index) => {
-          next[session.id] = Boolean(loaded[index]?.plan)
+          next[session.id] = loaded[index]?.plan ?? null
         })
         return next
       })
@@ -519,6 +557,23 @@ export function TodayScreen({
       return [...byPerson.values()]
     },
     [peopleClient],
+  )
+
+  /** §6.2's marker-becomes-a-button pass — the sheet's own save, curried per session exactly
+   *  like `chaseFamilies` above so `SessionBriefingControl` calls it with nothing but the
+   *  body it collected. `attendanceClient` is optional for the same reason `eventsClient`/
+   *  `peopleClient` are: a caller that has not wired one yet still gets a working marker
+   *  that can READ the cached text (the sheet still opens), and refuses rather than
+   *  pretending to succeed the one time it is asked to WRITE — the same rule
+   *  `RosterScreen`'s own `onSave` already applies to a missing `addSessionNote`. */
+  const saveBriefing = useCallback(
+    (sessionId: string) => async (body: string): Promise<void> => {
+      if (!attendanceClient?.addSessionNote) throw new Error('addSessionNote is not implemented')
+      await attendanceClient.addSessionNote(sessionId, body, 'plan')
+      // Mirrors `RosterScreen`'s own `setPlan(body)` — shown without a further fetch.
+      setPlans((current) => ({ ...current, [sessionId]: body }))
+    },
+    [attendanceClient],
   )
 
   if (failed) {
@@ -682,7 +737,9 @@ export function TodayScreen({
               locale={locale}
               today={today}
               roster={item.kind === 'session' ? rosters[item.id] : undefined}
-              hasBriefing={item.kind === 'session' ? (plans[item.id] ?? false) : false}
+              briefingText={item.kind === 'session' ? (plans[item.id] ?? null) : null}
+              canWritePlan={canWritePlan}
+              saveBriefing={saveBriefing}
               chaseFamilies={chaseFamilies}
             />
           ))}
@@ -698,7 +755,9 @@ function TimelineRow({
   locale,
   today,
   roster,
-  hasBriefing,
+  briefingText,
+  canWritePlan,
+  saveBriefing,
   chaseFamilies,
 }: {
   item: TimelineItem
@@ -706,7 +765,9 @@ function TimelineRow({
   locale: Locale
   today: string
   roster: RosterRow[] | undefined
-  hasBriefing: boolean
+  briefingText: string | null
+  canWritePlan: boolean
+  saveBriefing: (sessionId: string) => (body: string) => Promise<void>
   chaseFamilies: (studentIds: string[]) => () => Promise<ContactFamily[]>
 }) {
   return (
@@ -724,7 +785,9 @@ function TimelineRow({
               locale={locale}
               today={today}
               roster={roster}
-              hasBriefing={hasBriefing}
+              briefingText={briefingText}
+              canWritePlan={canWritePlan}
+              saveBriefing={saveBriefing}
               chaseFamilies={chaseFamilies}
             />
           ) : (
@@ -864,13 +927,95 @@ function SessionProgress({ locale, roster }: { locale: Locale; roster: RosterRow
   )
 }
 
+/**
+ * §6.2's marker, now a door rather than decoration (C5, 2026-09-07). Tapping it opens the
+ * SAME `SessionPlanCard` the register uses (`../briefing`) inside a real dialog —
+ * `useModalDialog` traps focus, closes on Escape, and (because it restores whatever had
+ * focus at the moment `open` became true) returns focus to this very button on close, the
+ * same contract `ContactFamiliesButton`'s panel already gives this app.
+ *
+ * Renders nothing when there is no briefing and the viewer cannot write one — the marker
+ * has exactly two live states, "there is one, open it" and "there is none, and you may add
+ * one"; a third (nothing to see, nothing to do) draws no control at all, matching decision
+ * 16's rule on the register exactly. The caller already gates on this (`showBriefingControl`
+ * in `SessionCard`, so the hints row's own `hasHints` agrees); the check is repeated here
+ * so this component is correct on its own terms too, not only when called correctly.
+ */
+function SessionBriefingControl({
+  locale,
+  briefingText,
+  canWrite,
+  onSave,
+}: {
+  locale: Locale
+  briefingText: string | null
+  canWrite: boolean
+  onSave: (body: string) => Promise<void>
+}) {
+  const [open, setOpen] = useState(false)
+  const close = useCallback(() => setOpen(false), [])
+  const dialogRef = useModalDialog(open, close)
+
+  if (briefingText === null && !canWrite) return null
+
+  const hasBriefing = briefingText !== null
+
+  return (
+    <>
+      <button
+        type="button"
+        data-testid="session-briefing-marker"
+        data-has-briefing={hasBriefing}
+        // SC 4.1.2 — the accessible name says what tapping it DOES, and the two states
+        // never share one: opening a briefing that exists is a different action from
+        // adding one that doesn't, and a screen-reader user needs to hear which is on offer.
+        aria-label={t(
+          locale,
+          hasBriefing ? 'schedule.session.openBriefing' : 'attendance.briefing.add',
+        )}
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1 font-bold text-blue-700"
+      >
+        <ClipboardList className="w-3 h-3" aria-hidden="true" />
+        {t(locale, hasBriefing ? 'schedule.session.hasBriefing' : 'attendance.briefing.add')}
+      </button>
+      {open ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-4 backdrop-blur-xs sm:items-center">
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={t(locale, 'attendance.briefing.title')}
+            tabIndex={-1}
+            data-testid="session-briefing-sheet"
+            className="relative w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl"
+          >
+            <button
+              type="button"
+              onClick={close}
+              aria-label={t(locale, 'common.a11y.close')}
+              data-testid="session-briefing-close"
+              className="absolute end-3 top-3 flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-400 hover:text-slate-700"
+            >
+              <X className="w-4 h-4" aria-hidden="true" />
+            </button>
+            <SessionPlanCard canWrite={canWrite} locale={locale} onSave={onSave} plan={briefingText} />
+          </div>
+        </div>
+      ) : null}
+    </>
+  )
+}
+
 function SessionCard({
   session,
   state,
   locale,
   today,
   roster,
-  hasBriefing,
+  briefingText,
+  canWritePlan,
+  saveBriefing,
   chaseFamilies,
 }: {
   session: SessionRow
@@ -879,9 +1024,17 @@ function SessionCard({
   /** An ISO instant — `ends_at - today` is the active card's own "נותרו X דק'" badge. */
   today: string
   roster: RosterRow[] | undefined
-  /** §6.2 — "a session carrying a briefing shows that it has one." Cache-only; see
-   *  `TodayScreen`'s own `plans` effect for why this is a boolean and not the text. */
-  hasBriefing: boolean
+  /** §6.2 — the cached briefing text, nullable; `null` means "none cached", never
+   *  "loading" (see `TodayScreen`'s own `plans` effect). The whole text now, not a
+   *  boolean — the marker became a door onto it (C5, 2026-09-07) and the sheet behind that
+   *  door needs something to show. */
+  briefingText: string | null
+  /** `owner`/`manager`/`lead_coach` — the same trio `RosterScreen`'s own `canWritePlan`
+   *  already gates decision 16 on. */
+  canWritePlan: boolean
+  /** Curried per session, exactly like `chaseFamilies` below: `SessionBriefingControl` gets
+   *  nothing but the body it collected, never the session id. */
+  saveBriefing: (sessionId: string) => (body: string) => Promise<void>
   chaseFamilies: (studentIds: string[]) => () => Promise<ContactFamily[]>
 }) {
   const counts = confirmationCounts(roster)
@@ -891,12 +1044,15 @@ function SessionCard({
   const coachLine = session.staff[0]
     ? session.staff[0].display_name
     : t(locale, 'schedule.session.noCoach')
+  // §6.2 — "the control still appears, offering to add one" whenever the viewer may write
+  // and there is none yet; "when there is none and you may not write, nothing is drawn."
+  const showBriefingControl = briefingText !== null || canWritePlan
   const hasHints =
     session.attendance_taken ||
     session.staff[0]?.is_substitute ||
     (session.is_manually_edited && !session.is_ad_hoc) ||
     session.is_ad_hoc ||
-    hasBriefing
+    showBriefingControl
 
   // C3 — while a class is in progress, "45 דק׳" (its total length, unchanging) is less
   // useful than "נותרו 32 דק׳" (how much is left, which is the fact a coach checking the
@@ -1013,16 +1169,17 @@ function SessionCard({
               <span>{t(locale, 'schedule.session.manuallyEditedHint')}</span>
             ) : null}
             {session.is_ad_hoc ? <span>{t(locale, 'schedule.session.adHoc')}</span> : null}
-            {/* §6.2 — the marker, never the text: "do not render the text on a list." The
-                briefing itself is read on the attendance screen, the moment it matters. */}
-            {hasBriefing ? (
-              <span
-                className="inline-flex items-center gap-1 font-bold text-blue-700"
-                data-testid="session-has-briefing"
-              >
-                <ClipboardList className="w-3 h-3" aria-hidden="true" />
-                {t(locale, 'schedule.session.hasBriefing')}
-              </span>
+            {/* §6.2, C5 (2026-09-07) — the marker is a door now, not decoration: tapping it
+                opens the SAME editor the register uses. The list itself still never renders
+                the text — only the sheet does. See `SessionBriefingControl`'s own header for
+                the dialog contract and why "no briefing, no write access" draws nothing. */}
+            {showBriefingControl ? (
+              <SessionBriefingControl
+                locale={locale}
+                briefingText={briefingText}
+                canWrite={canWritePlan}
+                onSave={saveBriefing(session.id)}
+              />
             ) : null}
           </div>
         ) : null}

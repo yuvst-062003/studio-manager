@@ -17,6 +17,7 @@ import { TodayScreen } from './TodayScreen'
 import type { SessionRow, StaffScheduleClient } from './client'
 import type { EventOut, StaffEventsClient } from '../events/client'
 import type { StaffPeopleClient } from '../people'
+import type { StaffAttendanceClient } from '../attendance/client'
 
 const base = {
   group_id: 'g1',
@@ -473,7 +474,7 @@ describe('TodayScreen — who has confirmed, from the offline cache (§4.1)', ()
   })
 })
 
-describe('TodayScreen — a session carrying a briefing shows that it has one (§6.2)', () => {
+describe('TodayScreen — the briefing marker is a door, not decoration (§6.2, C5)', () => {
   let store: OfflineStore
   const NOW = '2026-11-03T12:00:00Z'
 
@@ -489,6 +490,17 @@ describe('TodayScreen — a session carrying a briefing shows that it has one (�
     plan,
   })
 
+  function attendanceStub(overrides: Partial<StaffAttendanceClient> = {}): StaffAttendanceClient {
+    return {
+      bootstrap: vi.fn(),
+      sessionRoster: vi.fn(),
+      bulkPresent: vi.fn(),
+      studentAttendance: vi.fn(),
+      addSessionNote: vi.fn().mockResolvedValue(undefined),
+      ...overrides,
+    }
+  }
+
   beforeEach(() => {
     store = memoryStore()
     setOfflineStore(store)
@@ -498,7 +510,7 @@ describe('TodayScreen — a session carrying a briefing shows that it has one (�
     setOfflineStore(null)
   })
 
-  it('marks the card when the cached session carries a plan', async () => {
+  it('marks the card with a button, never the text — "do not render the text on a list"', async () => {
     // `GET /sessions` (this screen's own fetch) never carries `plan` at all — only the
     // bootstrap cache does — so this is a cache-only read, the same way the confirmation
     // counts above are.
@@ -510,12 +522,72 @@ describe('TodayScreen — a session carrying a briefing shows that it has one (�
       rosters: {},
     })
     render(screenFor({ client: stub([TODAY_SESSION]) }))
-    const marker = await screen.findByTestId('session-has-briefing')
-    // The marker, never the text — "do not render the text on a list."
+    const marker = await screen.findByTestId('session-briefing-marker')
+    expect(marker.tagName).toBe('BUTTON')
     expect(marker).not.toHaveTextContent('היום נתרגל השלכות')
+    expect(screen.queryByText('היום נתרגל השלכות')).not.toBeInTheDocument()
   })
 
-  it('does not mark the card when the cached session carries no plan', async () => {
+  it('opens the sheet on tap and shows the cached text there', async () => {
+    await writeWindow(store, {
+      server_time: NOW,
+      from_time: NOW,
+      to_time: NOW,
+      sessions: [cachedSession('היום נתרגל השלכות')],
+      rosters: {},
+    })
+    render(screenFor({ client: stub([TODAY_SESSION]) }))
+    await userEvent.click(await screen.findByTestId('session-briefing-marker'))
+    const sheet = await screen.findByTestId('session-briefing-sheet')
+    expect(sheet).toHaveTextContent('היום נתרגל השלכות')
+  })
+
+  it('closes on Escape and returns focus to the marker', async () => {
+    await writeWindow(store, {
+      server_time: NOW,
+      from_time: NOW,
+      to_time: NOW,
+      sessions: [cachedSession('היום נתרגל השלכות')],
+      rosters: {},
+    })
+    render(screenFor({ client: stub([TODAY_SESSION]) }))
+    const marker = await screen.findByTestId('session-briefing-marker')
+    await userEvent.click(marker)
+    await screen.findByTestId('session-briefing-sheet')
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByTestId('session-briefing-sheet')).not.toBeInTheDocument()
+    expect(marker).toHaveFocus()
+  })
+
+  it('a manager sees an editor inside the sheet', async () => {
+    await writeWindow(store, {
+      server_time: NOW,
+      from_time: NOW,
+      to_time: NOW,
+      sessions: [cachedSession('תרגול השלכות')],
+      rosters: {},
+    })
+    render(screenFor({ client: stub([TODAY_SESSION]), canWritePlan: true }))
+    await userEvent.click(await screen.findByTestId('session-briefing-marker'))
+    expect(await screen.findByTestId('session-plan-edit')).toBeInTheDocument()
+  })
+
+  it('an assistant coach sees the text and no editor', async () => {
+    await writeWindow(store, {
+      server_time: NOW,
+      from_time: NOW,
+      to_time: NOW,
+      sessions: [cachedSession('תרגול השלכות')],
+      rosters: {},
+    })
+    render(screenFor({ client: stub([TODAY_SESSION]), canWritePlan: false }))
+    await userEvent.click(await screen.findByTestId('session-briefing-marker'))
+    const sheet = await screen.findByTestId('session-briefing-sheet')
+    expect(sheet).toHaveTextContent('תרגול השלכות')
+    expect(screen.queryByTestId('session-plan-edit')).not.toBeInTheDocument()
+  })
+
+  it('with no briefing, offers a manager a marker to add one', async () => {
     await writeWindow(store, {
       server_time: NOW,
       from_time: NOW,
@@ -523,15 +595,84 @@ describe('TodayScreen — a session carrying a briefing shows that it has one (�
       sessions: [cachedSession(null)],
       rosters: {},
     })
-    render(screenFor({ client: stub([TODAY_SESSION]) }))
-    await screen.findByText(TODAY_SESSION.group_name)
-    expect(screen.queryByTestId('session-has-briefing')).not.toBeInTheDocument()
+    render(screenFor({ client: stub([TODAY_SESSION]), canWritePlan: true }))
+    const marker = await screen.findByRole('button', { name: t('he', 'attendance.briefing.add') })
+    // The two states never share an accessible name (SC 4.1.2) — this is the "add" one,
+    // not `schedule.session.openBriefing`.
+    expect(marker).not.toHaveAccessibleName(t('he', 'schedule.session.openBriefing'))
   })
 
-  it('does not mark the card when nothing is cached yet', async () => {
-    render(screenFor({ client: stub([TODAY_SESSION]) }))
+  it('with no briefing, an assistant coach sees no control at all', async () => {
+    await writeWindow(store, {
+      server_time: NOW,
+      from_time: NOW,
+      to_time: NOW,
+      sessions: [cachedSession(null)],
+      rosters: {},
+    })
+    render(screenFor({ client: stub([TODAY_SESSION]), canWritePlan: false }))
     await screen.findByText(TODAY_SESSION.group_name)
-    expect(screen.queryByTestId('session-has-briefing')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('session-briefing-marker')).not.toBeInTheDocument()
+  })
+
+  it('draws no marker when nothing is cached yet and the viewer may not write one', async () => {
+    render(screenFor({ client: stub([TODAY_SESSION]), canWritePlan: false }))
+    await screen.findByText(TODAY_SESSION.group_name)
+    expect(screen.queryByTestId('session-briefing-marker')).not.toBeInTheDocument()
+  })
+
+  it('writes a briefing through the API and shows it without a further fetch', async () => {
+    await writeWindow(store, {
+      server_time: NOW,
+      from_time: NOW,
+      to_time: NOW,
+      sessions: [cachedSession(null)],
+      rosters: {},
+    })
+    const attendanceClient = attendanceStub()
+    render(
+      screenFor({ client: stub([TODAY_SESSION]), attendanceClient, canWritePlan: true }),
+    )
+    await userEvent.click(await screen.findByTestId('session-briefing-marker'))
+    await userEvent.click(await screen.findByTestId('session-plan-edit'))
+    await userEvent.type(await screen.findByTestId('session-plan-input'), 'לעבוד על מסירות')
+    await userEvent.click(screen.getByTestId('session-plan-save'))
+
+    await waitFor(() =>
+      expect(attendanceClient.addSessionNote).toHaveBeenCalledWith(
+        TODAY_SESSION.id,
+        'לעבוד על מסירות',
+        'plan',
+      ),
+    )
+    expect(await screen.findByTestId('session-briefing-sheet')).toHaveTextContent(
+      'לעבוד על מסירות',
+    )
+  })
+
+  it('a failed save keeps the sheet open and names the problem', async () => {
+    await writeWindow(store, {
+      server_time: NOW,
+      from_time: NOW,
+      to_time: NOW,
+      sessions: [cachedSession(null)],
+      rosters: {},
+    })
+    const attendanceClient = attendanceStub({
+      addSessionNote: vi.fn().mockRejectedValue(new Error('403')),
+    })
+    render(
+      screenFor({ client: stub([TODAY_SESSION]), attendanceClient, canWritePlan: true }),
+    )
+    await userEvent.click(await screen.findByTestId('session-briefing-marker'))
+    await userEvent.click(await screen.findByTestId('session-plan-edit'))
+    await userEvent.type(await screen.findByTestId('session-plan-input'), 'תדריך')
+    await userEvent.click(screen.getByTestId('session-plan-save'))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      t('he', 'attendance.briefing.saveFailed'),
+    )
+    expect(screen.getByTestId('session-briefing-sheet')).toBeInTheDocument()
   })
 })
 

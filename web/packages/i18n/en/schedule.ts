@@ -111,6 +111,9 @@ export const schedule: Bundle = {
   'session.manuallyEditedHint': 'A schedule change will not overwrite a manually edited class',
   'session.adHoc': 'One-off class',
   'session.hasBriefing': 'Briefing added',
+  // C5 (2026-09-07) — the marker became a button, and its accessible name has to say what
+  // tapping it DOES, distinct from `attendance.briefing.add`'s "there is none yet".
+  'session.openBriefing': 'Open the session briefing',
   'session.cancel': 'Cancel class',
   'session.cancelReason': 'Reason for cancelling',
   'session.cancelReasonRequired': 'A reason is required to cancel',

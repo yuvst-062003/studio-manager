@@ -113,6 +113,9 @@ export const schedule: Bundle = {
   'session.manuallyEditedHint': 'Изменение расписания не перезапишет занятие, изменённое вручную',
   'session.adHoc': 'Разовое занятие',
   'session.hasBriefing': 'Есть инструктаж',
+  // C5 (2026-09-07) — the marker became a button, and its accessible name has to say what
+  // tapping it DOES, distinct from `attendance.briefing.add`'s "there is none yet".
+  'session.openBriefing': 'Открыть инструктаж к занятию',
   'session.cancel': 'Отменить занятие',
   'session.cancelReason': 'Причина отмены',
   'session.cancelReasonRequired': 'Необходимо указать причину отмены',

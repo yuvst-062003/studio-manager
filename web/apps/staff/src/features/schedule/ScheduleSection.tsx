@@ -17,6 +17,7 @@ import type { CoachOption } from './TodayScreen'
 import type { StaffScheduleClient } from './client'
 import type { StaffEventsClient } from '../events/client'
 import type { StaffPeopleClient } from '../people'
+import type { StaffAttendanceClient } from '../attendance/client'
 
 export type StaffScheduleView = 'today' | 'date'
 
@@ -30,11 +31,13 @@ export function ScheduleSection({
   client,
   eventsClient,
   peopleClient,
+  attendanceClient,
   hash,
   today,
   coaches = [],
   viewerPersonId,
   viewerIsCoach = false,
+  canWritePlan = false,
 }: {
   locale: Locale
   client: StaffScheduleClient
@@ -43,12 +46,18 @@ export function ScheduleSection({
   eventsClient?: StaffEventsClient
   /** §4.9's chase action, passed straight through. Same optionality as `eventsClient`. */
   peopleClient?: StaffPeopleClient
+  /** §6.2's marker-becomes-a-button pass (2026-09-07), passed straight through to 9a/1d —
+   *  same optionality as `eventsClient`/`peopleClient`: a caller that has not wired one yet
+   *  still gets a working marker, it just cannot save through it. */
+  attendanceClient?: StaffAttendanceClient
   hash: string
   /** An ISO instant. A prop, not `new Date()`, all the way down. */
   today: string
   coaches?: CoachOption[]
   viewerPersonId?: string
   viewerIsCoach?: boolean
+  /** §6.2, decision 16 — the same trio `RosterScreen`'s own prop of the same name gates. */
+  canWritePlan?: boolean
 }) {
   const [picked, setPicked] = useState<string | null>(null)
 
@@ -77,6 +86,7 @@ export function ScheduleSection({
       client={client}
       eventsClient={eventsClient}
       peopleClient={peopleClient}
+      attendanceClient={attendanceClient}
       today={today}
       // A day chosen in 9b wins over the clock until the coach navigates away — and
       // `חזרה להיום` on the screen itself walks back, because `today` stays honest.
@@ -84,6 +94,7 @@ export function ScheduleSection({
       coaches={coaches}
       viewerPersonId={viewerPersonId}
       viewerIsCoach={viewerIsCoach}
+      canWritePlan={canWritePlan}
     />
   )
 }
