@@ -45,6 +45,7 @@ import { matchJoinPath } from './features/onboarding/joinPath'
 // (`BookingFlow.tsx`) is unrelated and still runs its own flow. `JoinFlow.tsx` itself is
 // gone (task 7); only `matchJoinPath` above survived it, moved to `joinPath.ts`.
 import { JoinWizard } from './features/onboarding/wizard/JoinWizard'
+import { emptyStudent } from './features/onboarding/wizard/types'
 import { studioSource, tokenSource } from './features/onboarding/wizard/wizardSources'
 // Task 3b -- doors C and D read the same `/me/onboarding-status` this decides between,
 // and translate its answer into the wizard's own step numbering.
@@ -91,17 +92,15 @@ import { makeParentBillingClient } from './features/billing/PaymentsSection'
 import { ClubShop } from './features/billing/redesign/ClubShop'
 // §6.1 step 6 — the BLOCKING declaration. Mounted here because nothing imported it
 // (HB-w6-health-gate-unmounted): the gate, the form and the pad were built and tested in
-// W3 and a guardian with an unsigned declaration still reached home.
-import { HealthGate, firstStudentNeedingDeclaration, makeHealthClient, registerHealthSections } from './features/health'
+// W3 and a guardian with an unsigned declaration still reached home. **Both of §6.1's
+// blocking gates — step 5's consents and step 6's declaration — are now steps of the join
+// wizard rather than two components of their own (2026-09-06); `HealthGate`,
+// `AgreementFlow` and `ConsentGate` are deleted.** What that lesson leaves behind is
+// unchanged and is why this file still reads a roster at all: a gate nothing mounts is a
+// gate that does not exist, and the mount below is the thing to keep looking at.
+import { firstStudentNeedingDeclaration, makeHealthClient, registerHealthSections } from './features/health'
 import type { GatedStudent } from './features/health'
-// §6.1 step 5 — the OTHER blocking gate, and the one that had never been built.
-// SPEC:1314 puts `5  אישורים  →  terms of service + privacy policy` in the BLOCKING band
-// and SPEC:1327 says steps 5 and 6 are the only hard gates. M4 shipped step 6 and not
-// step 5, so `consent_record` was written by exactly one place in the whole product
-// (`app/services/events/rsvp.py`'s per-event consent) and no guardian had ever accepted a
-// privacy policy. `Resolve.tsx:9` records the handover that dropped it.
-import { ConsentGate, PrivacyScreen, makePrivacyClient } from './features/privacy'
-import type { ConsentGateStatus } from './features/privacy'
+import { PrivacyScreen, makePrivacyClient } from './features/privacy'
 
 // Seam 4 — the student card is a container and knows no section by name. This call was
 // written for "the app's own entry" and the entry never made it: only tests called it,
@@ -387,6 +386,12 @@ function AuthedApp() {
   // there is no separate tri-state to track here any more (task 9b removed the last
   // reader that needed one).
   const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatus | null>(null)
+  //: `onboardingStatus` is `null` for two different reasons -- still reading, and read and
+  //: failed -- and since it now decides whether the BLOCKING gate opens, those two must not
+  //: answer the same. Loading renders nothing; a failure stands the gate aside, the same
+  //: direction `HealthGate` chose and for the same reason: first login cannot happen
+  //: offline, and a network blip must not lock a family out of the cached PWA.
+  const [onboardingChecked, setOnboardingChecked] = useState(false)
   useEffect(() => {
     if (session.status !== 'signed-in' || !session.access.parent) return
     let alive = true
@@ -395,10 +400,12 @@ function AuthedApp() {
       .then((result) => {
         if (!alive) return
         setOnboardingStatus(result)
+        setOnboardingChecked(true)
       })
       .catch(() => {
         if (!alive) return
         setOnboardingStatus(null)
+        setOnboardingChecked(true)
       })
     return () => {
       alive = false
@@ -413,7 +420,6 @@ function AuthedApp() {
   // until the answer arrives: a bar drawn during the fetch is a bar a fast finger uses
   // before the gate exists, which is the same reason the shell renders nothing at all
   // while `gatedChildren` is null.
-  const [consentStatus, setConsentStatus] = useState<ConsentGateStatus>('loading')
   // §6.1 step 6 — which children still owe a declaration. `null` until the answer
   // arrives, and the shell renders NOTHING gated until it does: a home screen that
   // flashes before the gate is a gate a fast finger gets past. On a fetch failure the
@@ -422,6 +428,44 @@ function AuthedApp() {
   // parent §6.5 worked hardest to keep.
   const [gatedChildren, setGatedChildren] = useState<readonly GatedStudent[] | null>(null)
   const [setupChildren, setSetupChildren] = useState<readonly SetupChild[]>([])
+  //: §6.1's gate, asked of the SERVER rather than recomputed here. `next` is the first step
+  //: it still wants; `null` is a family with nothing outstanding. A failed read leaves
+  //: `onboardingStatus` null and stands the gate aside — see `onboardingChecked`.
+  //: **The two hard gates, and the same two questions the deleted components asked.**
+  //: SPEC:1327 — steps 5 and 6 are the only blocking ones. What changed on 2026-09-06 is
+  //: the SCREEN they open (the join wizard, not `ConsentGate`/`AgreementFlow`); what did
+  //: not change is either condition, and both are still asked of the source that can
+  //: actually answer them:
+  //:
+  //:   - Step 5, the consents: `/me/onboarding-status`'s `agreements` flag, which is the
+  //:     same `ConsentService.holds_current` pair `ConsentGate` used to read for itself.
+  //:   - Step 6, the declaration: the ROSTER, exactly as `HealthGate` did. NOT that
+  //:     endpoint's `health` flag, which is `health_signed` alone — a child whose
+  //:     declaration is signed and whose REGISTRATION is not is gated by
+  //:     `needsFullDeclaration` and is invisible to that flag. Swapping the two would have
+  //:     quietly narrowed a health gate, which is the one direction that must never happen
+  //:     by accident.
+  //:
+  //: And deliberately NOT `next !== null`, which would block on the other two answers this
+  //: endpoint gives: `payment` is "this family owes money" (that is `PaymentSetupGate`,
+  //: which renders the app behind it), and `students` is "no children yet", which is
+  //: `Resolve`'s first-run screen. Either one would lock a family out of their own app.
+  const consentsOutstanding = onboardingStatus?.next === 'agreements'
+  const declarationOutstanding =
+    gatedChildren !== null && firstStudentNeedingDeclaration(gatedChildren) !== null
+  const onboardingIncomplete = consentsOutstanding || declarationOutstanding
+  //: The children the club already has on file, as step 2's rows. Names only: `/me/students`
+  //: carries no birthdate, and the wizard needs one to know whether it is asking about a
+  //: minor — so the family confirms that themselves, which is the right way round for a
+  //: fact the club may not hold.
+  const gateRoster = useMemo(
+    () =>
+      (gatedChildren ?? []).map((child) => {
+        const [firstName = '', ...rest] = child.display_name.trim().split(' ')
+        return emptyStudent(child.id, { firstName, lastName: rest.join(' ') })
+      }),
+    [gatedChildren],
+  )
   /** §5.10's mandate links, one per child, for `PaymentSetupGate` below. Read live and
    *  never cached: a stale link signs a family up at the wrong amount and nobody finds
    *  out for months. Read once, on mount, through the same shared `loadStandingOrderLinks`
@@ -692,14 +736,14 @@ function AuthedApp() {
           activeTab={activeTab}
           locale={locale}
           updatesBadgeCount={pendingCount}
-          // The bar hides while EITHER of §6.1's gates holds — "no other screen is
-          // reachable" includes the bar that reaches them. Step 5 is `consentStatus`,
-          // step 6 is `gatedChildren`. Same condition the old `tabBar` prop carried.
-          tabBar={
-            consentStatus === 'open' &&
-            gatedChildren !== null &&
-            firstStudentNeedingDeclaration(gatedChildren) === null
-          }
+          // The bar hides while §6.1's gate holds — "no other screen is reachable"
+          // includes the bar that reaches them. ONE condition now, because there is one
+          // gate: the wizard. It is the same rule the two old gates carried between them,
+          // since consent (step 5) and the declaration (step 6) are two of that wizard's
+          // own steps and `/me/onboarding-status` is the server's answer for both. Hidden
+          // while the answer is still being read, too: a bar drawn during the fetch is a
+          // bar a fast finger uses.
+          tabBar={gatedChildren !== null && onboardingChecked && !onboardingIncomplete}
           devBar={
             <DevBar
               identity={
@@ -760,32 +804,50 @@ function AuthedApp() {
               standingOrderLinks={loadStandingOrderLinks}
               startAtStep={wizardStepFor(startingStep('invite', onboardingStatus))}
             />
-          ) : gatedChildren === null ? (
+          ) : gatedChildren === null || !onboardingChecked ? (
             <p data-testid="gated-children-loading">{t(locale, 'common.setup.loading')}</p>
+          ) : onboardingIncomplete ? (
+            /* §6.1's BLOCKING gate — steps 5 and 6 — and it is the same wizard doors B, C
+               and D open, not a second flow.
+               
+               It used to be `ConsentGate` wrapping `HealthGate` wrapping `AgreementFlow`: a
+               five-step rail of design-system screens that asked a family for consent, then
+               their registration details, then the health declaration, then the club's
+               terms. Every one of those questions is a step of this wizard, asked in the
+               same order, and `POST /me/students/register` writes all of them in the one
+               call — including for children who ALREADY exist, which is the property that
+               makes this possible at all: `OnboardingService.register` adopts a duplicate
+               rather than refusing it, then writes that student's registration details,
+               health declaration and club-terms acceptance exactly as it would a new one.
+               
+               `startingStep` opens on the first step the SERVER still wants, so a family
+               who owes only a declaration does not re-consent, and `initialStudents` seeds
+               the roster from the children the club already has on file — asking them to
+               retype those names is precisely the "gaps only" second flow §3 rules out.
+               
+               What makes it a GATE rather than an errand is only where it is mounted:
+               here, in front of everything, with the tab bar hidden. */
+            <JoinWizard
+              locale={locale}
+              billingClient={billingClient}
+              initialStudents={gateRoster}
+              onEnterApp={() => {
+                setFamilyJoined((n) => n + 1)
+                setDeclarationsSigned((count) => count + 1)
+              }}
+              source={memberSource}
+              standingOrderLinks={loadStandingOrderLinks}
+              startAtStep={wizardStepFor(startingStep('gate', onboardingStatus))}
+            />
           ) : (
-          /* §6.1 step 5 OUTSIDE step 6, because 5 precedes 6 and the ordering carries an
-             argument: the privacy policy is what permits the club to collect a medical
-             record about a child at all, so asking for the record first and the permission
-             afterwards has the consent doing no work. */
-          <ConsentGate
-            client={privacyClient}
-            locale={locale}
-            onStatusChange={setConsentStatus}
-          >
-          <HealthGate
-            locale={locale}
-            client={healthClient}
-            students={gatedChildren}
-            onSigned={() => setDeclarationsSigned((count) => count + 1)}
-          >
-          {/* §6.1's plan step, and it sits HERE for the reason the sequence gives: a family
-              picks what they are paying for after the club is allowed to hold the child's
-              record, never before. Unlike the two gates above it this one renders the app
-              behind it — see `PlanGate`'s header on why nagging beats blocking. */}
-          {/* The join already created the children, their groups, their price and their
-              first charge, so this step asks the one thing left: how the money moves, per
-              child. Then one summary — card in a single checkout, a mandate link each,
-              cash and cheques told to the manager. */}
+          /* §6.1's plan step. It is NOT part of the wizard above and is deliberately still
+             here: the wizard's own step 3 asks a family how they will pay for the children
+             THIS run registers, and this asks the same of a family who finished onboarding
+             long ago and never chose one. Deleting it with the rest of the old flow would
+             have removed the only thing that ever asks them.
+             
+             Unlike the gate above it, this one renders the app behind it — see
+             `PlanGate`'s header on why nagging beats blocking. */
           <PaymentSetupGate
             client={billingClient}
             locale={locale}
@@ -985,8 +1047,6 @@ function AuthedApp() {
             </>
           )}
           </PaymentSetupGate>
-          </HealthGate>
-          </ConsentGate>
           )}
         </ParentShell>
         </AccessGate>

@@ -17,7 +17,7 @@
 // `/me/onboarding-status` to decide whether the agreements step is still needed.
 import type { WizardStepKey } from './OnboardingWizardChrome'
 
-export type Door = 'join' | 'invite' | 'addChild'
+export type Door = 'join' | 'invite' | 'addChild' | 'gate'
 
 //: The one place a wizard step key becomes the STATUS endpoint's key -- the two
 //: vocabularies exist for a reason (`family`/`health`/`payment` are what the SCREENS are
@@ -47,6 +47,16 @@ export const DOOR_STEPS: Record<Door, readonly WizardStepKey[]> = {
   join: FULL_STEPS,
   invite: FULL_STEPS,
   addChild: FULL_STEPS,
+  //: §6.1's blocking gate, which is now this same wizard rather than a second flow.
+  //:
+  //: A family that already belongs to the club but still owes consent, registration
+  //: details or a health declaration used to meet `ConsentGate` → `AgreementFlow` — a
+  //: five-step rail built from different screens that asked the same questions in a
+  //: different order and a different design. It is the same door as C and D: an existing
+  //: account, the full four steps, opening on the first one the server still wants. The
+  //: only thing that makes it a gate rather than an errand is WHERE `App.tsx` mounts it —
+  //: in front of the app, with the tab bar hidden.
+  gate: FULL_STEPS,
 }
 
 /** §3 Door D: "The agreements step is skipped, not absent... The consents are already

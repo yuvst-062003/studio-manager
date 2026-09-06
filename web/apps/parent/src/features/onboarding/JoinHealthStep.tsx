@@ -17,7 +17,7 @@ import type { Locale } from '@studio/i18n'
 import { applicableClause, clauseTextKey, CLAUSE_QUESTION_ID } from '../health/clauses'
 import { isVisible } from '../health/healthClient'
 import type { AnswerValue, HealthClient, TemplateSchema } from '../health/healthClient'
-import { needsFullDeclaration, type GatedStudent } from '../health/HealthGate'
+import { needsFullDeclaration, type GatedStudent } from '../health/gating'
 import { SignaturePad } from '../health/SignaturePad'
 import {
   emptyHealthDraft,

@@ -4,6 +4,14 @@ import { t } from '@studio/i18n'
 import App from './App'
 
 // §6.1 step 6 / §5.5's parent-side hard gate, asserted against the SHELL rather than the
+// **The gate is the join wizard now (2026-09-06)**, not `HealthGate` — so these look for
+// `join-welcome`, the wizard's own first screen. What is asserted did not change, and that
+// is the point of leaving this file where it is rather than rewriting it: a child with a
+// missing declaration still reaches no other screen, the tab bar is still hidden while it
+// holds, and an incomplete REGISTRATION still gates even when the declaration is signed —
+// the last of which `/me/onboarding-status` cannot see, which is why `App.tsx` still asks
+// the roster for it.
+//
 // component: HB-w6-health-gate-unmounted was `HealthGate` fully built, fully tested and
 // imported by nothing, so a guardian with an unsigned declaration reached home. A test
 // that renders `HealthGate` directly can never notice that again — only one that renders
@@ -112,7 +120,7 @@ describe('the §6.1 health gate, mounted in the shell', () => {
   it('routes a guardian with a missing declaration to the gate and nowhere else', async () => {
     stubChildren('missing')
     render(<App />)
-    await waitFor(() => expect(screen.getByTestId('health-gate')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('join-welcome')).toBeInTheDocument())
     // "No other screen is reachable" — home must not render beside the form.
     expect(screen.queryByTestId('parent-home')).toBeNull()
   })
@@ -120,7 +128,7 @@ describe('the §6.1 health gate, mounted in the shell', () => {
   it('gates a trial-signed child who has been converted: §5.5 wants the full declaration', async () => {
     stubChildren('trial_signed', 'active')
     render(<App />)
-    await waitFor(() => expect(screen.getByTestId('health-gate')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('join-welcome')).toBeInTheDocument())
   })
 
   it('lets a family still on a trial reach the app — §6.3 draws them a home', async () => {
@@ -133,13 +141,13 @@ describe('the §6.1 health gate, mounted in the shell', () => {
     // on the first tick, while `gatedChildren` is still null and the shell is deliberately
     // rendering nothing at all — so on its own it asserts nothing about the gate.
     await waitFor(() => expect(screen.getByTestId('tab-bar')).toBeInTheDocument())
-    expect(screen.queryByTestId('health-gate')).toBeNull()
+    expect(screen.queryByTestId('join-welcome')).toBeNull()
   })
 
   it('stands aside once every child is signed', async () => {
     stubChildren('signed')
     render(<App />)
-    await waitFor(() => expect(screen.queryByTestId('health-gate')).toBeNull())
+    await waitFor(() => expect(screen.queryByTestId('join-welcome')).toBeNull())
   })
 })
 
@@ -187,7 +195,7 @@ describe('the tab bar, in the shell where 1a draws it', () => {
     // "No other screen is reachable" (§6.1) includes the bar that reaches them.
     stubChildren('missing')
     render(<App />)
-    await waitFor(() => expect(screen.getByTestId('health-gate')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('join-welcome')).toBeInTheDocument())
     expect(screen.queryByTestId('tab-bar')).toBeNull()
   })
 })
@@ -209,13 +217,13 @@ describe('the registration agreement reaches the gate', () => {
   it('gates a child whose declaration is signed but whose agreement is not complete', async () => {
     stubChildren('signed', 'active', [], false)
     render(<App />)
-    expect(await screen.findByTestId('health-gate')).toBeInTheDocument()
+    expect(await screen.findByTestId('join-welcome')).toBeInTheDocument()
   })
 
   it('lets a family through once the whole agreement is complete', async () => {
     stubChildren('signed', 'active', [], true)
     render(<App />)
-    await waitFor(() => expect(screen.queryByTestId('health-gate')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByTestId('join-welcome')).not.toBeInTheDocument())
   })
 
   it('still gates an unsigned child when the field is absent', async () => {
@@ -223,6 +231,6 @@ describe('the registration agreement reaches the gate', () => {
     // not open the gate for somebody who has signed nothing at all.
     stubChildren('missing', 'active', [], undefined)
     render(<App />)
-    expect(await screen.findByTestId('health-gate')).toBeInTheDocument()
+    expect(await screen.findByTestId('join-welcome')).toBeInTheDocument()
   })
 })

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { plural, t } from '@studio/i18n'
 import { makeHealthClient } from '../health/healthClient'
 import type { Fetcher, HealthClient } from '../health/healthClient'
-import type { GatedStudent } from '../health/HealthGate'
+import type { GatedStudent } from '../health/gating'
 import { JoinHealthStep } from './JoinHealthStep'
 
 const schema = {

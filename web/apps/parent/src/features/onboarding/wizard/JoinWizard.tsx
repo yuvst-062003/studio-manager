@@ -115,6 +115,15 @@ export type JoinWizardProps = {
   /** Door C's "one row pre-filled": the manager's stub name, seeded into the FIRST child
    *  the family adds and nowhere else. Undefined on every other door. */
   prefillFirstRowName?: string
+  /** The children this run already knows about, as rows on step 2.
+   *
+   *  §6.1's gate hands its whole roster: a family that already belongs to the club is
+   *  completing paperwork for children the club has on file, and asking them to type
+   *  those names again would be the "gaps only" second flow the redesign exists to
+   *  remove. Doors B and D pass nothing — there is nobody on file yet, or the family is
+   *  adding somebody new. Read ONCE, as the initial state: these are seeds a family then
+   *  edits, not a controlled value that would fight their typing. */
+  initialStudents?: readonly StudentDraft[]
   /** The step this run opens on. Doors C and D skip the agreements screen when the
    *  family's consents are already current -- `doorSteps.ts::startingStep` decides it
    *  from `GET /me/onboarding-status`. Door B always opens at 1. */
@@ -129,6 +138,7 @@ export function JoinWizard({
   billingClient,
   standingOrderLinks,
   prefillFirstRowName,
+  initialStudents,
   startAtStep,
   onEnterApp,
 }: JoinWizardProps) {
@@ -143,7 +153,7 @@ export function JoinWizard({
   // person already holds the current version, and its own docstring calls a re-signature
   // reaching it a duplicate rather than a mistake.
   const [agreed, setAgreed] = useState(() => (startAtStep ?? 1) > 1)
-  const [students, setStudents] = useState<StudentDraft[]>([])
+  const [students, setStudents] = useState<StudentDraft[]>(() => [...(initialStudents ?? [])])
   const [methods, setMethods] = useState<Record<string, PaymentMethod>>({})
   //: Step 3's own "כן, התשלום כבר הוסדר מראש" choice, lifted here because `submitJoin`
   //: needs it and step 3 does not call `submitJoin` itself.
