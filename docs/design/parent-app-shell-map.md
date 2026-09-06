@@ -113,8 +113,32 @@ the inbox's RSVP action.
 | 4 | **חנות המועדון** | ✅ mounted |
 | 5 | **פרופיל** — and with it the money, the trainee cards and add-a-child | ✅ mounted |
 | 6 | strings into `@studio/i18n`, mirrored into `en/` and `ru/` | ✅ done |
-| — | the dark sweep | outstanding, and see below |
+| — | the dark sweep | ✅ done, and see below |
 | — | deleting the screens the redesign replaced | ✅ done (b8621c3) |
+
+### The dark sweep, and what it deliberately left light
+
+The prototype ships eight `html.dark .<class> { … !important }` rules and relies on them
+entirely for three of its screens. Four of the ported files were drawn against those rules
+and carried no `dark:` variant of their own; the other eighteen carry their own throughout.
+
+**The rules are not portable as written.** `!important` on a bare class also beats the
+explicit `dark:` variants the eighteen files carry, so porting them would have flattened
+work that is more specific than a blanket rule. The same values are written per element
+instead — `#0f172a` is `slate-900`, `#1e293b` is `slate-800`, `#f8fafc` is `slate-50`,
+`#cbd5e1` is `slate-300`, `#94a3b8` is `slate-400` — 174 `dark:` siblings across the four.
+
+**One place the port is deliberately BETTER than the prototype.** `html.dark
+.text-slate-900 { color:#f8fafc !important }` also fires inside the prototype's own pink
+urgent banner and its pale-blue accent chips, which keep their light background: white text
+on `#ffdad6`. That is a contrast failure rather than a design, and the project's rule is
+4.5:1. A run whose background is an arbitrary hex or a 50/100/200 tint keeps its dark text.
+
+**What stays light in dark mode, on purpose.** The accent chips — `bg-blue-50` on the month
+button, `bg-[#EEF2FF]` on the shop's בחירה, the emerald and red status pills — keep their
+tint and their dark text, exactly as the prototype does. They read correctly (the
+screenshots in `docs/screenshots/parent-app-checkpoints/dark/` are what that judgement was
+made from), and darkening them is a design change the owner has not been shown.
 
 ### Still outstanding, and deliberately so
 

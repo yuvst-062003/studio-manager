@@ -39,7 +39,11 @@ export function ProfileHeader({
   locale: Locale
 }) {
   return (
-    <div className="flex flex-col space-y-4 text-start">
+    // `px-4` matches `ProfileMenu`'s, and is here rather than on a wrapper in
+    // `ProfileScreen` because the header is the only thing above the menu: without it the
+    // avatar sits flush against the inline-start edge of the phone column while the card
+    // under it is inset, which is what the dark-mode screenshots of 2026-09-06 showed.
+    <div className="flex flex-col space-y-4 text-start px-4 pt-4">
       {/* Header */}
       <header className="flex items-center justify-between" data-testid="profile-header">
         <div className="flex items-center gap-3">

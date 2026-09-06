@@ -69,11 +69,11 @@ export function HomeTop({
         <div className="text-start">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-[#10b981] animate-pulse"></span>
-            <h1 data-testid="home-club-name" className="text-xl font-black text-[#0A1938] tracking-tight">
+            <h1 data-testid="home-club-name" className="text-xl font-black text-[#0A1938] dark:text-slate-50 tracking-tight">
               {clubName}
             </h1>
           </div>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">{greeting}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">{greeting}</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -94,14 +94,14 @@ export function HomeTop({
             type="button"
             data-testid="home-notifications"
             onClick={onOpenNotifications}
-            className="relative p-2.5 rounded-2xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/80 shadow-xs active:scale-95 transition-all cursor-pointer group"
+            className="relative p-2.5 rounded-2xl bg-white dark:bg-slate-900 hover:bg-slate-50 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 shadow-xs active:scale-95 transition-all cursor-pointer group"
             title={t(locale, 'schedule.home.notificationsTitle')}
             aria-label={notificationsLabel}
           >
             {unreadCount > 0 ? (
               <BellRing className="w-5 h-5 text-[#2563EB] group-hover:rotate-12 transition-transform" />
             ) : (
-              <Bell className="w-5 h-5 text-slate-600 group-hover:rotate-12 transition-transform" />
+              <Bell className="w-5 h-5 text-slate-600 dark:text-slate-300 group-hover:rotate-12 transition-transform" />
             )}
             {unreadCount > 0 && (
               <span
@@ -140,7 +140,7 @@ export function HomeTop({
                 !
               </span>
             </div>
-            <p className="text-[11px] text-slate-700 leading-tight mt-1 font-normal">{urgentDetail}</p>
+            <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-tight mt-1 font-normal">{urgentDetail}</p>
           </div>
         </div>
       )}
@@ -161,13 +161,13 @@ export function HomeTop({
           className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all shrink-0 cursor-pointer ${
             selectedChildId === null
               ? 'bg-[#001849] text-white shadow-xs'
-              : 'bg-white text-slate-700 border border-slate-200/80 hover:bg-slate-50'
+              : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 hover:bg-slate-50'
           }`}
         >
           <span>{t(locale, 'schedule.home.allChildren')}</span>
           <span
             className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
-              selectedChildId === null ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+              selectedChildId === null ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
             }`}
           >
             {childList.length}
@@ -186,7 +186,7 @@ export function HomeTop({
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs transition-all shrink-0 cursor-pointer ${
                 isActive
                   ? 'bg-[#001849] text-white font-semibold shadow-xs'
-                  : 'bg-white text-slate-700 border border-slate-200/80 font-medium hover:bg-slate-50'
+                  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 font-medium hover:bg-slate-50'
               }`}
             >
               <span>{child.beltName ? `${child.firstName} (${child.beltName})` : child.firstName}</span>

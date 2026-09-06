@@ -109,7 +109,7 @@ function isNewPill(baseClassName: string, locale: Locale) {
 
 const STATE_SHELL = 'text-center py-12 px-4 space-y-3'
 const STATE_ICON_WRAP =
-  'w-14 h-14 mx-auto rounded-full bg-slate-100 flex items-center justify-center text-slate-400'
+  'w-14 h-14 mx-auto rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-400'
 
 export function UpdatesFeed({
   groups,
@@ -162,7 +162,7 @@ export function UpdatesFeed({
   const totalVisible = groups.urgent.length + groups.club.length + groups.personal.length
 
   return (
-    <div className="flex flex-col min-h-screen pb-28 bg-[#f7f9fd]" data-testid="updates-feed">
+    <div className="flex flex-col min-h-screen pb-28 bg-[#f7f9fd] dark:bg-slate-950" data-testid="updates-feed">
       {/* Top Header */}
       <header className="pt-6 px-4 pb-3" data-purpose="top-header">
         <div className="flex items-center justify-between gap-2">
@@ -172,7 +172,7 @@ export function UpdatesFeed({
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-3 w-3 bg-[#e02424]"></span>
             </span>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">{t(locale, 'comms.updates.title')}</h1>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">{t(locale, 'comms.updates.title')}</h1>
           </div>
 
           <div className="flex items-center gap-2">
@@ -202,7 +202,7 @@ export function UpdatesFeed({
             className={`whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-semibold transition-all cursor-pointer ${
               filter.kind === 'all'
                 ? 'bg-[#0d1d3a] text-white shadow-xs'
-                : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80'
+                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 border border-slate-200/80 dark:border-slate-700'
             }`}
           >
             {t(locale, 'comms.updates.filterAll')}
@@ -216,7 +216,7 @@ export function UpdatesFeed({
             className={`whitespace-nowrap px-3.5 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
               filter.kind === 'action'
                 ? 'bg-[#0d1d3a] text-white font-semibold shadow-xs'
-                : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80'
+                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 border border-slate-200/80 dark:border-slate-700'
             }`}
           >
             <span>{t(locale, 'comms.updates.filterAction')}</span>
@@ -235,7 +235,7 @@ export function UpdatesFeed({
             className={`whitespace-nowrap px-3.5 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${
               filter.kind === 'club'
                 ? 'bg-[#0d1d3a] text-white font-semibold shadow-xs'
-                : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80'
+                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 border border-slate-200/80 dark:border-slate-700'
             }`}
           >
             {t(locale, 'comms.updates.filterClub')}
@@ -253,7 +253,7 @@ export function UpdatesFeed({
                 className={`whitespace-nowrap px-3.5 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${
                   isActive
                     ? 'bg-[#0d1d3a] text-white font-semibold shadow-xs'
-                    : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80'
+                    : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 border border-slate-200/80 dark:border-slate-700'
                 }`}
               >
                 {name}
@@ -270,7 +270,7 @@ export function UpdatesFeed({
               type="button"
               onClick={onMarkAllRead}
               data-testid="updates-mark-all-read"
-              className="text-[11px] font-medium text-slate-500 hover:text-slate-700 underline underline-offset-2 transition-colors cursor-pointer"
+              className="text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 underline underline-offset-2 transition-colors cursor-pointer"
             >
               {t(locale, 'comms.updates.markAllRead')}
             </button>
@@ -285,14 +285,14 @@ export function UpdatesFeed({
             <div className={STATE_ICON_WRAP}>
               <Bell className="w-7 h-7" />
             </div>
-            <h4 className="font-bold text-slate-700">{t(locale, 'comms.updates.loading')}</h4>
+            <h4 className="font-bold text-slate-700 dark:text-slate-300">{t(locale, 'comms.updates.loading')}</h4>
           </div>
         ) : state === 'failed' ? (
           <div className={STATE_SHELL}>
             <div className={STATE_ICON_WRAP}>
               <Bell className="w-7 h-7" />
             </div>
-            <h4 className="font-bold text-slate-700">{resolveLoadFailedText(locale, 'comms.updates.loadFailed')}</h4>
+            <h4 className="font-bold text-slate-700 dark:text-slate-300">{resolveLoadFailedText(locale, 'comms.updates.loadFailed')}</h4>
             <button
               type="button"
               onClick={onRetry}
@@ -318,7 +318,7 @@ export function UpdatesFeed({
                       {t(locale, 'comms.updates.urgentHeading')}
                     </h2>
                   </div>
-                  <span className="text-xs text-slate-500 font-medium">{t(locale, 'comms.updates.urgentNote')}</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">{t(locale, 'comms.updates.urgentNote')}</span>
                 </div>
 
                 {groups.urgent.map((row) => {
@@ -330,7 +330,7 @@ export function UpdatesFeed({
                     <article
                       key={row.id}
                       data-testid={`updates-row-${row.id}`}
-                      className={`bg-white rounded-2xl p-4 shadow-xs border border-slate-100 border-s-4 flex items-center justify-between gap-3 transition-all hover:shadow-md ${
+                      className={`bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-xs border border-slate-100 dark:border-slate-800 border-s-4 flex items-center justify-between gap-3 transition-all hover:shadow-md ${
                         settled ? 'border-s-emerald-500 bg-emerald-50/20' : style.border
                       }`}
                     >
@@ -350,7 +350,7 @@ export function UpdatesFeed({
                               </span>
                             )}
                             {row.isNew && isNewPill('px-2 py-0.5 rounded text-xs font-medium', locale)}
-                            <h3 className="text-base font-bold text-slate-900 leading-snug">{row.title}</h3>
+                            <h3 className="text-base font-bold text-slate-900 dark:text-slate-50 leading-snug">{row.title}</h3>
                           </div>
                           <p className={`text-xs font-semibold ${settled ? 'text-emerald-700' : style.status}`}>
                             {row.body}
@@ -389,33 +389,33 @@ export function UpdatesFeed({
                 data-testid="updates-section-club"
               >
                 <div className="flex items-center justify-between pt-2">
-                  <div className="flex items-center gap-1.5 text-slate-900">
+                  <div className="flex items-center gap-1.5 text-slate-900 dark:text-slate-50">
                     <Megaphone className="w-5 h-5 text-blue-600" />
-                    <h2 id="updates-heading-club" className="font-bold text-base text-slate-900">
+                    <h2 id="updates-heading-club" className="font-bold text-base text-slate-900 dark:text-slate-50">
                       {t(locale, 'comms.updates.clubHeading')}
                     </h2>
                   </div>
                   {/* The prototype's trailing caption on the heading row — who the section
                       is about. Static, so it ports as written. */}
-                  <span className="text-xs text-slate-500 font-medium">{t(locale, 'comms.updates.clubNote')}</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">{t(locale, 'comms.updates.clubNote')}</span>
                 </div>
 
                 {groups.club.map((row) => (
                   <article
                     key={row.id}
                     data-testid={`updates-row-${row.id}`}
-                    className="bg-white rounded-2xl p-4 shadow-xs border border-slate-100 space-y-2.5 transition-all hover:shadow-md text-start"
+                    className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-xs border border-slate-100 dark:border-slate-800 space-y-2.5 transition-all hover:shadow-md text-start"
                   >
-                    <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
-                      <span className="font-bold text-slate-700">{dateLabel(row.createdAt)}</span>
+                    <div className="flex items-center justify-between text-xs text-slate-400 dark:text-slate-400 font-medium">
+                      <span className="font-bold text-slate-700 dark:text-slate-300">{dateLabel(row.createdAt)}</span>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-base font-bold text-slate-900 leading-tight">{row.title}</h3>
+                      <h3 className="text-base font-bold text-slate-900 dark:text-slate-50 leading-tight">{row.title}</h3>
                       {row.isNew && isNewPill('px-2 py-0.5 rounded text-xs font-medium', locale)}
                     </div>
-                    <p className="text-sm text-slate-600 leading-relaxed">{row.body}</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{row.body}</p>
                     {row.action !== null && row.action.href !== null ? (
-                      <div className="pt-2 border-t border-slate-50 flex items-center justify-end">
+                      <div className="pt-2 border-t border-slate-50 dark:border-slate-800 flex items-center justify-end">
                         <a
                           onClick={() => onOpen(row.id)}
                           href={row.action.href}
@@ -441,15 +441,15 @@ export function UpdatesFeed({
                 data-testid="updates-section-personal"
               >
                 <div className="flex items-center justify-between pt-2">
-                  <div className="flex items-center gap-1.5 text-slate-900">
+                  <div className="flex items-center gap-1.5 text-slate-900 dark:text-slate-50">
                     <Award className="w-5 h-5 text-blue-600" />
-                    <h2 id="updates-heading-personal" className="font-bold text-base text-slate-900">
+                    <h2 id="updates-heading-personal" className="font-bold text-base text-slate-900 dark:text-slate-50">
                       {t(locale, 'comms.updates.personalHeading')}
                     </h2>
                   </div>
                   {/* The prototype's trailing caption on the heading row — who the section
                       is about. Static, so it ports as written. */}
-                  <span className="text-xs text-slate-500 font-medium">{t(locale, 'comms.updates.personalNote')}</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">{t(locale, 'comms.updates.personalNote')}</span>
                 </div>
 
                 {groups.personal.map((row) => {
@@ -460,7 +460,7 @@ export function UpdatesFeed({
                     <article
                       key={row.id}
                       data-testid={`updates-row-${row.id}`}
-                      className={`bg-white rounded-2xl p-4 shadow-xs border border-slate-100 border-s-4 ${style.border} flex items-center justify-between gap-3 transition-all hover:shadow-md text-start`}
+                      className={`bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-xs border border-slate-100 dark:border-slate-800 border-s-4 ${style.border} flex items-center justify-between gap-3 transition-all hover:shadow-md text-start`}
                     >
                       <div className="flex items-start gap-3 flex-1">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${style.tile}`}>
@@ -474,9 +474,9 @@ export function UpdatesFeed({
                               </span>
                             )}
                             {row.isNew && isNewPill('px-2 py-0.5 rounded text-xs font-semibold', locale)}
-                            <h3 className="text-sm font-bold text-slate-900 leading-tight">{row.title}</h3>
+                            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-50 leading-tight">{row.title}</h3>
                           </div>
-                          <p className="text-xs text-slate-500 font-medium">{row.body}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">{row.body}</p>
                         </div>
                       </div>
                       {/* A SETTLED action shows that it is settled and offers nothing. Its
@@ -495,7 +495,7 @@ export function UpdatesFeed({
                           onClick={() => onOpen(row.id)}
                           href={row.action.href}
                           data-testid={`updates-action-${row.id}`}
-                          className="bg-[#eef2f9] hover:bg-blue-100 active:scale-95 text-blue-900 text-xs font-semibold px-3 py-2 rounded-xl flex items-center gap-1 transition-transform shrink-0 cursor-pointer"
+                          className="bg-[#eef2f9] dark:bg-slate-800 hover:bg-blue-100 active:scale-95 text-blue-900 text-xs font-semibold px-3 py-2 rounded-xl flex items-center gap-1 transition-transform shrink-0 cursor-pointer"
                         >
                           <span>{row.action.label}</span>
                           <ChevronLeft className="w-4 h-4" />
@@ -513,11 +513,11 @@ export function UpdatesFeed({
                 <div className={STATE_ICON_WRAP}>
                   <Bell className="w-7 h-7" />
                 </div>
-                <h4 className="font-bold text-slate-700">
+                <h4 className="font-bold text-slate-700 dark:text-slate-300">
                   {filter.kind !== 'all' ? t(locale, 'comms.updates.emptyFiltered') : t(locale, 'comms.updates.emptyTitle')}
                 </h4>
                 {filter.kind === 'all' && (
-                  <p className="text-xs text-slate-500 max-w-xs mx-auto">{t(locale, 'comms.updates.emptyBody')}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto">{t(locale, 'comms.updates.emptyBody')}</p>
                 )}
                 {filter.kind !== 'all' && (
                   <button

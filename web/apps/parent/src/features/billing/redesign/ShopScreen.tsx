@@ -88,15 +88,15 @@ export function ShopScreen({
   const sizeMissing = selectedProduct !== null && selectedProduct.sizes.length > 0 && modalSize === null
 
   return (
-    <div data-testid="shop-screen" className="flex flex-col min-h-screen pb-32 bg-[#faf8ff]">
+    <div data-testid="shop-screen" className="flex flex-col min-h-screen pb-32 bg-[#faf8ff] dark:bg-slate-950">
       {/* Top Header Section */}
       <header className="px-5 pt-8 pb-3">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h1 className="text-2xl font-black text-[#0A1938] tracking-tight leading-none mb-1.5">
+            <h1 className="text-2xl font-black text-[#0A1938] dark:text-slate-50 tracking-tight leading-none mb-1.5">
               {t(locale, 'billing.shop.title')}
             </h1>
-            <p className="text-[13px] font-medium text-slate-600">{t(locale, 'billing.shop.subtitle')}</p>
+            <p className="text-[13px] font-medium text-slate-600 dark:text-slate-300">{t(locale, 'billing.shop.subtitle')}</p>
           </div>
           <div className="shrink-0 flex flex-col items-end gap-1.5">
             <div className="flex items-center gap-1 bg-[#EEF2FF] text-[#2563EB] px-2.5 py-1.5 rounded-full border border-blue-100 shadow-xs">
@@ -127,7 +127,7 @@ export function ShopScreen({
                 <article
                   key={product.id}
                   data-testid={`shop-product-${product.id}`}
-                  className="product-item-card bg-white rounded-2xl p-2.5 shadow-xs border border-slate-100 flex flex-col justify-between transition-all hover:shadow-md cursor-pointer active:scale-[0.98]"
+                  className="product-item-card bg-white dark:bg-slate-900 rounded-2xl p-2.5 shadow-xs border border-slate-100 dark:border-slate-800 flex flex-col justify-between transition-all hover:shadow-md cursor-pointer active:scale-[0.98]"
                 >
                   <div>
                     {/* The manager's photo when there is one, the default tile when there
@@ -138,22 +138,22 @@ export function ShopScreen({
                         src={product.imageUrl}
                         alt=""
                         loading="lazy"
-                        className="relative w-full aspect-square rounded-xl overflow-hidden bg-slate-50 mb-2.5 object-cover"
+                        className="relative w-full aspect-square rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-800/70 mb-2.5 object-cover"
                       />
                     ) : (
                       <div
                         role="img"
                         aria-label={t(locale, 'billing.shop.noPhoto')}
-                        className="relative w-full aspect-square rounded-xl overflow-hidden bg-slate-50 mb-2.5 flex items-center justify-center"
+                        className="relative w-full aspect-square rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-800/70 mb-2.5 flex items-center justify-center"
                       >
-                        <ShoppingBag className="w-8 h-8 text-slate-300" aria-hidden="true" />
+                        <ShoppingBag className="w-8 h-8 text-slate-300 dark:text-slate-600" aria-hidden="true" />
                       </div>
                     )}
-                    <h3 className="font-black text-[15px] text-[#0A1938] leading-tight mb-1 line-clamp-1 text-start">
+                    <h3 className="font-black text-[15px] text-[#0A1938] dark:text-slate-50 leading-tight mb-1 line-clamp-1 text-start">
                       {product.name}
                     </h3>
                     {product.description !== null && (
-                      <p className="text-xs text-slate-500 line-clamp-1 mb-2.5 text-start">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1 mb-2.5 text-start">
                         {product.description}
                       </p>
                     )}
@@ -168,7 +168,7 @@ export function ShopScreen({
                       <span>{t(locale, 'billing.shop.choose')}</span>
                       <span className="text-sm font-black">+</span>
                     </button>
-                    <span className="font-extrabold text-[#0A1938] text-base">
+                    <span className="font-extrabold text-[#0A1938] dark:text-slate-50 text-base">
                       {money(product.priceAgorot)}
                     </span>
                   </div>
@@ -193,16 +193,16 @@ export function ShopScreen({
         <main className="px-5 mt-4 flex-1">
           <div
             data-testid={state === 'ready' ? 'shop-empty' : undefined}
-            className="bg-white rounded-2xl border border-slate-100 shadow-xs p-6 text-center"
+            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xs p-6 text-center"
           >
             {state === 'loading' && (
-              <p className="text-sm font-semibold text-slate-500" role="status">
+              <p className="text-sm font-semibold text-slate-500 dark:text-slate-400" role="status">
                 {t(locale, 'billing.shop.loading')}
               </p>
             )}
             {state === 'failed' && (
               <>
-                <p className="text-sm font-semibold text-slate-500 mb-3">{resolveLoadFailedText(locale, 'billing.shop.loadFailed')}</p>
+                <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-3">{resolveLoadFailedText(locale, 'billing.shop.loadFailed')}</p>
                 <button
                   type="button"
                   onClick={onRetry}
@@ -214,8 +214,8 @@ export function ShopScreen({
             )}
             {state === 'ready' && (
               <>
-                <p className="text-sm font-black text-[#0A1938] mb-1">{t(locale, 'billing.shop.empty')}</p>
-                <p className="text-xs text-slate-500">{t(locale, 'billing.shop.emptyBody')}</p>
+                <p className="text-sm font-black text-[#0A1938] dark:text-slate-50 mb-1">{t(locale, 'billing.shop.empty')}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{t(locale, 'billing.shop.emptyBody')}</p>
               </>
             )}
           </div>
@@ -237,7 +237,7 @@ export function ShopScreen({
                 </span>
               </div>
               <div className="text-start">
-                <div className="text-xs text-slate-300 font-medium">
+                <div className="text-xs text-slate-300 dark:text-slate-600 font-medium">
                   {cartTotalQty === 1 ? t(locale, 'billing.shop.cartBarOneItem') : fill(t(locale, 'billing.shop.cartBarItems'), { count: cartTotalQty })}
                 </div>
                 <div className="text-base font-black tracking-tight text-white">
@@ -279,18 +279,18 @@ export function ShopScreen({
             aria-labelledby="shop-customiser-title"
             tabIndex={-1}
             data-testid="shop-customiser"
-            className="bg-[#FAF8FF] w-full max-w-md mx-auto rounded-t-3xl shadow-2xl flex flex-col max-h-[92vh] border-t border-blue-100 overflow-hidden text-start"
+            className="bg-[#FAF8FF] dark:bg-slate-950 w-full max-w-md mx-auto rounded-t-3xl shadow-2xl flex flex-col max-h-[92vh] border-t border-blue-100 overflow-hidden text-start"
           >
             {/* Sheet Header */}
-            <div className="px-5 pt-4 pb-3 flex items-center justify-between border-b border-slate-200 bg-white">
-              <h2 id="shop-customiser-title" className="text-base font-black text-[#0A1938]">
+            <div className="px-5 pt-4 pb-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+              <h2 id="shop-customiser-title" className="text-base font-black text-[#0A1938] dark:text-slate-50">
                 {t(locale, 'billing.shop.customiseTitle')}
               </h2>
               <button
                 type="button"
                 onClick={() => setSelectedProduct(null)}
                 aria-label={t(locale, 'billing.shop.close')}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 flex items-center justify-center text-slate-600 dark:text-slate-300 font-bold transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" aria-hidden="true" />
               </button>
@@ -299,29 +299,29 @@ export function ShopScreen({
             {/* Scrollable Body */}
             <div className="p-5 overflow-y-auto space-y-4 no-scrollbar flex-1">
               {/* Item Info Box */}
-              <div className="flex gap-3.5 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
+              <div className="flex gap-3.5 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs">
                 {selectedProduct.imageUrl ? (
                   <img
                     src={selectedProduct.imageUrl}
                     alt=""
-                    className="w-20 h-20 rounded-xl border border-slate-100 shrink-0 bg-slate-50 object-cover"
+                    className="w-20 h-20 rounded-xl border border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50 dark:bg-slate-800/70 object-cover"
                   />
                 ) : (
                   <div
                     role="img"
                     aria-label={t(locale, 'billing.shop.noPhoto')}
-                    className="w-20 h-20 rounded-xl border border-slate-100 shrink-0 bg-slate-50 flex items-center justify-center"
+                    className="w-20 h-20 rounded-xl border border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50 dark:bg-slate-800/70 flex items-center justify-center"
                   >
-                    <ShoppingBag className="w-8 h-8 text-slate-300" aria-hidden="true" />
+                    <ShoppingBag className="w-8 h-8 text-slate-300 dark:text-slate-600" aria-hidden="true" />
                   </div>
                 )}
                 <div className="flex flex-col justify-between py-0.5">
                   <div>
-                    <h3 className="font-black text-base text-[#0A1938] leading-snug">
+                    <h3 className="font-black text-base text-[#0A1938] dark:text-slate-50 leading-snug">
                       {selectedProduct.name}
                     </h3>
                     {selectedProduct.description !== null && (
-                      <p className="text-xs text-slate-500 mt-1">{selectedProduct.description}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{selectedProduct.description}</p>
                     )}
                   </div>
                   <div className="text-base font-black text-[#2563EB]">
@@ -332,8 +332,8 @@ export function ShopScreen({
 
               {/* Size Options -- only when the item HAS sizes; a חגורה has none. */}
               {selectedProduct.sizes.length > 0 && (
-                <fieldset className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
-                  <legend className="block text-xs font-bold text-[#0A1938] mb-2 w-full text-start">
+                <fieldset className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs">
+                  <legend className="block text-xs font-bold text-[#0A1938] dark:text-slate-50 mb-2 w-full text-start">
                     {t(locale, 'billing.shop.sizeLegend')}
                   </legend>
                   <div className="grid grid-cols-3 gap-2">
@@ -345,7 +345,7 @@ export function ShopScreen({
                           className={`p-2 rounded-xl text-xs transition-all text-center border cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#2563EB] ${
                             isChosen
                               ? 'border-[#2563EB] bg-[#EEF2FF] text-[#2563EB] font-bold shadow-xs'
-                              : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-medium'
+                              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 font-medium'
                           }`}
                         >
                           <input
@@ -363,7 +363,7 @@ export function ShopScreen({
                     })}
                   </div>
                   {modalSize === null && (
-                    <p id="shop-size-hint" className="text-[11px] text-slate-500 mt-2">
+                    <p id="shop-size-hint" className="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
                       {t(locale, 'billing.shop.sizeRequired')}
                     </p>
                   )}
@@ -371,15 +371,15 @@ export function ShopScreen({
               )}
 
               {/* Quantity */}
-              <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-3">
-                <label htmlFor="shop-quantity" className="text-xs font-bold text-[#0A1938]">
+              <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-between gap-3">
+                <label htmlFor="shop-quantity" className="text-xs font-bold text-[#0A1938] dark:text-slate-50">
                   {t(locale, 'billing.shop.quantityLabel')}
                 </label>
                 <select
                   id="shop-quantity"
                   value={modalQty}
                   onChange={(event) => setModalQty(Number(event.target.value))}
-                  className="rounded-lg border border-slate-200 bg-[#F0F4FE] text-sm font-bold text-[#0A1938] px-3 py-1.5"
+                  className="rounded-lg border border-slate-200 dark:border-slate-700 bg-[#F0F4FE] text-sm font-bold text-[#0A1938] px-3 py-1.5"
                 >
                   {QUANTITY_OPTIONS.map((n) => (
                     <option key={n} value={n}>
@@ -390,8 +390,8 @@ export function ShopScreen({
               </div>
 
               {/* Note */}
-              <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
-                <label htmlFor="shop-note" className="block text-xs font-bold text-[#0A1938] mb-2">
+              <div className="bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs">
+                <label htmlFor="shop-note" className="block text-xs font-bold text-[#0A1938] dark:text-slate-50 mb-2">
                   {t(locale, 'billing.shop.noteLabel')}
                 </label>
                 <textarea
@@ -400,13 +400,13 @@ export function ShopScreen({
                   onChange={(event) => setModalNote(event.target.value)}
                   placeholder={t(locale, 'billing.shop.notePlaceholder')}
                   rows={2}
-                  className="w-full rounded-xl border border-slate-200 text-sm p-2.5 text-slate-700 placeholder:text-slate-400 focus:border-[#2563EB] focus:outline-none resize-none"
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 text-sm p-2.5 text-slate-700 dark:text-slate-300 placeholder:text-slate-400 focus:border-[#2563EB] focus:outline-none resize-none"
                 />
               </div>
             </div>
 
             {/* Footer CTA */}
-            <div className="p-4 bg-white border-t border-slate-200">
+            <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700">
               <button
                 type="button"
                 data-testid="shop-add"
@@ -440,15 +440,15 @@ export function ShopScreen({
             aria-labelledby="shop-cart-title"
             tabIndex={-1}
             data-testid="shop-cart"
-            className="bg-[#FAF8FF] w-full max-w-md mx-auto rounded-t-3xl shadow-2xl flex flex-col max-h-[90vh] border-t border-blue-100 overflow-hidden text-start"
+            className="bg-[#FAF8FF] dark:bg-slate-950 w-full max-w-md mx-auto rounded-t-3xl shadow-2xl flex flex-col max-h-[90vh] border-t border-blue-100 overflow-hidden text-start"
           >
             {/* Header */}
-            <div className="px-5 pt-4 pb-3 flex items-center justify-between border-b border-slate-200 bg-white">
+            <div className="px-5 pt-4 pb-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-[#EEF2FF] flex items-center justify-center text-[#2563EB]">
                   <ShoppingBag className="w-4 h-4" aria-hidden="true" />
                 </div>
-                <h2 id="shop-cart-title" className="text-base font-black text-[#0A1938]">
+                <h2 id="shop-cart-title" className="text-base font-black text-[#0A1938] dark:text-slate-50">
                   {t(locale, 'billing.shop.cartTitle')}
                 </h2>
               </div>
@@ -456,7 +456,7 @@ export function ShopScreen({
                 type="button"
                 onClick={() => setIsCartOpen(false)}
                 aria-label={t(locale, 'billing.shop.close')}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 font-bold transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 flex items-center justify-center text-slate-500 dark:text-slate-400 font-bold transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" aria-hidden="true" />
               </button>
@@ -469,8 +469,8 @@ export function ShopScreen({
                   <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3.5 shadow-inner border border-emerald-100 animate-bounce">
                     <CheckCircle2 className="w-9 h-9" aria-hidden="true" />
                   </div>
-                  <h3 className="text-xl font-black text-[#0A1938] mb-1">{t(locale, 'billing.shop.placedTitle')}</h3>
-                  <p className="text-xs text-slate-500 mb-4">
+                  <h3 className="text-xl font-black text-[#0A1938] dark:text-slate-50 mb-1">{t(locale, 'billing.shop.placedTitle')}</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
                     {fill(t(locale, 'billing.shop.placedBody'), {
                       count: checkout.lines,
                       total: money(checkout.totalAgorot),
@@ -491,7 +491,7 @@ export function ShopScreen({
                   </button>
                 </div>
               ) : cart.length === 0 ? (
-                <p className="text-sm text-slate-500 text-center py-6">{t(locale, 'billing.shop.cartEmpty')}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-6">{t(locale, 'billing.shop.cartEmpty')}</p>
               ) : (
                 <>
                   <div className="space-y-2.5">
@@ -499,18 +499,18 @@ export function ShopScreen({
                       <div
                         key={`${line.productId}-${line.size ?? 'none'}-${index}`}
                         data-testid={`shop-line-${index}`}
-                        className="flex items-center justify-between p-2.5 bg-white rounded-2xl border border-slate-100 shadow-xs gap-2"
+                        className="flex items-center justify-between p-2.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xs gap-2"
                       >
                         <div className="flex items-center gap-2.5 min-w-0 flex-1">
                           <div
                             role="img"
                             aria-label={t(locale, 'billing.shop.noPhoto')}
-                            className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 shrink-0 flex items-center justify-center"
+                            className="w-12 h-12 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-800 shrink-0 flex items-center justify-center"
                           >
-                            <ShoppingBag className="w-5 h-5 text-slate-300" aria-hidden="true" />
+                            <ShoppingBag className="w-5 h-5 text-slate-300 dark:text-slate-600" aria-hidden="true" />
                           </div>
                           <div className="truncate">
-                            <div className="font-black text-xs text-[#0A1938] truncate">
+                            <div className="font-black text-xs text-[#0A1938] dark:text-slate-50 truncate">
                               {line.name}
                             </div>
                             {(line.size || line.note) && (
@@ -537,7 +537,7 @@ export function ShopScreen({
                               </option>
                             ))}
                           </select>
-                          <span className="font-black text-xs text-[#0A1938] min-w-[40px] text-end">
+                          <span className="font-black text-xs text-[#0A1938] dark:text-slate-50 min-w-[40px] text-end">
                             {money(line.priceAgorot * line.quantity)}
                           </span>
                           <button
@@ -545,7 +545,7 @@ export function ShopScreen({
                             data-testid={`shop-remove-${index}`}
                             onClick={() => onRemoveLine(index)}
                             aria-label={t(locale, 'billing.shop.cartRemove')}
-                            className="text-slate-400 hover:text-red-500 p-1 text-xs cursor-pointer"
+                            className="text-slate-400 dark:text-slate-400 hover:text-red-500 p-1 text-xs cursor-pointer"
                           >
                             <X className="w-3.5 h-3.5" aria-hidden="true" />
                           </button>
@@ -564,7 +564,7 @@ export function ShopScreen({
 
             {/* Footer Button */}
             {checkout.kind !== 'placed' && cart.length > 0 && (
-              <div className="p-4 bg-white border-t border-slate-200">
+              <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700">
                 <button
                   type="button"
                   data-testid="shop-checkout"

@@ -68,7 +68,7 @@ export function HomeSchedule({
       {/* Weekly Calendar Strip Container */}
       <div
         data-testid="home-week-strip"
-        className="bg-white rounded-3xl p-2.5 shadow-xs border border-slate-100 flex items-center justify-between gap-1"
+        className="bg-white dark:bg-slate-900 rounded-3xl p-2.5 shadow-xs border border-slate-100 dark:border-slate-800 flex items-center justify-between gap-1"
       >
         {/* Monthly Trigger Button */}
         <button
@@ -82,7 +82,7 @@ export function HomeSchedule({
           <span className="text-[11px] font-medium mt-0.5">{t(locale, 'schedule.home.monthButton')}</span>
         </button>
 
-        <div className="h-9 w-px bg-slate-200 mx-0.5 shrink-0"></div>
+        <div className="h-9 w-px bg-slate-200 dark:bg-slate-700 mx-0.5 shrink-0"></div>
 
         {/* Days Horizontal Strip — a single-choice control, so the group carries the
             selection semantics and each chip reports its own pressed state. */}
@@ -103,7 +103,7 @@ export function HomeSchedule({
                 className={`day-chip flex flex-col items-center py-1.5 rounded-2xl transition-all cursor-pointer ${
                   isSelected
                     ? 'bg-[#001849] text-white shadow-xs font-semibold'
-                    : 'hover:bg-slate-50 text-slate-800'
+                    : 'hover:bg-slate-50 text-slate-800 dark:text-slate-50'
                 }`}
               >
                 <span
@@ -125,7 +125,7 @@ export function HomeSchedule({
                   className={`text-sm font-bold ${
                     isSelected
                       ? 'text-white text-base mt-0.5'
-                      : `mt-0.5 ${day.hasSessions ? 'text-slate-800' : 'text-slate-400 dark:text-slate-600'}`
+                      : `mt-0.5 ${day.hasSessions ? 'text-slate-800 dark:text-slate-50' : 'text-slate-400 dark:text-slate-600'}`
                   }`}
                 >
                   {day.dayOfMonth}
@@ -141,10 +141,10 @@ export function HomeSchedule({
         {/* Date Headline & Schedule Count */}
         <div className="flex items-center justify-between mb-3 px-1 mt-1">
           <div className="text-start">
-            <h2 data-testid="home-headline" className="text-lg font-bold text-slate-900 tracking-tight">
+            <h2 data-testid="home-headline" className="text-lg font-bold text-slate-900 dark:text-slate-50 tracking-tight">
               {headline}
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5 font-normal">{countLabel}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-normal">{countLabel}</p>
           </div>
           <div className="w-8 h-8 rounded-full bg-blue-50 text-[#0056c5] flex items-center justify-center">
             <Clock className="w-4 h-4 text-[#0056c5]" />
@@ -154,18 +154,18 @@ export function HomeSchedule({
         {/* Training Session Cards List */}
         <div className="space-y-3" data-testid="home-sessions">
           {state === 'loading' ? (
-            <div className="text-center py-10 bg-white rounded-3xl border border-dashed border-slate-200 mt-3 p-6">
-              <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-400">
+            <div className="text-center py-10 bg-white dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700 mt-3 p-6">
+              <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800/70 rounded-full flex items-center justify-center mx-auto text-slate-400 dark:text-slate-400">
                 <Calendar className="w-6 h-6" />
               </div>
-              <h4 className="font-semibold text-slate-700 mt-2">{t(locale, 'schedule.home.loading')}</h4>
+              <h4 className="font-semibold text-slate-700 dark:text-slate-300 mt-2">{t(locale, 'schedule.home.loading')}</h4>
             </div>
           ) : state === 'failed' ? (
-            <div className="text-center py-10 bg-white rounded-3xl border border-dashed border-slate-200 mt-3 p-6">
-              <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-400">
+            <div className="text-center py-10 bg-white dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700 mt-3 p-6">
+              <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800/70 rounded-full flex items-center justify-center mx-auto text-slate-400 dark:text-slate-400">
                 <Calendar className="w-6 h-6" />
               </div>
-              <h4 className="font-semibold text-slate-700 mt-2">{resolveLoadFailedText(locale, 'schedule.home.loadFailed')}</h4>
+              <h4 className="font-semibold text-slate-700 dark:text-slate-300 mt-2">{resolveLoadFailedText(locale, 'schedule.home.loadFailed')}</h4>
               <button
                 type="button"
                 onClick={onRetry}
@@ -191,7 +191,7 @@ export function HomeSchedule({
                 <div
                   key={`${session.id}:${session.studentId}`}
                   data-testid={`home-session-${session.id}-${session.studentId}`}
-                  className="session-card bg-white rounded-3xl p-3.5 shadow-xs border border-slate-100 flex items-center justify-between gap-3 relative overflow-hidden transition-all duration-300"
+                  className="session-card bg-white dark:bg-slate-900 rounded-3xl p-3.5 shadow-xs border border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3 relative overflow-hidden transition-all duration-300"
                 >
                   {/* Absence Action Button */}
                   <button
@@ -204,8 +204,8 @@ export function HomeSchedule({
                       isAbsent
                         ? 'bg-emerald-50/70 border-emerald-200 text-emerald-700 cursor-default'
                         : isCancelled
-                          ? 'bg-slate-50 border-slate-100 text-slate-400 cursor-default'
-                          : 'bg-slate-50 text-slate-600 hover:bg-slate-100 active:scale-95 border-slate-100'
+                          ? 'bg-slate-50 dark:bg-slate-800/70 border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-400 cursor-default'
+                          : 'bg-slate-50 dark:bg-slate-800/70 text-slate-600 dark:text-slate-300 hover:bg-slate-100 active:scale-95 border-slate-100 dark:border-slate-800'
                     }`}
                   >
                     {isAbsent ? (
@@ -215,12 +215,12 @@ export function HomeSchedule({
                       </>
                     ) : isCancelled ? (
                       <>
-                        <CalendarX className="w-4 h-4 text-slate-400" />
+                        <CalendarX className="w-4 h-4 text-slate-400 dark:text-slate-400" />
                         <span className="text-[11px] font-medium mt-0.5">{t(locale, 'schedule.home.absentQuestion')}</span>
                       </>
                     ) : (
                       <>
-                        <Calendar className="w-4 h-4 text-slate-600" />
+                        <Calendar className="w-4 h-4 text-slate-600 dark:text-slate-300" />
                         <span className="text-[11px] font-medium mt-0.5">{t(locale, 'schedule.home.absentQuestion')}</span>
                       </>
                     )}
@@ -237,27 +237,27 @@ export function HomeSchedule({
                       <a
                         href={`#/student/${session.studentId}`}
                         data-testid={`home-child-${session.studentId}`}
-                        className="font-bold text-base text-slate-900 hover:underline underline-offset-2 cursor-pointer"
+                        className="font-bold text-base text-slate-900 dark:text-slate-50 hover:underline underline-offset-2 cursor-pointer"
                       >
                         {session.studentName}
                       </a>
                       <span
                         className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
                           isCancelled
-                            ? 'bg-slate-100 text-slate-500'
+                            ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                             : isAbsent
                               ? 'bg-amber-100 text-amber-900 font-semibold'
-                              : 'bg-slate-100 text-slate-600'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
                         }`}
                       >
                         {isCancelled ? t(locale, 'schedule.home.statusCancelled') : isAbsent ? t(locale, 'schedule.home.statusReported') : t(locale, 'schedule.home.statusScheduled')}
                       </span>
                     </div>
-                    <p className="font-semibold text-sm text-slate-800 mt-0.5">{session.groupName}</p>
+                    <p className="font-semibold text-sm text-slate-800 dark:text-slate-50 mt-0.5">{session.groupName}</p>
                     {isCancelled ? (
-                      <p className="text-xs text-slate-500 mt-0.5">{session.cancelledReason}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{session.cancelledReason}</p>
                     ) : null}
-                    <div className="flex items-center justify-between text-xs text-slate-500 mt-1.5 gap-2 flex-wrap">
+                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1.5 gap-2 flex-wrap">
                       {location !== null ? (
                         <div className="flex items-center gap-1">
                           <MapPin className="w-3.5 h-3.5 text-[#0056c5] shrink-0" />
@@ -276,7 +276,7 @@ export function HomeSchedule({
                           className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-all cursor-pointer ${
                             reminderOn
                               ? 'bg-blue-50 text-[#0056c5] border-blue-200 shadow-2xs'
-                              : 'bg-slate-50 text-slate-600 hover:bg-blue-50 hover:text-[#0056c5] border-slate-200/80'
+                              : 'bg-slate-50 dark:bg-slate-800/70 text-slate-600 dark:text-slate-300 hover:bg-blue-50 hover:text-[#0056c5] border-slate-200/80 dark:border-slate-700'
                           }`}
                         >
                           <Bell className={`w-3 h-3 ${reminderOn ? 'fill-blue-600 text-blue-600' : 'text-slate-400'}`} />
@@ -289,9 +289,9 @@ export function HomeSchedule({
                   {/* Time & Belt Rank Bar */}
                   <div className="flex items-center gap-3 shrink-0">
                     <div className="text-end">
-                      <div className="text-base font-bold text-slate-900 leading-none">{timeLabel(session)}</div>
+                      <div className="text-base font-bold text-slate-900 dark:text-slate-50 leading-none">{timeLabel(session)}</div>
                       {duration !== null ? (
-                        <div className="text-[11px] text-slate-400 font-medium mt-1">
+                        <div className="text-[11px] text-slate-400 dark:text-slate-400 font-medium mt-1">
                           {duration} {t(locale, 'schedule.home.minutesShort')}
                         </div>
                       ) : null}
@@ -308,13 +308,13 @@ export function HomeSchedule({
             /* Empty State Container */
             <div
               data-testid="home-empty"
-              className="text-center py-10 bg-white rounded-3xl border border-dashed border-slate-200 mt-3 p-6"
+              className="text-center py-10 bg-white dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700 mt-3 p-6"
             >
-              <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-400">
+              <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800/70 rounded-full flex items-center justify-center mx-auto text-slate-400 dark:text-slate-400">
                 <Calendar className="w-6 h-6" />
               </div>
-              <h4 className="font-semibold text-slate-700 mt-2">{t(locale, 'schedule.home.emptyTitle')}</h4>
-              <p className="text-xs text-slate-400 mt-1">{t(locale, 'schedule.home.emptyBody')}</p>
+              <h4 className="font-semibold text-slate-700 dark:text-slate-300 mt-2">{t(locale, 'schedule.home.emptyTitle')}</h4>
+              <p className="text-xs text-slate-400 dark:text-slate-400 mt-1">{t(locale, 'schedule.home.emptyBody')}</p>
               <button
                 type="button"
                 onClick={onOpenMonth}
