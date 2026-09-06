@@ -270,4 +270,40 @@ export const attendance: Bundle = {
   'reason.vacation.sub': 'חופשה מחוץ לבית',
   'reason.other.label': 'אחר',
   'reason.other.sub': 'פירוט חופשי בהערה',
+  // -- FLOW B, the prototype's דיווח היעדרות תקופתי: a holiday, exams, a week away ------
+  //
+  // Two things it does that the prototype's version does not, because the prototype has no
+  // server: it FETCHES the sessions in the chosen range (the home holds two weeks, and a
+  // family away for a month would otherwise report nothing at all and be told it worked),
+  // and it reports per write, because N writes do not all have to succeed.
+  'rangeAbsence.title': 'דיווח היעדרות תקופתי',
+  'rangeAbsence.subtitle': 'חופשה, מבחנים או היעדרות מרובת ימים',
+  'rangeAbsence.whoLegend': 'עבור מי ההיעדרות?',
+  'rangeAbsence.selectAll': 'סימון כל הילדים',
+  'rangeAbsence.clearAll': 'ניקוי הבחירה',
+  'rangeAbsence.whoRequired': 'יש לבחור לפחות ילד אחד',
+  'rangeAbsence.presetsLegend': 'טווח מהיר:',
+  'rangeAbsence.presetToday': 'היום',
+  'rangeAbsence.presetWeekend': 'סופ״ש הקרוב',
+  'rangeAbsence.presetWeek': 'שבוע שלם',
+  'rangeAbsence.from': 'מתאריך:',
+  'rangeAbsence.to': 'עד תאריך:',
+  // The range is checked before anything is written. A backwards range is a typo, and a
+  // very long one is almost always a year typed into the month field — both are refused
+  // with the reason rather than turned into a hundred writes.
+  'rangeAbsence.rangeBackwards': 'תאריך הסיום מוקדם מתאריך ההתחלה',
+  'rangeAbsence.rangeTooLong': 'אפשר לדווח על טווח של עד {{days}} ימים',
+  'rangeAbsence.submit': 'עדכון היעדרות במערכת',
+  'rangeAbsence.submitting': 'בודק אילו אימונים בטווח…',
+  // NOT named `loadFailed`, and `tools/__tests__/load-failed-recovery.test.ts` is why:
+  // that guard reads a `*.loadFailed` key as "this SCREEN could not load" and requires the
+  // `LoadFailed` primitive with its retry. This is a sheet's own refusal — the parent is
+  // still on the form, the submit is still there, and the range they typed is still in the
+  // fields. Naming it `loadFailed` would have been a claim about the screen that is false.
+  'rangeAbsence.rangeReadFailed': 'לא הצלחנו לקרוא את האימונים בטווח. נסו שוב.',
+  // The range HAS no lessons in it. Said plainly rather than reported as a success: a
+  // parent told "הדיווח נשלח" over zero writes believes the club was told.
+  'rangeAbsence.nothingInRange': 'אין אימונים מתוכננים בטווח שנבחר לילדים שנבחרו',
+  'rangeAbsence.foundOne': 'נמצא אימון אחד בטווח',
+  'rangeAbsence.foundMany': 'נמצאו {{count}} אימונים בטווח',
 }

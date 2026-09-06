@@ -1,49 +1,24 @@
 // FLOW A2 — "דיווח היעדרות לכל הילדים", ported from the prototype's `HomeScreen.tsx`
 // (lines 759-887) and opened from the calendar's day card.
 //
-// ONE BUTTON, N WRITES, AND THE PROTOTYPE NEVER HAS TO ADMIT IT.
-//
-// `POST /absence-reports` files one report per (session, student). A family of three with
-// two lessons each is six writes, and they do NOT all have to succeed: §10.2 puts the
-// deadline on the server, so a lesson that has already started comes back `too_late` while
-// its siblings are accepted. The prototype flips one boolean and prints
-// "היעדרות כל הילדים נרשמה בהצלחה ✓" — which, on a real server, is a sentence that can be
-// false about half the day.
-//
-// So this sheet does not close on submit. It shows a row per lesson with what actually
-// happened, the same shape the wizard's step 4 uses for its payment outcomes and for the
-// same reason: a screen that says "done" for a batch it only partly wrote leaves a parent
-// believing the club was told, and a coach who was not.
+// ONE BUTTON, N WRITES, AND THE PROTOTYPE NEVER HAS TO ADMIT IT. The sheet does not close
+// on submit; it shows a row per lesson with what actually happened. `AbsenceResults` is
+// that list and carries the full reasoning — it is shared with FLOW B, which batches the
+// same way over a date range instead of a day.
 import { useState } from 'react'
-import { AlertTriangle, Check, Users, X } from 'lucide-react'
+import { Check, Users, X } from 'lucide-react'
 import { fill } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { useDialog } from '../../onboarding/wizard/useDialog'
+import { AbsenceResults } from './AbsenceResults'
+import type { AbsenceOutcome } from './AbsenceResults'
 import { ABSENCE_REASONS, reasonForWire, reasonLabel, reasonSub } from './absenceReasons'
 import type { ReasonKey } from './absenceReasons'
 
-/** What one write came back with. `pending` is "not attempted yet". */
-export type DayAbsenceOutcome = {
-  sessionId: string
-  studentId: string
-  studentName: string
-  groupName: string
-  timeLabel: string
-  state: 'pending' | 'recorded' | 'too_late' | 'already_marked' | 'failed'
-}
-
-/** What one row's outcome says. A function rather than a constant map: the strings are
- *  translated now, and a module-level table would freeze the first language loaded. */
-function resultText(state: Exclude<DayAbsenceOutcome['state'], 'pending'>, locale: Locale): string {
-  const key = {
-    recorded: 'resultRecorded',
-    too_late: 'resultTooLate',
-    already_marked: 'resultAlready',
-    failed: 'resultFailed',
-  }[state]
-  return t(locale, `attendance.dayAbsence.${key}`)
-}
+/** FLOW A2's rows are FLOW B's rows. Re-exported under the name this sheet's callers have
+ *  always used, so moving the shape did not move every import with it. */
+export type DayAbsenceOutcome = AbsenceOutcome
 
 export function AllDayAbsenceSheet({
   targets,
@@ -74,7 +49,6 @@ export function AllDayAbsenceSheet({
 
   // Hebrew on the wire whatever the parent is reading — see `absenceReasons.ts`.
   const composed = reasonForWire(reasonKey, note)
-  const anyFailed = (outcomes ?? []).some((row) => row.state !== 'recorded' && row.state !== 'pending')
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/60 flex items-end sm:items-center justify-center p-0 sm:p-4 modal-backdrop-blur transition-all duration-300">
@@ -246,64 +220,13 @@ export function AllDayAbsenceSheet({
           </>
         ) : (
           <>
-            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">{t(locale, 'attendance.dayAbsence.resultsTitle')}</h4>
-            <ul className="space-y-1.5 list-none m-0 p-0" data-testid="home-day-absence-results">
-              {outcomes.map((row) => (
-                <li
-                  key={`${row.sessionId}:${row.studentId}`}
-                  className={`flex items-center justify-between gap-2 text-xs rounded-xl px-3 py-2.5 border ${
-                    row.state === 'recorded'
-                      ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/25'
-                      : row.state === 'pending'
-                        ? 'bg-slate-50 dark:bg-slate-800/70 border-slate-200 dark:border-slate-700'
-                        : 'bg-[#ffdad6] dark:bg-red-500/15 border-red-200 dark:border-red-500/25'
-                  }`}
-                >
-                  <span className="font-semibold text-slate-900 dark:text-slate-50 truncate">
-                    {row.studentName} · {row.timeLabel}
-                  </span>
-                  <span
-                    className={`shrink-0 font-bold flex items-center gap-1 ${
-                      row.state === 'recorded'
-                        ? 'text-emerald-700 dark:text-emerald-300'
-                        : row.state === 'pending'
-                          ? 'text-slate-500'
-                          : 'text-[#ba1a1a] dark:text-red-300'
-                    }`}
-                  >
-                    {row.state === 'recorded' ? <Check className="w-3.5 h-3.5" /> : null}
-                    {row.state !== 'recorded' && row.state !== 'pending' ? (
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                    ) : null}
-                    <span>
-                      {row.state === 'pending'
-                        ? t(locale, 'attendance.dayAbsence.submitting')
-                        : resultText(row.state, locale)}
-                    </span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-
-            <p
-              role="status"
-              className={`text-xs font-semibold text-start ${
-                anyFailed ? 'text-[#ba1a1a] dark:text-red-300' : 'text-emerald-700 dark:text-emerald-300'
-              }`}
-            >
-              {anyFailed
-                ? t(locale, 'attendance.dayAbsence.resultsSomeFailed')
-                : t(locale, 'attendance.dayAbsence.resultsAllOk')}
-            </p>
-
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={busy}
-              className="w-full bg-[#001849] hover:bg-[#0d2c6c] disabled:opacity-60 text-white py-3.5 rounded-2xl text-xs font-bold shadow-md transition-all cursor-pointer"
-            >
-              {t(locale, 'attendance.dayAbsence.done')}
-            </button>
+            <AbsenceResults
+              outcomes={outcomes}
+              locale={locale}
+              busy={busy}
+              testId="home-day-absence-results"
+              onClose={onClose}
+            />
           </>
         )}
       </div>

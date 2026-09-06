@@ -232,3 +232,143 @@ describe('events on the home screen', () => {
     vi.unstubAllGlobals()
   })
 })
+
+// -- FLOW B's seam: a range → `GET /sessions` → N writes ----------------------
+/**
+ * `RangeAbsenceSheet.test.tsx` covers what the sheet refuses. This covers the half that
+ * only exists once it is wired: that the range the parent picked is the range ASKED FOR,
+ * and that every lesson it names becomes its own `POST /absence-reports`.
+ *
+ * The home holds two weeks. Before this, the floating button went to `#/absence` — one
+ * report, one child, one session — so a fortnight away was thirty trips through a form.
+ */
+describe('reporting an absence over a date range', () => {
+  const TODAY = studioDayKey(new Date())
+
+  function stub(overrides: { sessionsStatus?: number } = {}) {
+    const posted: string[] = []
+    const asked: string[] = []
+    const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
+      async (input, init) => {
+        const url = String(input)
+        if (url.includes('/absence-reports')) {
+          posted.push(String(init?.body))
+          return new Response('{}', { status: 201 })
+        }
+        if (url.includes('/sessions')) {
+          asked.push(url)
+          if (overrides.sessionsStatus) return new Response('nope', { status: overrides.sessionsStatus })
+          return new Response(
+            JSON.stringify({
+              items: [
+                {
+                  id: 's1',
+                  group_name: 'מתחילים',
+                  starts_at: `${TODAY}T15:00:00Z`,
+                  ends_at: `${TODAY}T16:00:00Z`,
+                  location_name: null,
+                  staff: [],
+                  status: 'scheduled',
+                  cancel_reason: null,
+                },
+              ],
+              next_cursor: null,
+              has_more: false,
+            }),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/me/students')) {
+          return new Response(
+            JSON.stringify({
+              items: [
+                {
+                  id: 'st1',
+                  person_id: 'p1',
+                  first_name: 'נועה',
+                  last_name: 'כהן',
+                  status: 'active',
+                  group_names: ['מתחילים'],
+                  current_belt_color_hex: '#f59e0b',
+                  current_belt_name: 'צהובה',
+                },
+                // A sibling in a group the stub NEVER returns a lesson for. She is how the
+                // "range named nothing" case is reached without an empty child list, which
+                // the sheet refuses for its own reason.
+                {
+                  id: 'st2',
+                  person_id: 'p2',
+                  first_name: 'דנה',
+                  last_name: 'כהן',
+                  status: 'active',
+                  group_names: ['מתקדמים'],
+                  current_belt_color_hex: '#10b981',
+                  current_belt_name: 'ירוקה',
+                },
+              ],
+            }),
+            { status: 200 },
+          )
+        }
+        return new Response('{"items":[]}', { status: 200 })
+      },
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    return { posted, asked }
+  }
+
+  async function openTheSheet() {
+    render(<Resolve session={session()} locale="he" />)
+    await waitFor(() => expect(screen.getByTestId('home-fab')).toBeInTheDocument())
+    await userEvent.click(screen.getByTestId('home-fab'))
+    return screen.findByTestId('home-range-absence-sheet')
+  }
+
+  it('asks the server for the range the parent picked, then writes one report per lesson', async () => {
+    const { posted, asked } = stub()
+    await openTheSheet()
+    await userEvent.click(screen.getByTestId('range-absence-preset-week'))
+    await userEvent.click(screen.getByTestId('range-absence-submit'))
+
+    // The RANGE, and not the two weeks the home already had — that window is what made a
+    // month-long holiday report nothing at all.
+    await waitFor(() => expect(asked.some((url) => url.includes(`from=${TODAY}`))).toBe(true))
+    await waitFor(() => expect(posted).toHaveLength(1))
+    // Hebrew on the wire whatever the parent is reading: a coach reads this on the mat.
+    expect(posted[0]).toContain(t('he', 'attendance.reason.vacation.label'))
+    await screen.findByTestId('home-range-absence-results')
+    vi.unstubAllGlobals()
+  })
+
+  it('says the range named nothing rather than reporting a success over zero writes', async () => {
+    const { posted } = stub()
+    await openTheSheet()
+    // Only דנה, who trains 'מתקדמים' — a group the stub never returns a lesson for. The
+    // range therefore resolves to nothing, and the batch is per (session, CHILD).
+    await userEvent.click(screen.getByTestId('range-absence-toggle-all'))
+    await userEvent.click(screen.getByTestId('range-absence-child-st2'))
+    await userEvent.click(screen.getByTestId('range-absence-submit'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('range-absence-notice')).toHaveTextContent(
+        t('he', 'attendance.rangeAbsence.nothingInRange'),
+      ),
+    )
+    // Nothing written. A parent told "הדיווח נשלח" over zero writes believes the club knows.
+    expect(posted).toHaveLength(0)
+    vi.unstubAllGlobals()
+  })
+
+  it('says the read failed rather than writing into a range it could not see', async () => {
+    const { posted } = stub({ sessionsStatus: 500 })
+    await openTheSheet()
+    await userEvent.click(screen.getByTestId('range-absence-submit'))
+    await waitFor(() =>
+      expect(screen.getByTestId('range-absence-notice')).toHaveTextContent(
+        t('he', 'attendance.rangeAbsence.rangeReadFailed'),
+      ),
+    )
+    expect(posted).toHaveLength(0)
+    vi.unstubAllGlobals()
+  })
+})

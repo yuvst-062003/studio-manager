@@ -116,6 +116,7 @@ the inbox's RSVP action.
 | — | the dark sweep | ✅ done, and see below |
 | — | deleting the screens the redesign replaced | ✅ done (b8621c3) |
 | — | §5.12's events, beside the lessons on בית | ✅ done |
+| — | FLOW B — the date-range absence report | ✅ done |
 
 ### The dark sweep, and what it deliberately left light
 
@@ -143,10 +144,18 @@ made from), and darkening them is a design change the owner has not been shown.
 
 ### Still outstanding, and deliberately so
 
-- **The date-range absence flow** (the prototype's FLOW B: pick children, pick from/to).
-  Home's header button and the floating button both go to `#/absence`, which is a working
-  screen that already does multi-child, multi-session picking. Nothing is broken; the
-  prototype's version is simply not built.
+- ~~**The date-range absence flow**~~ (the prototype's FLOW B). Done 2026-09-06, and the
+  note that stood here was WRONG: `#/absence` files ONE report for ONE child at ONE
+  session — reading the screen showed it has a single `studentId` and a single `sessionId`
+  — so a fortnight away was thirty trips through that form. `RangeAbsenceSheet` opens from
+  the floating button; `#/absence` still exists and is still reachable.
+
+  Three things it does that the prototype's version cannot, because the prototype has no
+  server: it RESOLVES the range to actual lessons first (the home holds two weeks, so a
+  month-long holiday would otherwise report nothing at all and be told it worked); it
+  REFUSES a backwards range and one longer than six weeks, which is always a year typed
+  into the month field; and it reports PER WRITE, through the `AbsenceResults` list now
+  shared with FLOW A2.
 - ~~**Events folded into Home.**~~ Done 2026-09-06. `GET /me/events` already returns one
   row per CHILD per event — the shape בית's list is in — so no server change was needed and
   no join either. `expandEvents` builds the rows, `mergeSchedule` interleaves them by time,

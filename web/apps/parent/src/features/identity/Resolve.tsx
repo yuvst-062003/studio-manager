@@ -365,6 +365,26 @@ export function Resolve({
       writer={{
         reportAbsence: (sessionId, studentId, reason) =>
           makeIntentClient(apiFetch).reportAbsence(sessionId, studentId, reason),
+        // FLOW B's one read. The home holds the two weeks fetched above; a range outside
+        // it has to be asked for, or a family away for a month reports nothing at all and
+        // is told it worked. `scope=mine` and the guardian narrowing are the schedule
+        // client's — this names no group and no student, same as every other call.
+        lessonsInRange: (from, to) =>
+          scheduleClient.listSessions({ from, to }).then((rows) =>
+            rows
+              .filter((row) => row.status !== 'completed')
+              .map((row) => ({
+                id: row.id,
+                startsAt: row.starts_at,
+                endsAt: row.ends_at,
+                groupName: row.group_name,
+                locationName: row.location_name,
+                coachName:
+                  row.staff.find((member) => member.role === 'lead_coach')?.display_name ?? null,
+                status: row.status,
+                cancelReason: row.cancel_reason,
+              })),
+          ),
       }}
       cancelReasonLabel={(reason) => cancelReasonLabel(locale, reason)}
       onAbsenceReported={() => setIntentEpoch((n) => n + 1)}

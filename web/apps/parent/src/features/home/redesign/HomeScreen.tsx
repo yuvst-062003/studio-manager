@@ -24,6 +24,8 @@ import { HomeSchedule } from './HomeSchedule'
 import { AbsenceModal } from './AbsenceModal'
 import { MonthCalendarModal } from './MonthCalendarModal'
 import { AllDayAbsenceSheet } from './AllDayAbsenceSheet'
+import { RangeAbsenceSheet } from './RangeAbsenceSheet'
+import type { RangeAbsenceSubmission } from './RangeAbsenceSheet'
 import type { DayAbsenceOutcome } from './AllDayAbsenceSheet'
 import type { AbsenceFailure } from './AbsenceModal'
 import { ReminderSheet, readReminders, writeReminder } from './ReminderSheet'
@@ -45,6 +47,16 @@ import type { HomeChild, HomeSession, HomeUrgent } from './types'
 /** The writes בית makes. One narrow interface so the screen can be tested without a fetch. */
 export type HomeWriter = {
   reportAbsence: (sessionId: string, studentId: string, reason: string) => Promise<void>
+  /**
+   * The lessons in an arbitrary range — FLOW B's one read.
+   *
+   * This screen "deliberately does NOT fetch" (see the header), and this is not an
+   * exception to that: the CALLER owns the request, and what is passed in is a function the
+   * container built from its own client. It is a prop rather than a `Resolve` fetch because
+   * the range is chosen inside the sheet, and the home holds two weeks — a family away for
+   * a month would otherwise report nothing at all and be told it worked.
+   */
+  lessonsInRange: (from: string, to: string) => Promise<readonly Lesson[]>
 }
 
 export function HomeScreen({
@@ -110,6 +122,10 @@ export function HomeScreen({
   const [dayOutcomes, setDayOutcomes] = useState<readonly DayAbsenceOutcome[] | null>(null)
   const [dayBusy, setDayBusy] = useState(false)
   const [reminders, setReminders] = useState<Record<string, LeadTime>>(() => readReminders())
+  const [rangeOpen, setRangeOpen] = useState(false)
+  const [rangeBusy, setRangeBusy] = useState(false)
+  const [rangeNotice, setRangeNotice] = useState<string | null>(null)
+  const [rangeOutcomes, setRangeOutcomes] = useState<readonly DayAbsenceOutcome[] | null>(null)
 
   const allSessions = useMemo(
     () =>
@@ -258,6 +274,74 @@ export function HomeScreen({
     [dayTargets, writer, onAbsenceReported],
   )
 
+  /**
+   * FLOW B — a range, resolved to lessons, then the same sequential batch.
+   *
+   * THE RANGE IS RESOLVED BEFORE ANYTHING IS WRITTEN, and a range that names no lesson says
+   * so rather than reporting a success over zero writes. A parent told "הדיווח נשלח" about an
+   * empty batch believes the club was told; the register's own rule is that a write which
+   * cannot mean anything should refuse rather than accept.
+   */
+  const submitRangeAbsence = useCallback(
+    ({ from, to, studentIds, reason }: RangeAbsenceSubmission) => {
+      setRangeNotice(null)
+      setRangeBusy(true)
+      void (async () => {
+        let inRange: readonly Lesson[]
+        try {
+          inRange = await writer.lessonsInRange(from, to)
+        } catch {
+          setRangeBusy(false)
+          setRangeNotice(t(locale, 'attendance.rangeAbsence.rangeReadFailed'))
+          return
+        }
+        const chosen = (childList ?? []).filter((child) => studentIds.includes(child.id))
+        const targets = expandSessions(inRange, chosen, intents, cancelReasonLabel)
+          .filter((row) => !row.reportedAbsent && row.cancelledReason === null)
+          .map((row) => ({
+            sessionId: row.id,
+            studentId: row.studentId,
+            studentName: row.studentName,
+            groupName: row.groupName,
+            // The DATE as well as the time: a row reading only "18:00" in a week-long batch
+            // names nothing a parent can check.
+            timeLabel: `${formatDayAndMonth(studioDayKey(row.startsAt), locale)} · ${formatTimeInStudioZone(row.startsAt, locale)}`,
+            state: 'pending' as const,
+          }))
+        if (targets.length === 0) {
+          setRangeBusy(false)
+          setRangeNotice(t(locale, 'attendance.rangeAbsence.nothingInRange'))
+          return
+        }
+        if (globalThis.navigator?.onLine === false) {
+          setRangeBusy(false)
+          setRangeOutcomes(targets.map((row) => ({ ...row, state: 'failed' as const })))
+          return
+        }
+        setRangeOutcomes(targets)
+        // Sequential for the reason `submitDayAbsence` gives: a rate-limited endpoint turns
+        // one late lesson into N ambiguous failures when fired all at once.
+        const done: DayAbsenceOutcome[] = []
+        for (const target of targets) {
+          try {
+            await writer.reportAbsence(target.sessionId, target.studentId, reason)
+            done.push({ ...target, state: 'recorded' })
+          } catch (error: unknown) {
+            const code = (error as { code?: string } | null)?.code
+            done.push({
+              ...target,
+              state: code === 'too_late' || code === 'already_marked' ? code : ('failed' as const),
+            })
+          }
+          setRangeOutcomes([...done, ...targets.slice(done.length)])
+        }
+        setRangeBusy(false)
+        onAbsenceReported()
+      })()
+    },
+    [writer, childList, intents, cancelReasonLabel, locale, onAbsenceReported],
+  )
+
   return (
     // The landmark and the testid `ParentHome` carried, kept deliberately. Two tests assert
     // `parent-home` is what rendered — one that a single-studio guardian skips the picker,
@@ -307,7 +391,12 @@ export function HomeScreen({
           setAbsenceTarget(session)
         }}
         onReportAbsenceRange={() => {
-          globalThis.location.hash = '#/absence'
+          // Was `#/absence`, which files ONE report for ONE child at ONE session — a
+          // fortnight away was thirty trips through that form. FLOW B is the flow this
+          // button was always drawn for. `#/absence` still exists and is still reachable.
+          setRangeNotice(null)
+          setRangeOutcomes(null)
+          setRangeOpen(true)
         }}
         timeLabel={(session) => formatTimeInStudioZone(session.startsAt, locale)}
         durationMinutes={durationMinutesOf}
@@ -358,6 +447,19 @@ export function HomeScreen({
             setAbsenceFailure(null)
             setAbsenceTarget(session)
           }}
+        />
+      ) : null}
+
+      {rangeOpen ? (
+        <RangeAbsenceSheet
+          childList={childList ?? []}
+          locale={locale}
+          todayKey={todayKey}
+          busy={rangeBusy}
+          outcomes={rangeOutcomes}
+          notice={rangeNotice}
+          onSubmit={submitRangeAbsence}
+          onClose={() => setRangeOpen(false)}
         />
       ) : null}
 
