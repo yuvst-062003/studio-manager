@@ -991,4 +991,22 @@ export const people: Bundle = {
   'joinWizard.faq.trial-period.question': 'האם יש תקופת הסתגלות ומהי מדיניות הביטולים?',
   'joinWizard.faq.trial-period.answer': 'בוודאי! אנו מאמינים בחיבור אישי לספורט. הרישום כולל תקופת התאמה ראשונית. במידה והחניך מחליט שאינו מעוניין להמשיך, ניתן לבטל את הרישום בהתאם למדיניות הביטולים המפורטת בתקנון התשלום ללא דמי ביטול דרקוניים.',
 
+  // -- staff 9h/9c, the redesign's students tab and student detail sheet (C4, 2026-09-06) --
+  //
+  // The prototype's card has a `school` field; the real Student has `grade`, and no
+  // staff-reachable endpoint returns it (only the write-only registration form and the
+  // health declaration PDF read it) — so neither a school nor a grade is shown here. The
+  // prototype's attendance trend chart and its "add student" form are not built either —
+  // see docs/superpowers/specs/2026-09-06-staff-app-redesign.md §9.
+  'list.title': 'רשימת תלמידים',
+  'list.registeredCount': '{{count}} רשומים',
+  'list.sortAlpha': 'סדר א-ב',
+  'list.sortAttendance': 'לפי נוכחות',
+  'staffCard.personalDetails': 'פרטים אישיים',
+  'staffCard.contactStudentTrigger': 'יצירת קשר עם התלמיד/ה',
+  'staffCard.contactStudentMessage': 'היי {{name}}, מחכים לך באימון!',
+  'staffCard.contactParentsTrigger': 'יצירת קשר עם ההורים',
+  'staffCard.contactParentsMessage': 'שלום, פנייה מהמועדון בנוגע ל{{name}}.',
+  'staffCard.guardiansTitle': 'אנשי קשר והורים',
+  'staffCard.noGuardians': 'לא משויכים הורים לחניך/ה',
 }

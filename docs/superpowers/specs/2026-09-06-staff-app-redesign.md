@@ -48,8 +48,14 @@ Decisions I took myself, because they do not change what gets built:
 
 - **Build order** is §10.
 - **A student's school is not shown**, because it is not stored. The prototype's card has a
-  `school` field; the real `Student` has `grade` — the school *class* ("ד'2"), not the school.
-  The card shows the grade, which is the true fact, rather than a field with nothing behind it.
+  `school` field and the real `Student` has none.
+  **Corrected during C4:** an earlier version of this line said the card would show `grade`
+  instead — the school *class* ("ד'2"). It cannot. `Student.grade` exists on the model but is
+  on no staff-reachable response: `StudentDetailOut` has no such field, and the column is read
+  only by the registration form that writes it and the health-declaration PDF. Showing it would
+  need a backend schema change, which is not part of a screen checkpoint. **Neither a school nor
+  a grade is rendered.** Left here rather than deleted, because a claim in a spec that turns out
+  to be false is worth more as a correction than as a silent edit.
 - **A coach's own role is displayed, not edited.** It is a role assignment a manager controls,
   and a self-service role change is a permission escalation wearing a profile form.
 - **The existing belt-exam results screen stays reachable** from an event's attendance screen.
@@ -587,11 +593,12 @@ document and it is not true of every screen.
 
 | Screen | Without signal |
 |---|---|
-| Schedule tab, today and tomorrow | **Works.** Cached, and marks queue |
+| Schedule tab, today and tomorrow | **Does NOT work — corrected 2026-09-06, see below** |
 | Attendance, session — today and tomorrow | **Works.** The whole point |
 | Attendance, event — today and tomorrow | **Works**, after §6.5 |
 | Session briefing | **Works** — rides with its session |
-| Tasks: unclosed sessions, health forms | **Works** — both derived from cached data |
+| Tasks: unclosed sessions | **Does not** — it derives from the session list, which is a live fetch |
+| Tasks: health forms | Derives from cached rosters, but needs the session list to know which rosters |
 | Tasks: call a parent | Needs signal — it reads the notification inbox |
 | Timer | **Works.** Entirely local |
 | Language and theme | **Work.** Neither touches the network |
@@ -599,6 +606,34 @@ document and it is not true of every screen.
 | Schedule tab, beyond tomorrow | Needs signal |
 | Calendar | Needs signal, and says so |
 | Filing unavailability | Needs signal |
+
+
+### A correction, and the defect underneath it
+
+The two rows above said "works" in the first three drafts of this document. **They were wrong,
+and the reason is worth more than the correction.**
+
+`TodayScreen` calls `client.listSessions()` — a live network fetch. Only the *rosters* are read
+from IndexedDB. The service worker precaches the app shell and the fonts and does not cache
+`/api` routes, which is correct; API responses are what the offline store is for.
+
+But the offline store **already holds the sessions.** `GET /sync/bootstrap` writes today's and
+tomorrow's into it on first launch and again on every `visibilitychange`, and
+`packages/core/src/offline/cache.ts` exports `cachedSessions()` to read them back.
+
+**Nothing calls `cachedSessions`.** Not one screen in any of the three apps. `readSession` uses
+it internally for a single session, which is how the roster screen works on a mat; the *list* has
+no reader.
+
+So a coach who opens this app with no signal sees a load failure on the one screen the whole
+offline apparatus exists to serve, while the data sits in IndexedDB a function call away. Marking
+a register still works — `RosterScreen` reads the cache and the queue flushes on reconnect — but
+only for a session already open. You cannot find your day.
+
+This is the same family as §2's three bugs: something built, tested, exported and connected to
+nothing. It is not a regression from this redesign; it predates it. It is fixed as part of C2,
+because C2 owns that screen and because a spec that asserted this worked is worse than one that
+never mentioned it.
 
 ---
 

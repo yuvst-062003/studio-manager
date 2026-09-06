@@ -18,9 +18,44 @@
 // are hardcoded Hebrew and its day strip changes nothing when tapped. It is the visual
 // reference here, never the behavioural one — everything above this comment already
 // existed and keeps working exactly as it did.
+//
+// **Second pass, same day: the anatomy, not a token swap.** The first pass kept the old
+// flat-row card and the old boxy day strip and only recoloured them, which is not what
+// `~/Downloads/staff-app/src/components/ScheduleView.tsx` draws. This pass ports the
+// prototype's actual shapes — the pill day strip, the chip-and-time card header, the
+// meta row, the divider with a small outlined action beside a stat cluster — onto the real
+// data `timeline.ts` already computes correctly. Two adaptations from the prototype, both
+// because it hardcodes four bespoke cards and this screen draws one shape for any session:
+//   - The state chip now speaks for THREE of the dot's four states (`pendingClose`,
+//     `activeNow`, `nextUp` — all three already have a words-not-colour label the dot's own
+//     `aria-label` uses), plus a fourth for a cancelled session, which `timelineStates`
+//     files under the same neutral `later` bucket as "ended and closed" but which still
+//     needs its own word or a coach reads a cancelled class as an ordinary later one. A
+//     `later` session that is not cancelled gets no chip — its dot and its position in the
+//     list already say everything there is to say, same as before this pass.
+//   - The stat cluster in the bottom-right shows `confirmationCounts` off the cached roster
+//     when there is one, and `headcount` (the group's live enrollment, always on the wire)
+//     when there is not — never a blank corner. `openRoster`, this session's one real
+//     action, is the outlined button beside it; a cancelled session has no such action, so
+//     that corner names the cancellation and its reason instead.
+// The calendar icon button the header now carries opens the same `#/schedule/date` this
+// screen always has — `open-date-picker` moved in from `ScheduleSection`'s own header bar,
+// which sat as a separate line above this one; see that file's own note.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, Card, EmptyState, LoadFailed, StatusChip } from '@studio/ui'
+import {
+  AlertCircle,
+  Ban,
+  Calendar as CalendarIcon,
+  CheckCircle2,
+  ChevronLeft,
+  Clock,
+  MapPin,
+  Trophy,
+  User,
+  Users,
+} from 'lucide-react'
+import { EmptyState, LoadFailed } from '@studio/ui'
 import {
   formatDateInStudioZone,
   formatTimeInStudioZone,
@@ -54,60 +89,12 @@ function stripAround(key: string): string[] {
   return Array.from({ length: 7 }, (_, offset) => shiftDayKey(key, offset - 3))
 }
 
-const pageStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--space-4)',
-  maxInlineSize: '30rem',
-  marginInline: 'auto',
-  inlineSize: '100%',
-}
-
-const stripStyle: CSSProperties = {
-  display: 'flex',
-  gap: 'var(--space-2)',
-  overflowX: 'auto',
-  paddingBlockEnd: 'var(--space-2)',
-}
-
-const chipStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  gap: 'var(--space-1)',
-  // §6.2 — a thumb, one-handed, on a moving bus.
-  minInlineSize: '44px',
-  minBlockSize: '44px',
-  padding: 'var(--space-2)',
-  borderRadius: 'var(--radius-sm)',
-  border: 'var(--border-width-hairline) solid var(--border)',
-  background: 'var(--surface)',
-  fontSize: 'var(--text-caption)',
-}
-
-const selectedChipStyle: CSSProperties = {
-  ...chipStyle,
-  background: 'var(--fg)',
-  color: 'var(--on-fg)',
-  border: 'var(--border-width-hairline) solid var(--fg)',
-}
-
-const rowStyle: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  alignItems: 'center',
-  gap: 'var(--space-3)',
-  minBlockSize: '44px',
-}
-
 const filterStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 'var(--space-1)',
   fontSize: 'var(--text-label)',
 }
-
-const noteStyle: CSSProperties = { color: 'var(--text-secondary)', fontSize: 'var(--text-caption)' }
 
 // -- the timeline: a grey line, a dot per item, that item's own start time beneath it -----
 //
@@ -122,6 +109,29 @@ const DOT_COLOR: Record<DotState, string> = {
   activeNow: 'var(--pending)',
   nextUp: 'var(--emphasis)',
   later: 'var(--border-strong)',
+}
+
+/**
+ * The card's own border, tinted by the SAME `DotState` the dot carries — rose for a
+ * register still owed, emerald for a class happening right now, blue for the next thing up,
+ * slate for everything else (a cancelled session included: `timelineStates` already resolves
+ * it to `later`). Tailwind's literal hues, not the tokens above — this pass draws that line
+ * on purpose: the tokens stay the dot's alone, and `--paid`'s green is money-scoped and never
+ * borrowed here.
+ */
+const CARD_BORDER: Record<DotState, string> = {
+  pendingClose: 'border-rose-200',
+  activeNow: 'border-emerald-300',
+  nextUp: 'border-blue-200',
+  later: 'border-slate-200/80',
+}
+
+/** The small outlined action beside the stat cluster, tinted the same way as the chip. */
+const ACTION_TINT: Record<DotState, string> = {
+  pendingClose: 'border-rose-300 text-rose-700 hover:bg-rose-50',
+  activeNow: 'border-emerald-300 text-emerald-700 hover:bg-emerald-50',
+  nextUp: 'border-blue-300 text-blue-700 hover:bg-blue-50',
+  later: 'border-slate-200 text-slate-700 bg-slate-50 hover:bg-slate-100',
 }
 
 const timelineRowStyle: CSSProperties = {
@@ -204,12 +214,6 @@ function TimelineDot({ state, time, locale }: { state: DotState; time: string; l
     </div>
   )
 }
-
-const stateBadgeStyle = (color: string): CSSProperties => ({
-  color,
-  fontSize: 'var(--text-caption)',
-  fontWeight: 600,
-})
 
 export interface CoachOption {
   person_id: string
@@ -418,34 +422,71 @@ export function TodayScreen({
   }
 
   return (
-    <section aria-labelledby="today-title" data-testid="staff-today" style={pageStyle}>
-      <h1 id="today-title">
-        {/* S7 — `היום`, or the day being looked at: `יום שלישי · 3 בנובמבר`. */}
-        {day === todayKey
-          ? t(locale, 'schedule.today.title')
-          : `${t(locale, 'attendance.roster.dayLabel').replace(
-              '{{weekday}}',
-              t(locale, `schedule.weekday.${new Date(`${day}T12:00:00Z`).getUTCDay()}`),
-            )} · ${formatDateInStudioZone(`${day}T12:00:00Z`, locale)}`}
-      </h1>
+    <section
+      aria-labelledby="today-title"
+      data-testid="staff-today"
+      className="flex flex-col gap-4 px-4 pt-4"
+    >
+      {/* Two clusters, one row. Leading: the calendar door to 9b and, only while looking at
+          a day that is not today, a `היום` pill back to it — see this file's own header for
+          why that pill is not unconditional the way the prototype's is. Trailing: the date,
+          and beneath it the count this screen has always carried in `today-summary`. */}
+      <header className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <a
+            href="#/schedule/date"
+            data-testid="open-date-picker"
+            aria-label={t(locale, 'schedule.datePicker.title')}
+            className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-xs border border-blue-100 active:scale-95 transition-all shrink-0"
+          >
+            <CalendarIcon className="w-5 h-5" aria-hidden="true" />
+          </a>
+          {day !== todayKey ? (
+            <button
+              type="button"
+              data-testid="back-to-today"
+              onClick={() => setDay(todayKey)}
+              className="px-3.5 py-1 rounded-xl text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 active:scale-95 transition-all"
+            >
+              {t(locale, 'schedule.today.title')}
+            </button>
+          ) : null}
+        </div>
 
-      {/* S7 — `5 שיעורים · אלון מזרחי`. The coach half renders only when the filter has
-          chosen one, which for a coach opening their own day is the default. Sessions
-          only — an event is a different kind of thing to count in the same breath. */}
-      <p data-testid="today-summary" style={noteStyle}>
-        {plural(locale, 'schedule.today.sessionCount', onThisDay.length)}
-        {coachName ? <> · <bdi>{coachName}</bdi></> : null}
-      </p>
+        <div className="text-end">
+          <h1 id="today-title" className="text-base font-black text-slate-900 tracking-tight">
+            {/* S7 — `היום`, or the day being looked at: `יום שלישי · 3 בנובמבר`. */}
+            {day === todayKey
+              ? t(locale, 'schedule.today.title')
+              : `${t(locale, 'attendance.roster.dayLabel').replace(
+                  '{{weekday}}',
+                  t(locale, `schedule.weekday.${new Date(`${day}T12:00:00Z`).getUTCDay()}`),
+                )} · ${formatDateInStudioZone(`${day}T12:00:00Z`, locale)}`}
+          </h1>
+          {/* S7 — `5 שיעורים · אלון מזרחי`. The coach half renders only when the filter has
+              chosen one, which for a coach opening their own day is the default. Sessions
+              only — an event is a different kind of thing to count in the same breath. */}
+          <p data-testid="today-summary" className="text-xs font-semibold text-slate-400 mt-0.5">
+            ({plural(locale, 'schedule.today.sessionCount', onThisDay.length)}
+            {coachName ? (
+              <>
+                {' · '}
+                <bdi>{coachName}</bdi>
+              </>
+            ) : null}
+            )
+          </p>
+        </div>
+      </header>
 
-      {day !== todayKey ? (
-        <Button variant="secondary" data-testid="back-to-today" onClick={() => setDay(todayKey)}>
-          {t(locale, 'schedule.today.backToToday')}
-        </Button>
-      ) : null}
-
-      <div style={stripStyle} role="group" aria-label={t(locale, 'schedule.datePicker.title')}>
+      <div
+        role="group"
+        aria-label={t(locale, 'schedule.datePicker.title')}
+        className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1"
+      >
         {strip.map((key) => {
           const selected = key === day
+          const isToday = key === todayKey
           return (
             <button
               key={key}
@@ -455,11 +496,25 @@ export function TodayScreen({
               // the accessibility tree instead of a test hook.
               data-testid={`day-chip-${key}`}
               aria-current={selected ? 'date' : undefined}
-              style={selected ? selectedChipStyle : chipStyle}
               onClick={() => chooseDay(key)}
+              className={`flex-1 min-w-[44px] py-2.5 rounded-2xl flex flex-col items-center gap-0.5 transition-all active:scale-95 ${
+                selected
+                  ? 'bg-[#1e3a8a] text-white shadow-md ring-2 ring-blue-600/30'
+                  : 'bg-white text-slate-600 border border-slate-200/80'
+              }`}
             >
-              <span>{t(locale, `schedule.weekday.${new Date(`${key}T12:00:00Z`).getUTCDay()}`)}</span>
-              <span>{key.slice(8)}</span>
+              <span
+                className={`text-[11px] font-semibold ${selected ? 'text-blue-200' : 'text-slate-400'}`}
+              >
+                {t(locale, `schedule.weekday.${new Date(`${key}T12:00:00Z`).getUTCDay()}`)}
+              </span>
+              <span className="text-sm font-black font-mono">{key.slice(8)}</span>
+              {isToday ? (
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${selected ? 'bg-white' : 'bg-blue-600'}`}
+                  aria-hidden="true"
+                />
+              ) : null}
             </button>
           )
         })}
@@ -550,12 +605,77 @@ function TimelineRow({
               chaseFamilies={chaseFamilies}
             />
           ) : (
-            <EventCard event={item.event} locale={locale} />
+            <EventCard event={item.event} state={state} locale={locale} />
           )}
         </div>
       </div>
     </li>
   )
+}
+
+/**
+ * Row 1's leading chip — the state in words, never colour alone (SC 1.4.1). Three of the
+ * dot's four states get one, the same three the dot's own `aria-label` already names
+ * (`pendingClose`, `activeNow`, `nextUp`); a cancelled session gets a fourth the dot does
+ * not carry at all, because `timelineStates` files it under the same neutral `later` bucket
+ * as "ended and closed" and a plain grey card would read as an ordinary later class. A
+ * `later` session that is not cancelled gets no chip here — its dot and its position in the
+ * list already say everything there is to say, unchanged from before this pass.
+ */
+function SessionStateChip({
+  status,
+  state,
+  locale,
+}: {
+  status: SessionRow['status']
+  state: DotState
+  locale: Locale
+}) {
+  if (status === 'cancelled') {
+    return (
+      <span
+        data-testid="session-state"
+        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600"
+      >
+        <Ban className="w-3 h-3" aria-hidden="true" />
+        <span>{t(locale, 'schedule.session.status.cancelled')}</span>
+      </span>
+    )
+  }
+  if (state === 'pendingClose') {
+    return (
+      <span
+        data-testid="session-state"
+        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200"
+      >
+        <AlertCircle className="w-3 h-3" aria-hidden="true" />
+        <span>{t(locale, 'schedule.session.state.pendingClose')}</span>
+      </span>
+    )
+  }
+  if (state === 'activeNow') {
+    return (
+      <span
+        data-testid="session-state"
+        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"
+      >
+        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true" />
+        <span>{t(locale, 'schedule.session.state.activeNow')}</span>
+      </span>
+    )
+  }
+  if (state === 'nextUp') {
+    return (
+      <span
+        data-testid="session-state"
+        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-100"
+      >
+        <Clock className="w-3 h-3" aria-hidden="true" />
+        <span>{t(locale, 'schedule.session.state.nextUp')}</span>
+      </span>
+    )
+  }
+  return null
 }
 
 function SessionCard({
@@ -575,125 +695,177 @@ function SessionCard({
   const notAnsweredIds = (roster ?? [])
     .filter((row) => row.has_confirmation !== true && !row.has_absence_report)
     .map((row) => row.student_id)
+  const coachLine = session.staff[0]
+    ? session.staff[0].display_name
+    : t(locale, 'schedule.session.noCoach')
+  const hasHints =
+    session.attendance_taken ||
+    session.staff[0]?.is_substitute ||
+    (session.is_manually_edited && !session.is_ad_hoc) ||
+    session.is_ad_hoc
 
   return (
-    <Card>
-      <div style={rowStyle}>
-        {/* The state badge — text, not colour alone, for exactly the two states that mean
-            "look at this": a register still owed, or a class in progress right now. A
-            plain upcoming session gets no badge here; its dot and position on the list
-            already say everything there is to say. */}
-        {session.status !== 'cancelled' && state === 'pendingClose' ? (
-          <span style={stateBadgeStyle('var(--danger)')} data-testid="session-state">
-            {t(locale, 'schedule.session.state.pendingClose')}
-          </span>
-        ) : null}
-        {session.status !== 'cancelled' && state === 'activeNow' ? (
-          <span style={stateBadgeStyle('var(--pending)')} data-testid="session-state">
-            {t(locale, 'schedule.session.state.activeNow')}
-          </span>
-        ) : null}
-        <span
-          style={{
-            fontVariantNumeric: 'tabular-nums',
-            fontWeight: 600,
-            fontSize: 'var(--text-title)',
-          }}
-        >
-          {formatTimeInStudioZone(session.starts_at, locale)}
-          {'–'}
-          {formatTimeInStudioZone(session.ends_at, locale)}
-        </span>
+    <article className={`bg-white rounded-3xl p-4 border shadow-xs ${CARD_BORDER[state]}`}>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <SessionStateChip status={session.status} state={state} locale={locale} />
         {/* 1d — `45 דק׳`, derived: two instants are already on the wire. */}
-        <span style={noteStyle} data-testid="session-duration">
-          {t(locale, 'schedule.session.durationMinutes').replace(
-            '{{minutes}}',
-            String(Math.round((Date.parse(session.ends_at) - Date.parse(session.starts_at)) / 60_000)),
-          )}
-        </span>
-        <strong>{session.group_name}</strong>
-        {/* 1d — `אולם א׳ · 14 חניכים`. */}
-        <span style={noteStyle} data-testid="session-headcount">
-          {session.location_name ? <>{session.location_name} · </> : null}
-          {t(locale, 'schedule.session.headcount').replace('{{count}}', String(session.headcount))}
-        </span>
-        <StatusChip
-          status={session.status === 'cancelled' ? 'cancelled' : 'planned'}
-          label={t(locale, `schedule.session.status.${session.status}`)}
-        />
-        {/* 1d — `נוכחות נרשמה`: the register-state marker, the difference between
-            "done" and "still owed" at a glance down the day. */}
-        {session.attendance_taken ? (
-          <StatusChip status="paid" label={t(locale, 'schedule.session.attendanceTaken')} />
-        ) : null}
-        {session.staff[0] ? (
-          <span style={noteStyle}>{session.staff[0].display_name}</span>
-        ) : (
-          <span style={noteStyle}>{t(locale, 'schedule.session.noCoach')}</span>
-        )}
-        {session.staff[0]?.is_substitute ? (
-          <span style={noteStyle}>{t(locale, 'schedule.session.substitute')}</span>
-        ) : null}
-        {session.is_manually_edited && !session.is_ad_hoc ? (
-          <span style={noteStyle}>{t(locale, 'schedule.session.manuallyEditedHint')}</span>
-        ) : null}
-        {session.is_ad_hoc ? <span style={noteStyle}>{t(locale, 'schedule.session.adHoc')}</span> : null}
-        {session.cancel_reason ? (
-          <span style={noteStyle}>{cancelReasonLabel(locale, session.cancel_reason)}</span>
+        <div className="flex flex-col items-end gap-0.5">
+          <span className="text-xs font-bold font-mono text-slate-400">
+            {formatTimeInStudioZone(session.starts_at, locale)}
+            {'–'}
+            {formatTimeInStudioZone(session.ends_at, locale)}
+          </span>
+          <span className="text-[10px] font-semibold text-slate-300" data-testid="session-duration">
+            {t(locale, 'schedule.session.durationMinutes').replace(
+              '{{minutes}}',
+              String(Math.round((Date.parse(session.ends_at) - Date.parse(session.starts_at)) / 60_000)),
+            )}
+          </span>
+        </div>
+      </div>
+
+      <strong className="block text-base font-black text-slate-900 mb-1">{session.group_name}</strong>
+
+      <div className="flex flex-col gap-1 mb-3">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+          {session.location_name ? (
+            <span className="flex items-center gap-1">
+              <MapPin className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+              <span>{session.location_name}</span>
+            </span>
+          ) : null}
+          {session.location_name ? <span aria-hidden="true">•</span> : null}
+          <span className="flex items-center gap-1">
+            <User className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+            <span>{coachLine}</span>
+          </span>
+        </div>
+        {hasHints ? (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-400">
+            {/* 1d — "נוכחות נרשמה": the register-state marker, the difference between
+                "done" and "still owed" at a glance down the day. A Tailwind badge of our
+                own rather than `StatusChip status="paid"` — that token is money-scoped. */}
+            {session.attendance_taken ? (
+              <span className="inline-flex items-center gap-1 font-bold text-emerald-700">
+                <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
+                {t(locale, 'schedule.session.attendanceTaken')}
+              </span>
+            ) : null}
+            {session.staff[0]?.is_substitute ? (
+              <span>{t(locale, 'schedule.session.substitute')}</span>
+            ) : null}
+            {session.is_manually_edited && !session.is_ad_hoc ? (
+              <span>{t(locale, 'schedule.session.manuallyEditedHint')}</span>
+            ) : null}
+            {session.is_ad_hoc ? <span>{t(locale, 'schedule.session.adHoc')}</span> : null}
+          </div>
         ) : null}
       </div>
 
-      {/* §4.1's "the card also carries who has answered" — thrown away until now, and
-          every field it needs is already in the offline cache. `counts.total === 0` covers
-          both "roster not cached yet" and "nobody expected", and neither is worth a line. */}
-      {counts.total > 0 ? (
-        <p style={noteStyle} data-testid="session-confirmed">
-          {t(locale, 'schedule.session.confirmedCount')
-            .replace('{{confirmed}}', String(counts.confirmed))
-            .replace('{{total}}', String(counts.total))}
-        </p>
-      ) : null}
-      {counts.notAnswered > 0 ? (
-        <p style={noteStyle} data-testid="session-not-answered">
-          {plural(locale, 'schedule.session.notAnsweredCount', counts.notAnswered)}
-        </p>
-      ) : null}
-
-      {/* §4.9's chase action, decision 18: the same mechanism as everywhere else in the
-          app — copy the numbers, open WhatsApp with the message ready. No integration. */}
-      {counts.notAnswered > 0 ? (
-        <div style={{ marginBlockStart: 'var(--space-2)' }}>
-          <ContactFamiliesButton
-            locale={locale}
-            triggerLabel={plural(locale, 'schedule.session.chaseButton', counts.notAnswered)}
-            title={session.group_name}
-            message={t(locale, 'schedule.session.chaseMessage')
-              .replace('{{group}}', session.group_name)
-              .replace('{{time}}', formatTimeInStudioZone(session.starts_at, locale))}
-            resolveFamilies={chaseFamilies(notAnsweredIds)}
-          />
+      {/* §4.1's "the card also carries who has answered" — thrown away until C2, and
+          every field it needs is already in the offline cache. The stat cluster's leading
+          half is `confirmationCounts` off that cache when there is one; `headcount` (the
+          group's live enrollment, always on the wire) is the honest fallback when there
+          isn't — never a blank corner. A cancelled session has no `openRoster` action, so
+          its corner names the cancellation and its reason instead. */}
+      <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+        <div className="flex items-center gap-2 flex-wrap">
+          {session.status !== 'cancelled' ? (
+            // 1d — "לחיצה פותחת את 1c". Until the design pass NOTHING in the app linked to
+            // the roster: the product's core daily flow was reachable only by typing
+            // `#/attendance/<id>` into the URL bar.
+            <a
+              href={`#/attendance/${session.id}`}
+              data-testid="open-roster"
+              className={`px-4 py-2 rounded-xl border text-xs font-bold active:scale-95 transition-all inline-flex items-center gap-1 ${ACTION_TINT[state]}`}
+            >
+              <span>{t(locale, 'schedule.today.openRoster')}</span>
+              <ChevronLeft className="w-4 h-4" aria-hidden="true" />
+            </a>
+          ) : (
+            <span className="text-xs font-semibold text-slate-500">
+              {t(locale, 'schedule.session.cancelled')}
+              {session.cancel_reason ? (
+                <>
+                  {' · '}
+                  <span>{cancelReasonLabel(locale, session.cancel_reason)}</span>
+                </>
+              ) : null}
+            </span>
+          )}
+          {/* §4.9's chase action, decision 18: the same mechanism as everywhere else in
+              the app — copy the numbers, open WhatsApp with the message ready. No
+              integration. */}
+          {counts.notAnswered > 0 ? (
+            <ContactFamiliesButton
+              locale={locale}
+              triggerLabel={plural(locale, 'schedule.session.chaseButton', counts.notAnswered)}
+              title={session.group_name}
+              message={t(locale, 'schedule.session.chaseMessage')
+                .replace('{{group}}', session.group_name)
+                .replace('{{time}}', formatTimeInStudioZone(session.starts_at, locale))}
+              resolveFamilies={chaseFamilies(notAnsweredIds)}
+            />
+          ) : null}
         </div>
-      ) : null}
 
-      {session.status !== 'cancelled' ? (
-        // 1d — "לחיצה פותחת את 1c". Until the design pass NOTHING in the app linked to
-        // the roster: the product's core daily flow was reachable only by typing
-        // `#/attendance/<id>` into the URL bar.
-        <a
-          href={`#/attendance/${session.id}`}
-          data-testid="open-roster"
-          className="studio-btn"
-          data-variant="primary"
-          style={{
-            marginBlockStart: 'var(--space-3)',
-            display: 'flex',
-            textDecoration: 'none',
-          }}
-        >
-          {t(locale, 'schedule.today.openRoster')}
-        </a>
-      ) : null}
-    </Card>
+        <div className="flex items-center gap-2 shrink-0">
+          {counts.total > 0 ? (
+            <>
+              <div className="text-end">
+                {counts.notAnswered > 0 ? (
+                  <span
+                    data-testid="session-not-answered"
+                    className="block font-extrabold text-rose-700 text-xs"
+                  >
+                    {plural(locale, 'schedule.session.notAnsweredCount', counts.notAnswered)}
+                  </span>
+                ) : null}
+                <span
+                  data-testid="session-confirmed"
+                  className={
+                    counts.notAnswered > 0
+                      ? 'block text-[11px] text-slate-400'
+                      : 'block font-extrabold text-emerald-700 text-xs'
+                  }
+                >
+                  {t(locale, 'schedule.session.confirmedCount')
+                    .replace('{{confirmed}}', String(counts.confirmed))
+                    .replace('{{total}}', String(counts.total))}
+                </span>
+              </div>
+              <div
+                className={`w-7 h-7 rounded-xl flex items-center justify-center ${
+                  counts.notAnswered > 0 ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-600'
+                }`}
+              >
+                {counts.notAnswered > 0 ? (
+                  <AlertCircle className="w-4 h-4" aria-hidden="true" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              {/* 1d — `אולם א׳ · 14 חניכים`. */}
+              <span data-testid="session-headcount" className="text-xs font-bold text-slate-700">
+                {session.location_name ? (
+                  <>
+                    {session.location_name}
+                    {' · '}
+                  </>
+                ) : null}
+                {t(locale, 'schedule.session.headcount').replace('{{count}}', String(session.headcount))}
+              </span>
+              <div className="w-7 h-7 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center">
+                <Users className="w-4 h-4" aria-hidden="true" />
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </article>
   )
 }
 
@@ -701,36 +873,55 @@ function SessionCard({
  * §4.1's merge, "visually marked as events" — the type chip (`events.type.*`, the same
  * labels 9i already uses) is what marks it, rather than inventing a second "this is an
  * event" badge nobody asked for. Tapping it opens 9i's own roster screen, which already
- * exists; this card is deliberately thin.
+ * exists; this card is deliberately thin. The outer border still follows the timeline's
+ * own state (an event can be `activeNow`/`nextUp`/`later` exactly like a session, per
+ * `timelineStates`'s own rule) — the amber only marks the leading chip, which is about
+ * what kind of thing this is, not when.
  */
-function EventCard({ event, locale }: { event: EventOut; locale: Locale }) {
+function EventCard({ event, state, locale }: { event: EventOut; state: DotState; locale: Locale }) {
   const total = event.rsvp_yes_count + event.rsvp_no_count + event.rsvp_pending_count
   return (
-    <Card>
-      <div style={rowStyle}>
-        <StatusChip status="planned" label={t(locale, `events.type.${event.type}`)} />
-        <strong>{event.title}</strong>
-        <span style={noteStyle} data-testid="event-when">
-          {formatTimeInStudioZone(event.starts_at, locale)}
-          {event.location_text ? <> · <bdi>{event.location_text}</bdi></> : null}
+    <article className={`bg-white rounded-3xl p-4 border shadow-xs ${CARD_BORDER[state]}`}>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+          <Trophy className="w-3 h-3" aria-hidden="true" />
+          <span>{t(locale, `events.type.${event.type}`)}</span>
         </span>
-        {total > 0 ? (
-          <span style={noteStyle}>
-            {t(locale, 'events.counts.confirmed')} {event.rsvp_yes_count}/{total}
-          </span>
-        ) : (
-          <span style={noteStyle}>{t(locale, 'events.roster.empty')}</span>
-        )}
+        <span className="text-xs font-bold font-mono text-slate-400" data-testid="event-when">
+          {formatTimeInStudioZone(event.starts_at, locale)}
+        </span>
       </div>
-      <a
-        href={`#/events/${event.id}/roster`}
-        data-testid="open-event-roster"
-        className="studio-btn"
-        data-variant="secondary"
-        style={{ marginBlockStart: 'var(--space-3)', display: 'flex', textDecoration: 'none' }}
-      >
-        {t(locale, 'events.roster.title')}
-      </a>
-    </Card>
+
+      <strong className="block text-base font-black text-slate-900 mb-1">{event.title}</strong>
+
+      {event.location_text ? (
+        <div className="flex items-center gap-1 text-xs text-slate-500 mb-3">
+          <MapPin className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+          <bdi>{event.location_text}</bdi>
+        </div>
+      ) : null}
+
+      <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+        <a
+          href={`#/events/${event.id}/roster`}
+          data-testid="open-event-roster"
+          className="px-4 py-2 rounded-xl border border-amber-300 text-amber-700 font-bold text-xs hover:bg-amber-50 active:scale-95 transition-all inline-flex items-center gap-1"
+        >
+          <span>{t(locale, 'events.roster.title')}</span>
+          <ChevronLeft className="w-4 h-4" aria-hidden="true" />
+        </a>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs font-bold text-slate-700">
+            {total > 0
+              ? `${t(locale, 'events.counts.confirmed')} ${event.rsvp_yes_count}/${total}`
+              : t(locale, 'events.roster.empty')}
+          </span>
+          <div className="w-7 h-7 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
+            <Users className="w-4 h-4" aria-hidden="true" />
+          </div>
+        </div>
+      </div>
+    </article>
   )
 }

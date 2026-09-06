@@ -13,7 +13,6 @@ import { PaymentsScreen } from './PaymentsScreen'
 import type { DebtRow } from './PaymentsScreen'
 import { PaymentHistoryScreen } from './PaymentHistoryScreen'
 import { PaymentCompleteScreen } from './PaymentCompleteScreen'
-import { PaymentStrip } from './PaymentStrip'
 import { instalmentSplit, oldestMonths, selectionTotal } from './billingClient'
 import type { BillingClient, ChargeOut, PaymentOut, PaymentPromiseOut } from './billingClient'
 
@@ -819,22 +818,6 @@ describe('the return from uPay', () => {
       t(LOCALE, 'billing.order.status.expired'),
     )
     expect(screen.queryByText(t(LOCALE, 'billing.order.verifying'))).not.toBeInTheDocument()
-  })
-})
-
-describe('the student-card payment strip', () => {
-  it('shows nothing when the family owes nothing', () => {
-    // D2 keeps the debt alert on `1a`. A strip announcing a zero balance is noise on a card
-    // about a child.
-    const { container } = render(
-      <PaymentStrip locale={LOCALE} balanceAgorot={0} onOpenPayments={vi.fn()} />,
-    )
-    expect(container.firstChild).toBeNull()
-  })
-
-  it('shows the debt through MoneyDisplay when there is one', () => {
-    render(<PaymentStrip locale={LOCALE} balanceAgorot={32_000} onOpenPayments={vi.fn()} />)
-    expect(screen.getByTestId('payment-strip').querySelector('.studio-money')).not.toBeNull()
   })
 })
 

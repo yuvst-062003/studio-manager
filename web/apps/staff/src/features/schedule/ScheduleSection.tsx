@@ -10,8 +10,6 @@
 // the back button and open-in-new-tab, with no router dependency —
 // `.claude/rules/ui-rtl-a11y.md` says not to add one without asking.
 import { useCallback, useState } from 'react'
-import type { CSSProperties } from 'react'
-import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { DatePickerScreen } from './DatePickerScreen'
 import { TodayScreen } from './TodayScreen'
@@ -19,12 +17,6 @@ import type { CoachOption } from './TodayScreen'
 import type { StaffScheduleClient } from './client'
 import type { StaffEventsClient } from '../events/client'
 import type { StaffPeopleClient } from '../people'
-
-const openPickerStyle: CSSProperties = {
-  display: 'inline-block',
-  marginBlockEnd: 'var(--space-3)',
-  fontSize: 'var(--text-label)',
-}
 
 export type StaffScheduleView = 'today' | 'date'
 
@@ -72,29 +64,26 @@ export function ScheduleSection({
     return <DatePickerScreen locale={locale} client={client} today={today} onSelect={onSelect} />
   }
 
+  // 9b is reachable or it is not delivered — `open-date-picker` used to be a standalone
+  // line drawn here, above 9a/1d's own header. C2's anatomy pass gave 9a a header of its
+  // own with a calendar icon button that IS that door (a real `<a href>`, same reasoning:
+  // it survives the back button and open-in-new-tab), so `TodayScreen` renders it now and
+  // this file has nothing left to draw beside it.
   return (
-    <>
-      {/* 9b is reachable or it is not delivered. A real <a href> rather than a button, so
-          it survives the back button and open-in-new-tab — the same reason the whole
-          vertical routes on the hash. */}
-      <a href="#/schedule/date" data-testid="open-date-picker" style={openPickerStyle}>
-        {t(locale, 'schedule.datePicker.title')}
-      </a>
-      <TodayScreen
-        // Remounts when the pick changes, so the day state re-seeds from it.
-        key={picked ?? 'today'}
-        locale={locale}
-        client={client}
-        eventsClient={eventsClient}
-        peopleClient={peopleClient}
-        today={today}
-        // A day chosen in 9b wins over the clock until the coach navigates away — and
-        // `חזרה להיום` on the screen itself walks back, because `today` stays honest.
-        initialDay={picked}
-        coaches={coaches}
-        viewerPersonId={viewerPersonId}
-        viewerIsCoach={viewerIsCoach}
-      />
-    </>
+    <TodayScreen
+      // Remounts when the pick changes, so the day state re-seeds from it.
+      key={picked ?? 'today'}
+      locale={locale}
+      client={client}
+      eventsClient={eventsClient}
+      peopleClient={peopleClient}
+      today={today}
+      // A day chosen in 9b wins over the clock until the coach navigates away — and
+      // `חזרה להיום` on the screen itself walks back, because `today` stays honest.
+      initialDay={picked}
+      coaches={coaches}
+      viewerPersonId={viewerPersonId}
+      viewerIsCoach={viewerIsCoach}
+    />
   )
 }

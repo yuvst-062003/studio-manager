@@ -77,6 +77,7 @@ import { StaffShell } from './features/shell/StaffShell'
 import type { StaffTab } from './features/shell/StaffTabBar'
 import { AccountScreen } from './features/account/AccountScreen'
 import { TimerScreen } from './features/timer'
+import { TasksScreen, openTaskCount, useOpenTasks } from './features/tasks'
 import './features/attendance/attendance.css'
 
 // §5.1 — 'the staff app and dashboard route them into a resumable wizard'. Both mount the
@@ -202,6 +203,24 @@ export default function App() {
   // is about coach-scoped endpoints, and neither the entry nor the screen exists for a coach.
   const viewerIsManager =
     membership?.roles.some((role) => role === 'owner' || role === 'manager') ?? false
+  // §4.4 (checkpoint 8) — "no task table, rebuilt every time the tab opens". Called here,
+  // once, rather than inside the tasks screen alone, because the tab bar's own badge is
+  // visible on every screen and needs the same count `TasksScreen` renders; see
+  // `features/tasks/useOpenTasks.ts`'s own header for why this is a second, independent
+  // call rather than a value threaded down as a prop. `hash` is the refresh key: this
+  // component never unmounts, so re-running the fetches on every navigation is what keeps
+  // the badge from freezing at whatever it saw when the coach signed in.
+  const openTasks = useOpenTasks({
+    enabled: session.access.staff,
+    locale,
+    scheduleClient,
+    peopleClient,
+    commsClient,
+    viewerPersonId: membership?.person_id ?? null,
+    viewerIsManager,
+    today,
+    refreshKey: hash,
+  })
   // Staff `9h` is one hash away from Today. The card (`9c`) and the mid-lesson trial
   // (`11b`) open from a roster row, which is M5's screen — they are exported from
   // features/people for that lane to mount without reopening this file.
@@ -333,10 +352,11 @@ export default function App() {
         <StaffShell
           activeTab={activeTab}
           locale={locale}
-          // Wired properly at a later checkpoint — this is not a placeholder count, it is
-          // the honest one: §1's decision is "no task table", so there is nothing to count
-          // yet, and a badge showing an invented number is worse than no badge.
-          tasksBadgeCount={0}
+          // §4.4 (checkpoint 8) — the real open-task count, computed by the same
+          // derivation the tasks screen itself renders from (`openTasks` above). Before
+          // this checkpoint the count was hardcoded to 0 rather than invented; now it is
+          // the honest number because there is finally something honest to count.
+          tasksBadgeCount={openTaskCount(openTasks.tasks)}
           networkStatus={session.access.staff ? <NetworkStatus locale={locale} /> : null}
           staffAlerts={
             session.access.staff ? <StaffAlerts client={commsClient} locale={locale} /> : null
@@ -410,10 +430,20 @@ export default function App() {
             // this file changes to mount it.
             <TimerScreen locale={locale} />
           ) : session.access.staff && onTasks ? (
-            <section aria-label={t(locale, 'tasks.title')} data-testid="tasks-placeholder">
-              <h1>{t(locale, 'tasks.title')}</h1>
-              <p>{t(locale, 'tasks.empty')}</p>
-            </section>
+            // §4.4 (checkpoint 8) — coach and manager rows, derived fresh every time this
+            // tab opens. `scheduleClient`/`peopleClient`/`commsClient` are the same
+            // instances every other screen already uses; the promise and health-review
+            // clients are self-contained inside the screen, the same shape
+            // `PaymentPromisesSection` already uses for its own manager-only fetch.
+            <TasksScreen
+              locale={locale}
+              scheduleClient={scheduleClient}
+              peopleClient={peopleClient}
+              commsClient={commsClient}
+              viewerPersonId={membership?.person_id ?? null}
+              viewerIsManager={viewerIsManager}
+              today={today}
+            />
           ) : onInstall ? (
             // Needs no access guard: installing the app is every signed-in person's
             // business, and the screen shows nothing from any studio.

@@ -185,13 +185,13 @@ describe('StaffStudentCard — 9c', () => {
 
   it('renders the card for every staff role', () => {
     render(card(ASSISTANT))
-    expect(screen.getByTestId('staff-student-card')).toBeInTheDocument()
-    expect(screen.getByTestId('staff-card-guardian')).toBeInTheDocument()
+    expect(screen.getByTestId('staff-student-transfer-card')).toBeInTheDocument()
+    expect(screen.getByTestId('staff-card-transfer-guardian')).toBeInTheDocument()
   })
 
   it('offers contact in one tap', () => {
     render(card(LEAD))
-    expect(screen.getByTestId('staff-card-call')).toHaveAttribute('href', 'tel:0521234567')
+    expect(screen.getByTestId('staff-card-transfer-call')).toHaveAttribute('href', 'tel:0521234567')
   })
 
   it('renders every live enrollment, not one', () => {
@@ -545,5 +545,68 @@ describe('StudentsSearch — S8', () => {
     render(<StudentsSearch locale="he" client={client} now="2027-02-10T12:00:00Z" />)
     const row = await screen.findByText(/92%/)
     expect(row).toHaveTextContent('מתחילים · 5 חודשים · 92%')
+  })
+})
+
+// -- C4's addition: the prototype's "לפי נוכחות" / "סדר א-ב" flip ----------------
+
+describe('StudentsSearch — the attendance sort toggle (C4)', () => {
+  const GROUPS = [
+    { id: 'g1', class_id: 'c1', name: 'מתחילים', description: null, age_min: null, age_max: null, is_active: true },
+    { id: 'g2', class_id: 'c1', name: 'נבחרת', description: null, age_min: null, age_max: null, is_active: true },
+  ]
+
+  it('defaults to the existing class grouping — nothing changes for a caller that never flips it', async () => {
+    const client = makeClient({ groups: vi.fn(() => Promise.resolve({ items: GROUPS })) })
+    render(<StudentsSearch locale="he" client={client} />)
+    expect(await screen.findAllByTestId('class-header')).toHaveLength(1)
+    expect(screen.getByTestId('sort-toggle')).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('flips to one flat list ranked by attendance, highest first', async () => {
+    const user = userEvent.setup()
+    const client = makeClient({
+      groups: vi.fn(() => Promise.resolve({ items: GROUPS })),
+      search: vi.fn(() =>
+        Promise.resolve({
+          items: [
+            summary({ id: 'st1', first_name: 'א', attendance_percent: 40 }),
+            summary({ id: 'st2', first_name: 'ב', attendance_percent: 95 }),
+            summary({ id: 'st3', first_name: 'ג', attendance_percent: null }),
+          ],
+        }),
+      ),
+    })
+    render(<StudentsSearch locale="he" client={client} />)
+    await screen.findByText('ב לוי')
+
+    await user.click(screen.getByTestId('sort-toggle'))
+    expect(screen.getByTestId('sort-toggle')).toHaveAttribute('aria-pressed', 'true')
+    // The class-grouped headers are gone — one ranking, not several class lists.
+    expect(screen.queryByTestId('class-header')).toBeNull()
+
+    const names = screen.getAllByRole('button', { name: /^[אבג]/ }).map((el) => el.textContent)
+    // ב (95%) before א (40%) before ג (never marked, pushed to the end).
+    expect(names.findIndex((text) => text?.startsWith('ב'))).toBeLessThan(
+      names.findIndex((text) => text?.startsWith('א')),
+    )
+    expect(names.findIndex((text) => text?.startsWith('א'))).toBeLessThan(
+      names.findIndex((text) => text?.startsWith('ג')),
+    )
+  })
+
+  it('carries the D7 ring on the list row belt pill', async () => {
+    const client = makeClient({
+      search: vi.fn(() =>
+        Promise.resolve({
+          items: [summary({ current_belt_color_hex: '#ffffff', current_belt_name: 'לבנה' })],
+        }),
+      ),
+    })
+    render(<StudentsSearch locale="he" client={client} />)
+    const dot = (await screen.findByText('נועה לוי'))
+      .closest('button')
+      ?.querySelector('[style*="belt-ring"]')
+    expect(dot).toBeTruthy()
   })
 })

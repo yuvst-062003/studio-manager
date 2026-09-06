@@ -935,7 +935,25 @@ waves:
         status: pending
       - id: C4
         title: The students tab and the student detail sheet
-        status: pending
+        why: >-
+          The list and the detail sheet redrawn to the prototype, reusing C2's contact
+          component rather than writing a second one.
+
+          Two claims in the spec turned out to be false and were corrected rather than quietly
+          edited. A student's school class cannot be shown: Student.grade exists on the model
+          but appears on no staff-reachable response, so neither a school nor a grade is
+          rendered.
+
+          And the checkpoint surfaced a defect older than this port. StaffStudentCard — the
+          ONLY implementation of moving a student between groups — was exported, tested and
+          mounted nowhere, while the account screen told a lead coach that permission was not
+          locked for them. The app promised a capability with no screen behind it. Mounted on
+          the student detail route with the real signed-in actor, so the capability gate
+          actually gates. Mounting it surfaced two testid collisions and an ARIA landmark
+          collision that had never fired because the component had never rendered beside its
+          neighbours.
+        status: shipped
+        on: 2026-09-06
       - id: C5
         title: The schema contract — one revision carrying unavailability, the briefing column, and the removal of the coach-substituted switch
         status: pending
@@ -962,7 +980,21 @@ waves:
         on: 2026-09-06
       - id: C8
         title: The tasks tab — derived, personal, with a tick box for the one type the app cannot observe
-        status: pending
+        why: >-
+          Five derived rows, nothing stored: unclosed sessions, missing health forms, parents
+          to call, and — for whoever holds the responsibility rather than the job title — cash
+          awaiting confirmation and health reviews pending. The tab badge is wired to the real
+          count.
+
+          Only "call a parent" carries a tick, because it is the only one the app cannot
+          observe; it marks the underlying notification read. The rest vanish when the thing
+          itself is done, which is the whole argument for deriving them.
+
+          This checkpoint also found the error in the spec's own offline table — see the
+          correction recorded in §7 of the spec, and the cachedSessions defect underneath
+          it.
+        status: shipped
+        on: 2026-09-06
       - id: C9
         title: The timer tab — local presets, a wake lock, no backend
         why: >-

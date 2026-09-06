@@ -2,7 +2,6 @@ export { PaymentsScreen } from './PaymentsScreen'
 export type { DebtRow, PaymentsScreenProps } from './PaymentsScreen'
 export { PaymentHistoryScreen } from './PaymentHistoryScreen'
 export { PaymentCompleteScreen } from './PaymentCompleteScreen'
-export { PaymentStrip } from './PaymentStrip'
 export { instalmentSplit, oldestMonths, selectionTotal } from './billingClient'
 export type { BillingClient, ChargeOut, PaymentOut, UpayForm } from './billingClient'
 // §6.1's payment step: a method per child, then one summary. Replaced the plan picker —

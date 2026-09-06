@@ -877,4 +877,16 @@ export const people: Bundle = {
   'joinWizard.faq.trial-period.question': 'Is there a settling-in period, and what\'s the cancellation policy?',
   'joinWizard.faq.trial-period.answer': 'Absolutely! We believe in a personal connection to the sport. Registration includes an initial settling-in period. If a student decides they don\'t want to continue, registration can be cancelled according to the cancellation policy detailed in the payment terms, with no draconian cancellation fees.',
 
+  // -- staff 9h/9c, the redesign's students tab and student detail sheet (C4, 2026-09-06) --
+  'list.title': 'Student list',
+  'list.registeredCount': '{{count}} registered',
+  'list.sortAlpha': 'A–Z',
+  'list.sortAttendance': 'By attendance',
+  'staffCard.personalDetails': 'Personal details',
+  'staffCard.contactStudentTrigger': 'Contact the student',
+  'staffCard.contactStudentMessage': 'Hi {{name}}, see you at practice!',
+  'staffCard.contactParentsTrigger': 'Contact the parents',
+  'staffCard.contactParentsMessage': 'Hello, a message from the club about {{name}}.',
+  'staffCard.guardiansTitle': 'Contacts and parents',
+  'staffCard.noGuardians': 'No guardians linked to this student',
 }

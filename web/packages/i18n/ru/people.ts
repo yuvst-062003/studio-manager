@@ -879,4 +879,16 @@ export const people: Bundle = {
   'joinWizard.faq.trial-period.question': 'Есть ли период адаптации и какова политика отмены?',
   'joinWizard.faq.trial-period.answer': 'Конечно! Мы верим в личную связь со спортом. Регистрация включает начальный период адаптации. Если ученик решает, что не хочет продолжать, регистрацию можно отменить согласно политике отмены, изложенной в правилах оплаты, без драконовских штрафов за отмену.',
 
+  // -- staff 9h/9c, the redesign's students tab and student detail sheet (C4, 2026-09-06) --
+  'list.title': 'Список учеников',
+  'list.registeredCount': '{{count}} записано',
+  'list.sortAlpha': 'А–Я',
+  'list.sortAttendance': 'По посещаемости',
+  'staffCard.personalDetails': 'Личные данные',
+  'staffCard.contactStudentTrigger': 'Связаться с учеником',
+  'staffCard.contactStudentMessage': 'Привет, {{name}}! Ждём тебя на тренировке.',
+  'staffCard.contactParentsTrigger': 'Связаться с родителями',
+  'staffCard.contactParentsMessage': 'Здравствуйте, сообщение от клуба по поводу {{name}}.',
+  'staffCard.guardiansTitle': 'Контакты и родители',
+  'staffCard.noGuardians': 'К ученику не привязаны родители',
 }

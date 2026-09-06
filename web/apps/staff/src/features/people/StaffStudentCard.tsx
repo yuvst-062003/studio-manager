@@ -88,7 +88,18 @@ export function StaffStudentCard({
   const live = enrollments.filter((enrollment) => enrollment.ended_on == null)
 
   return (
-    <section style={pageStyle} aria-labelledby="staff-card-title" data-testid="staff-student-card">
+    // Not `staff-student-card` — `StudentCardScreen` (features/attendance) already claims
+    // that testid for its own `<article>`. Both mount together in `StudentCardRoute` now,
+    // so this one is renamed rather than colliding silently.
+    //
+    // No `aria-labelledby` on the section: it used to point at the `<h1>` below, which
+    // made this a second ARIA "region" landmark named after the student — the same name
+    // `StudentCardRoute`'s own profile banner already gives its `<section aria-label>`,
+    // once the two mount together. Dropped rather than renamed: the banner's landmark is
+    // the one a screen reader should land on first, and a second region with the same
+    // name is a worse a11y story than one, not a better one. The `<h1>` itself is
+    // unchanged — heading navigation still finds this section by its own name.
+    <section style={pageStyle} data-testid="staff-student-transfer-card">
       <h1 id="staff-card-title">
         <bdi>{`${student.first_name} ${student.last_name}`}</bdi>
       </h1>
@@ -111,10 +122,13 @@ export function StaffStudentCard({
         <h2>{t(locale, 'people.guardian.plural')}</h2>
         <ul>
           {(student.guardians ?? []).map((guardian) => (
-            <li key={guardian.person_id} data-testid="staff-card-guardian">
+            // `-transfer-` — `StudentCardRoute`'s own `ParentContacts` already uses
+            // `staff-card-guardian`/`staff-card-call` for the same guardian, once both
+            // mount together on the same screen.
+            <li key={guardian.person_id} data-testid="staff-card-transfer-guardian">
               <bdi>{guardian.display_name}</bdi>
               {/* §6.2 — 'contact in one tap' from the roster. */}
-              <a href={`tel:${guardian.phone ?? ''}`} data-testid="staff-card-call">
+              <a href={`tel:${guardian.phone ?? ''}`} data-testid="staff-card-transfer-call">
                 {t(locale, 'people.guardian.call')}
               </a>
             </li>
