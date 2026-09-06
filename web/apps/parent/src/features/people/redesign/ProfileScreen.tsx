@@ -24,6 +24,8 @@ import { ProfileMenu } from './ProfileMenu'
 import type { MenuKey } from './ProfileMenu'
 import { ClubSheet, PaymentsSheet, SettingsSheet, TraineesSheet } from './sheets'
 import { PersonalDetailsSheet } from './PersonalDetails'
+import { Sheet } from './Sheet'
+import { SheetFailed } from './SheetFailed'
 import type { MyDetails } from './PersonalDetails'
 import { coverageFrom, familyNameOf } from './derive'
 import type { Coverage, CoverageCharge } from './derive'
@@ -65,6 +67,20 @@ export function ProfileScreen({
   const [open, setOpen] = useState<MenuKey | 'settings' | null>(null)
   const [savingDetails, setSavingDetails] = useState(false)
   const [detailsFailed, setDetailsFailed] = useState(false)
+  // WHICH READ FAILED, not "did anything". The sheets open one at a time and each one
+  // should answer for its own data — a families sheet greyed out because the CLUB's
+  // address could not be read would be its own small lie.
+  const [failed, setFailed] = useState<
+    Readonly<Record<'children' | 'details' | 'money' | 'club', boolean>>
+  >({ children: false, details: false, money: false, club: false })
+  // Bumped by the retry button. `useEffect` re-runs the whole block, which is what a retry
+  // should do: the reads are independent and re-reading one that succeeded costs nothing
+  // next to a screen that stays half wrong.
+  const [epoch, setEpoch] = useState(0)
+  const retry = useCallback(() => {
+    setFailed({ children: false, details: false, money: false, club: false })
+    setEpoch((n) => n + 1)
+  }, [])
 
   useEffect(() => {
     let live = true
@@ -94,11 +110,17 @@ export function ProfileScreen({
           })),
         )
       })
-      .catch(() => live && setChildren([]))
+      // NOT `setChildren([])`. An empty roster is a family with no children in the club,
+      // and telling that to a family that has three is the failure this whole flag exists
+      // for.
+      .catch(() => live && setFailed((current) => ({ ...current, children: true })))
 
     void apiFetch('/api/v1/me/profile')
       .then(async (response) => {
-        if (!response.ok || !live) return
+        if (!live) return
+        // `fetch` RESOLVES on a 4xx/5xx, so the flag has to be set here and not only in
+        // the `catch` — which is how the first version of this shipped still silent.
+        if (!response.ok) return setFailed((current) => ({ ...current, details: true }))
         const body = (await response.json()) as {
           first_name: string
           last_name: string
@@ -112,11 +134,12 @@ export function ProfileScreen({
           phone: body.phone,
         })
       })
-      .catch(() => undefined)
+      .catch(() => live && setFailed((current) => ({ ...current, details: true })))
 
     void apiFetch('/api/v1/me/studio')
       .then(async (response) => {
-        if (!response.ok || !live) return
+        if (!live) return
+        if (!response.ok) return setFailed((current) => ({ ...current, club: true }))
         const body = (await response.json()) as ClubDetails
         setClub({
           name: body.name,
@@ -125,11 +148,12 @@ export function ProfileScreen({
           email: body.email ?? null,
         })
       })
-      .catch(() => undefined)
+      .catch(() => live && setFailed((current) => ({ ...current, club: true })))
 
     void apiFetch('/api/v1/me/balance')
       .then(async (response) => {
-        if (!response.ok || !live) return
+        if (!live) return
+        if (!response.ok) return setFailed((current) => ({ ...current, money: true }))
         const body = (await response.json()) as {
           balance_agorot: number
           open_charge_count: number
@@ -139,18 +163,19 @@ export function ProfileScreen({
           openChargeCount: body.open_charge_count,
         })
       })
-      .catch(() => undefined)
+      .catch(() => live && setFailed((current) => ({ ...current, money: true })))
 
     void apiFetch('/api/v1/me/payment-promises')
       .then(async (response) => {
-        if (!response.ok || !live) return
+        if (!live) return
+        if (!response.ok) return setFailed((current) => ({ ...current, money: true }))
         const body = (await response.json()) as { items?: { method?: string | null }[] }
         const method = body.items?.[0]?.method ?? null
         setMethodLabel(method ? t(locale, `billing.method.${method}`) : null)
         // The PCI note is only true for a card payer; see `PaymentsSheet`.
         setMethodIsCard(method === 'upay_card' || method === 'card')
       })
-      .catch(() => undefined)
+      .catch(() => live && setFailed((current) => ({ ...current, money: true })))
 
     // The charges are read for ONE question: which month is already paid for. `coverageFrom`
     // takes the furthest settled tuition period, which is how a family that wrote cheques
@@ -158,16 +183,16 @@ export function ProfileScreen({
     void apiFetch('/api/v1/me/charges')
       .then(async (response) => {
         if (!live) return
-        if (!response.ok) return setCharges([])
+        if (!response.ok) return setFailed((current) => ({ ...current, money: true }))
         const body = (await response.json()) as { items: CoverageCharge[] }
         setCharges(body.items)
       })
-      .catch(() => live && setCharges([]))
+      .catch(() => live && setFailed((current) => ({ ...current, money: true })))
 
     return () => {
       live = false
     }
-  }, [locale])
+  }, [locale, epoch])
 
   const familyName = useMemo(
     () => (children === null ? null : familyNameOf(children.map((child) => child.lastName))),
@@ -231,6 +256,17 @@ export function ProfileScreen({
         }}
       />
 
+      {open === 'personal' && details === null ? (
+        <Sheet
+          title={t(locale, 'people.profile.personalSheetTitle')}
+          locale={locale}
+          testId="sheet-personal-failed"
+          onClose={close}
+        >
+          <SheetFailed locale={locale} onRetry={retry} />
+        </Sheet>
+      ) : null}
+
       {open === 'personal' && details ? (
         <PersonalDetailsSheet
           locale={locale}
@@ -243,13 +279,21 @@ export function ProfileScreen({
       ) : null}
 
       {open === 'trainees' ? (
-        <TraineesSheet childList={children ?? []} locale={locale} onClose={close} />
+        <TraineesSheet
+          childList={children ?? []}
+          locale={locale}
+          failed={failed.children}
+          onRetry={retry}
+          onClose={close}
+        />
       ) : null}
 
       {open === 'payments' ? (
         <PaymentsSheet
           coverage={coverage}
           locale={locale}
+          failed={failed.money}
+          onRetry={retry}
           methodLabel={methodLabel}
           methodIsCard={methodIsCard}
           money={money}
@@ -258,7 +302,15 @@ export function ProfileScreen({
         />
       ) : null}
 
-      {open === 'club' ? <ClubSheet club={club} locale={locale} onClose={close} /> : null}
+      {open === 'club' ? (
+        <ClubSheet
+          club={club}
+          locale={locale}
+          failed={failed.club}
+          onRetry={retry}
+          onClose={close}
+        />
+      ) : null}
 
       {open === 'settings' ? (
         <SettingsSheet

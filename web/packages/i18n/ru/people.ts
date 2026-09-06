@@ -493,5 +493,8 @@ export const people: Bundle = {
   'profile.calendarFeed': 'Синхронизация календаря',
   'profile.close': 'Закрыть',
   'profile.loading': 'Загрузка…',
+  // -- when a פרופיל sheet's own read failed --------------------------------------
+  'profile.sheetFailed': 'Не удалось загрузить данные',
+  'profile.sheetRetry': 'Повторить',
 
 }

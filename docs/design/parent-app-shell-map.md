@@ -168,13 +168,18 @@ made from), and darkening them is a design change the owner has not been shown.
   subscription, which is what the route still exists for now that בית draws the month itself
   in a modal. `AccountControls`'s two transitional links are gone: Profile carries
   `#/add-child` under its trainee cards and `#/calendar` here.
-- **A section of פרופיל whose fetch fails renders as EMPTY, not as failed.** Each of the
-  screen's reads ends `.catch(() => setChildren([]))`, so a network failure tells a family
-  they have no trainees. `tools/__tests__/load-failed-recovery.test.ts` catches the shape it
-  knows — `setLoaded(true)` in a catch — and not this one. The four tabs that DO have a
-  failure state now share `resolveLoadFailedText`, which is where the fix belongs; פרופיל
-  needs a failure state of its own first, which is a change to the screen and not to a
-  string, so it is not part of step 6.
+- ~~**A section of פרופיל whose fetch fails renders as EMPTY, not as failed.**~~ Fixed
+  2026-09-06. Each read now sets a flag for the sheet it feeds — `children`, `details`,
+  `money`, `club` — and `SheetFailed` draws the message and a retry that re-runs the reads.
+  Four separate lies were being told: a family with three children was told they had none;
+  the payments sheet span on 'טוען…' for ever, because `coverage` is null until BOTH the
+  balance and the charges land; the club was reported to have set no address and no contact
+  details; and the פרטים אישיים row opened nothing at all, because its sheet is gated on
+  the value that failed to arrive.
+
+  The subtle half: `fetch` RESOLVES on a 4xx/5xx, so a `.catch` alone left three of the
+  four still silent. The flag is set on the response as well, and the tests stub a 500
+  rather than a rejection for exactly that reason.
 
 ### The dark-mode correction
 

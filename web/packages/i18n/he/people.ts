@@ -586,5 +586,11 @@ export const people: Bundle = {
   'profile.calendarFeed': 'סנכרון יומן',
   'profile.close': 'סגירה',
   'profile.loading': 'טוען…',
+  // -- when a פרופיל sheet's own read failed --------------------------------------
+  // Each of the screen's reads used to end `.catch(() => setChildren([]))`, so a network
+  // failure told a family they had no trainees, and the payments sheet span on 'טוען…'
+  // for ever. An empty list is an ANSWER; a failed read is not one.
+  'profile.sheetFailed': 'לא הצלחנו לטעון את הפרטים',
+  'profile.sheetRetry': 'נסו שוב',
 
 }

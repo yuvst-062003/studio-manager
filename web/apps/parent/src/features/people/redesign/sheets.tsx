@@ -6,6 +6,7 @@ import { fill } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { Sheet } from './Sheet'
+import { SheetFailed } from './SheetFailed'
 import { ProfilePreferences } from './ProfileTop'
 import { ContactActions } from './ContactSheet'
 import { AccountControls } from '../../shell/AccountControls'
@@ -23,10 +24,17 @@ import type { ClubDetails, ProfileChild } from './types'
 export function TraineesSheet({
   childList,
   locale,
+  failed,
+  onRetry,
   onClose,
 }: {
   childList: readonly ProfileChild[]
   locale: Locale
+  /** The roster read failed. NOT the same as an empty roster, which is a family with no
+   *  children in the club — telling that to a family that has three is the lie this flag
+   *  exists to stop. */
+  failed: boolean
+  onRetry: () => void
   onClose: () => void
 }) {
   return (
@@ -38,6 +46,8 @@ export function TraineesSheet({
       onClose={onClose}
     >
       <div className="space-y-2.5">
+        {failed ? <SheetFailed locale={locale} onRetry={onRetry} /> : null}
+
         {childList.map((child) => (
           <a
             key={child.id}
@@ -107,6 +117,8 @@ export function TraineesSheet({
 export function PaymentsSheet({
   coverage,
   locale,
+  failed,
+  onRetry,
   methodLabel,
   methodIsCard,
   money,
@@ -115,6 +127,10 @@ export function PaymentsSheet({
 }: {
   coverage: Coverage | null
   locale: Locale
+  /** A money read failed. Without this the sheet renders `loading` for ever, because
+   *  `coverage` is `null` until BOTH the balance and the charges have landed. */
+  failed: boolean
+  onRetry: () => void
   methodLabel: string | null
   /** Whether the family actually pays by card. The PCI note below is only true for them. */
   methodIsCard: boolean
@@ -132,7 +148,9 @@ export function PaymentsSheet({
       testId="sheet-payments"
       onClose={onClose}
     >
-      {coverage === null ? (
+      {failed ? (
+        <SheetFailed locale={locale} onRetry={onRetry} />
+      ) : coverage === null ? (
         <p className="text-xs text-slate-500 dark:text-slate-400">{t(locale, 'people.profile.loading')}</p>
       ) : coverage.kind === 'owed' ? (
         <div
@@ -221,10 +239,16 @@ export function PaymentsSheet({
 export function ClubSheet({
   club,
   locale,
+  failed,
+  onRetry,
   onClose,
 }: {
   club: ClubDetails | null
   locale: Locale
+  /** The studio read failed. Without it the sheet says the club has set no address and no
+   *  contact details, which is a statement about the CLUB made from a network error. */
+  failed: boolean
+  onRetry: () => void
   onClose: () => void
 }) {
   return (
@@ -235,6 +259,8 @@ export function ClubSheet({
       testId="sheet-club"
       onClose={onClose}
     >
+      {failed ? <SheetFailed locale={locale} onRetry={onRetry} /> : null}
+
       <ContactActions club={club} locale={locale} />
 
       <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700 text-start space-y-2">

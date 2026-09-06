@@ -491,5 +491,8 @@ export const people: Bundle = {
   'profile.calendarFeed': 'Calendar sync',
   'profile.close': 'Close',
   'profile.loading': 'Loading…',
+  // -- when a פרופיל sheet's own read failed --------------------------------------
+  'profile.sheetFailed': "We couldn't load this",
+  'profile.sheetRetry': 'Try again',
 
 }
