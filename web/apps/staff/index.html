@@ -2,7 +2,15 @@
 <html lang="he" dir="rtl" data-theme="light">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- `maximum-scale=1, user-scalable=no` — a native app does not scale under two
+         fingers. Honoured by Android, and by iOS for a home-screen web app; iOS Safari in
+         a browser TAB ignores both since iOS 10, which is what `lockViewportZoom()` in
+         main.tsx is for. The accessibility trade this makes is argued there, and rests on
+         AccessibilityMenu's own text scaling being the replacement. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
     <meta name="theme-color" content="#f7f5f1" />
 
     <!-- iOS ignores the manifest for the home-screen icon and reads these

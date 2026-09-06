@@ -10,7 +10,15 @@
 <html lang="he" dir="rtl" data-theme="light" data-surface="outward">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- `maximum-scale=1, user-scalable=no` — a native app does not scale under two
+         fingers. Honoured by Android, and by iOS for a home-screen web app; iOS Safari in
+         a browser TAB ignores both since iOS 10, which is what `lockViewportZoom()` in
+         main.tsx is for. The accessibility trade this makes is argued there, and rests on
+         AccessibilityMenu's own text scaling being the replacement. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
     <!-- The OUTWARD ground. ThemeProvider rewrites this on mount for dark mode; this
          value is what paints the status bar in the moments before it does, so a stale one
          is a visible flash of the wrong palette on every cold start. -->

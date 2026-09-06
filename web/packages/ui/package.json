@@ -9,7 +9,8 @@
     ".": "./src/index.ts",
     "./theme": "./src/theme.ts",
     "./manifest": "./src/manifest.ts",
-    "./dev-bar": "./src/dev-bar/index.ts"
+    "./dev-bar": "./src/dev-bar/index.ts",
+    "./app-viewport.css": "./src/app-viewport.css"
   },
   "dependencies": {
     "@fontsource-variable/rubik": "^5.2.8"

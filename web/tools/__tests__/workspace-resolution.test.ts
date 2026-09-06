@@ -40,11 +40,14 @@ describe('workspace aliases', () => {
     expect(finds).toContain('@studio/core')
     expect(finds).toContain('@studio/api-client')
     expect(finds).toContain('@studio/i18n')
-    // `@studio/ui` declares three subpath exports and every one of them is imported
+    // `@studio/ui` declares four subpath exports and every one of them is imported
     // somewhere in the apps. A bare-specifier-only map would silently miss them.
     expect(finds).toContain('@studio/ui/theme')
     expect(finds).toContain('@studio/ui/manifest')
     expect(finds).toContain('@studio/ui/dev-bar')
+    // A stylesheet, and it counts for the same reason: resolved through main's
+    // node_modules a lane would style itself from main's copy.
+    expect(finds).toContain('@studio/ui/app-viewport.css')
   })
 
   it('points every alias at a file that exists in THIS checkout', () => {

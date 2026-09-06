@@ -1,0 +1,72 @@
+/* The installed app's viewport: no pinch-zoom, no double-tap zoom, no zoom-on-focus.
+ *
+ * A native app does not scale under two fingers, and a PWA that does is the single loudest
+ * tell that it is a web page in a costume. Three separate browser behaviours produce it and
+ * each needs its own answer — the viewport meta tag in each app's index.html handles the
+ * first two where it is honoured, this sheet handles what CSS can reach, and
+ * `lockViewportZoom()` in @studio/core handles the one iOS Safari refuses to take from a
+ * meta tag at all. All three, or the behaviour survives on one platform.
+ *
+ * **NOT imported by packages/ui/src/index.ts.** The barrel reaches all three apps and the
+ * dashboard is the manager's desktop tool (§ layout, "manager web") — dense tables that a
+ * manager has every reason to zoom into on a tablet. This is imported by name from the two
+ * phone apps' main.tsx, which is also what makes the exclusion visible rather than implied.
+ *
+ * **Unlayered on purpose.** The parent app runs Tailwind v4, whose utilities live in
+ * `@layer utilities` — so `text-[14px]` on an input beats anything a normal declaration
+ * here could say from inside `@layer base`. Unlayered normal declarations outrank every
+ * layer, which is what settles that contest. It is NOT what settles the contest against a
+ * component's own class selector; see the `!important` note below, which is a separate
+ * mechanism against a separate competitor. Neither has a visible failure mode, so
+ * tools/__tests__/app-viewport.test.ts guards both.
+ */
+
+html {
+  /* `pan-x pan-y` rather than `manipulation`: `manipulation` only drops the double-tap
+   * gesture and deliberately keeps pinch-zoom, which is half the thing being removed.
+   * Naming the two pans instead permits scrolling in both directions and nothing else.
+   *
+   * On `html` because pinch-zoom is a document-level gesture — the browser intersects
+   * touch-action up the whole ancestor chain, so the root is the only element that can
+   * refuse it. A descendant may still restrict itself further, which is how
+   * SignaturePad's canvas keeps its `touch-action: none` and stays drawable.
+   */
+  touch-action: pan-x pan-y;
+}
+
+/* iOS zooms the page in whenever a focused field's font-size is under 16px, and does not
+ * zoom back out when the field is blurred — so one tap on a form leaves the parent stranded
+ * at 130% with a header off-screen. It is the zoom people actually hit, and unlike the
+ * other two it happens in a browser tab whatever the meta tag says.
+ *
+ * `max(16px, 1em)` and not a flat `16px`: this raises anything below the threshold and
+ * leaves a deliberately larger field alone, so it is a floor rather than an override.
+ *
+ * `pointer: coarse` keeps it to touch. A mouse never triggers the zoom, and a desktop form
+ * has no reason to grow.
+ *
+ * The exclusions are the input types that carry no text to zoom into and whose size is
+ * drawn by the UA rather than by font-size.
+ *
+ * `!important`, deliberately, and for a different reason than the unlayering. Layer order
+ * settles Tailwind; it does nothing about an ordinary class selector. This is an element
+ * selector at (0,0,1), so any component naming its own field outranks it —
+ * `.studio-field__input { font-size: var(--text-body) }` is 14px and wins, and so would the
+ * next styled input somebody writes. A floor a new component can silently defeat is a floor
+ * that will be defeated, with nothing on screen to say so. This is not competing with a
+ * design: it is refusing a browser gesture, and `max()` keeps it a floor, not an override.
+ *
+ * One caveat worth knowing before adding one: for `!important` declarations the layer order
+ * INVERTS, and unlayered is the weakest tier — so a Tailwind important modifier
+ * (`!text-[14px]`, in `@layer utilities`) would beat this. None exists in either app today.
+ *
+ * The one thing this forbids: a touch field deliberately LARGER than its container's text.
+ * Nothing renders one today (checked across all four stylesheet trees). Anything that wants
+ * to must set the container's size, not the field's. */
+@media (pointer: coarse) {
+  textarea,
+  select,
+  input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file']) {
+    font-size: max(16px, 1em) !important;
+  }
+}

@@ -27,6 +27,9 @@
       "@studio/ui/dev-bar": [
         "./packages/ui/src/dev-bar/index.ts"
       ],
+      "@studio/ui/app-viewport.css": [
+        "./packages/ui/src/app-viewport.css"
+      ],
       "@studio/core": [
         "./packages/core/src/index.ts"
       ],

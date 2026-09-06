@@ -1,4 +1,6 @@
 export { getDisplayMode, isInstalled, useDisplayMode } from './useDisplayMode'
+export { lockViewportZoom } from './lockViewportZoom'
+export type { GestureTarget } from './lockViewportZoom'
 export { useAuthedImage } from './useAuthedImage'
 export type { DisplayMode } from './useDisplayMode'
 export {
