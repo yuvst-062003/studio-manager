@@ -2,13 +2,14 @@
 // on the old stacked screen — the reorder of 2026-09-06 changed where they live, not what
 // they look like inside.
 import { Award, ChevronLeft, MapPin, Navigation, Plus } from 'lucide-react'
+import { fill } from '@studio/core'
+import { t } from '@studio/i18n'
+import type { Locale } from '@studio/i18n'
 import { Sheet } from './Sheet'
 import { ProfilePreferences } from './ProfileTop'
 import { ContactActions } from './ContactSheet'
 import { AccountControls } from '../../shell/AccountControls'
 import type { AccountControlsProps } from '../../shell/AccountControls'
-import { PROFILE, fill } from './content'
-import { MONTH_NAME } from '../../home/redesign/content'
 import type { Coverage } from './derive'
 import type { ClubDetails, ProfileChild } from './types'
 
@@ -21,13 +22,21 @@ import type { ClubDetails, ProfileChild } from './types'
  */
 export function TraineesSheet({
   childList,
+  locale,
   onClose,
 }: {
   childList: readonly ProfileChild[]
+  locale: Locale
   onClose: () => void
 }) {
   return (
-    <Sheet title={PROFILE.traineesTitle} subtitle={PROFILE.traineesSub} testId="sheet-trainees" onClose={onClose}>
+    <Sheet
+      title={t(locale, 'people.profile.traineesTitle')}
+      subtitle={t(locale, 'people.profile.traineesSub')}
+      locale={locale}
+      testId="sheet-trainees"
+      onClose={onClose}
+    >
       <div className="space-y-2.5">
         {childList.map((child) => (
           <a
@@ -52,19 +61,19 @@ export function TraineesSheet({
                     {child.beltName}
                   </span>
                 ) : (
-                  <span className="text-[10px] text-slate-400 shrink-0">{PROFILE.beltUnset}</span>
+                  <span className="text-[10px] text-slate-400 shrink-0">{t(locale, 'people.profile.beltUnset')}</span>
                 )}
               </span>
               {/* The attendance number, on the child it belongs to. `null` renders nothing —
                   a server that has not computed a rate is not a rate of zero. */}
               {child.attendancePercent !== null ? (
                 <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  {PROFILE.attendanceLabel}: {child.attendancePercent}%
+                  {t(locale, 'people.profile.attendanceLabel')}: {child.attendancePercent}%
                 </span>
               ) : null}
               {child.needsDeclaration ? (
                 <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold text-[#ba1a1a] dark:text-red-300 bg-[#ffdad6] dark:bg-red-500/15 px-2 py-0.5 rounded-full">
-                  {PROFILE.needsDeclaration}
+                  {t(locale, 'people.profile.needsDeclaration')}
                 </span>
               ) : null}
             </span>
@@ -78,7 +87,7 @@ export function TraineesSheet({
           className="flex items-center justify-center gap-1.5 p-3 rounded-2xl border border-dashed border-slate-300 dark:border-slate-600 text-sm font-bold text-[#0056c5] dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-400/10 transition-colors cursor-pointer"
         >
           <Plus className="w-4 h-4" aria-hidden="true" />
-          <span>{PROFILE.addChild}</span>
+          <span>{t(locale, 'people.profile.addChild')}</span>
         </a>
       </div>
     </Sheet>
@@ -97,24 +106,34 @@ export function TraineesSheet({
  */
 export function PaymentsSheet({
   coverage,
+  locale,
   methodLabel,
   methodIsCard,
   money,
-  monthName,
+  monthLabel,
   onClose,
 }: {
   coverage: Coverage | null
+  locale: Locale
   methodLabel: string | null
   /** Whether the family actually pays by card. The PCI note below is only true for them. */
   methodIsCard: boolean
   money: (agorot: number) => string
-  monthName: (month: number) => string
+  /** `(year, month)` → the localized month heading. `formatMonthLabel` gives 'אוגוסט 2026'
+   *  in one string, so the sentence has one token and not a hand-ordered pair — Russian
+   *  needs the genitive and English puts the year the other side of a comma. */
+  monthLabel: (year: number, month: number) => string
   onClose: () => void
 }) {
   return (
-    <Sheet title={PROFILE.billingTitle} testId="sheet-payments" onClose={onClose}>
+    <Sheet
+      title={t(locale, 'people.profile.billingTitle')}
+      locale={locale}
+      testId="sheet-payments"
+      onClose={onClose}
+    >
       {coverage === null ? (
-        <p className="text-xs text-slate-500 dark:text-slate-400">{PROFILE.loading}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">{t(locale, 'people.profile.loading')}</p>
       ) : coverage.kind === 'owed' ? (
         <div
           data-testid="sheet-payments-owed"
@@ -124,16 +143,16 @@ export function PaymentsSheet({
             href="#/payments"
             className="bg-[#ba1a1a] text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-xs hover:bg-red-800 active:scale-95 transition-transform shrink-0 cursor-pointer"
           >
-            {PROFILE.payNow}
+            {t(locale, 'people.profile.payNow')}
           </a>
           <div className="text-start">
             <p className="font-bold text-[#ba1a1a] dark:text-red-300 text-sm">
-              {PROFILE.coverageOwedTitle} · {money(coverage.balanceAgorot)}
+              {t(locale, 'people.profile.coverageOwedTitle')} · {money(coverage.balanceAgorot)}
             </p>
             <p className="text-[11px] text-slate-700 dark:text-slate-300 mt-0.5">
               {coverage.openChargeCount === 1
-                ? PROFILE.openChargeOne
-                : fill(PROFILE.openCharges, { count: coverage.openChargeCount })}
+                ? t(locale, 'people.profile.openChargeOne')
+                : fill(t(locale, 'people.profile.openCharges'), { count: coverage.openChargeCount })}
             </p>
           </div>
         </div>
@@ -144,16 +163,15 @@ export function PaymentsSheet({
         >
           <p className="font-bold text-emerald-800 dark:text-emerald-300 text-sm">
             {coverage.kind === 'covered'
-              ? fill(PROFILE.coverageCovered, {
-                  month: monthName(coverage.month),
-                  year: coverage.year,
+              ? fill(t(locale, 'people.profile.coverageCovered'), {
+                  month: monthLabel(coverage.year, coverage.month),
                 })
-              : PROFILE.coverageSettled}
+              : t(locale, 'people.profile.coverageSettled')}
           </p>
           <p className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80 mt-0.5">
             {coverage.kind === 'covered'
-              ? PROFILE.coverageCoveredNote
-              : PROFILE.coverageSettledNote}
+              ? t(locale, 'people.profile.coverageCoveredNote')
+              : t(locale, 'people.profile.coverageSettledNote')}
           </p>
         </div>
       )}
@@ -164,12 +182,12 @@ export function PaymentsSheet({
           data-testid="sheet-payments-method"
           className="text-xs font-bold text-[#0056c5] dark:text-blue-300 shrink-0 cursor-pointer"
         >
-          {PROFILE.paymentMethodUpdate}
+          {t(locale, 'people.profile.paymentMethodUpdate')}
         </a>
         <div className="text-start min-w-0">
-          <p className="text-xs text-slate-500 dark:text-slate-400">{PROFILE.paymentMethod}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">{t(locale, 'people.profile.paymentMethod')}</p>
           <p className="text-sm font-bold text-slate-900 dark:text-slate-50 truncate">
-            {methodLabel ?? PROFILE.paymentMethodNone}
+            {methodLabel ?? t(locale, 'people.profile.paymentMethodNone')}
           </p>
         </div>
       </div>
@@ -179,7 +197,7 @@ export function PaymentsSheet({
           do, on the one screen that is supposed to answer "am I sorted". */}
       {methodIsCard || methodLabel === null ? (
         <p className="text-[11px] text-slate-500 dark:text-slate-400 text-start">
-          {PROFILE.paymentMethodHint}
+          {t(locale, 'people.profile.paymentMethodHint')}
         </p>
       ) : null}
 
@@ -190,7 +208,7 @@ export function PaymentsSheet({
         data-testid="sheet-payments-history"
         className="block text-center text-xs font-bold text-[#0056c5] dark:text-blue-300 py-2 cursor-pointer"
       >
-        {PROFILE.allTransactions}
+        {t(locale, 'people.profile.allTransactions')}
       </a>
     </Sheet>
   )
@@ -200,15 +218,29 @@ export function PaymentsSheet({
  * The dojo and the contact actions, merged: both answer "how do I reach the club", and two
  * rows for one question is what fills a screen.
  */
-export function ClubSheet({ club, onClose }: { club: ClubDetails | null; onClose: () => void }) {
+export function ClubSheet({
+  club,
+  locale,
+  onClose,
+}: {
+  club: ClubDetails | null
+  locale: Locale
+  onClose: () => void
+}) {
   return (
-    <Sheet title={PROFILE.clubTitle} subtitle={club?.name ?? null} testId="sheet-club" onClose={onClose}>
-      <ContactActions club={club} />
+    <Sheet
+      title={t(locale, 'people.profile.clubTitle')}
+      subtitle={club?.name ?? null}
+      locale={locale}
+      testId="sheet-club"
+      onClose={onClose}
+    >
+      <ContactActions club={club} locale={locale} />
 
       <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700 text-start space-y-2">
         <p className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300">
           <MapPin className="w-4 h-4 text-[#0056c5] dark:text-blue-300 shrink-0 mt-0.5" aria-hidden="true" />
-          <span>{club?.address ?? PROFILE.dojoNoAddress}</span>
+          <span>{club?.address ?? t(locale, 'people.profile.dojoNoAddress')}</span>
         </p>
         <a
           href="#/directions"
@@ -216,7 +248,7 @@ export function ClubSheet({ club, onClose }: { club: ClubDetails | null; onClose
           className="inline-flex items-center gap-1 text-xs font-bold text-[#0056c5] dark:text-blue-300 cursor-pointer"
         >
           <Navigation className="w-3.5 h-3.5" aria-hidden="true" />
-          <span>{PROFILE.directions}</span>
+          <span>{t(locale, 'people.profile.directions')}</span>
         </a>
       </div>
     </Sheet>
@@ -236,7 +268,7 @@ export function SettingsSheet({
   account,
   onClose,
 }: {
-  locale: string
+  locale: Locale
   locales: readonly string[]
   localeLabel: (code: string) => string
   onChooseLocale: (code: string) => void
@@ -246,7 +278,12 @@ export function SettingsSheet({
   onClose: () => void
 }) {
   return (
-    <Sheet title={PROFILE.menuSettings} testId="sheet-settings" onClose={onClose}>
+    <Sheet
+      title={t(locale, 'people.profile.menuSettings')}
+      locale={locale}
+      testId="sheet-settings"
+      onClose={onClose}
+    >
       <ProfilePreferences
         locale={locale}
         locales={locales}
@@ -261,7 +298,7 @@ export function SettingsSheet({
           href="#/privacy"
           className="flex items-center justify-between px-3.5 py-3 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer"
         >
-          <span>{PROFILE.privacy}</span>
+          <span>{t(locale, 'people.profile.privacy')}</span>
           <ChevronLeft className="w-4 h-4 text-slate-400" aria-hidden="true" />
         </a>
         <a
@@ -269,7 +306,7 @@ export function SettingsSheet({
           data-testid="link-calendar"
           className="flex items-center justify-between px-3.5 py-3 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer"
         >
-          <span>{PROFILE.calendarFeed}</span>
+          <span>{t(locale, 'people.profile.calendarFeed')}</span>
           <ChevronLeft className="w-4 h-4 text-slate-400" aria-hidden="true" />
         </a>
       </div>
@@ -279,5 +316,3 @@ export function SettingsSheet({
   )
 }
 
-/** Re-exported so the container has one import for the month name the coverage line needs. */
-export { MONTH_NAME }

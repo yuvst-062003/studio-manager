@@ -12,15 +12,16 @@
 // That is correct in a right-to-left document — forward is leftward, so the arrow pointing
 // away from the text's flow direction is the one that advances — and it is kept as drawn.
 import { Calendar, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Eye, X } from 'lucide-react'
+import { fill, studioDayKey, weekdayInitials } from '@studio/core'
+import { t } from '@studio/i18n'
+import type { Locale } from '@studio/i18n'
 import { useDialog } from '../../onboarding/wizard/useDialog'
-import { DAY_ABSENCE } from './content.absence'
-import { HOME, WEEKDAY_LETTER, fill } from './content'
-import { studioDayKey } from '@studio/core'
 import { monthGrid } from './derive'
 import type { HomeChild, HomeSession } from './types'
 
 export function MonthCalendarModal({
   at,
+  locale,
   monthLabel,
   sessions,
   todayKey,
@@ -40,6 +41,7 @@ export function MonthCalendarModal({
 }: {
   /** The month on screen. `month` is 1-based, like every other month value here. */
   at: { year: number; month: number }
+  locale: Locale
   /** Already formatted, e.g. "אוגוסט 2026" — `formatMonthLabel` does it in the caller. */
   monthLabel: string
   /** EVERY session the family has loaded, not just the selected day's: the grid marks the
@@ -96,14 +98,14 @@ export function MonthCalendarModal({
             </div>
             <div className="text-start">
               <h3 id="month-modal-title" className="text-base font-bold text-slate-900 dark:text-slate-50 leading-tight">
-                {HOME.monthTitle}
+                {t(locale, 'schedule.home.monthTitle')}
               </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">{HOME.monthSubtitle}</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">{t(locale, 'schedule.home.monthSubtitle')}</p>
             </div>
           </div>
           <button
             type="button"
-            aria-label={HOME.monthClose}
+            aria-label={t(locale, 'schedule.home.monthClose')}
             onClick={onClose}
             className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
           >
@@ -118,8 +120,8 @@ export function MonthCalendarModal({
             <button
               type="button"
               onClick={() => onShiftMonth(1)}
-              title={HOME.monthNext}
-              aria-label={HOME.monthNext}
+              title={t(locale, 'schedule.home.monthNext')}
+              aria-label={t(locale, 'schedule.home.monthNext')}
               data-testid="month-next"
               className="w-8 h-8 rounded-xl flex items-center justify-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer"
             >
@@ -135,8 +137,8 @@ export function MonthCalendarModal({
             <button
               type="button"
               onClick={() => onShiftMonth(-1)}
-              title={HOME.monthPrev}
-              aria-label={HOME.monthPrev}
+              title={t(locale, 'schedule.home.monthPrev')}
+              aria-label={t(locale, 'schedule.home.monthPrev')}
               data-testid="month-prev"
               className="w-8 h-8 rounded-xl flex items-center justify-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer"
             >
@@ -149,13 +151,13 @@ export function MonthCalendarModal({
             data-testid="month-today"
             className="px-3 py-1 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 rounded-xl text-xs font-semibold text-[#0056c5] dark:text-blue-300 hover:bg-blue-50 shadow-xs transition-all active:scale-95 cursor-pointer"
           >
-            {HOME.monthToday}
+            {t(locale, 'schedule.home.monthToday')}
           </button>
         </div>
 
         {/* The same child filter the screen behind carries, so opening the modal does not
             silently widen what you were looking at. */}
-        <div role="group" aria-label={HOME.allChildren} className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+        <div role="group" aria-label={t(locale, 'schedule.home.allChildren')} className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
           <button
             type="button"
             aria-pressed={selectedChildId === null}
@@ -166,7 +168,7 @@ export function MonthCalendarModal({
                 : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700 font-medium'
             }`}
           >
-            <span>{HOME.allChildren}</span>
+            <span>{t(locale, 'schedule.home.allChildren')}</span>
             <span
               className={`text-[10px] px-1.5 rounded-full font-bold ${
                 selectedChildId === null ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
@@ -203,11 +205,11 @@ export function MonthCalendarModal({
             each day carries `aria-pressed` and its full date as an accessible label. */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-2.5 shadow-xs space-y-2">
           <div className="grid grid-cols-7 gap-1 text-center font-bold text-xs text-slate-400 py-1 border-b border-slate-100 dark:border-slate-800">
-            {WEEKDAY_LETTER.map((letter) => (
+            {weekdayInitials(locale).map((letter) => (
               <div key={letter}>{letter}</div>
             ))}
           </div>
-          <div role="group" aria-label={HOME.monthGridLabel} className="grid grid-cols-7 gap-1 text-center text-xs">
+          <div role="group" aria-label={t(locale, 'schedule.home.monthGridLabel')} className="grid grid-cols-7 gap-1 text-center text-xs">
             {Array.from({ length: leadingBlanks }, (_, index) => (
               <div key={`blank-${index}`} className="py-2" />
             ))}
@@ -262,10 +264,10 @@ export function MonthCalendarModal({
                 </h4>
                 <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
                   {agenda.length === 0
-                    ? HOME.monthAgendaEmpty
+                    ? t(locale, 'schedule.home.monthAgendaEmpty')
                     : agenda.length === 1
-                      ? HOME.monthDayOneSession
-                      : fill(HOME.monthDaySessions, { count: agenda.length })}
+                      ? t(locale, 'schedule.home.monthDayOneSession')
+                      : fill(t(locale, 'schedule.home.monthDaySessions'), { count: agenda.length })}
                 </p>
               </div>
             </div>
@@ -276,7 +278,7 @@ export function MonthCalendarModal({
               className="px-2.5 py-1.5 bg-[#0056c5] hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-1 transition-all shrink-0 cursor-pointer"
             >
               <Eye className="w-3.5 h-3.5" />
-              <span>{HOME.monthShowOnHome}</span>
+              <span>{t(locale, 'schedule.home.monthShowOnHome')}</span>
             </button>
           </div>
 
@@ -287,7 +289,7 @@ export function MonthCalendarModal({
             allReported ? (
               <p className="w-full py-2.5 px-3 rounded-2xl text-xs font-bold bg-emerald-600 text-white flex items-center justify-center gap-2">
                 <CheckCircle2 className="w-4 h-4" />
-                <span>{DAY_ABSENCE.openDone}</span>
+                <span>{t(locale, 'attendance.dayAbsence.openDone')}</span>
               </p>
             ) : (
               <button
@@ -297,7 +299,7 @@ export function MonthCalendarModal({
                 className="w-full py-2.5 px-3 rounded-2xl text-xs font-bold shadow-xs active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer bg-red-50 dark:bg-red-500/10 hover:bg-red-100/80 border border-red-200 dark:border-red-500/25 text-red-700 dark:text-red-300"
               >
                 <Calendar className="w-4 h-4" />
-                <span>{DAY_ABSENCE.openCta}</span>
+                <span>{t(locale, 'attendance.dayAbsence.openCta')}</span>
               </button>
             )
           ) : null}
@@ -338,18 +340,18 @@ export function MonthCalendarModal({
                         data-testid={`month-reported-${session.id}-${session.studentId}`}
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>{HOME.absentReported}</span>
+                        <span>{t(locale, 'schedule.home.absentReported')}</span>
                       </span>
                     ) : (
                       <button
                         type="button"
                         onClick={() => onReportSession(session)}
-                        aria-label={`${HOME.absentQuestion} ${session.studentName}`}
+                        aria-label={`${t(locale, 'schedule.home.absentQuestion')} ${session.studentName}`}
                         data-testid={`month-absence-${session.id}-${session.studentId}`}
                         className="px-2.5 py-2 rounded-xl bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-300 hover:bg-red-100 border border-red-200 dark:border-red-500/25 text-[10px] font-bold flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
                       >
                         <Calendar className="w-3.5 h-3.5" />
-                        <span>{HOME.absentQuestion}</span>
+                        <span>{t(locale, 'schedule.home.absentQuestion')}</span>
                       </button>
                     )
                   ) : null}

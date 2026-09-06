@@ -152,7 +152,14 @@ describe('buildWeekStrip', () => {
 
 describe('headlineFor', () => {
   it('prints the prototype’s own headline shape', () => {
-    expect(headlineFor('2026-08-25')).toBe('יום ג׳ • 25 באוגוסט 2026')
+    expect(headlineFor('2026-08-25', 'he')).toBe('יום ג׳ • 25 באוגוסט 2026')
+  })
+
+  it('and translates it, which the hard-coded month table it replaced could not', () => {
+    // Russian declines the month after a day number — `августа`, not `август`. A key per
+    // month would have shipped the nominative and read wrong every single day.
+    expect(headlineFor('2026-08-25', 'ru')).toContain('августа')
+    expect(headlineFor('2026-08-25', 'en')).toBe('Tue • August 25, 2026')
   })
 })
 

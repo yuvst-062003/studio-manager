@@ -25,22 +25,29 @@
 // popup, and a dot is a mark rather than a number.
 import type { LucideIcon } from 'lucide-react'
 import { Building2, ChevronLeft, CreditCard, Settings, User, Users } from 'lucide-react'
-import { PROFILE } from './content'
+import { t } from '@studio/i18n'
+import type { Locale } from '@studio/i18n'
 
 export type MenuKey = 'personal' | 'trainees' | 'payments' | 'club'
 
-const ROWS: { key: MenuKey; label: string; icon: LucideIcon }[] = [
-  { key: 'personal', label: PROFILE.menuPersonal, icon: User },
-  { key: 'trainees', label: PROFILE.menuTrainees, icon: Users },
-  { key: 'payments', label: PROFILE.menuPayments, icon: CreditCard },
-  { key: 'club', label: PROFILE.menuClub, icon: Building2 },
-]
+/** Built per render rather than once at module load: the labels are translated, and a
+ *  module-level constant would freeze whichever language happened to load first. */
+function rowsFor(locale: Locale): { key: MenuKey; label: string; icon: LucideIcon }[] {
+  return [
+    { key: 'personal', label: t(locale, 'people.profile.menuPersonal'), icon: User },
+    { key: 'trainees', label: t(locale, 'people.profile.menuTrainees'), icon: Users },
+    { key: 'payments', label: t(locale, 'people.profile.menuPayments'), icon: CreditCard },
+    { key: 'club', label: t(locale, 'people.profile.menuClub'), icon: Building2 },
+  ]
+}
 
 export function ProfileMenu({
+  locale,
   onOpen,
   onOpenSettings,
   attention,
 }: {
+  locale: Locale
   onOpen: (key: MenuKey) => void
   onOpenSettings: () => void
   /** Which rows need the parent to do something. */
@@ -52,13 +59,14 @@ export function ProfileMenu({
         data-testid="profile-menu"
         className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-xs overflow-hidden divide-y divide-slate-100 dark:divide-slate-800"
       >
-        {ROWS.map(({ key, label, icon: Icon }) => (
+        {rowsFor(locale).map(({ key, label, icon: Icon }) => (
           <Row
             key={key}
             icon={Icon}
             label={label}
             testId={`profile-row-${key}`}
             needsAttention={attention[key] === true}
+            attentionLabel={t(locale, 'people.profile.needsAttention')}
             onClick={() => onOpen(key)}
           />
         ))}
@@ -70,9 +78,10 @@ export function ProfileMenu({
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-xs overflow-hidden">
         <Row
           icon={Settings}
-          label={PROFILE.menuSettings}
+          label={t(locale, 'people.profile.menuSettings')}
           testId="profile-row-settings"
           needsAttention={false}
+          attentionLabel={t(locale, 'people.profile.needsAttention')}
           onClick={onOpenSettings}
         />
       </div>
@@ -85,12 +94,14 @@ function Row({
   label,
   testId,
   needsAttention,
+  attentionLabel,
   onClick,
 }: {
   icon: LucideIcon
   label: string
   testId: string
   needsAttention: boolean
+  attentionLabel: string
   onClick: () => void
 }) {
   return (
@@ -100,7 +111,7 @@ function Row({
       data-testid={testId}
       // The dot is a colour, so it cannot be the only carrier of "this needs you" — the
       // accessible name says it too. SC 1.4.1.
-      aria-label={needsAttention ? `${label} · ${PROFILE.needsAttention}` : undefined}
+      aria-label={needsAttention ? `${label} · ${attentionLabel}` : undefined}
       className="w-full flex items-center gap-3 px-4 py-4 text-start hover:bg-slate-50 dark:hover:bg-slate-800/60 active:scale-[0.99] transition-all cursor-pointer"
     >
       <span className="w-9 h-9 rounded-2xl bg-blue-50 dark:bg-blue-400/15 text-[#0056c5] dark:text-blue-300 flex items-center justify-center shrink-0">

@@ -8,11 +8,15 @@
 // third: CANCELLED, when the club calls the lesson off (`session.cancelledReason` is a
 // resolved sentence, not a flag) — a cancelled lesson is never drawn as an absence.
 import { Bell, Calendar, CalendarDays, CalendarX, CheckCircle2, Clock, MapPin, Plus } from 'lucide-react'
+import { fill, weekdayInitials } from '@studio/core'
+import { t } from '@studio/i18n'
+import { resolveLoadFailedText } from '../../shell/loadFailed'
+import type { Locale } from '@studio/i18n'
 import type { HomeSession, StripDay } from './types'
-import { fill, HOME, WEEKDAY_LETTER } from './content'
 
 export function HomeSchedule({
   days,
+  locale,
   selectedDayKey,
   onSelectDay,
   onOpenMonth,
@@ -28,6 +32,7 @@ export function HomeSchedule({
   durationMinutes,
 }: {
   days: readonly StripDay[]
+  locale: Locale
   selectedDayKey: string
   onSelectDay: (dayKey: string) => void
   onOpenMonth: () => void
@@ -47,12 +52,16 @@ export function HomeSchedule({
   /** e.g. 75. `null` when the session has no end time. */
   durationMinutes: (session: HomeSession) => number | null
 }) {
+  // `Intl`'s own initials, Sunday first — the order is `group_schedule_rule.weekday`'s and
+  // deliberately not the locale's first-day-of-week, which is Monday for ru and would
+  // rotate this row out of step with the days under it.
+  const initials = weekdayInitials(locale)
   const countLabel =
     sessions.length === 0
-      ? HOME.noSessionsPlanned
+      ? t(locale, 'schedule.home.noSessionsPlanned')
       : sessions.length === 1
-        ? HOME.oneSessionPlanned
-        : fill(HOME.manySessionsPlanned, { count: sessions.length })
+        ? t(locale, 'schedule.home.oneSessionPlanned')
+        : fill(t(locale, 'schedule.home.manySessionsPlanned'), { count: sessions.length })
 
   return (
     <>
@@ -67,10 +76,10 @@ export function HomeSchedule({
           onClick={onOpenMonth}
           data-testid="home-open-month"
           className="flex flex-col items-center justify-center p-2 rounded-2xl bg-blue-50 text-[#0056c5] hover:bg-blue-100/70 active:scale-95 transition-all border border-blue-100/80 w-14 shrink-0 cursor-pointer"
-          title={HOME.monthButtonTitle}
+          title={t(locale, 'schedule.home.monthButtonTitle')}
         >
           <CalendarDays className="w-5 h-5 text-[#0056c5]" />
-          <span className="text-[11px] font-medium mt-0.5">{HOME.monthButton}</span>
+          <span className="text-[11px] font-medium mt-0.5">{t(locale, 'schedule.home.monthButton')}</span>
         </button>
 
         <div className="h-9 w-px bg-slate-200 mx-0.5 shrink-0"></div>
@@ -79,7 +88,7 @@ export function HomeSchedule({
             selection semantics and each chip reports its own pressed state. */}
         <div
           role="group"
-          aria-label={HOME.weekStripLabel}
+          aria-label={t(locale, 'schedule.home.weekStripLabel')}
           className="grid grid-cols-7 gap-1 flex-1 text-center"
         >
           {days.map((day) => {
@@ -104,12 +113,12 @@ export function HomeSchedule({
                 >
                   {day.isToday ? (
                     <>
-                      {HOME.today}
+                      {t(locale, 'schedule.home.today')}
                       <br />
-                      {WEEKDAY_LETTER[day.weekday]}
+                      {initials[day.weekday]}
                     </>
                   ) : (
-                    WEEKDAY_LETTER[day.weekday]
+                    initials[day.weekday]
                   )}
                 </span>
                 <span
@@ -149,20 +158,20 @@ export function HomeSchedule({
               <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-400">
                 <Calendar className="w-6 h-6" />
               </div>
-              <h4 className="font-semibold text-slate-700 mt-2">{HOME.loading}</h4>
+              <h4 className="font-semibold text-slate-700 mt-2">{t(locale, 'schedule.home.loading')}</h4>
             </div>
           ) : state === 'failed' ? (
             <div className="text-center py-10 bg-white rounded-3xl border border-dashed border-slate-200 mt-3 p-6">
               <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-400">
                 <Calendar className="w-6 h-6" />
               </div>
-              <h4 className="font-semibold text-slate-700 mt-2">{HOME.loadFailed}</h4>
+              <h4 className="font-semibold text-slate-700 mt-2">{resolveLoadFailedText(locale, 'schedule.home.loadFailed')}</h4>
               <button
                 type="button"
                 onClick={onRetry}
                 className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-[#0056c5] bg-blue-50 px-3.5 py-2 rounded-xl hover:bg-blue-100 transition-colors cursor-pointer"
               >
-                <span>{HOME.retry}</span>
+                <span>{t(locale, 'schedule.home.retry')}</span>
               </button>
             </div>
           ) : sessions.length > 0 ? (
@@ -171,12 +180,12 @@ export function HomeSchedule({
               const isAbsent = !isCancelled && session.reportedAbsent
               const location =
                 session.locationName !== null && session.coachName !== null
-                  ? `${session.locationName}${HOME.urgentSeparator}${session.coachName}`
+                  ? `${session.locationName}${t(locale, 'schedule.home.urgentSeparator')}${session.coachName}`
                   : (session.locationName ?? session.coachName)
               const duration = durationMinutes(session)
               const reminderOn = hasReminder(session)
-              const reminderLabel = reminderOn ? HOME.reminderSet : HOME.reminderUnset
-              const absenceLabel = isAbsent ? HOME.absentReported : HOME.absentQuestion
+              const reminderLabel = reminderOn ? t(locale, 'schedule.home.reminderSet') : t(locale, 'schedule.home.reminderUnset')
+              const absenceLabel = isAbsent ? t(locale, 'schedule.home.absentReported') : t(locale, 'schedule.home.absentQuestion')
 
               return (
                 <div
@@ -202,17 +211,17 @@ export function HomeSchedule({
                     {isAbsent ? (
                       <>
                         <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                        <span className="text-[10px] font-bold text-emerald-700 mt-0.5">{HOME.absentReported}</span>
+                        <span className="text-[10px] font-bold text-emerald-700 mt-0.5">{t(locale, 'schedule.home.absentReported')}</span>
                       </>
                     ) : isCancelled ? (
                       <>
                         <CalendarX className="w-4 h-4 text-slate-400" />
-                        <span className="text-[11px] font-medium mt-0.5">{HOME.absentQuestion}</span>
+                        <span className="text-[11px] font-medium mt-0.5">{t(locale, 'schedule.home.absentQuestion')}</span>
                       </>
                     ) : (
                       <>
                         <Calendar className="w-4 h-4 text-slate-600" />
-                        <span className="text-[11px] font-medium mt-0.5">{HOME.absentQuestion}</span>
+                        <span className="text-[11px] font-medium mt-0.5">{t(locale, 'schedule.home.absentQuestion')}</span>
                       </>
                     )}
                   </button>
@@ -241,7 +250,7 @@ export function HomeSchedule({
                               : 'bg-slate-100 text-slate-600'
                         }`}
                       >
-                        {isCancelled ? HOME.statusCancelled : isAbsent ? HOME.statusReported : HOME.statusScheduled}
+                        {isCancelled ? t(locale, 'schedule.home.statusCancelled') : isAbsent ? t(locale, 'schedule.home.statusReported') : t(locale, 'schedule.home.statusScheduled')}
                       </span>
                     </div>
                     <p className="font-semibold text-sm text-slate-800 mt-0.5">{session.groupName}</p>
@@ -263,7 +272,7 @@ export function HomeSchedule({
                           onClick={() => onOpenReminder(session)}
                           data-testid={`home-reminder-${session.id}`}
                           aria-label={`${reminderLabel} ${session.studentName}`}
-                          title={HOME.reminderTitle}
+                          title={t(locale, 'schedule.home.reminderTitle')}
                           className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-all cursor-pointer ${
                             reminderOn
                               ? 'bg-blue-50 text-[#0056c5] border-blue-200 shadow-2xs'
@@ -283,7 +292,7 @@ export function HomeSchedule({
                       <div className="text-base font-bold text-slate-900 leading-none">{timeLabel(session)}</div>
                       {duration !== null ? (
                         <div className="text-[11px] text-slate-400 font-medium mt-1">
-                          {duration} {HOME.minutesShort}
+                          {duration} {t(locale, 'schedule.home.minutesShort')}
                         </div>
                       ) : null}
                     </div>
@@ -304,15 +313,15 @@ export function HomeSchedule({
               <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-400">
                 <Calendar className="w-6 h-6" />
               </div>
-              <h4 className="font-semibold text-slate-700 mt-2">{HOME.emptyTitle}</h4>
-              <p className="text-xs text-slate-400 mt-1">{HOME.emptyBody}</p>
+              <h4 className="font-semibold text-slate-700 mt-2">{t(locale, 'schedule.home.emptyTitle')}</h4>
+              <p className="text-xs text-slate-400 mt-1">{t(locale, 'schedule.home.emptyBody')}</p>
               <button
                 type="button"
                 onClick={onOpenMonth}
                 className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-[#0056c5] bg-blue-50 px-3.5 py-2 rounded-xl hover:bg-blue-100 transition-colors cursor-pointer"
               >
                 <CalendarDays className="w-4 h-4" />
-                <span>{HOME.emptyCta}</span>
+                <span>{t(locale, 'schedule.home.emptyCta')}</span>
               </button>
             </div>
           )}
@@ -335,7 +344,7 @@ export function HomeSchedule({
           className="flex items-center gap-2 bg-[#001849] text-white px-4 py-3 rounded-full shadow-lg hover:bg-[#0d2c6c] active:scale-95 transition-all text-sm font-semibold tracking-wide cursor-pointer"
         >
           <Plus className="w-5 h-5" />
-          <span>{HOME.reportAbsence}</span>
+          <span>{t(locale, 'schedule.home.reportAbsence')}</span>
         </button>
       </div>
     </>

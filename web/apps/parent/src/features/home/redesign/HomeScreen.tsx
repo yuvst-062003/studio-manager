@@ -11,7 +11,12 @@
 // here would be a second `/auth/refresh` on every visit and two answers about what the
 // family owes.
 import { useCallback, useMemo, useState } from 'react'
-import { formatMonthLabel, formatTimeInStudioZone, studioDayKey } from '@studio/core'
+import {
+  formatDayAndMonth,
+  formatMonthLabel,
+  formatTimeInStudioZone,
+  studioDayKey,
+} from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { HomeTop } from './HomeTop'
@@ -23,10 +28,8 @@ import type { DayAbsenceOutcome } from './AllDayAbsenceSheet'
 import type { AbsenceFailure } from './AbsenceModal'
 import { ReminderSheet, readReminders, writeReminder } from './ReminderSheet'
 import type { LeadTime } from './ReminderSheet'
-import { MONTH_NAME, WEEKDAY_LETTER } from './content'
 import {
   buildWeekStrip,
-  dayOfMonthOf,
   durationMinutesOf,
   expandSessions,
   headlineFor,
@@ -242,6 +245,7 @@ export function HomeScreen({
     // which arrangement of home won. A fragment here would have quietly made them vacuous.
     <section aria-label={t(locale, 'common.home.title')} data-testid="parent-home">
       <HomeTop
+        locale={locale}
         clubName={clubName}
         familyName={familyName}
         childList={childList ?? []}
@@ -267,11 +271,12 @@ export function HomeScreen({
       />
 
       <HomeSchedule
+        locale={locale}
         days={strip}
         selectedDayKey={selectedDayKey}
         onSelectDay={setSelectedDayKey}
         onOpenMonth={() => setMonthOpen(monthOf(selectedDayKey))}
-        headline={headlineFor(selectedDayKey)}
+        headline={headlineFor(selectedDayKey, locale)}
         sessions={visible}
         state={state}
         onRetry={onRetry}
@@ -290,8 +295,9 @@ export function HomeScreen({
 
       {absenceTarget ? (
         <AbsenceModal
+          locale={locale}
           session={absenceTarget}
-          dayLabel={dayLabelFor(studioDayKey(absenceTarget.startsAt))}
+          dayLabel={formatDayAndMonth(studioDayKey(absenceTarget.startsAt), locale)}
           timeLabel={formatTimeInStudioZone(absenceTarget.startsAt, locale)}
           busy={absenceBusy}
           failure={absenceFailure}
@@ -302,6 +308,7 @@ export function HomeScreen({
 
       {monthOpen ? (
         <MonthCalendarModal
+          locale={locale}
           at={monthOpen}
           monthLabel={formatMonthLabel(monthOpen.year, monthOpen.month, locale)}
           // EVERY loaded session, not the day's: the grid's whole job is marking the month.
@@ -324,7 +331,7 @@ export function HomeScreen({
           }}
           onClose={() => setMonthOpen(null)}
           timeLabel={(session) => formatTimeInStudioZone(session.startsAt, locale)}
-          dayHeadline={headlineFor(selectedDayKey)}
+          dayHeadline={headlineFor(selectedDayKey, locale)}
           onReportWholeDay={() => openDayAbsence(selectedDayKey)}
           onShowOnHome={() => setMonthOpen(null)}
           onReportSession={(session) => {
@@ -336,9 +343,10 @@ export function HomeScreen({
 
       {dayAbsenceFor ? (
         <AllDayAbsenceSheet
+          locale={locale}
           targets={dayTargets}
           childNames={[...new Set(dayTargets.map((row) => row.studentName))]}
-          dayLabel={dayLabelFor(dayAbsenceFor)}
+          dayLabel={formatDayAndMonth(dayAbsenceFor, locale)}
           busy={dayBusy}
           outcomes={dayOutcomes}
           onSubmit={submitDayAbsence}
@@ -366,11 +374,6 @@ export function HomeScreen({
   )
 }
 
-/** `2026-08-25` → `25 באוגוסט`, the short form the absence sheet's date pill prints. */
-function dayLabelFor(dayKey: string): string {
-  return `${dayOfMonthOf(dayKey)} ב${MONTH_NAME[Number(dayKey.slice(5, 7)) - 1] ?? ''}`
-}
-
 /** Re-exported so `Resolve` can build a headline without importing two modules. */
-export { headlineFor, weekdayOf, WEEKDAY_LETTER }
+export { headlineFor, weekdayOf }
 export type { HomeSession }

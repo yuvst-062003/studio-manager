@@ -3,14 +3,18 @@
 // colour, order-tracker state) and why none of them is guessable from what the API returns.
 import { useState } from 'react'
 import { CheckCircle2, ChevronLeft, ShieldCheck, ShoppingBag, X } from 'lucide-react'
+import { fill } from '@studio/core'
+import { t } from '@studio/i18n'
+import { resolveLoadFailedText } from '../../shell/loadFailed'
+import type { Locale } from '@studio/i18n'
 import { useDialog } from '../../onboarding/wizard/useDialog'
-import { SHOP, fill } from './content'
 import type { CartLine, CheckoutState, ShopProduct } from './types'
 
 const QUANTITY_OPTIONS = Array.from({ length: 10 }, (_, index) => index + 1)
 
 export function ShopScreen({
   products,
+  locale,
   state,
   onRetry,
   cart,
@@ -25,6 +29,7 @@ export function ShopScreen({
 }: {
   /** `null` while loading. */
   products: readonly ShopProduct[] | null
+  locale: Locale
   state: 'ready' | 'loading' | 'failed'
   onRetry: () => void
   cart: readonly CartLine[]
@@ -89,14 +94,14 @@ export function ShopScreen({
         <div className="flex items-start justify-between gap-2">
           <div>
             <h1 className="text-2xl font-black text-[#0A1938] tracking-tight leading-none mb-1.5">
-              {SHOP.title}
+              {t(locale, 'billing.shop.title')}
             </h1>
-            <p className="text-[13px] font-medium text-slate-600">{SHOP.subtitle}</p>
+            <p className="text-[13px] font-medium text-slate-600">{t(locale, 'billing.shop.subtitle')}</p>
           </div>
           <div className="shrink-0 flex flex-col items-end gap-1.5">
             <div className="flex items-center gap-1 bg-[#EEF2FF] text-[#2563EB] px-2.5 py-1.5 rounded-full border border-blue-100 shadow-xs">
               <ShieldCheck className="w-4 h-4 text-[#2563EB]" aria-hidden="true" />
-              <span className="text-xs font-bold whitespace-nowrap">{SHOP.standardBadge}</span>
+              <span className="text-xs font-bold whitespace-nowrap">{t(locale, 'billing.shop.standardBadge')}</span>
             </div>
             {/* ההזמנות שלי — moved here from פרופיל (owner review, 2026-09-06). It belongs
                 beside the catalogue it is a history of, which is also where the prototype's
@@ -107,7 +112,7 @@ export function ShopScreen({
               data-testid="shop-open-orders"
               className="text-xs font-bold text-[#2563EB] underline underline-offset-2 whitespace-nowrap cursor-pointer"
             >
-              {SHOP.ordersCta}
+              {t(locale, 'billing.shop.ordersCta')}
             </button>
           </div>
         </div>
@@ -138,7 +143,7 @@ export function ShopScreen({
                     ) : (
                       <div
                         role="img"
-                        aria-label={SHOP.noPhoto}
+                        aria-label={t(locale, 'billing.shop.noPhoto')}
                         className="relative w-full aspect-square rounded-xl overflow-hidden bg-slate-50 mb-2.5 flex items-center justify-center"
                       >
                         <ShoppingBag className="w-8 h-8 text-slate-300" aria-hidden="true" />
@@ -160,7 +165,7 @@ export function ShopScreen({
                       onClick={() => openProduct(product)}
                       className="flex items-center gap-1 bg-[#EEF2FF] hover:bg-[#E0E7FE] text-[#2563EB] px-2.5 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer"
                     >
-                      <span>{SHOP.choose}</span>
+                      <span>{t(locale, 'billing.shop.choose')}</span>
                       <span className="text-sm font-black">+</span>
                     </button>
                     <span className="font-extrabold text-[#0A1938] text-base">
@@ -179,7 +184,7 @@ export function ShopScreen({
                 <ShieldCheck className="w-6 h-6" aria-hidden="true" />
               </div>
               <p className="text-xs font-semibold text-[#1e3a8a] leading-relaxed text-start">
-                {SHOP.deliveryNote}
+                {t(locale, 'billing.shop.deliveryNote')}
               </p>
             </div>
           </section>
@@ -192,25 +197,25 @@ export function ShopScreen({
           >
             {state === 'loading' && (
               <p className="text-sm font-semibold text-slate-500" role="status">
-                {SHOP.loading}
+                {t(locale, 'billing.shop.loading')}
               </p>
             )}
             {state === 'failed' && (
               <>
-                <p className="text-sm font-semibold text-slate-500 mb-3">{SHOP.loadFailed}</p>
+                <p className="text-sm font-semibold text-slate-500 mb-3">{resolveLoadFailedText(locale, 'billing.shop.loadFailed')}</p>
                 <button
                   type="button"
                   onClick={onRetry}
                   className="bg-[#2563EB] hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl cursor-pointer"
                 >
-                  {SHOP.retry}
+                  {t(locale, 'billing.shop.retry')}
                 </button>
               </>
             )}
             {state === 'ready' && (
               <>
-                <p className="text-sm font-black text-[#0A1938] mb-1">{SHOP.empty}</p>
-                <p className="text-xs text-slate-500">{SHOP.emptyBody}</p>
+                <p className="text-sm font-black text-[#0A1938] mb-1">{t(locale, 'billing.shop.empty')}</p>
+                <p className="text-xs text-slate-500">{t(locale, 'billing.shop.emptyBody')}</p>
               </>
             )}
           </div>
@@ -233,7 +238,7 @@ export function ShopScreen({
               </div>
               <div className="text-start">
                 <div className="text-xs text-slate-300 font-medium">
-                  {cartTotalQty === 1 ? SHOP.cartBarOneItem : fill(SHOP.cartBarItems, { count: cartTotalQty })}
+                  {cartTotalQty === 1 ? t(locale, 'billing.shop.cartBarOneItem') : fill(t(locale, 'billing.shop.cartBarItems'), { count: cartTotalQty })}
                 </div>
                 <div className="text-base font-black tracking-tight text-white">
                   {money(cartTotalAgorot)}
@@ -246,7 +251,7 @@ export function ShopScreen({
               onClick={() => setIsCartOpen(true)}
               className="bg-[#2563EB] hover:bg-blue-600 active:scale-95 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer"
             >
-              <span>{SHOP.cartOpen}</span>
+              <span>{t(locale, 'billing.shop.cartOpen')}</span>
               <span aria-hidden="true" className="text-sm">
                 ⬅
               </span>
@@ -279,12 +284,12 @@ export function ShopScreen({
             {/* Sheet Header */}
             <div className="px-5 pt-4 pb-3 flex items-center justify-between border-b border-slate-200 bg-white">
               <h2 id="shop-customiser-title" className="text-base font-black text-[#0A1938]">
-                {SHOP.customiseTitle}
+                {t(locale, 'billing.shop.customiseTitle')}
               </h2>
               <button
                 type="button"
                 onClick={() => setSelectedProduct(null)}
-                aria-label={SHOP.close}
+                aria-label={t(locale, 'billing.shop.close')}
                 className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" aria-hidden="true" />
@@ -304,7 +309,7 @@ export function ShopScreen({
                 ) : (
                   <div
                     role="img"
-                    aria-label={SHOP.noPhoto}
+                    aria-label={t(locale, 'billing.shop.noPhoto')}
                     className="w-20 h-20 rounded-xl border border-slate-100 shrink-0 bg-slate-50 flex items-center justify-center"
                   >
                     <ShoppingBag className="w-8 h-8 text-slate-300" aria-hidden="true" />
@@ -329,7 +334,7 @@ export function ShopScreen({
               {selectedProduct.sizes.length > 0 && (
                 <fieldset className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
                   <legend className="block text-xs font-bold text-[#0A1938] mb-2 w-full text-start">
-                    {SHOP.sizeLegend}
+                    {t(locale, 'billing.shop.sizeLegend')}
                   </legend>
                   <div className="grid grid-cols-3 gap-2">
                     {selectedProduct.sizes.map((size) => {
@@ -359,7 +364,7 @@ export function ShopScreen({
                   </div>
                   {modalSize === null && (
                     <p id="shop-size-hint" className="text-[11px] text-slate-500 mt-2">
-                      {SHOP.sizeRequired}
+                      {t(locale, 'billing.shop.sizeRequired')}
                     </p>
                   )}
                 </fieldset>
@@ -368,7 +373,7 @@ export function ShopScreen({
               {/* Quantity */}
               <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-3">
                 <label htmlFor="shop-quantity" className="text-xs font-bold text-[#0A1938]">
-                  {SHOP.quantityLabel}
+                  {t(locale, 'billing.shop.quantityLabel')}
                 </label>
                 <select
                   id="shop-quantity"
@@ -387,13 +392,13 @@ export function ShopScreen({
               {/* Note */}
               <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
                 <label htmlFor="shop-note" className="block text-xs font-bold text-[#0A1938] mb-2">
-                  {SHOP.noteLabel}
+                  {t(locale, 'billing.shop.noteLabel')}
                 </label>
                 <textarea
                   id="shop-note"
                   value={modalNote}
                   onChange={(event) => setModalNote(event.target.value)}
-                  placeholder={SHOP.notePlaceholder}
+                  placeholder={t(locale, 'billing.shop.notePlaceholder')}
                   rows={2}
                   className="w-full rounded-xl border border-slate-200 text-sm p-2.5 text-slate-700 placeholder:text-slate-400 focus:border-[#2563EB] focus:outline-none resize-none"
                 />
@@ -410,7 +415,7 @@ export function ShopScreen({
                 aria-describedby={sizeMissing ? 'shop-size-hint' : undefined}
                 className="w-full bg-[#2563EB] hover:bg-blue-700 active:scale-[0.99] text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition flex items-center justify-between text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <span>{SHOP.addToCart}</span>
+                <span>{t(locale, 'billing.shop.addToCart')}</span>
                 <span className="font-black text-base">
                   {money(selectedProduct.priceAgorot * modalQty)}
                 </span>
@@ -444,13 +449,13 @@ export function ShopScreen({
                   <ShoppingBag className="w-4 h-4" aria-hidden="true" />
                 </div>
                 <h2 id="shop-cart-title" className="text-base font-black text-[#0A1938]">
-                  {SHOP.cartTitle}
+                  {t(locale, 'billing.shop.cartTitle')}
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={() => setIsCartOpen(false)}
-                aria-label={SHOP.close}
+                aria-label={t(locale, 'billing.shop.close')}
                 className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 font-bold transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" aria-hidden="true" />
@@ -464,15 +469,15 @@ export function ShopScreen({
                   <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3.5 shadow-inner border border-emerald-100 animate-bounce">
                     <CheckCircle2 className="w-9 h-9" aria-hidden="true" />
                   </div>
-                  <h3 className="text-xl font-black text-[#0A1938] mb-1">{SHOP.placedTitle}</h3>
+                  <h3 className="text-xl font-black text-[#0A1938] mb-1">{t(locale, 'billing.shop.placedTitle')}</h3>
                   <p className="text-xs text-slate-500 mb-4">
-                    {fill(SHOP.placedBody, {
+                    {fill(t(locale, 'billing.shop.placedBody'), {
                       count: checkout.lines,
                       total: money(checkout.totalAgorot),
                     })}
                   </p>
                   <a href="#/payments" className="block text-center text-sm font-bold text-[#2563EB] mb-3">
-                    {SHOP.placedPay}
+                    {t(locale, 'billing.shop.placedPay')}
                   </a>
                   <button
                     type="button"
@@ -482,11 +487,11 @@ export function ShopScreen({
                     }}
                     className="w-full bg-[#05163E] hover:bg-[#0A1938] text-white font-bold py-3.5 rounded-xl text-xs transition shadow-md active:scale-95 cursor-pointer"
                   >
-                    {SHOP.placedClose}
+                    {t(locale, 'billing.shop.placedClose')}
                   </button>
                 </div>
               ) : cart.length === 0 ? (
-                <p className="text-sm text-slate-500 text-center py-6">{SHOP.cartEmpty}</p>
+                <p className="text-sm text-slate-500 text-center py-6">{t(locale, 'billing.shop.cartEmpty')}</p>
               ) : (
                 <>
                   <div className="space-y-2.5">
@@ -499,7 +504,7 @@ export function ShopScreen({
                         <div className="flex items-center gap-2.5 min-w-0 flex-1">
                           <div
                             role="img"
-                            aria-label={SHOP.noPhoto}
+                            aria-label={t(locale, 'billing.shop.noPhoto')}
                             className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 shrink-0 flex items-center justify-center"
                           >
                             <ShoppingBag className="w-5 h-5 text-slate-300" aria-hidden="true" />
@@ -518,7 +523,7 @@ export function ShopScreen({
 
                         <div className="flex items-center gap-2 shrink-0">
                           <label htmlFor={`shop-line-qty-${index}`} className="sr-only">
-                            {SHOP.cartQuantity}
+                            {t(locale, 'billing.shop.cartQuantity')}
                           </label>
                           <select
                             id={`shop-line-qty-${index}`}
@@ -539,7 +544,7 @@ export function ShopScreen({
                             type="button"
                             data-testid={`shop-remove-${index}`}
                             onClick={() => onRemoveLine(index)}
-                            aria-label={SHOP.cartRemove}
+                            aria-label={t(locale, 'billing.shop.cartRemove')}
                             className="text-slate-400 hover:text-red-500 p-1 text-xs cursor-pointer"
                           >
                             <X className="w-3.5 h-3.5" aria-hidden="true" />
@@ -550,7 +555,7 @@ export function ShopScreen({
                   </div>
 
                   <div className="bg-[#EEF2FE] rounded-2xl p-3.5 border border-blue-100 flex justify-between items-center text-sm font-black text-[#0A1938]">
-                    <span>{SHOP.cartTotal}</span>
+                    <span>{t(locale, 'billing.shop.cartTotal')}</span>
                     <span className="text-lg text-[#2563EB]">{money(cartTotalAgorot)}</span>
                   </div>
                 </>
@@ -567,12 +572,12 @@ export function ShopScreen({
                   disabled={checkout.kind === 'sending'}
                   className="w-full bg-[#2563EB] hover:bg-blue-700 active:scale-[0.99] text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-2 text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <span>{checkout.kind === 'sending' ? SHOP.checkoutSending : SHOP.checkout}</span>
+                  <span>{checkout.kind === 'sending' ? t(locale, 'billing.shop.checkoutSending') : t(locale, 'billing.shop.checkout')}</span>
                   <ChevronLeft className="w-4 h-4" aria-hidden="true" />
                 </button>
                 {checkout.kind === 'failed' && (
                   <p role="alert" className="text-[11px] text-red-600 font-semibold text-center mt-2">
-                    {SHOP.checkoutFailed}
+                    {t(locale, 'billing.shop.checkoutFailed')}
                   </p>
                 )}
               </div>

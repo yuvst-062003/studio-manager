@@ -15,8 +15,9 @@
 // `tel:` and `mailto:` — so they work with no permission, no SDK and no JS, and a
 // long-press "copy" behaves the way a parent expects.
 import { Mail, MessageCircle, Phone, X } from 'lucide-react'
+import { t } from '@studio/i18n'
+import type { Locale } from '@studio/i18n'
 import { useDialog } from '../../onboarding/wizard/useDialog'
-import { PROFILE } from './content'
 import type { ClubDetails } from './types'
 
 /**
@@ -46,7 +47,13 @@ export function whatsappNumber(phone: string | null): string | null {
  * 2026-09-06): that sheet needs the buttons inside a panel it already owns, and a second
  * `useDialog` nested in the first would fight the same focus trap.
  */
-export function ContactActions({ club }: { club: ClubDetails | null }) {
+export function ContactActions({
+  club,
+  locale,
+}: {
+  club: ClubDetails | null
+  locale: Locale
+}) {
   const wa = whatsappNumber(club?.phone ?? null)
   const count = (wa ? 1 : 0) + (club?.phone ? 1 : 0) + (club?.email ? 1 : 0)
   const hasAny = count > 0
@@ -64,7 +71,7 @@ export function ContactActions({ club }: { club: ClubDetails | null }) {
             className="flex flex-col items-center gap-1.5 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/25 text-emerald-800 dark:text-emerald-300 text-xs font-bold active:scale-95 transition-all cursor-pointer"
           >
             <MessageCircle className="w-6 h-6" />
-            <span>{PROFILE.contactWhatsApp}</span>
+            <span>{t(locale, 'people.profile.contactWhatsApp')}</span>
           </a>
         ) : null}
         {club?.phone ? (
@@ -74,7 +81,7 @@ export function ContactActions({ club }: { club: ClubDetails | null }) {
             className="flex flex-col items-center gap-1.5 p-4 rounded-2xl bg-blue-50 dark:bg-blue-400/15 border border-blue-200 dark:border-blue-500/25 text-[#0056c5] dark:text-blue-300 text-xs font-bold active:scale-95 transition-all cursor-pointer"
           >
             <Phone className="w-6 h-6" />
-            <span>{PROFILE.contactCall}</span>
+            <span>{t(locale, 'people.profile.contactCall')}</span>
           </a>
         ) : null}
         {club?.email ? (
@@ -84,7 +91,7 @@ export function ContactActions({ club }: { club: ClubDetails | null }) {
             className="flex flex-col items-center gap-1.5 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold active:scale-95 transition-all cursor-pointer"
           >
             <Mail className="w-6 h-6" />
-            <span>{PROFILE.contactEmail}</span>
+            <span>{t(locale, 'people.profile.contactEmail')}</span>
           </a>
         ) : null}
       </div>
@@ -92,14 +99,22 @@ export function ContactActions({ club }: { club: ClubDetails | null }) {
       // The honest state, and a real one: a club that has not filled in its phone
       // number. Saying so beats two buttons that dial nothing.
       <p className="text-xs text-slate-500 dark:text-slate-400 text-center py-4">
-        {PROFILE.contactNone}
+        {t(locale, 'people.profile.contactNone')}
       </p>
     )}
     </>
   )
 }
 
-export function ContactSheet({ club, onClose }: { club: ClubDetails | null; onClose: () => void }) {
+export function ContactSheet({
+  club,
+  locale,
+  onClose,
+}: {
+  club: ClubDetails | null
+  locale: Locale
+  onClose: () => void
+}) {
   const dialogRef = useDialog(true, onClose)
 
   return (
@@ -121,7 +136,7 @@ export function ContactSheet({ club, onClose }: { club: ClubDetails | null; onCl
               id="contact-title"
               className="text-base font-bold text-slate-900 dark:text-slate-50 leading-tight"
             >
-              {PROFILE.contactTitle}
+              {t(locale, 'people.profile.contactTitle')}
             </h3>
             {club ? (
               <p className="text-[11px] text-slate-500 dark:text-slate-400">{club.name}</p>
@@ -130,14 +145,14 @@ export function ContactSheet({ club, onClose }: { club: ClubDetails | null; onCl
           <button
             type="button"
             onClick={onClose}
-            aria-label={PROFILE.close}
+            aria-label={t(locale, 'people.profile.close')}
             className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <ContactActions club={club} />
+        <ContactActions club={club} locale={locale} />
 
         {club?.address ? (
           <p className="text-[11px] text-slate-500 dark:text-slate-400 text-center">

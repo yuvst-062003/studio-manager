@@ -10,7 +10,9 @@ import {
   Sun,
   User,
 } from 'lucide-react'
-import { PROFILE, fill } from './content'
+import { fill } from '@studio/core'
+import { t } from '@studio/i18n'
+import type { Locale } from '@studio/i18n'
 
 const THEME_OPTIONS = ['light', 'dark', 'system'] as const
 
@@ -29,7 +31,13 @@ const THEME_OPTIONS = ['light', 'dark', 'system'] as const
  * stale link hides, and `routes.reachable.test.ts` cannot tell the difference.
  */
 
-export function ProfileHeader({ familyName }: { familyName: string | null }) {
+export function ProfileHeader({
+  familyName,
+  locale,
+}: {
+  familyName: string | null
+  locale: Locale
+}) {
   return (
     <div className="flex flex-col space-y-4 text-start">
       {/* Header */}
@@ -44,10 +52,10 @@ export function ProfileHeader({ familyName }: { familyName: string | null }) {
           <div>
             <h1 className="text-xl font-bold text-slate-900 dark:text-white leading-tight">
               {familyName !== null
-                ? fill(PROFILE.familyTitle, { name: familyName })
-                : PROFILE.familyTitleUnknown}
+                ? fill(t(locale, 'people.profile.familyTitle'), { name: familyName })
+                : t(locale, 'people.profile.familyTitleUnknown')}
             </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400">{PROFILE.familySubtitle}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{t(locale, 'people.profile.familySubtitle')}</p>
           </div>
         </div>
       </header>
@@ -64,7 +72,7 @@ export function ProfilePreferences({
   theme,
   onChooseTheme,
 }: {
-  locale: string
+  locale: Locale
   locales: readonly string[]
   localeLabel: (code: string) => string
   onChooseLocale: (code: string) => void
@@ -87,9 +95,9 @@ export function ProfilePreferences({
     system: 'text-indigo-400',
   }
   const themeLabels: Record<(typeof THEME_OPTIONS)[number], string> = {
-    light: PROFILE.themeLight,
-    dark: PROFILE.themeDark,
-    system: PROFILE.themeAuto,
+    light: t(locale, 'people.profile.themeLight'),
+    dark: t(locale, 'people.profile.themeDark'),
+    system: t(locale, 'people.profile.themeAuto'),
   }
   const ThemeIcon = themeIcons[theme]
 
@@ -102,7 +110,7 @@ export function ProfilePreferences({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs font-bold text-slate-900 dark:text-white">
             <Sliders className="w-4 h-4 text-[#0056c5] dark:text-blue-400" />
-            <span>{PROFILE.preferencesTitle}</span>
+            <span>{t(locale, 'people.profile.preferencesTitle')}</span>
           </div>
         </div>
 
@@ -111,7 +119,7 @@ export function ProfilePreferences({
           <legend className="w-full flex items-center justify-between text-[11px] p-0">
             <span className="font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
               <Globe className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-              <span>{PROFILE.languageLabel}</span>
+              <span>{t(locale, 'people.profile.languageLabel')}</span>
             </span>
             {/* The language's OWN name, not its code. The theme legend beside it says
                 "אוטומטי" — a word — and `HE` in a monospace face was the only machine-facing
@@ -153,7 +161,7 @@ export function ProfilePreferences({
           <legend className="w-full flex items-center justify-between text-[11px] p-0">
             <span className="font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
               <ThemeIcon className={`w-3.5 h-3.5 ${themeIconTint[theme]}`} />
-              <span>{PROFILE.themeLabel}</span>
+              <span>{t(locale, 'people.profile.themeLabel')}</span>
             </span>
             <span className="text-[10px] text-slate-400 capitalize">{themeLabels[theme]}</span>
           </legend>

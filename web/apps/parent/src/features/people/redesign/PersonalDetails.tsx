@@ -15,8 +15,9 @@
 // club calling a number nobody has.
 import { useState } from 'react'
 import { Check, Pencil, User, X } from 'lucide-react'
+import { t } from '@studio/i18n'
+import type { Locale } from '@studio/i18n'
 import { useDialog } from '../../onboarding/wizard/useDialog'
-import { PROFILE } from './content'
 
 export type MyDetails = {
   firstName: string
@@ -26,9 +27,11 @@ export type MyDetails = {
 }
 
 export function ProfilePersonalDetails({
+  locale,
   details,
   onEdit,
 }: {
+  locale: Locale
   details: MyDetails | null
   onEdit: () => void
 }) {
@@ -45,7 +48,7 @@ export function ProfilePersonalDetails({
             className="text-sm font-bold text-slate-900 dark:text-slate-50 flex items-center gap-1.5"
           >
             <User className="w-4 h-4 text-blue-600 dark:text-blue-400" aria-hidden="true" />
-            <span>{PROFILE.personalTitle}</span>
+            <span>{t(locale, 'people.profile.personalTitle')}</span>
           </h3>
           <button
             type="button"
@@ -55,23 +58,34 @@ export function ProfilePersonalDetails({
             className="flex items-center gap-1 text-xs font-bold text-[#0056c5] dark:text-blue-300 bg-blue-50 dark:bg-blue-400/15 px-3 py-1.5 rounded-xl disabled:opacity-50 active:scale-95 transition-all cursor-pointer"
           >
             <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
-            <span>{PROFILE.personalEdit}</span>
+            <span>{t(locale, 'people.profile.personalEdit')}</span>
           </button>
         </div>
 
         {details === null ? (
-          <p className="text-xs text-slate-500 dark:text-slate-400">{PROFILE.loading}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">{t(locale, 'people.profile.loading')}</p>
         ) : (
           <dl className="space-y-2 text-start m-0">
             <Row
-              label={PROFILE.personalName}
+              label={t(locale, 'people.profile.personalName')}
+              notSetLabel={t(locale, 'people.profile.personalNotSet')}
               value={`${details.firstName} ${details.lastName}`.trim()}
             />
             {/* An address and a number are LTR runs inside a right-to-left paragraph, so
                 each goes in its own `bdi` — otherwise the digits of a phone number reorder
                 around the punctuation and a parent reads their own number backwards. */}
-            <Row label={PROFILE.personalEmail} value={details.email} ltr />
-            <Row label={PROFILE.personalPhone} value={details.phone} ltr />
+            <Row
+              label={t(locale, 'people.profile.personalEmail')}
+              value={details.email}
+              notSetLabel={t(locale, 'people.profile.personalNotSet')}
+              ltr
+            />
+            <Row
+              label={t(locale, 'people.profile.personalPhone')}
+              value={details.phone}
+              notSetLabel={t(locale, 'people.profile.personalNotSet')}
+              ltr
+            />
           </dl>
         )}
       </section>
@@ -82,10 +96,14 @@ export function ProfilePersonalDetails({
 function Row({
   label,
   value,
+  notSetLabel,
   ltr = false,
 }: {
   label: string
   value: string | null
+  /** What an empty field says. Passed in rather than looked up, so `Row` needs no locale
+   *  of its own for the one string it can render. */
+  notSetLabel: string
   ltr?: boolean
 }) {
   return (
@@ -99,7 +117,7 @@ function Row({
             value
           )
         ) : (
-          <span className="font-normal text-slate-400">{PROFILE.personalNotSet}</span>
+          <span className="font-normal text-slate-400">{notSetLabel}</span>
         )}
       </dd>
     </div>
@@ -107,12 +125,14 @@ function Row({
 }
 
 export function PersonalDetailsSheet({
+  locale,
   details,
   busy,
   failed,
   onSave,
   onClose,
 }: {
+  locale: Locale
   details: MyDetails
   busy: boolean
   failed: boolean
@@ -150,12 +170,12 @@ export function PersonalDetailsSheet({
               id="personal-sheet-title"
               className="text-base font-bold text-slate-900 dark:text-slate-50 leading-tight text-start"
             >
-              {PROFILE.personalSheetTitle}
+              {t(locale, 'people.profile.personalSheetTitle')}
             </h3>
             <button
               type="button"
               onClick={onClose}
-              aria-label={PROFILE.close}
+              aria-label={t(locale, 'people.profile.close')}
               className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
@@ -164,28 +184,28 @@ export function PersonalDetailsSheet({
 
           <Field
             id="personal-first"
-            label={PROFILE.personalFirstName}
+            label={t(locale, 'people.profile.personalFirstName')}
             value={draft.firstName}
             onChange={(firstName) => setDraft((d) => ({ ...d, firstName }))}
             required
           />
           <Field
             id="personal-last"
-            label={PROFILE.personalLastName}
+            label={t(locale, 'people.profile.personalLastName')}
             value={draft.lastName}
             onChange={(lastName) => setDraft((d) => ({ ...d, lastName }))}
             required
           />
           <Field
             id="personal-email"
-            label={PROFILE.personalEmail}
+            label={t(locale, 'people.profile.personalEmail')}
             type="email"
             value={draft.email ?? ''}
             onChange={(email) => setDraft((d) => ({ ...d, email: email || null }))}
           />
           <Field
             id="personal-phone"
-            label={PROFILE.personalPhone}
+            label={t(locale, 'people.profile.personalPhone')}
             type="tel"
             value={draft.phone ?? ''}
             onChange={(phone) => setDraft((d) => ({ ...d, phone: phone || null }))}
@@ -197,7 +217,7 @@ export function PersonalDetailsSheet({
               data-testid="profile-personal-error"
               className="text-xs font-semibold text-[#ba1a1a] dark:text-red-300 bg-[#ffdad6] dark:bg-red-500/15 rounded-2xl p-3 text-start"
             >
-              {PROFILE.personalSaveFailed}
+              {t(locale, 'people.profile.personalSaveFailed')}
             </p>
           ) : null}
 
@@ -209,14 +229,14 @@ export function PersonalDetailsSheet({
               className="flex-1 bg-[#001849] hover:bg-[#0d2c6c] disabled:opacity-60 text-white py-3.5 rounded-2xl text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <Check className="w-4 h-4" />
-              <span>{busy ? PROFILE.personalSaving : PROFILE.personalSave}</span>
+              <span>{busy ? t(locale, 'people.profile.personalSaving') : t(locale, 'people.profile.personalSave')}</span>
             </button>
             <button
               type="button"
               onClick={onClose}
               className="px-4 py-3.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 rounded-2xl text-xs font-semibold transition-all cursor-pointer"
             >
-              {PROFILE.personalCancel}
+              {t(locale, 'people.profile.personalCancel')}
             </button>
           </div>
         </form>

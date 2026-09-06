@@ -18,11 +18,13 @@
 // the rest of the account controls, where §4 puts them — a family enrolled in two clubs is
 // rare, and switching between them is an account action, not a per-screen one.
 import type { ReactNode } from 'react'
+import type { Locale } from '@studio/i18n'
 import { ParentTabBar } from './ParentTabBar'
 import type { ParentTab } from './ParentTabBar'
 
 export function ParentShell({
   activeTab,
+  locale,
   updatesBadgeCount,
   devBar,
   tabBar = true,
@@ -31,6 +33,7 @@ export function ParentShell({
   /** `null` on a screen that is behind or beside the four tabs — a student card, the
    *  privacy screen, a uPay return. The bar still shows; nothing in it is current. */
   activeTab: ParentTab | null
+  locale: Locale
   updatesBadgeCount?: number
   devBar?: ReactNode
   /** §6.1's two blocking gates hide the bar: "no other screen is reachable" includes the
@@ -59,7 +62,7 @@ export function ParentShell({
             {children}
           </main>
           {tabBar ? (
-            <ParentTabBar active={activeTab} updatesBadgeCount={updatesBadgeCount} />
+            <ParentTabBar active={activeTab} locale={locale} updatesBadgeCount={updatesBadgeCount} />
           ) : null}
         </div>
       </div>

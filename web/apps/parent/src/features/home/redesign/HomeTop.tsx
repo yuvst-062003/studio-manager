@@ -1,10 +1,13 @@
 import { Bell, BellRing, Plus } from 'lucide-react'
 
-import { HOME, fill } from './content'
+import { fill } from '@studio/core'
+import { t } from '@studio/i18n'
+import type { Locale } from '@studio/i18n'
 import type { HomeChild, HomeUrgent } from './types'
 
 export function HomeTop({
   clubName,
+  locale,
   familyName,
   childList,
   selectedChildId,
@@ -18,7 +21,8 @@ export function HomeTop({
 }: {
   /** The club's name. Replaces the prototype's hardcoded "מועדון ג׳ודו גלדיאטור". */
   clubName: string
-  /** The guardian's surname, or null. When null the greeting is HOME.greeting alone —
+  locale: Locale
+  /** The guardian's surname, or null. When null the greeting is `schedule.home.greeting` alone —
    *  the prototype's "עונת תשפ״ה (2025/26)" season suffix has no source in this app and
    *  must NOT be rendered or invented. */
   familyName: string | null
@@ -35,19 +39,19 @@ export function HomeTop({
   unreadCount: number
   onOpenNotifications: () => void
 }) {
-  const greeting = familyName ? fill(HOME.greetingFamily, { name: familyName }) : HOME.greeting
+  const greeting = familyName ? fill(t(locale, 'schedule.home.greetingFamily'), { name: familyName }) : t(locale, 'schedule.home.greeting')
 
-  const debtPart = debtLabel !== null ? fill(HOME.urgentDebt, { amount: debtLabel }) : null
+  const debtPart = debtLabel !== null ? fill(t(locale, 'schedule.home.urgentDebt'), { amount: debtLabel }) : null
   const healthCount = urgent.childrenNeedingDeclaration.length
   const healthPart =
     healthCount === 1
-      ? fill(HOME.urgentHealthOne, { name: urgent.childrenNeedingDeclaration[0] ?? '' })
+      ? fill(t(locale, 'schedule.home.urgentHealthOne'), { name: urgent.childrenNeedingDeclaration[0] ?? '' })
       : healthCount >= 2
-        ? fill(HOME.urgentHealthMany, { count: healthCount })
+        ? fill(t(locale, 'schedule.home.urgentHealthMany'), { count: healthCount })
         : null
   const urgentDetail = [debtPart, healthPart]
     .filter((part): part is string => part !== null)
-    .join(HOME.urgentSeparator)
+    .join(t(locale, 'schedule.home.urgentSeparator'))
 
   // Decided by what the banner can actually SAY, not by what the caller knows. Keying this
   // off `urgent.debtAgorot` — which is what it first did — let a family with a debt and no
@@ -56,7 +60,7 @@ export function HomeTop({
   const isUrgent = urgentDetail !== ''
 
   const notificationsLabel =
-    unreadCount > 0 ? `${HOME.notificationsLabel} (${unreadCount})` : HOME.notificationsLabel
+    unreadCount > 0 ? `${t(locale, 'schedule.home.notificationsLabel')} (${unreadCount})` : t(locale, 'schedule.home.notificationsLabel')
 
   return (
     <header className="p-4 pt-6 space-y-3">
@@ -79,10 +83,10 @@ export function HomeTop({
             data-testid="home-report-absence"
             onClick={onReportAbsence}
             className="flex items-center gap-1.5 bg-[#0A1938] hover:bg-[#152a55] text-white text-xs font-bold px-3 py-2 rounded-2xl shadow-xs active:scale-95 transition-all cursor-pointer"
-            title={HOME.reportAbsence}
+            title={t(locale, 'schedule.home.reportAbsence')}
           >
             <Plus className="w-4 h-4 text-emerald-400" />
-            <span>{HOME.reportAbsence}</span>
+            <span>{t(locale, 'schedule.home.reportAbsence')}</span>
           </button>
 
           {/* Notification Bell */}
@@ -91,7 +95,7 @@ export function HomeTop({
             data-testid="home-notifications"
             onClick={onOpenNotifications}
             className="relative p-2.5 rounded-2xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/80 shadow-xs active:scale-95 transition-all cursor-pointer group"
-            title={HOME.notificationsTitle}
+            title={t(locale, 'schedule.home.notificationsTitle')}
             aria-label={notificationsLabel}
           >
             {unreadCount > 0 ? (
@@ -125,13 +129,13 @@ export function HomeTop({
             onClick={onUrgentAction}
             className="bg-[#ba1a1a] text-white text-xs font-semibold px-3.5 py-2 rounded-xl shadow-xs hover:bg-red-800 active:scale-95 transition-transform shrink-0 cursor-pointer"
           >
-            {HOME.urgentCta}
+            {t(locale, 'schedule.home.urgentCta')}
           </button>
 
           {/* Alert Content */}
           <div className="text-start flex-1">
             <div className="flex items-center justify-end gap-1.5 font-bold text-[#ba1a1a] text-sm">
-              <span>{HOME.urgentTitle}</span>
+              <span>{t(locale, 'schedule.home.urgentTitle')}</span>
               <span className="inline-flex items-center justify-center w-5 h-5 bg-[#ba1a1a] text-white rounded-full text-xs font-bold">
                 !
               </span>
@@ -144,7 +148,7 @@ export function HomeTop({
       {/* Trainee Filter Chips Strip */}
       <div
         role="group"
-        aria-label={HOME.allChildren}
+        aria-label={t(locale, 'schedule.home.allChildren')}
         data-purpose="trainee-filters"
         className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1"
       >
@@ -160,7 +164,7 @@ export function HomeTop({
               : 'bg-white text-slate-700 border border-slate-200/80 hover:bg-slate-50'
           }`}
         >
-          <span>{HOME.allChildren}</span>
+          <span>{t(locale, 'schedule.home.allChildren')}</span>
           <span
             className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
               selectedChildId === null ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'

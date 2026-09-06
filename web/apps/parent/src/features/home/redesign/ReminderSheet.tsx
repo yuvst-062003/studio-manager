@@ -23,9 +23,9 @@
 import { useState } from 'react'
 import { Bell, X } from 'lucide-react'
 import { formatSessionWhen } from '@studio/core'
+import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { useDialog } from '../../onboarding/wizard/useDialog'
-import { REMINDER } from './content.absence.reminder'
 import type { HomeSession } from './types'
 
 export type LeadTime = '15min' | '30min' | '1hour' | '2hours' | '1day'
@@ -73,13 +73,20 @@ function icsStamp(iso: string): string {
   return `${new Date(iso).toISOString().replace(/[-:]/g, '').split('.')[0]}Z`
 }
 
-export function buildIcs(session: HomeSession, lead: LeadTime, clubName: string): string {
+export function buildIcs(
+  session: HomeSession,
+  lead: LeadTime,
+  clubName: string,
+  locale: Locale,
+): string {
   const summary = `${clubName}: ${session.studentName} — ${session.groupName}`
   const details = [
-    `${REMINDER.icsChild} ${session.studentName}`,
-    `${REMINDER.icsGroup} ${session.groupName}`,
-    session.coachName ? `${REMINDER.icsCoach} ${session.coachName}` : null,
-    session.locationName ? `${REMINDER.icsWhere} ${session.locationName}` : null,
+    `${t(locale, 'schedule.reminder.icsChild')} ${session.studentName}`,
+    `${t(locale, 'schedule.reminder.icsGroup')} ${session.groupName}`,
+    session.coachName ? `${t(locale, 'schedule.reminder.icsCoach')} ${session.coachName}` : null,
+    session.locationName
+      ? `${t(locale, 'schedule.reminder.icsWhere')} ${session.locationName}`
+      : null,
   ]
     .filter((line): line is string => line !== null)
     .join('\n')
@@ -130,7 +137,7 @@ export function ReminderSheet({
   const dialogRef = useDialog(true, onClose)
   const [lead, setLead] = useState<LeadTime>(current ?? '30min')
 
-  const href = `data:text/calendar;charset=utf-8,${encodeURIComponent(buildIcs(session, lead, clubName))}`
+  const href = `data:text/calendar;charset=utf-8,${encodeURIComponent(buildIcs(session, lead, clubName, locale))}`
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/60 flex items-end sm:items-center justify-center p-0 sm:p-4 modal-backdrop-blur">
@@ -152,7 +159,7 @@ export function ReminderSheet({
             </div>
             <div className="text-start">
               <h3 id="reminder-title" className="text-base font-bold text-slate-900 dark:text-slate-50 leading-tight">
-                {REMINDER.title}
+                {t(locale, 'schedule.reminder.title')}
               </h3>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 <bdi dir="ltr">{formatSessionWhen(session.startsAt, locale)}</bdi>
@@ -162,7 +169,7 @@ export function ReminderSheet({
           <button
             type="button"
             onClick={onClose}
-            aria-label={REMINDER.close}
+            aria-label={t(locale, 'schedule.reminder.close')}
             className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -171,7 +178,7 @@ export function ReminderSheet({
 
         <fieldset className="space-y-2 border-0 m-0 p-0">
           <legend className="text-xs font-bold text-slate-800 dark:text-slate-200 p-0 pb-1">
-            {REMINDER.legend}
+            {t(locale, 'schedule.reminder.legend')}
           </legend>
           {(Object.keys(LEAD_MINUTES) as LeadTime[]).map((option) => (
             <label
@@ -190,13 +197,13 @@ export function ReminderSheet({
                 onChange={() => setLead(option)}
               />
               <span className="text-xs font-medium text-slate-800 dark:text-slate-200">
-                {REMINDER.options[option]}
+                {t(locale, `schedule.reminder.lead.${option}`)}
               </span>
             </label>
           ))}
         </fieldset>
 
-        <p className="text-[11px] text-slate-500 dark:text-slate-400 text-start">{REMINDER.hint}</p>
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 text-start">{t(locale, 'schedule.reminder.hint')}</p>
 
         {/* A real link with `download`, not a scripted blob: the browser knows what to do
             with text/calendar, it survives a long-press "open in", and it is the same
@@ -212,7 +219,7 @@ export function ReminderSheet({
           className="w-full bg-[#001849] hover:bg-[#0d2c6c] text-white py-3.5 rounded-2xl text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
         >
           <Bell className="w-4 h-4" />
-          <span>{REMINDER.save}</span>
+          <span>{t(locale, 'schedule.reminder.save')}</span>
         </a>
       </div>
     </div>

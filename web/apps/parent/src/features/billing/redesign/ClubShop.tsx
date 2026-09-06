@@ -181,6 +181,7 @@ export function ClubShop({ locale }: { locale: Locale }) {
     <section aria-label={t(locale, 'billing.shop.title')} data-testid="parent-shop">
       <ShopScreen
         products={products}
+        locale={locale}
         state={state}
         onRetry={() => setAttempt((n) => n + 1)}
         cart={cart}
@@ -201,6 +202,7 @@ export function ClubShop({ locale }: { locale: Locale }) {
       {ordersOpen ? (
         <OrdersSheet
           orders={orders}
+          locale={locale}
           money={money}
           dateLabel={(isoDate) => formatDateInStudioZone(`${isoDate}T12:00:00Z`, locale)}
           onClose={() => setOrdersOpen(false)}

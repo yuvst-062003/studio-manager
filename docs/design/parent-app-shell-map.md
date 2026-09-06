@@ -112,8 +112,9 @@ the inbox's RSVP action.
 | 3 | **עדכונים**, and בית's monthly calendar with its day/lesson absence reports | ✅ mounted |
 | 4 | **חנות המועדון** | ✅ mounted |
 | 5 | **פרופיל** — and with it the money, the trainee cards and add-a-child | ✅ mounted |
-| 6 | strings into `@studio/i18n`, mirrored into `en/` and `ru/` | outstanding |
+| 6 | strings into `@studio/i18n`, mirrored into `en/` and `ru/` | ✅ done |
 | — | the dark sweep | outstanding, and see below |
+| — | deleting the screens the redesign replaced | ✅ done (b8621c3) |
 
 ### Still outstanding, and deliberately so
 
@@ -128,11 +129,13 @@ the inbox's RSVP action.
   subscription, which is what the route still exists for now that בית draws the month itself
   in a modal. `AccountControls`'s two transitional links are gone: Profile carries
   `#/add-child` under its trainee cards and `#/calendar` here.
-- **`ParentHome`, `InboxScreen`, `ShopSection`, `OrderItemsScreen`** are all still on disk
-  and no longer rendered. They are kept until the redesign is accepted end to end. **Note
-  the hazard:** `routes.reachable.test.ts` scans source, not the render tree, so a link
-  living only inside an unmounted component now counts as reachable. Deleting these files is
-  part of finishing, not an afterthought.
+- **A section of פרופיל whose fetch fails renders as EMPTY, not as failed.** Each of the
+  screen's reads ends `.catch(() => setChildren([]))`, so a network failure tells a family
+  they have no trainees. `tools/__tests__/load-failed-recovery.test.ts` catches the shape it
+  knows — `setLoaded(true)` in a catch — and not this one. The four tabs that DO have a
+  failure state now share `resolveLoadFailedText`, which is where the fix belongs; פרופיל
+  needs a failure state of its own first, which is a change to the screen and not to a
+  string, so it is not part of step 6.
 
 ### The dark-mode correction
 

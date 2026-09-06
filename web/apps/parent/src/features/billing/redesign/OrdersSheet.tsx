@@ -9,8 +9,9 @@
 // is no fulfilment state to show: §4.3 says inventory is a different product, so "has the
 // coach handed it over" is not something this system knows.
 import { Package, X } from 'lucide-react'
+import { t } from '@studio/i18n'
+import type { Locale } from '@studio/i18n'
 import { useDialog } from '../../onboarding/wizard/useDialog'
-import { SHOP } from './content'
 
 export type OrderRow = {
   id: string
@@ -21,11 +22,13 @@ export type OrderRow = {
 
 export function OrdersSheet({
   orders,
+  locale,
   money,
   dateLabel,
   onClose,
 }: {
   orders: readonly OrderRow[] | null
+  locale: Locale
   money: (agorot: number) => string
   dateLabel: (isoDate: string) => string
   onClose: () => void
@@ -48,14 +51,14 @@ export function OrdersSheet({
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
           <div className="text-start">
             <h3 id="orders-title" className="text-base font-bold text-slate-900 dark:text-slate-50 leading-tight">
-              {SHOP.ordersTitle}
+              {t(locale, 'billing.shop.ordersTitle')}
             </h3>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">{SHOP.ordersSub}</p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">{t(locale, 'billing.shop.ordersSub')}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label={SHOP.close}
+            aria-label={t(locale, 'billing.shop.close')}
             className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -63,10 +66,10 @@ export function OrdersSheet({
         </div>
 
         {orders === null ? (
-          <p className="text-xs text-slate-500 dark:text-slate-400">{SHOP.loading}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">{t(locale, 'billing.shop.loading')}</p>
         ) : orders.length === 0 ? (
           <p className="text-xs text-slate-500 dark:text-slate-400 text-center py-6">
-            {SHOP.ordersEmpty}
+            {t(locale, 'billing.shop.ordersEmpty')}
           </p>
         ) : (
           <ul className="space-y-2 list-none m-0 p-0">
@@ -100,7 +103,7 @@ export function OrdersSheet({
           href="#/payments/history"
           className="block text-center text-xs font-bold text-[#0056c5] dark:text-blue-300 py-2 cursor-pointer"
         >
-          {SHOP.ordersAll}
+          {t(locale, 'billing.shop.ordersAll')}
         </a>
       </div>
     </div>

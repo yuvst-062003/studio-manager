@@ -20,8 +20,11 @@ import { Calendar, Check, X } from 'lucide-react'
 // Lives under the wizard because that is where the first ported modals were. It is not
 // wizard-specific and should move to a shared home once that work lands; importing it is
 // still better than a second copy of a focus trap.
+import { t } from '@studio/i18n'
+import type { Locale } from '@studio/i18n'
 import { useDialog } from '../../onboarding/wizard/useDialog'
-import { ABSENCE, ABSENCE_REASONS } from './content.absence'
+import { ABSENCE_REASONS, reasonForWire, reasonLabel, reasonSub } from './absenceReasons'
+import type { ReasonKey } from './absenceReasons'
 import type { HomeSession } from './types'
 
 /** What the submit can come back with. `null` is "nothing has gone wrong yet". */
@@ -29,6 +32,7 @@ export type AbsenceFailure = 'too_late' | 'already_marked' | 'offline' | 'unknow
 
 export function AbsenceModal({
   session,
+  locale,
   dayLabel,
   timeLabel,
   busy,
@@ -37,6 +41,7 @@ export function AbsenceModal({
   onClose,
 }: {
   session: HomeSession
+  locale: Locale
   /** e.g. "25 באוגוסט" — formatted by the caller, in the studio's zone. */
   dayLabel: string
   timeLabel: string
@@ -47,16 +52,15 @@ export function AbsenceModal({
   onClose: () => void
 }) {
   const dialogRef = useDialog(true, onClose)
-  const [reasonKey, setReasonKey] = useState<string>('sick')
+  const [reasonKey, setReasonKey] = useState<ReasonKey>('sick')
   const [note, setNote] = useState('')
-
-  const chosen = ABSENCE_REASONS.find((reason) => reason.key === reasonKey)
 
   // ONE free-text field is what `POST /absence-reports` stores, and what a coach reads on
   // the mat. The prototype's six cards are a nicer way to ask the same question, so the
   // label and the note are composed into that one string rather than a code the server has
-  // no column for and no coach could read.
-  const composed = note.trim() ? `${chosen?.label ?? ''} — ${note.trim()}` : (chosen?.label ?? '')
+  // no column for and no coach could read. `reasonForWire` composes it in HEBREW whatever
+  // the parent is reading — see the note at the top of `absenceReasons.ts`.
+  const composed = reasonForWire(reasonKey, note)
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/60 flex items-end sm:items-center justify-center p-0 sm:p-4 modal-backdrop-blur transition-all duration-300">
@@ -81,15 +85,15 @@ export function AbsenceModal({
                 id="absence-modal-title"
                 className="text-base font-bold text-slate-900 dark:text-slate-50 leading-tight"
               >
-                {ABSENCE.title}
+                {t(locale, 'attendance.absenceSheet.title')}
               </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">{ABSENCE.subtitle}</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">{t(locale, 'attendance.absenceSheet.subtitle')}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label={ABSENCE.close}
+            aria-label={t(locale, 'attendance.absenceSheet.close')}
             className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -126,9 +130,9 @@ export function AbsenceModal({
         <fieldset className="space-y-2 text-start border-0 m-0 p-0">
           <div className="flex items-center justify-between">
             <legend className="text-xs font-bold text-slate-800 dark:text-slate-200 p-0">
-              {ABSENCE.reasonLegend}
+              {t(locale, 'attendance.absenceSheet.reasonLegend')}
             </legend>
-            <span className="text-[11px] text-slate-400">{ABSENCE.reasonHint}</span>
+            <span className="text-[11px] text-slate-400">{t(locale, 'attendance.absenceSheet.reasonHint')}</span>
           </div>
           <div className="grid grid-cols-2 gap-2">
             {ABSENCE_REASONS.map((reason) => {
@@ -167,9 +171,11 @@ export function AbsenceModal({
                           isSelected ? 'text-[#001849] dark:text-blue-200' : 'text-slate-800 dark:text-slate-200'
                         }`}
                       >
-                        {reason.label}
+                        {reasonLabel(reason.key, locale)}
                       </p>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{reason.sub}</p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                        {reasonSub(reason.key, locale)}
+                      </p>
                     </div>
                   </div>
                   <span
@@ -191,9 +197,9 @@ export function AbsenceModal({
             htmlFor="absence-note"
             className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between"
           >
-            <span>{ABSENCE.noteLabel}</span>
+            <span>{t(locale, 'attendance.absenceSheet.noteLabel')}</span>
             <span className="text-[10px] font-normal text-slate-400">
-              {reasonKey === 'other' ? ABSENCE.noteRecommended : ''}
+              {reasonKey === 'other' ? t(locale, 'attendance.absenceSheet.noteRecommended') : ''}
             </span>
           </label>
           <textarea
@@ -201,7 +207,7 @@ export function AbsenceModal({
             rows={2}
             value={note}
             onChange={(event) => setNote(event.target.value)}
-            placeholder={ABSENCE.notePlaceholder}
+            placeholder={t(locale, 'attendance.absenceSheet.notePlaceholder')}
             className="w-full text-xs rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 focus:border-[#0056c5] focus:ring-1 focus:ring-[#0056c5] p-3 text-start transition-all outline-none"
           />
         </div>
@@ -215,7 +221,7 @@ export function AbsenceModal({
             data-testid="home-absence-error"
             className="text-xs font-semibold text-[#ba1a1a] dark:text-red-300 bg-[#ffdad6] dark:bg-red-500/15 rounded-2xl p-3 text-start"
           >
-            {ABSENCE.failure[failure]}
+            {t(locale, `attendance.absenceSheet.failure.${failure}`)}
           </p>
         ) : null}
 
@@ -228,14 +234,18 @@ export function AbsenceModal({
             className="flex-1 bg-[#001849] hover:bg-[#0d2c6c] disabled:opacity-60 text-white py-3.5 rounded-2xl text-xs font-bold shadow-md hover:shadow-lg active:scale-98 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <Check className="w-4 h-4" />
-            <span>{busy ? ABSENCE.submitting : ABSENCE.submit}</span>
+            <span>
+              {busy
+                ? t(locale, 'attendance.absenceSheet.submitting')
+                : t(locale, 'attendance.absenceSheet.submit')}
+            </span>
           </button>
           <button
             type="button"
             onClick={onClose}
             className="px-4 py-3.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-2xl text-xs font-semibold active:scale-98 transition-all cursor-pointer"
           >
-            {ABSENCE.cancel}
+            {t(locale, 'attendance.absenceSheet.cancel')}
           </button>
         </div>
       </div>

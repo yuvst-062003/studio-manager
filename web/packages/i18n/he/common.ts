@@ -95,6 +95,15 @@ export const common: Bundle = {
   'nav.myChildren': 'הילדים שלי',
   'nav.settings': 'הגדרות',
   'nav.signOut': 'התנתקות',
+  // -- the parent app's four tabs (the redesign of 2026-09-05) ------------------
+  // Separate from `nav.*`, which is the STAFF drawer's. Two products name the same
+  // destination differently: a coach's drawer says 'הודעות', the parent's tab bar says
+  // 'עדכונים', and one key for both would force one of them to be wrong.
+  'tabs.parentBarLabel': 'ניווט ראשי',
+  'tabs.parentHome': 'בית',
+  'tabs.parentShop': 'חנות המועדון',
+  'tabs.parentUpdates': 'עדכונים',
+  'tabs.parentProfile': 'פרופיל',
   // §6.1's first run. The refusal wording is §6.1's own, verbatim.
   'language.title': 'שפה',
   // -- the parent app's sign-in face (owner's Stitch design, 2026-09-01) ---------

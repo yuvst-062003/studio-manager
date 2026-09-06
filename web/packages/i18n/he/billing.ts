@@ -143,12 +143,61 @@ export const billing: Bundle = {
   'promise.manager.forPlan': 'עבור מסלול',
   'promise.manager.saysPaid': 'מדווח ששילם',
   'promise.manager.saysWillPay': 'עומד לשלם',
+  // -- חנות המועדון (the redesign of 2026-09-05) ---------------------------------
+  //
+  // This block REPLACES the five keys the old `ShopSection` used ('shop.order',
+  // 'shop.ordered', 'shop.toPayment' and the two others), which went orphan when that
+  // screen was deleted. 'shop.title' is the one that survived unchanged, because it is
+  // the same three words on the same tab.
   'shop.title': 'חנות המועדון',
-  'shop.empty': 'אין פריטים למכירה כרגע.',
-  'shop.order': 'הזמנה',
-  'shop.ordered': 'ההזמנה נוצרה — אפשר לשלם עכשיו בכרטיס או במזומן.',
-  'shop.toPayment': 'למסך התשלומים',
-  'shop.quantity': 'כמות',
+  'shop.subtitle': 'מזמינים באפליקציה, מקבלים ישירות מהמאמן באימון',
+  'shop.standardBadge': 'ציוד תקני',
+  // -- the product grid --
+  'shop.choose': 'בחירה',
+  // The tile where the prototype puts a photograph. Named, so a screen reader does not
+  // announce a decorative panel and so a missing image is legible rather than broken.
+  'shop.noPhoto': 'אין תמונה לפריט',
+  'shop.deliveryNote': 'מסירה אישית ובטוחה ישירות מהמאמן בתחילת האימון לאחר וידוא מידה.',
+  // -- the customiser sheet --
+  'shop.customiseTitle': 'בחירת פריט ומאפיינים',
+  'shop.sizeLegend': 'מידה',
+  'shop.sizeRequired': 'יש לבחור מידה',
+  'shop.quantityLabel': 'כמות',
+  'shop.noteLabel': 'הערה למאמן (אופציונלי)',
+  'shop.notePlaceholder': 'למשל: רקמת שם על הגי',
+  'shop.addToCart': 'הוספה לסל',
+  // -- the basket --
+  'shop.cartBarItems': '{{count}} פריטים בסל',
+  'shop.cartBarOneItem': 'פריט אחד בסל',
+  'shop.cartOpen': 'לסל ותשלום',
+  'shop.cartTitle': 'סל הקניות',
+  'shop.cartEmpty': 'הסל ריק',
+  'shop.cartRemove': 'הסרה',
+  'shop.cartQuantity': 'כמות',
+  'shop.cartTotal': 'סה״כ',
+  'shop.checkout': 'שליחת ההזמנה',
+  'shop.checkoutSending': 'שולח…',
+  // -- after the order. The club charges for it; nothing is paid here --
+  'shop.placedTitle': 'ההזמנה נשלחה למועדון',
+  // `{{total}}` arrives already formatted — agorot are never divided at a call site.
+  'shop.placedBody': 'נוצרו {{count}} חיובים על סך {{total}}. המאמן יימסור את הפריטים באימון הקרוב.',
+  'shop.placedPay': 'מעבר לתשלומים',
+  'shop.placedClose': 'סגירה',
+  'shop.checkoutFailed': 'ההזמנה לא נשלחה. נסו שוב.',
+  // -- ההזמנות שלי, moved here from פרופיל on the owner's review of 2026-09-06: they are
+  //    shop orders, and the prototype's own shop puts an order tracker at the top --
+  'shop.ordersCta': 'ההזמנות שלי',
+  'shop.ordersTitle': 'ההזמנות שלי',
+  'shop.ordersSub': 'פריטים שהזמנתם מהמועדון',
+  'shop.ordersEmpty': 'עדיין לא הזמנתם פריטים',
+  'shop.ordersAll': 'לכל התשלומים',
+  // -- the catalogue's own states --
+  'shop.loading': 'טוען את החנות…',
+  'shop.loadFailed': 'לא הצלחנו לטעון את החנות',
+  'shop.retry': 'נסו שוב',
+  'shop.empty': 'אין כרגע פריטים למכירה',
+  'shop.emptyBody': 'כשהמועדון יוסיף ציוד, הוא יופיע כאן.',
+  'shop.close': 'סגירה',
 
   // D9.3 — the email affordance is card rows only, and the reason is on the screen.
   'receipt.email': 'שליחת קבלה במייל',

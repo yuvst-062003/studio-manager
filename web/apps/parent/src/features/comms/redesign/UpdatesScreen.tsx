@@ -185,6 +185,7 @@ export function UpdatesScreen({
 
       <UpdatesFeed
         groups={visible}
+        locale={locale}
         filter={filter}
         onFilterChange={setFilter}
         childNames={childNames}

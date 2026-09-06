@@ -5,8 +5,8 @@
 // `HomeTop` and `HomeSchedule` are presentational and take finished values. That split is
 // deliberate: the markup is a port and is verified by looking at it, and this is verified by
 // tests, because no screenshot can show that a lesson was filed under the wrong day.
-import { studioDayKey } from '@studio/core'
-import { MONTH_NAME, WEEKDAY_LETTER } from './content'
+import { formatDayHeadline, studioDayKey } from '@studio/core'
+import type { Locale } from '@studio/core'
 import type { HomeChild, HomeSession, StripDay } from './types'
 
 /** A lesson as `GET /sessions` returns it, narrowed to the fields בית reads. */
@@ -26,7 +26,7 @@ export type Lesson = {
 export type Intents = Readonly<Record<string, 'coming' | 'not_coming'>>
 
 /**
- * `YYYY-MM-DD` → the weekday index `WEEKDAY_LETTER` is indexed by (Sunday = 0).
+ * `YYYY-MM-DD` → the weekday index `weekdayInitials` is indexed by (Sunday = 0).
  *
  * Parsed at MIDDAY UTC, never midnight. `new Date('2026-08-25')` is midnight UTC, which is
  * still 24 August in a negative-offset zone and 25 August in Jerusalem — the same one-day
@@ -119,10 +119,17 @@ export function buildWeekStrip(todayKey: string, sessions: readonly HomeSession[
   })
 }
 
-/** `2026-08-25` → `יום ג׳ • 25 באוגוסט 2026`, which is what the prototype prints. */
-export function headlineFor(dayKey: string): string {
-  const month = MONTH_NAME[Number(dayKey.slice(5, 7)) - 1] ?? ''
-  return `יום ${WEEKDAY_LETTER[weekdayOf(dayKey)]} • ${dayOfMonthOf(dayKey)} ב${month} ${dayKey.slice(0, 4)}`
+/**
+ * `2026-08-25` → `יום ג׳ • 25 באוגוסט 2026`, which is what the prototype prints.
+ *
+ * A one-line delegation, kept as a named export because this is where the home's callers
+ * look for it. It used to compose the sentence itself, from a hard-coded Hebrew month
+ * table and a hand-written `ב` preposition — untranslatable by construction, and wrong in
+ * Russian twice over (the month declines after a day number, and the preposition does not
+ * exist). `Intl` produces every one of those strings, including `25 августа`.
+ */
+export function headlineFor(dayKey: string, locale: Locale): string {
+  return formatDayHeadline(dayKey, locale)
 }
 
 /** A session's length in whole minutes, or `null` when it has no end. */

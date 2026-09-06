@@ -16,9 +16,12 @@
 // believing the club was told, and a coach who was not.
 import { useState } from 'react'
 import { AlertTriangle, Check, Users, X } from 'lucide-react'
+import { fill } from '@studio/core'
+import { t } from '@studio/i18n'
+import type { Locale } from '@studio/i18n'
 import { useDialog } from '../../onboarding/wizard/useDialog'
-import { ABSENCE, ABSENCE_REASONS, DAY_ABSENCE } from './content.absence'
-import { fill } from './content'
+import { ABSENCE_REASONS, reasonForWire, reasonLabel, reasonSub } from './absenceReasons'
+import type { ReasonKey } from './absenceReasons'
 
 /** What one write came back with. `pending` is "not attempted yet". */
 export type DayAbsenceOutcome = {
@@ -30,15 +33,21 @@ export type DayAbsenceOutcome = {
   state: 'pending' | 'recorded' | 'too_late' | 'already_marked' | 'failed'
 }
 
-const RESULT_TEXT: Record<Exclude<DayAbsenceOutcome['state'], 'pending'>, string> = {
-  recorded: DAY_ABSENCE.resultRecorded,
-  too_late: DAY_ABSENCE.resultTooLate,
-  already_marked: DAY_ABSENCE.resultAlready,
-  failed: DAY_ABSENCE.resultFailed,
+/** What one row's outcome says. A function rather than a constant map: the strings are
+ *  translated now, and a module-level table would freeze the first language loaded. */
+function resultText(state: Exclude<DayAbsenceOutcome['state'], 'pending'>, locale: Locale): string {
+  const key = {
+    recorded: 'resultRecorded',
+    too_late: 'resultTooLate',
+    already_marked: 'resultAlready',
+    failed: 'resultFailed',
+  }[state]
+  return t(locale, `attendance.dayAbsence.${key}`)
 }
 
 export function AllDayAbsenceSheet({
   targets,
+  locale,
   childNames,
   dayLabel,
   busy,
@@ -49,6 +58,7 @@ export function AllDayAbsenceSheet({
   /** Every lesson this report is about, captured when the sheet opened. Frozen, because a
    *  report that succeeds must not empty the description of what it was about. */
   targets: readonly DayAbsenceOutcome[]
+  locale: Locale
   /** Distinct first names among those lessons, in roster order. */
   childNames: readonly string[]
   dayLabel: string
@@ -59,11 +69,11 @@ export function AllDayAbsenceSheet({
   onClose: () => void
 }) {
   const dialogRef = useDialog(true, onClose)
-  const [reasonKey, setReasonKey] = useState<string>('sick')
+  const [reasonKey, setReasonKey] = useState<ReasonKey>('sick')
   const [note, setNote] = useState('')
 
-  const chosen = ABSENCE_REASONS.find((reason) => reason.key === reasonKey)
-  const composed = note.trim() ? `${chosen?.label ?? ''} — ${note.trim()}` : (chosen?.label ?? '')
+  // Hebrew on the wire whatever the parent is reading — see `absenceReasons.ts`.
+  const composed = reasonForWire(reasonKey, note)
   const anyFailed = (outcomes ?? []).some((row) => row.state !== 'recorded' && row.state !== 'pending')
 
   return (
@@ -86,15 +96,15 @@ export function AllDayAbsenceSheet({
             </div>
             <div className="text-start">
               <h3 id="day-absence-title" className="text-base font-bold text-slate-900 dark:text-slate-50 leading-tight">
-                {DAY_ABSENCE.title}
+                {t(locale, 'attendance.dayAbsence.title')}
               </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">{DAY_ABSENCE.subtitle}</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">{t(locale, 'attendance.dayAbsence.subtitle')}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label={ABSENCE.close}
+            aria-label={t(locale, 'attendance.absenceSheet.close')}
             className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -106,14 +116,14 @@ export function AllDayAbsenceSheet({
           <div className="min-w-0">
             <div className="font-bold text-slate-900 dark:text-slate-50 text-sm">
               {childNames.length === 1
-                ? fill(DAY_ABSENCE.targetOne, { names: childNames[0] ?? '' })
-                : fill(DAY_ABSENCE.targetMany, {
+                ? fill(t(locale, 'attendance.dayAbsence.targetOne'), { names: childNames[0] ?? '' })
+                : fill(t(locale, 'attendance.dayAbsence.targetMany'), {
                     count: childNames.length,
                     names: childNames.join(', '),
                   })}
             </div>
             <div className="text-xs text-slate-600 dark:text-slate-300 mt-0.5 font-medium">
-              {DAY_ABSENCE.targetNote}
+              {t(locale, 'attendance.dayAbsence.targetNote')}
             </div>
           </div>
           <div className="text-[11px] font-semibold text-red-700 dark:text-red-300 bg-white dark:bg-slate-800 px-2.5 py-1 rounded-xl shadow-xs border border-red-100 dark:border-slate-700 shrink-0">
@@ -126,9 +136,9 @@ export function AllDayAbsenceSheet({
             <fieldset className="space-y-2 text-start border-0 m-0 p-0">
               <div className="flex items-center justify-between">
                 <legend className="text-xs font-bold text-slate-800 dark:text-slate-200 p-0">
-                  {ABSENCE.reasonLegend}
+                  {t(locale, 'attendance.absenceSheet.reasonLegend')}
                 </legend>
-                <span className="text-[11px] text-slate-400">{ABSENCE.reasonHint}</span>
+                <span className="text-[11px] text-slate-400">{t(locale, 'attendance.absenceSheet.reasonHint')}</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {ABSENCE_REASONS.map((reason) => {
@@ -159,9 +169,9 @@ export function AllDayAbsenceSheet({
                         </span>
                         <div className="min-w-0">
                           <p className={`text-xs font-bold leading-tight ${isSelected ? 'text-[#001849] dark:text-blue-200' : 'text-slate-800 dark:text-slate-200'}`}>
-                            {reason.label}
+                            {reasonLabel(reason.key, locale)}
                           </p>
-                          <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{reason.sub}</p>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{reasonSub(reason.key, locale)}</p>
                         </div>
                       </div>
                       <span
@@ -180,14 +190,14 @@ export function AllDayAbsenceSheet({
 
             <div className="space-y-1.5 text-start">
               <label htmlFor="day-absence-note" className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                {ABSENCE.noteLabel}
+                {t(locale, 'attendance.absenceSheet.noteLabel')}
               </label>
               <textarea
                 id="day-absence-note"
                 rows={2}
                 value={note}
                 onChange={(event) => setNote(event.target.value)}
-                placeholder={ABSENCE.notePlaceholder}
+                placeholder={t(locale, 'attendance.absenceSheet.notePlaceholder')}
                 className="w-full text-xs rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 focus:border-[#0056c5] focus:ring-1 focus:ring-[#0056c5] p-3 text-start transition-all outline-none"
               />
             </div>
@@ -219,10 +229,10 @@ export function AllDayAbsenceSheet({
                 <Check className="w-4 h-4" />
                 <span>
                   {targets.length === 0
-                    ? DAY_ABSENCE.nothingToReport
+                    ? t(locale, 'attendance.dayAbsence.nothingToReport')
                     : busy
-                      ? DAY_ABSENCE.submitting
-                      : DAY_ABSENCE.submit}
+                      ? t(locale, 'attendance.dayAbsence.submitting')
+                      : t(locale, 'attendance.dayAbsence.submit')}
                 </span>
               </button>
               <button
@@ -230,13 +240,13 @@ export function AllDayAbsenceSheet({
                 onClick={onClose}
                 className="px-4 py-3.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 rounded-2xl text-xs font-semibold transition-all cursor-pointer"
               >
-                {ABSENCE.cancel}
+                {t(locale, 'attendance.absenceSheet.cancel')}
               </button>
             </div>
           </>
         ) : (
           <>
-            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">{DAY_ABSENCE.resultsTitle}</h4>
+            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">{t(locale, 'attendance.dayAbsence.resultsTitle')}</h4>
             <ul className="space-y-1.5 list-none m-0 p-0" data-testid="home-day-absence-results">
               {outcomes.map((row) => (
                 <li
@@ -265,7 +275,11 @@ export function AllDayAbsenceSheet({
                     {row.state !== 'recorded' && row.state !== 'pending' ? (
                       <AlertTriangle className="w-3.5 h-3.5" />
                     ) : null}
-                    <span>{row.state === 'pending' ? DAY_ABSENCE.submitting : RESULT_TEXT[row.state]}</span>
+                    <span>
+                      {row.state === 'pending'
+                        ? t(locale, 'attendance.dayAbsence.submitting')
+                        : resultText(row.state, locale)}
+                    </span>
                   </span>
                 </li>
               ))}
@@ -277,7 +291,9 @@ export function AllDayAbsenceSheet({
                 anyFailed ? 'text-[#ba1a1a] dark:text-red-300' : 'text-emerald-700 dark:text-emerald-300'
               }`}
             >
-              {anyFailed ? DAY_ABSENCE.resultsSomeFailed : DAY_ABSENCE.resultsAllOk}
+              {anyFailed
+                ? t(locale, 'attendance.dayAbsence.resultsSomeFailed')
+                : t(locale, 'attendance.dayAbsence.resultsAllOk')}
             </p>
 
             <button
@@ -286,7 +302,7 @@ export function AllDayAbsenceSheet({
               disabled={busy}
               className="w-full bg-[#001849] hover:bg-[#0d2c6c] disabled:opacity-60 text-white py-3.5 rounded-2xl text-xs font-bold shadow-md transition-all cursor-pointer"
             >
-              {DAY_ABSENCE.done}
+              {t(locale, 'attendance.dayAbsence.done')}
             </button>
           </>
         )}

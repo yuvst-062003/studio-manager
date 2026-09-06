@@ -665,6 +665,7 @@ function AuthedApp() {
         <AccessGate session={session} locale={locale}>
         <ParentShell
           activeTab={activeTab}
+          locale={locale}
           updatesBadgeCount={pendingCount}
           // The bar hides while EITHER of §6.1's gates holds — "no other screen is
           // reachable" includes the bar that reaches them. Step 5 is `consentStatus`,

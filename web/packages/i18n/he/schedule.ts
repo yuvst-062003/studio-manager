@@ -618,4 +618,93 @@ export const schedule: Bundle = {
   'plan.group.kind.private': 'אימון פרטני',
   'plan.group.inviteOnly': 'הצטרפות בהזמנה בלבד',
   'plan.group.eligibility': 'קבוצות בסיס שרשאיות להשתתף',
+  // -- בית, the parent app's home tab (the redesign of 2026-09-05) ---------------
+  //
+  // WHAT THE PROTOTYPE HARD-CODES AND THIS DOES NOT. The prototype's home is written for
+  // one family: "שלום, משפחת כהן", "חוב שכר לימוד ₪320", "3" children, three named chips,
+  // "עונת תשפ״ה (2025/26)". Every one of those is a value at the call site, and where the
+  // API has no source for one it is ABSENT rather than invented — the season line most of
+  // all: `SessionRow.training_year_id` is a uuid and nothing resolves it to a name, so the
+  // greeting renders the family alone rather than a Hebrew year guessed on the client.
+  'home.greeting': 'שלום',
+  'home.greetingFamily': 'שלום, משפחת {{name}}',
+  'home.reportAbsence': 'דיווח היעדרות',
+  'home.notificationsTitle': 'התראות והודעות מהמאמן',
+  'home.notificationsLabel': 'התראות מהמאמן',
+  // -- the urgent banner. Both halves are conditional and the separator appears only
+  //    between two present halves --
+  'home.urgentTitle': 'דרוש טיפול דחוף בהרשמה',
+  'home.urgentCta': 'טיפול מהיר',
+  'home.urgentSeparator': ' • ',
+  // `{{amount}}` arrives already formatted — agorot are never divided at a call site.
+  'home.urgentDebt': 'חוב שכר לימוד {{amount}}',
+  'home.urgentHealthOne': 'הצהרת בריאות ל{{name}} חסרה',
+  // Two or more, because "הצהרת בריאות לנועה, לדנה וליוסי חסרה" does not decline.
+  'home.urgentHealthMany': 'חסרות {{count}} הצהרות בריאות',
+  'home.allChildren': 'כל הילדים',
+  // -- the week strip. `weekStripLabel` names the landmark for a screen reader; the port
+  //    first fell back to the day headline, which reads as a date rather than a control --
+  'home.weekStripLabel': 'בחירת יום',
+  'home.monthButton': 'חודש',
+  'home.monthButtonTitle': 'פתיחת לוח חודשי מלא',
+  'home.today': 'היום',
+  // -- the day headline's count --
+  'home.noSessionsPlanned': 'אין אימונים מתוכננים',
+  'home.oneSessionPlanned': 'שיעור אחד מתוכנן',
+  'home.manySessionsPlanned': '{{count}} שיעורים מתוכננים',
+  // -- the session card --
+  'home.absentQuestion': 'נעדר/ת?',
+  'home.absentReported': 'דווח ✓',
+  // The badge the staff roster and the dashboard count are both built to read.
+  'home.statusReported': 'הודעתם מראש ✓',
+  'home.statusScheduled': 'מתוכנן',
+  'home.statusCancelled': 'בוטל',
+  'home.minutesShort': 'דק׳',
+  'home.reminderSet': 'תזכורת ביומן 🔔',
+  'home.reminderUnset': 'תזכורת ליומן',
+  'home.reminderTitle': 'הגדר תזכורת אישית ביומן המכשיר',
+  // -- the empty day --
+  'home.emptyTitle': 'אין אימונים מתוכננים ליום זה',
+  'home.emptyBody': 'ניתן לצפות בימים אחרים או בלוח החודשי המלא',
+  'home.emptyCta': 'פתיחת לוח חודשי',
+  // -- the monthly calendar modal, which is where the deleted drawer's calendar went --
+  'home.monthTitle': 'לוח אימונים ואירועים',
+  'home.monthSubtitle': 'לוח פעילות חודשי מלא',
+  'home.monthClose': 'סגירה',
+  'home.monthPrev': 'חודש קודם',
+  'home.monthNext': 'חודש הבא',
+  'home.monthToday': 'היום',
+  'home.monthGridLabel': 'בחירת תאריך',
+  'home.monthAgendaEmpty': 'אין אימונים ביום זה',
+  'home.monthShowOnHome': 'הצג במסך הבית',
+  'home.monthDaySessions': '{{count}} אימונים מתוכננים למשפחה',
+  'home.monthDayOneSession': 'אימון אחד מתוכנן למשפחה',
+  // -- loading and failure, neither of which the prototype has: it has no network --
+  'home.loading': 'טוען את לוח האימונים…',
+  'home.loadFailed': 'לא הצלחנו לטעון את לוח האימונים',
+  'home.retry': 'נסו שוב',
+  // -- the per-session calendar reminder (the parent home redesign, 2026-09-05) ---
+  //
+  // The prototype carries all three languages inline in `REMINDER_OPTIONS`
+  // (`labelHe`/`labelEn`/`labelRu`) and picks with a ternary at the call site. That is the
+  // arrangement §Conventions exists to prevent — a second string table this module cannot
+  // see — so the options live here with every other mirror.
+  'reminder.title': 'תזכורת ביומן האישי',
+  'reminder.close': 'סגירה',
+  'reminder.legend': 'מתי להזכיר?',
+  'reminder.save': 'הוספה ליומן',
+  // Says what the button actually does. The prototype's modal implies the club is storing
+  // the reminder; nothing of the sort happens — a file is saved to this device, and the
+  // club never learns of it.
+  'reminder.hint': 'התזכורת נשמרת ביומן של המכשיר הזה בלבד. המועדון לא מקבל אותה, והיא לא תעבור למכשיר אחר.',
+  'reminder.lead.15min': '15 דקות לפני (התארגנות מהירה)',
+  'reminder.lead.30min': '30 דקות לפני (יציאה מהבית — מומלץ)',
+  'reminder.lead.1hour': 'שעה לפני (הכנת תיק ובקבוק)',
+  'reminder.lead.2hours': 'שעתיים לפני',
+  'reminder.lead.1day': 'יום לפני',
+  // -- field labels inside the .ics description --
+  'reminder.icsChild': 'חניך/ה:',
+  'reminder.icsGroup': 'קבוצה:',
+  'reminder.icsCoach': 'מאמן/ת:',
+  'reminder.icsWhere': 'מיקום:',
 }

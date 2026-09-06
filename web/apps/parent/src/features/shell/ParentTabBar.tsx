@@ -31,7 +31,8 @@
 // preference rather than the OS because tailwind.css redefines the `dark` variant against
 // `[data-theme]`, which is what `@studio/ui`'s ThemeProvider writes — see the note there.
 import { Home, ShoppingBag, Bell, User } from 'lucide-react'
-import { TAB_BAR_LABEL, TAB_LABELS } from './content'
+import { t } from '@studio/i18n'
+import type { Locale } from '@studio/i18n'
 
 export type ParentTab = 'home' | 'shop' | 'updates' | 'profile'
 
@@ -65,6 +66,16 @@ const IDLE_INK =
 
 const ICONS = { home: Home, shop: ShoppingBag, updates: Bell, profile: User } as const
 
+/** The tab's label key. Under `common.tabs.*` rather than `common.nav.*`: `nav.*` is the
+ *  staff drawer's, which calls the same destination 'הודעות' where the parent bar says
+ *  'עדכונים'. */
+const LABEL_KEY: Record<ParentTab, string> = {
+  home: 'common.tabs.parentHome',
+  shop: 'common.tabs.parentShop',
+  updates: 'common.tabs.parentUpdates',
+  profile: 'common.tabs.parentProfile',
+}
+
 const ORDER: readonly ParentTab[] = ['home', 'shop', 'updates', 'profile']
 
 /** Deviation 4. `99+` past the cap, so one slot cannot grow and squeeze the other three. */
@@ -74,16 +85,18 @@ function badgeLabel(count: number): string {
 
 export function ParentTabBar({
   active,
+  locale,
   updatesBadgeCount = 0,
 }: {
   active: ParentTab | null
+  locale: Locale
   /** Unread updates. `0` renders nothing — an empty inbox is not a notification, and a
    *  badge showing zero is a permanent mark that stops meaning anything. */
   updatesBadgeCount?: number
 }) {
   return (
     <nav
-      aria-label={TAB_BAR_LABEL}
+      aria-label={t(locale, 'common.tabs.parentBarLabel')}
       data-testid="tab-bar"
       className="tw-scope fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-100 dark:border-slate-800 py-2.5 px-6 z-40 shadow-[0_-4px_16px_rgba(0,0,0,0.04)] dark:shadow-[0_-4px_16px_rgba(0,0,0,0.4)] transition-colors"
     >
@@ -92,13 +105,14 @@ export function ParentTabBar({
           const isActive = active === tab
           const Glyph = ICONS[tab]
           const badge = tab === 'updates' ? updatesBadgeCount : 0
+          const label = t(locale, LABEL_KEY[tab])
           return (
             <a
               key={tab}
               href={HREF[tab]}
               aria-current={isActive ? 'page' : undefined}
               // Deviation 3 — the count belongs in the name, not only in the mark.
-              aria-label={badge > 0 ? `${TAB_LABELS[tab]} ${badgeLabel(badge)}` : undefined}
+              aria-label={badge > 0 ? `${label} ${badgeLabel(badge)}` : undefined}
               data-testid={`tab-${tab}`}
               className={`flex flex-col items-center gap-1 text-[11px] transition-all cursor-pointer ${
                 isActive ? `${ACTIVE_INK[tab]} font-bold` : IDLE_INK
@@ -117,7 +131,7 @@ export function ParentTabBar({
                   </span>
                 ) : null}
               </div>
-              <span>{TAB_LABELS[tab]}</span>
+              <span>{label}</span>
             </a>
           )
         })}

@@ -87,6 +87,12 @@ export const common: Bundle = {
   'nav.myChildren': 'my children',
   'nav.settings': 'settings',
   'nav.signOut': 'sign out',
+  // -- the parent app's four tabs (the redesign of 2026-09-05) ------------------
+  'tabs.parentBarLabel': 'main navigation',
+  'tabs.parentHome': 'Home',
+  'tabs.parentShop': 'Club shop',
+  'tabs.parentUpdates': 'Updates',
+  'tabs.parentProfile': 'Profile',
   // §6.1's first run.
   'language.title': 'language',
   // -- the parent app's sign-in face (owner's Stitch design, 2026-09-01) ---------

@@ -34,7 +34,7 @@
 //   prototype kept in `UpdatesScreen`. This component takes no `useState` and has no
 //   bookmark prop or `UpdateRow` field to read one from, so the bookmark button is dropped.
 // - The empty state's "show all updates" button had no `UPDATES.*` string of its own,
-//   either. It reuses `UPDATES.filterAll` ("הכל") and calls `onFilterChange({ kind: 'all' })`
+//   either. It reuses `comms.updates.filterAll` ("הכל") and calls `onFilterChange({ kind: 'all' })`
 //   — close enough to the prototype's intent to avoid a dead-end empty screen without
 //   inventing new copy.
 import {
@@ -51,7 +51,10 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-import { fill, UPDATES } from './content'
+import { fill } from '@studio/core'
+import { t } from '@studio/i18n'
+import { resolveLoadFailedText } from '../../shell/loadFailed'
+import type { Locale } from '@studio/i18n'
 import type { UpdateGroups, UpdateFilter } from './types'
 
 type KindStyle = {
@@ -96,8 +99,12 @@ function styleForKind(kind: string): KindStyle {
 
 /** Shared by both the urgent chip (font-medium) and the personal chip (font-semibold) — the
  *  caller passes its own base classes and this only ever overrides the color. */
-function isNewPill(baseClassName: string) {
-  return <span className={`bg-[#feecee] text-[#cf1322] ${baseClassName}`}>{UPDATES.isNew}</span>
+function isNewPill(baseClassName: string, locale: Locale) {
+  return (
+    <span className={`bg-[#feecee] text-[#cf1322] ${baseClassName}`}>
+      {t(locale, 'comms.updates.isNew')}
+    </span>
+  )
 }
 
 const STATE_SHELL = 'text-center py-12 px-4 space-y-3'
@@ -106,6 +113,7 @@ const STATE_ICON_WRAP =
 
 export function UpdatesFeed({
   groups,
+  locale,
   filter,
   onFilterChange,
   childNames,
@@ -122,6 +130,7 @@ export function UpdatesFeed({
 }: {
   /** Already filtered and classified by the container. */
   groups: UpdateGroups
+  locale: Locale
   filter: UpdateFilter
   onFilterChange: (next: UpdateFilter) => void
   /** The family's children, first names, for the per-child filter chips. The prototype
@@ -163,7 +172,7 @@ export function UpdatesFeed({
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-3 w-3 bg-[#e02424]"></span>
             </span>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">{UPDATES.title}</h1>
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">{t(locale, 'comms.updates.title')}</h1>
           </div>
 
           <div className="flex items-center gap-2">
@@ -178,13 +187,13 @@ export function UpdatesFeed({
                 waitingCount > 0 ? 'bg-[#feecee] text-[#cf1322]' : 'bg-emerald-50 text-emerald-800'
               }`}
             >
-              {waitingCount > 0 ? fill(UPDATES.pendingCount, { count: waitingCount }) : UPDATES.allClear}
+              {waitingCount > 0 ? fill(t(locale, 'comms.updates.pendingCount'), { count: waitingCount }) : t(locale, 'comms.updates.allClear')}
             </div>
           </div>
         </div>
 
         {/* Category Filter Strip */}
-        <nav aria-label={UPDATES.filterLabel} className="mt-4 flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+        <nav aria-label={t(locale, 'comms.updates.filterLabel')} className="mt-4 flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
           <button
             type="button"
             data-testid="updates-filter-all"
@@ -196,7 +205,7 @@ export function UpdatesFeed({
                 : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80'
             }`}
           >
-            {UPDATES.filterAll}
+            {t(locale, 'comms.updates.filterAll')}
           </button>
 
           <button
@@ -210,7 +219,7 @@ export function UpdatesFeed({
                 : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80'
             }`}
           >
-            <span>{UPDATES.filterAction}</span>
+            <span>{t(locale, 'comms.updates.filterAction')}</span>
             {pendingCount > 0 && (
               <span className="w-4 h-4 rounded-full bg-[#e02424] text-white text-[10px] flex items-center justify-center font-bold">
                 {pendingCount}
@@ -229,7 +238,7 @@ export function UpdatesFeed({
                 : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200/80'
             }`}
           >
-            {UPDATES.filterClub}
+            {t(locale, 'comms.updates.filterClub')}
           </button>
 
           {childNames.map((name) => {
@@ -263,7 +272,7 @@ export function UpdatesFeed({
               data-testid="updates-mark-all-read"
               className="text-[11px] font-medium text-slate-500 hover:text-slate-700 underline underline-offset-2 transition-colors cursor-pointer"
             >
-              {UPDATES.markAllRead}
+              {t(locale, 'comms.updates.markAllRead')}
             </button>
           </div>
         ) : null}
@@ -276,20 +285,20 @@ export function UpdatesFeed({
             <div className={STATE_ICON_WRAP}>
               <Bell className="w-7 h-7" />
             </div>
-            <h4 className="font-bold text-slate-700">{UPDATES.loading}</h4>
+            <h4 className="font-bold text-slate-700">{t(locale, 'comms.updates.loading')}</h4>
           </div>
         ) : state === 'failed' ? (
           <div className={STATE_SHELL}>
             <div className={STATE_ICON_WRAP}>
               <Bell className="w-7 h-7" />
             </div>
-            <h4 className="font-bold text-slate-700">{UPDATES.loadFailed}</h4>
+            <h4 className="font-bold text-slate-700">{resolveLoadFailedText(locale, 'comms.updates.loadFailed')}</h4>
             <button
               type="button"
               onClick={onRetry}
               className="text-xs font-semibold text-[#0056c5] hover:underline"
             >
-              {UPDATES.retry}
+              {t(locale, 'comms.updates.retry')}
             </button>
           </div>
         ) : (
@@ -306,10 +315,10 @@ export function UpdatesFeed({
                   <div className="flex items-center gap-1.5 text-[#e02424]">
                     <AlertCircle className="w-5 h-5 text-[#e02424] fill-[#e02424]/10" />
                     <h2 id="updates-heading-urgent" className="font-bold text-base text-[#e02424]">
-                      {UPDATES.urgentHeading}
+                      {t(locale, 'comms.updates.urgentHeading')}
                     </h2>
                   </div>
-                  <span className="text-xs text-slate-500 font-medium">{UPDATES.urgentNote}</span>
+                  <span className="text-xs text-slate-500 font-medium">{t(locale, 'comms.updates.urgentNote')}</span>
                 </div>
 
                 {groups.urgent.map((row) => {
@@ -340,7 +349,7 @@ export function UpdatesFeed({
                                 {row.subjectName}
                               </span>
                             )}
-                            {row.isNew && isNewPill('px-2 py-0.5 rounded text-xs font-medium')}
+                            {row.isNew && isNewPill('px-2 py-0.5 rounded text-xs font-medium', locale)}
                             <h3 className="text-base font-bold text-slate-900 leading-snug">{row.title}</h3>
                           </div>
                           <p className={`text-xs font-semibold ${settled ? 'text-emerald-700' : style.status}`}>
@@ -352,7 +361,7 @@ export function UpdatesFeed({
                       {settled ? (
                         <span className="text-sm font-medium px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-xs shrink-0 bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default">
                           <Check className="w-4 h-4 text-emerald-600" />
-                          <span>{UPDATES.settled}</span>
+                          <span>{t(locale, 'comms.updates.settled')}</span>
                         </span>
                       ) : row.action !== null && row.action.href !== null ? (
                         <a
@@ -383,12 +392,12 @@ export function UpdatesFeed({
                   <div className="flex items-center gap-1.5 text-slate-900">
                     <Megaphone className="w-5 h-5 text-blue-600" />
                     <h2 id="updates-heading-club" className="font-bold text-base text-slate-900">
-                      {UPDATES.clubHeading}
+                      {t(locale, 'comms.updates.clubHeading')}
                     </h2>
                   </div>
                   {/* The prototype's trailing caption on the heading row — who the section
                       is about. Static, so it ports as written. */}
-                  <span className="text-xs text-slate-500 font-medium">{UPDATES.clubNote}</span>
+                  <span className="text-xs text-slate-500 font-medium">{t(locale, 'comms.updates.clubNote')}</span>
                 </div>
 
                 {groups.club.map((row) => (
@@ -402,7 +411,7 @@ export function UpdatesFeed({
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-base font-bold text-slate-900 leading-tight">{row.title}</h3>
-                      {row.isNew && isNewPill('px-2 py-0.5 rounded text-xs font-medium')}
+                      {row.isNew && isNewPill('px-2 py-0.5 rounded text-xs font-medium', locale)}
                     </div>
                     <p className="text-sm text-slate-600 leading-relaxed">{row.body}</p>
                     {row.action !== null && row.action.href !== null ? (
@@ -435,12 +444,12 @@ export function UpdatesFeed({
                   <div className="flex items-center gap-1.5 text-slate-900">
                     <Award className="w-5 h-5 text-blue-600" />
                     <h2 id="updates-heading-personal" className="font-bold text-base text-slate-900">
-                      {UPDATES.personalHeading}
+                      {t(locale, 'comms.updates.personalHeading')}
                     </h2>
                   </div>
                   {/* The prototype's trailing caption on the heading row — who the section
                       is about. Static, so it ports as written. */}
-                  <span className="text-xs text-slate-500 font-medium">{UPDATES.personalNote}</span>
+                  <span className="text-xs text-slate-500 font-medium">{t(locale, 'comms.updates.personalNote')}</span>
                 </div>
 
                 {groups.personal.map((row) => {
@@ -464,7 +473,7 @@ export function UpdatesFeed({
                                 {row.subjectName}
                               </span>
                             )}
-                            {row.isNew && isNewPill('px-2 py-0.5 rounded text-xs font-semibold')}
+                            {row.isNew && isNewPill('px-2 py-0.5 rounded text-xs font-semibold', locale)}
                             <h3 className="text-sm font-bold text-slate-900 leading-tight">{row.title}</h3>
                           </div>
                           <p className="text-xs text-slate-500 font-medium">{row.body}</p>
@@ -479,7 +488,7 @@ export function UpdatesFeed({
                           className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold px-3 py-2 rounded-xl flex items-center gap-1 shrink-0"
                         >
                           <Check className="w-4 h-4" />
-                          <span>{UPDATES.settled}</span>
+                          <span>{t(locale, 'comms.updates.settled')}</span>
                         </span>
                       ) : row.action !== null && row.action.href !== null ? (
                         <a
@@ -505,10 +514,10 @@ export function UpdatesFeed({
                   <Bell className="w-7 h-7" />
                 </div>
                 <h4 className="font-bold text-slate-700">
-                  {filter.kind !== 'all' ? UPDATES.emptyFiltered : UPDATES.emptyTitle}
+                  {filter.kind !== 'all' ? t(locale, 'comms.updates.emptyFiltered') : t(locale, 'comms.updates.emptyTitle')}
                 </h4>
                 {filter.kind === 'all' && (
-                  <p className="text-xs text-slate-500 max-w-xs mx-auto">{UPDATES.emptyBody}</p>
+                  <p className="text-xs text-slate-500 max-w-xs mx-auto">{t(locale, 'comms.updates.emptyBody')}</p>
                 )}
                 {filter.kind !== 'all' && (
                   <button
@@ -516,7 +525,7 @@ export function UpdatesFeed({
                     onClick={() => onFilterChange({ kind: 'all' })}
                     className="text-xs font-semibold text-[#0056c5] hover:underline"
                   >
-                    {UPDATES.filterAll}
+                    {t(locale, 'comms.updates.filterAll')}
                   </button>
                 )}
               </div>
@@ -530,7 +539,7 @@ export function UpdatesFeed({
                   onClick={onLoadMore}
                   className="text-xs font-semibold text-[#0056c5] hover:underline"
                 >
-                  {UPDATES.loadMore}
+                  {t(locale, 'comms.updates.loadMore')}
                 </button>
               </div>
             )}

@@ -12,7 +12,7 @@
 // `ProfileSection`'s own header records why: "a studio read that 403s must not blank a
 // screen whose subject is the parent."
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { apiFetch, formatAgorot } from '@studio/core'
+import { apiFetch, formatAgorot, formatMonthLabel } from '@studio/core'
 import { useTheme } from '@studio/ui'
 import { ENDONYM } from '@studio/ui'
 import { LOCALES, t } from '@studio/i18n'
@@ -22,7 +22,7 @@ import type { AccountControlsProps } from '../../shell/AccountControls'
 import { ProfileHeader } from './ProfileTop'
 import { ProfileMenu } from './ProfileMenu'
 import type { MenuKey } from './ProfileMenu'
-import { ClubSheet, MONTH_NAME, PaymentsSheet, SettingsSheet, TraineesSheet } from './sheets'
+import { ClubSheet, PaymentsSheet, SettingsSheet, TraineesSheet } from './sheets'
 import { PersonalDetailsSheet } from './PersonalDetails'
 import type { MyDetails } from './PersonalDetails'
 import { coverageFrom, familyNameOf } from './derive'
@@ -217,9 +217,10 @@ export function ProfileScreen({
 
   return (
     <section aria-label={t(locale, 'people.profile.title')} data-testid="parent-profile">
-      <ProfileHeader familyName={familyName} />
+      <ProfileHeader familyName={familyName} locale={locale} />
 
       <ProfileMenu
+        locale={locale}
         onOpen={setOpen}
         onOpenSettings={() => setOpen('settings')}
         // A dot, never a number: "בלי המידע עצמו" was the instruction, and a silent row
@@ -232,6 +233,7 @@ export function ProfileScreen({
 
       {open === 'personal' && details ? (
         <PersonalDetailsSheet
+          locale={locale}
           details={details}
           busy={savingDetails}
           failed={detailsFailed}
@@ -241,21 +243,22 @@ export function ProfileScreen({
       ) : null}
 
       {open === 'trainees' ? (
-        <TraineesSheet childList={children ?? []} onClose={close} />
+        <TraineesSheet childList={children ?? []} locale={locale} onClose={close} />
       ) : null}
 
       {open === 'payments' ? (
         <PaymentsSheet
           coverage={coverage}
+          locale={locale}
           methodLabel={methodLabel}
           methodIsCard={methodIsCard}
           money={money}
-          monthName={(month) => MONTH_NAME[month - 1] ?? String(month)}
+          monthLabel={(year, month) => formatMonthLabel(year, month, locale)}
           onClose={close}
         />
       ) : null}
 
-      {open === 'club' ? <ClubSheet club={club} onClose={close} /> : null}
+      {open === 'club' ? <ClubSheet club={club} locale={locale} onClose={close} /> : null}
 
       {open === 'settings' ? (
         <SettingsSheet

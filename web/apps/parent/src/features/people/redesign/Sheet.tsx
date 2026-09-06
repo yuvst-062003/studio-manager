@@ -9,17 +9,20 @@
 // wrong, and the wrong one is always the one nobody opened with a keyboard.
 import type { ReactNode } from 'react'
 import { X } from 'lucide-react'
+import { t } from '@studio/i18n'
+import type { Locale } from '@studio/i18n'
 import { useDialog } from '../../onboarding/wizard/useDialog'
-import { PROFILE } from './content'
 
 export function Sheet({
   title,
+  locale,
   subtitle,
   testId,
   onClose,
   children,
 }: {
   title: string
+  locale: Locale
   subtitle?: string | null
   testId: string
   onClose: () => void
@@ -56,7 +59,7 @@ export function Sheet({
           <button
             type="button"
             onClick={onClose}
-            aria-label={PROFILE.close}
+            aria-label={t(locale, 'people.profile.close')}
             className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 flex items-center justify-center transition-colors cursor-pointer shrink-0"
           >
             <X className="w-4 h-4" />
