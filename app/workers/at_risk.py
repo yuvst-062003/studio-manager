@@ -58,8 +58,9 @@ from app.core.tenancy import TenantSession, use_studio
 from app.models.attendance import Attendance
 from app.models.comms import Notification
 from app.models.people import Enrollment, Student
-from app.models.person import Guardian, Person
+from app.models.person import Guardian, Person, RoleAssignment
 from app.models.schedule import Session as SessionRow
+from app.models.structure import GroupStaff
 from app.models.studio import Studio
 from app.services.attendance.settings import get_at_risk_threshold
 from app.services.comms import NotificationService
@@ -176,6 +177,40 @@ def _already_alerted_for(
     return last == str(streak_start_session_id)
 
 
+def _group_coaches(session: TenantSession, group_id: uuid.UUID) -> list[uuid.UUID]:
+    """§5.14's "the group's coaches" — `group_staff`, the roster of who normally coaches
+    this group, deliberately NOT `session_staff` (who actually ran one particular
+    session — see the distinction in `app/models/schedule.py::SessionStaff`'s own
+    docstring). `to_date IS NULL` is the live-assignment filter every other reader of
+    this table already uses (`app/services/structure/service.py::list_group_staff` and
+    others)."""
+    return list(
+        session.execute(
+            select(GroupStaff.person_id).where(
+                GroupStaff.group_id == group_id, GroupStaff.to_date.is_(None)
+            )
+        ).scalars()
+    )
+
+
+def _studio_managers(session: TenantSession) -> list[uuid.UUID]:
+    """Every owner and manager the active studio currently has — the same query
+    `app/services/people/onboarding.py::_managers_of_studio`,
+    `app/services/billing/payment_promise.py::_notify_managers` and
+    `app/services/attendance/service.py` each already run for their own single caller.
+    A fourth restatement here rather than a shared helper: none of those three may be
+    refactored as part of this fix."""
+    return list(
+        session.execute(
+            select(RoleAssignment.person_id).where(
+                RoleAssignment.role.in_(("owner", "manager")),
+                RoleAssignment.scope_type == "studio",
+                RoleAssignment.revoked_at.is_(None),
+            )
+        ).scalars()
+    )
+
+
 def raise_at_risk(session: TenantSession, studio: Studio, *, at: datetime, tally: Tally) -> None:
     threshold = get_at_risk_threshold(session, studio)
     enrollments = session.execute(
@@ -207,22 +242,40 @@ def raise_at_risk(session: TenantSession, studio: Studio, *, at: datetime, tally
         # exists, and "N היעדרויות רצופות" (register/reports' own phrasing,
         # `i18n/he/reports.ts::atRisk.consecutiveAbsences`) needs no conjugated verb.
         display_name = f"{person.first_name} {person.last_name}"
+        # §5.14, verbatim (kinds.py / comms/__init__.py): "a notification to the group's
+        # coaches and to managers with a one-tap צור קשר עם ההורה" — not the guardian
+        # alone. `dict.fromkeys` de-dupes while keeping the guardian first: a coach who
+        # is also a manager, or a manager also coaching this group, gets ONE notification.
+        recipients = list(
+            dict.fromkeys(
+                [
+                    contact.person_id,
+                    *_group_coaches(session, enrollment.group_id),
+                    *_studio_managers(session),
+                ]
+            )
+        )
         # §5.14 — "a one-tap צור קשר עם ההורה", which is why `contact_phone` travels in the
         # payload rather than the client having to look the guardian up a second time.
-        NotificationService().enqueue(
-            person_id=contact.person_id,
-            kind=AT_RISK,
-            title="תלמיד בסיכון",
-            body=f"{display_name} — {streak} היעדרויות רצופות",
-            payload={
-                "student_id": str(student.id),
-                "group_id": str(enrollment.group_id),
-                "contact_person_id": str(contact.person_id),
-                "contact_phone": contact.phone,
-                "missed_count": streak,
-                "streak_start_session_id": str(oldest.id),
-            },
-        )
+        # Same payload, same title and body, for every recipient — the contract
+        # (kinds.py::AT_RISK) names no per-recipient variation, and a coach or manager
+        # needs the same one-tap dial the guardian's own copy carries.
+        payload = {
+            "student_id": str(student.id),
+            "group_id": str(enrollment.group_id),
+            "contact_person_id": str(contact.person_id),
+            "contact_phone": contact.phone,
+            "missed_count": streak,
+            "streak_start_session_id": str(oldest.id),
+        }
+        for person_id in recipients:
+            NotificationService().enqueue(
+                person_id=person_id,
+                kind=AT_RISK,
+                title="תלמיד בסיכון",
+                body=f"{display_name} — {streak} היעדרויות רצופות",
+                payload=payload,
+            )
         tally.raised += 1
 
 

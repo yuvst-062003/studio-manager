@@ -19,11 +19,43 @@ import pytest
 from app.models.attendance import Attendance
 from app.models.comms import Notification
 from app.models.people import Enrollment, Student
-from app.models.person import Guardian, Person
+from app.models.person import Guardian, Person, RoleAssignment
 from app.services.comms.kinds import AT_RISK
 from app.workers.at_risk import Tally, raise_at_risk
 from sqlalchemy import select
 from tests.attendance.conftest import T0, YEAR_STARTS, make_session
+
+
+def _manager(app_session, studio, *, name: str = "מנהל") -> uuid.UUID:
+    """A person holding a live studio-scoped `owner`/`manager` role assignment — the same
+    shape `_make_caller(role="manager")` in tests/attendance/conftest.py creates, without
+    the sign-in machinery this worker-level test does not need."""
+    person = Person(studio_id=studio.id, first_name=name, last_name="בדיקה")
+    app_session.add(person)
+    app_session.flush()
+    app_session.add(
+        RoleAssignment(
+            studio_id=studio.id,
+            person_id=person.id,
+            role="manager",
+            scope_type="studio",
+            granted_at=T0,
+        )
+    )
+    app_session.commit()
+    return person.id
+
+
+def _coach(
+    app_session, studio, assign_coach, *, group_id: uuid.UUID, name: str = "מאמן"
+) -> uuid.UUID:
+    """A person with a live `group_staff` row on `group_id` — via the `assign_coach`
+    fixture tests/structure and tests/schedule already rely on for the same wiring."""
+    person = Person(studio_id=studio.id, first_name=name, last_name="בדיקה")
+    app_session.add(person)
+    app_session.commit()
+    assign_coach(person.id, group_id)
+    return person.id
 
 
 def _mark(app_session, *, session_id, student_id, status):
@@ -288,3 +320,91 @@ def test_a_fresh_streak_after_the_alerted_one_raises_again(
     second = Tally()
     raise_at_risk(tenant_session, studio, at=later, tally=second)
     assert second.raised == 1
+
+
+def test_notifies_the_guardian_the_groups_coaches_and_the_studios_managers(
+    app_session, tenant_session, studio, a_group, a_family_of, assign_coach
+):
+    """The rule this worker documents but does not keep — SPEC quoted verbatim in both
+    app/services/comms/kinds.py and app/services/comms/__init__.py: 'a notification to
+    the group's coaches and to managers with a one-tap צור קשר עם ההורה.' A coach or a
+    manager has never received this alert; only the guardian has.
+
+    Asserting WHO received the alert, not how many notifications went out — a count
+    assertion is exactly what let a worker that pages only the guardian ship, and stay
+    broken, under a test suite that was green the whole time."""
+    student_id, parent_id = a_family_of(
+        weeks_ago_and_status=[
+            (3, "absent_unexcused"),
+            (2, "absent_excused"),
+            (1, "absent_unexcused"),
+        ]
+    )
+    coach_id = _coach(app_session, studio, assign_coach, group_id=a_group)
+    manager_id = _manager(app_session, studio)
+
+    tally = Tally()
+    raise_at_risk(tenant_session, studio, at=AT, tally=tally)
+    tenant_session.commit()
+
+    # One alert raised (per student, per streak — unchanged), fanned out to three people.
+    assert tally.raised == 1
+    notifications = list(
+        app_session.execute(
+            select(Notification).where(
+                Notification.kind == AT_RISK, Notification.studio_id == studio.id
+            )
+        ).scalars()
+    )
+    assert {n.person_id for n in notifications} == {parent_id, coach_id, manager_id}
+    # The payload contract (kinds.py::AT_RISK) travels unchanged to every recipient — the
+    # staff card's one-tap dial reads `contact_phone` regardless of who is looking at it.
+    for note in notifications:
+        assert note.payload["student_id"] == str(student_id)
+        assert note.payload["group_id"] == str(a_group)
+        assert note.payload["contact_person_id"] == str(parent_id)
+        assert note.payload["contact_phone"] == "050-1234567"
+        assert note.payload["missed_count"] == 3
+
+
+def test_a_coach_who_is_also_a_manager_is_notified_once(
+    app_session, tenant_session, studio, a_group, a_family_of, assign_coach
+):
+    """A person wearing both hats — coaching the at-risk student's group AND holding the
+    manager role — must get exactly one notification, not two."""
+    a_family_of(
+        weeks_ago_and_status=[
+            (3, "absent_unexcused"),
+            (2, "absent_excused"),
+            (1, "absent_unexcused"),
+        ]
+    )
+    both = Person(studio_id=studio.id, first_name="גם", last_name="וגם")
+    app_session.add(both)
+    app_session.flush()
+    assign_coach(both.id, a_group)
+    app_session.add(
+        RoleAssignment(
+            studio_id=studio.id,
+            person_id=both.id,
+            role="manager",
+            scope_type="studio",
+            granted_at=T0,
+        )
+    )
+    app_session.commit()
+
+    tally = Tally()
+    raise_at_risk(tenant_session, studio, at=AT, tally=tally)
+    tenant_session.commit()
+
+    rows = list(
+        app_session.execute(
+            select(Notification).where(
+                Notification.kind == AT_RISK,
+                Notification.studio_id == studio.id,
+                Notification.person_id == both.id,
+            )
+        ).scalars()
+    )
+    assert len(rows) == 1

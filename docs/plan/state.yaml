@@ -914,7 +914,22 @@ waves:
         status: pending
       - id: C7
         title: The at-risk worker reaches coaches and managers, as its own documentation says it does
-        status: pending
+        why: >-
+          The worker enqueued exactly one notification, to the guardian, while two module
+          docstrings and SPEC §5.14 all said it reached the group's coaches and the studio's
+          managers. AtRiskAlert.tsx has therefore rendered nothing since it shipped — built,
+          tested, mounted, and querying an inbox that never had a row in it.
+
+          The failing test asserts WHO receives it, as a set. A count assertion is what let
+          the defect ship and would have passed throughout its life. A second test covers the
+          person who is both a coach and a manager receiving one notification rather than two.
+
+          Recipients are de-duped with dict.fromkeys, keeping the guardian first. The group's
+          coaches come from group_staff — who normally coaches — rather than session_staff,
+          which records who took one session. Idempotency is unchanged: the streak dedupe key
+          is (student, streak start) and does not care how many rows one streak produced.
+        status: shipped
+        on: 2026-09-06
       - id: C8
         title: The tasks tab — derived, personal, with a tick box for the one type the app cannot observe
         status: pending
