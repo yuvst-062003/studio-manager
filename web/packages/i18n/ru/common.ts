@@ -95,6 +95,13 @@ export const common: Bundle = {
   'nav.myChildren': 'мои дети',
   'nav.settings': 'настройки',
   'nav.signOut': 'выйти',
+  // -- the parent app's four tabs (the redesign of 2026-09-05) ------------------
+  'tabs.parentBarLabel': 'главная навигация',
+  'tabs.parentHome': 'Главная',
+  'tabs.parentShop': 'Магазин клуба',
+  'tabs.parentUpdates': 'Обновления',
+  'tabs.parentTechniques': 'Приёмы',
+  'tabs.parentProfile': 'Профиль',
   // §6.1's first run.
   'language.title': 'язык',
   // -- the parent app's sign-in face (owner's Stitch design, 2026-09-01) ---------
@@ -278,6 +285,7 @@ export const common: Bundle = {
   'setup.studio.name': 'Название клуба',
   'setup.studio.sport': 'Вид спорта',
   'setup.studio.address': 'Адрес',
+  'setup.studio.email': 'Эл. почта клуба',
   'setup.studio.phone': 'Телефон',
   'setup.studio.parentLocales': 'Языки, которые увидят родители',
   'setup.studio.locale.he': 'Иврит',
@@ -469,8 +477,6 @@ export const common: Bundle = {
   'home.restOfWeek': 'Далее на неделе',
   'home.upcoming': 'Ближайшие занятия',
   'home.alerts': 'Уведомления',
-  'home.noChildren': 'К этому аккаунту пока не привязан ни один ребёнок.',
-  'home.childrenComeLater': 'Клуб привязывает ребёнка к аккаунту при записи.',
   'home.noUpcoming': 'Занятия пока не запланированы.',
   'home.noUpcomingWeek': 'На ближайшую неделю занятия не запланированы.',
   'home.noAlerts': 'Ничего не требует вашего внимания.',

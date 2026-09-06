@@ -11,9 +11,9 @@
  * reads as somewhere else — which is what it is.
  */
 import { useEffect, useRef, useState } from 'react'
+import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { EmptyState, Button } from '@studio/ui'
-import { s } from './strings'
 
 export function IjfSheet({
   locale,
@@ -48,18 +48,18 @@ export function IjfSheet({
   const broken = failed || offline
 
   return (
-    <div aria-label={s(locale, 'ijf.heading')} className="studio-ijf" role="dialog" aria-modal="true">
+    <div aria-label={t(locale, 'techniques.ijf.heading')} className="studio-ijf" role="dialog" aria-modal="true">
       <div className="studio-ijf__panel">
         <div className="studio-ijf__bar">
           <div className="studio-ijf__titles">
             <p className="studio-ijf__title">
-              <bdi>{title}</bdi> · {s(locale, 'ijf.heading')}
+              <bdi>{title}</bdi> · {t(locale, 'techniques.ijf.heading')}
             </p>
             {/* Named where it is read, not in a tooltip. */}
-            <span className="studio-ijf__attribution">{s(locale, 'ijf.attribution')}</span>
+            <span className="studio-ijf__attribution">{t(locale, 'techniques.ijf.attribution')}</span>
           </div>
           <a
-            aria-label={s(locale, 'ijf.external')}
+            aria-label={t(locale, 'techniques.ijf.external')}
             className="studio-ijf__action"
             href={url}
             rel="noreferrer noopener"
@@ -72,7 +72,7 @@ export function IjfSheet({
             </svg>
           </a>
           <button
-            aria-label={s(locale, 'ijf.close')}
+            aria-label={t(locale, 'techniques.ijf.close')}
             className="studio-ijf__action"
             onClick={onClose}
             ref={closeRef}
@@ -92,11 +92,11 @@ export function IjfSheet({
                     onClick={() => globalThis.open?.(url, '_blank', 'noopener')}
                     variant="secondary"
                   >
-                    {s(locale, 'ijf.external')}
+                    {t(locale, 'techniques.ijf.external')}
                   </Button>
                 }
-                description={s(locale, 'ijf.failed.hint')}
-                title={s(locale, 'ijf.failed')}
+                description={t(locale, 'techniques.ijf.failed.hint')}
+                title={t(locale, 'techniques.ijf.failed')}
               />
             </div>
           ) : (
@@ -106,7 +106,7 @@ export function IjfSheet({
               referrerPolicy="no-referrer"
               sandbox="allow-scripts allow-same-origin allow-popups"
               src={url}
-              title={s(locale, 'ijf.heading')}
+              title={t(locale, 'techniques.ijf.heading')}
             />
           )}
         </div>

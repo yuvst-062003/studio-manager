@@ -51,6 +51,25 @@ const nameStyle: CSSProperties = {
   minInlineSize: 0,
 }
 
+//: The row's photo. Fixed square so a portrait and a landscape shot do not change the
+//: card's height — the manager is scanning a list, not viewing a gallery.
+const thumbStyle: CSSProperties = {
+  blockSize: '3rem',
+  inlineSize: '3rem',
+  objectFit: 'cover',
+  borderRadius: 'var(--radius-sm)',
+  border: 'var(--border-width-hairline) solid var(--border)',
+  flexShrink: 0,
+}
+
+const photoRowStyle: CSSProperties = {
+  alignItems: 'center',
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 'var(--space-2)',
+  marginBlockStart: 'var(--space-2)',
+}
+
 const hintStyle: CSSProperties = {
   color: 'var(--text-secondary)',
   fontSize: 'var(--text-caption)',
@@ -79,6 +98,11 @@ export function ItemsScreen({
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
   const [showRetired, setShowRetired] = useState(false)
+  //: Which row is mid-upload, and what went wrong on it. Keyed by product id rather than a
+  //: single boolean: a manager photographing a catalogue does it row after row, and one
+  //: shared flag would grey out every button because one row is busy.
+  const [photoBusy, setPhotoBusy] = useState<string | null>(null)
+  const [photoError, setPhotoError] = useState<Record<string, string>>({})
 
   const visible = showRetired ? products : products.filter((row) => row.is_active)
 
@@ -110,6 +134,32 @@ export function ItemsScreen({
       onChanged()
     } catch {
       setFailed(true)
+    }
+  }
+
+  const setPhoto = async (product: ProductOut, file: File | null) => {
+    setPhotoBusy(product.id)
+    setPhotoError((current) => ({ ...current, [product.id]: '' }))
+    try {
+      if (file) await client.uploadProductImage(product.id, file)
+      else await client.deleteProductImage(product.id)
+      onChanged()
+    } catch (error: unknown) {
+      // The two refusals the route actually returns are worth telling apart: "wrong format"
+      // and "too big" send a manager to different fixes, and one generic "failed" sends
+      // them back to the same file.
+      const status = (error as { status?: number } | null)?.status
+      setPhotoError((current) => ({
+        ...current,
+        [product.id]:
+          status === 415
+            ? t(locale, 'billing.product.photoUnsupported')
+            : status === 413
+              ? t(locale, 'billing.product.photoTooLarge')
+              : t(locale, 'billing.product.photoFailed'),
+      }))
+    } finally {
+      setPhotoBusy(null)
     }
   }
 
@@ -195,6 +245,61 @@ export function ItemsScreen({
             <p style={hintStyle}>
               {t(locale, 'billing.product.sizes')}: {sizesLabel(product, locale)}
             </p>
+
+            {/* The photo the parent app's shop renders. A SECOND step after the item
+                exists, because the object is keyed by the product's own id — so there is
+                nothing to upload against until the row has been created. */}
+            <div style={photoRowStyle}>
+              {product.image_url ? (
+                <img alt="" src={product.image_url} style={thumbStyle} />
+              ) : (
+                <p style={hintStyle}>{t(locale, 'billing.product.photoNone')}</p>
+              )}
+              <label
+                style={{ fontSize: 'var(--text-caption)' }}
+                // The input carries the accessible name; the label names WHICH product, so
+                // a screen full of "Add a photo" is navigable.
+                aria-label={`${
+                  product.image_url
+                    ? t(locale, 'billing.product.photoReplace')
+                    : t(locale, 'billing.product.photoAdd')
+                } ${product.name}`}
+              >
+                <span>
+                  {product.image_url
+                    ? t(locale, 'billing.product.photoReplace')
+                    : t(locale, 'billing.product.photoAdd')}
+                </span>
+                <input
+                  accept="image/png,image/jpeg,image/webp"
+                  data-testid={`product-photo-${product.id}`}
+                  disabled={photoBusy !== null}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null
+                    // Cleared so choosing the SAME file twice fires `change` again — after a
+                    // failed upload a manager retries with the file they already picked.
+                    event.target.value = ''
+                    if (file) void setPhoto(product, file)
+                  }}
+                  type="file"
+                />
+              </label>
+              {product.image_url ? (
+                <Button
+                  aria-label={`${t(locale, 'billing.product.photoRemove')} ${product.name}`}
+                  disabled={photoBusy !== null}
+                  onClick={() => void setPhoto(product, null)}
+                  variant="ghost"
+                >
+                  {t(locale, 'billing.product.photoRemove')}
+                </Button>
+              ) : null}
+              {photoError[product.id] ? (
+                <p role="alert" style={{ ...hintStyle, color: 'var(--danger)' }}>
+                  {photoError[product.id]}
+                </p>
+              ) : null}
+            </div>
           </Card>
         ))
       )}

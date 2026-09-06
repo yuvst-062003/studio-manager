@@ -3289,6 +3289,35 @@ export interface paths {
         patch: operations["update_product_api_v1_products__product_id__patch"];
         trace?: never;
     };
+    "/api/v1/products/{product_id}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Product Image
+         * @description Any signed-in member of the studio — **guardians included**.
+         *
+         *     Deliberately not `ManagerOrOwner`: this is the image the PARENT app's shop renders, and
+         *     a catalogue a parent can read while its pictures 403 would be enforcing a rule about
+         *     writes by breaking a read. The same reasoning `GET /studio/logo` records.
+         */
+        get: operations["read_product_image_api_v1_products__product_id__image_get"];
+        put?: never;
+        /** Upload Product Image */
+        post: operations["upload_product_image_api_v1_products__product_id__image_post"];
+        /**
+         * Delete Product Image
+         * @description Idempotent — a DELETE on a product with no photo is a 204, not a 404.
+         */
+        delete: operations["delete_product_image_api_v1_products__product_id__image_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/groups/{group_id}/trial-slots": {
         parameters: {
             query?: never;
@@ -6082,6 +6111,14 @@ export interface components {
              */
             file: string;
         };
+        /** Body_upload_product_image_api_v1_products__product_id__image_post */
+        Body_upload_product_image_api_v1_products__product_id__image_post: {
+            /**
+             * File
+             * @description PNG, JPEG or WebP. Never SVG.
+             */
+            file: string;
+        };
         /** Body_upload_source_pdf_api_v1_health_templates__template_id__source_pdf_post */
         Body_upload_source_pdf_api_v1_health_templates__template_id__source_pdf_post: {
             /**
@@ -6426,6 +6463,8 @@ export interface components {
             period_month?: number | null;
             /** Period Year */
             period_year: number | null;
+            /** Product Id */
+            product_id?: string | null;
             /** Proration Note */
             proration_note: string | null;
             /**
@@ -9799,6 +9838,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Image Url */
+            image_url?: string | null;
             /** Is Active */
             is_active: boolean;
             /** Name */
@@ -11073,6 +11114,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Image Url */
+            image_url?: string | null;
             /** Name */
             name: string;
             /** Price Agorot */
@@ -11783,6 +11826,8 @@ export interface components {
         StudioUpdate: {
             /** Address */
             address?: string | null;
+            /** Email */
+            email?: string | null;
             landing?: components["schemas"]["StudioLandingContent"] | null;
             /** Name */
             name?: string | null;
@@ -12464,6 +12509,8 @@ export interface components {
             address?: string | null;
             /** Default Locale */
             default_locale: string;
+            /** Email */
+            email?: string | null;
             /**
              * Id
              * Format: uuid
@@ -17491,6 +17538,101 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ProductOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_product_image_api_v1_products__product_id__image_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_product_image_api_v1_products__product_id__image_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_product_image_api_v1_products__product_id__image_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_product_image_api_v1_products__product_id__image_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

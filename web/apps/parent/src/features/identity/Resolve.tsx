@@ -18,18 +18,34 @@
 import { useEffect, useMemo, useState } from 'react'
 import { StudioSwitcher } from '@studio/ui'
 import type { Session } from '@studio/core'
-import { apiFetch } from '@studio/core'
+import { apiFetch, formatAgorot, studioDayKey } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { ParentHome } from '../home/ParentHome'
-import type { HomeIntents, HomeLesson } from '../home/ParentHome'
+// Checkpoint 2 of the parent-app redesign. `ParentHome` (artboard 1a, the 2026-09-01
+// Option B rearrangement) is replaced wholesale by the port of the owner's prototype; it
+// stays on disk until the redesign is accepted end to end, then goes.
+import { HomeScreen } from '../home/redesign/HomeScreen'
+import { childrenNeedingDeclaration, familyNameOf } from '../home/redesign/derive'
+import type { FamilyEvent, Intents, Lesson } from '../home/redesign/derive'
+import { needsFullDeclaration } from '../health/HealthGate'
 import { makeIntentClient } from '../home/intentClient'
+import { cancelReasonLabel } from '../schedule/client'
 import { everyChildIsOnATrial, makePeopleClient, nextTrialLesson, useMyStudents } from '../people'
 import type { TrialLesson } from '../people'
 import { TrialHome } from '../people'
 import { makeParentScheduleClient } from '../schedule/client'
 
-export function Resolve({ session, locale }: { session: Session; locale: Locale }) {
+export function Resolve({
+  session,
+  locale,
+  notificationCount = 0,
+}: {
+  session: Session
+  locale: Locale
+  /** The unread count the shell already fetches for the tab badge. Passed down rather than
+   *  read again: one `/me/notifications` read per screen, and one number on it. */
+  notificationCount?: number
+}) {
   // A session with memberships but NO active studio has no tenant scope, and every
   // tenant-scoped route answers 401 without one. The picker below is skipped at a single
   // studio (§6.1 step 4 shows it "only if she belongs to more than one"), so such a
@@ -80,17 +96,20 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
   // groups, this week. `null` while loading so the home stays quiet rather than flashing
   // an empty state; a failed read renders the empty state, because a home that dies on a
   // schedule hiccup is worse than one missing a list.
-  const [upcoming, setUpcoming] = useState<readonly HomeLesson[] | null>(null)
+  const [upcoming, setUpcoming] = useState<readonly Lesson[] | null>(null)
+  // The schedule read failing is its own state: בית offers a retry rather than drawing an
+  // empty week, which reads as "no training this week" and is a different claim entirely.
+  const [lessonsFailed, setLessonsFailed] = useState(false)
   // 1a's debt alert — the same `/me/balance` read `12f` renders in full. Zero on failure:
   // a home that cannot ask about money shows no alert rather than a broken one.
   const [debtAgorot, setDebtAgorot] = useState(0)
-  const [attendance, setAttendance] = useState<
-    readonly { session_id: string; student_id: string; status: string }[]
-  >([])
   // What the family has already told the club about their COMING lessons. Read from the
   // server rather than held locally, so reopening the app shows what the club knows and
   // not what this device last hoped — the whole point of the answer being real.
-  const [intents, setIntents] = useState<HomeIntents>({})
+  const [intents, setIntents] = useState<Intents>({})
+  // `[]` and not `null`: a family with no events is the ordinary case and draws a home
+  // with no events on it, so there is no third state for this read to be in.
+  const [events, setEvents] = useState<readonly FamilyEvent[]>([])
   // Bumped after an answer lands, which re-runs the read below. One source of truth.
   const [intentEpoch, setIntentEpoch] = useState(0)
   // §6.3's reduced home is drawn around a lesson, and `TrialHome` was mounted below with
@@ -133,7 +152,11 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
         if (!live) return
         setUpcoming(
           rows
-            .filter((row) => row.status === 'scheduled')
+            // `completed` is dropped and `cancelled` is KEPT, which is the change the
+            // redesign needed: בית draws a cancelled lesson as cancelled, with the club's
+            // reason on it. Filtering it out here is what made the old home silently lose
+            // the row a parent most needs to see -- they turn up to a locked dojo.
+            .filter((row) => row.status !== 'completed')
             .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
             .map((row) => ({
               id: row.id,
@@ -141,10 +164,19 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
               endsAt: row.ends_at,
               groupName: row.group_name,
               locationName: row.location_name,
+              // The lead coach, never a substitute's absence of one. `staff` can be empty.
+              coachName:
+                row.staff.find((member) => member.role === 'lead_coach')?.display_name ?? null,
+              status: row.status,
+              cancelReason: row.cancel_reason,
             })),
         )
       })
-      .catch(() => live && setUpcoming([]))
+      .catch(() => {
+        if (!live) return
+        setUpcoming([])
+        setLessonsFailed(true)
+      })
     // The two-way control's read half — the coming week, not the past one.
     void apiFetch(`/api/v1/me/attendance-intents?from=${day(now)}&to=${day(weekOut)}`)
       .then((response) =>
@@ -161,17 +193,61 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
         setIntents(next)
       })
       .catch(() => {})
-    // 2a's other half — what actually happened, for the strip's past days.
-    void apiFetch(`/api/v1/me/attendance?from=${day(weekBack)}&to=${day(now)}`)
+    // §4 — "events appear beside every other session". Read here rather than only behind
+    // `#/events`, because a family's week is one week and a grading a parent finds only in
+    // a second list is a grading they miss. `/me/events` already returns one row per CHILD
+    // per event, which is the shape the home's session list is in.
+    //
+    // A failure leaves the list empty rather than raising: an unreachable events read must
+    // not take the lessons down with it, and a home with no events on it is what a family
+    // with no events sees anyway.
+    void apiFetch('/api/v1/me/events')
       .then((response) =>
         response.ok
-          ? (response.json() as Promise<{ items: { session_id: string; student_id: string; status: string }[] }>)
+          ? (response.json() as Promise<{
+              items: {
+                event: {
+                  id: string
+                  title: string
+                  starts_at: string
+                  ends_at: string | null
+                  location_text: string | null
+                  status: string
+                }
+                registration: {
+                  student_id: string
+                  student_display_name: string
+                  rsvp: 'yes' | 'no' | 'pending'
+                }
+              }[]
+            }>)
           : { items: [] },
       )
       .then((body) => {
-        if (live) setAttendance(body.items)
+        if (!live) return
+        setEvents(
+          body.items.map((row) => ({
+            id: row.event.id,
+            title: row.event.title,
+            startsAt: row.event.starts_at,
+            endsAt: row.event.ends_at,
+            locationText: row.event.location_text,
+            cancelled: row.event.status === 'cancelled',
+            studentId: row.registration.student_id,
+            studentName: row.registration.student_display_name,
+            rsvp: row.registration.rsvp,
+          })),
+        )
       })
       .catch(() => {})
+    // 2a's other half — what actually happened — is NOT read here any more.
+    //
+    // The old strip let a parent read backwards into past attendance. The redesign's strip
+    // looks forward and marks only whether a day has training; the prototype puts the
+    // attendance record in PROFILE instead ("סיכום נוכחות" and "נוכחויות קודמות"), which is
+    // checkpoint 5. So the capability moves rather than disappearing, and the read moves
+    // with it — a fetch on this screen for a number no one on this screen renders is how a
+    // home ends up making four calls to draw three things.
     return () => {
       live = false
     }
@@ -239,32 +315,83 @@ export function Resolve({ session, locale }: { session: Session; locale: Locale 
     // §6.1's home — artboard 1a. The health gate (step 6) wraps this whole shell in
     // App.tsx since the ship audit mounted it. The W1 `hasChildren` boolean is retired
     // with it: `mine` has named the children since M3, so the home renders them.
-    <ParentHome
+    <HomeScreen
       locale={locale}
-      students={
+      clubName={session.activeStudioName ?? ''}
+      familyName={
+        mine.status === 'ready' ? familyNameOf(mine.students.map((s) => s.last_name)) : null
+      }
+      childList={
         mine.status === 'ready'
           ? mine.students.map((student) => ({
               id: student.id,
-              displayName: `${student.first_name} ${student.last_name}`,
-              // The card and the week rows name a child by their FIRST name — three
-              // "… הורה" surnames in one column identify nobody.
               firstName: student.first_name,
+              displayName: `${student.first_name} ${student.last_name}`,
               groupNames: student.group_names ?? [],
-              // D7's bar colour. It was on `/me/students` all along as
-              // `current_belt_color_hex`; the first pass simply never mapped it, so
-              // every child rendered without the one mark that tells them apart.
+              // D7's bar colour, from `/me/students`. `null` before a first belt, and drawn
+              // as absent rather than as an invented grey.
               beltColorHex: student.current_belt_color_hex ?? null,
+              beltName: student.current_belt_name ?? null,
             }))
           : mine.status === 'error'
             ? []
             : null
       }
-      upcoming={upcoming}
-      attendance={attendance}
-      debtAgorot={debtAgorot}
+      lessons={upcoming}
+      events={events}
+      lessonsFailed={lessonsFailed}
       intents={intents}
-      intentClient={makeIntentClient(apiFetch)}
-      onIntentChanged={() => setIntentEpoch((n) => n + 1)}
+      urgent={{
+        debtAgorot: debtAgorot > 0 ? debtAgorot : null,
+        // The SAME predicate §6.1's gate uses. Two spellings of "does this child still owe
+        // something" is how a banner comes to disagree with the gate that blocks the app.
+        childrenNeedingDeclaration:
+          mine.status === 'ready'
+            ? childrenNeedingDeclaration(
+                mine.students.map((student) => ({
+                  firstName: student.first_name,
+                  // `GatedStudent` needs a display name the roster row does not carry.
+                  // Composed here rather than by loosening the predicate: it is the gate's
+                  // own type, and the gate is the thing this banner must agree with.
+                  student: { ...student, display_name: `${student.first_name} ${student.last_name}` },
+                })),
+                ({ student }) => needsFullDeclaration(student),
+              )
+            : [],
+      }}
+      debtLabel={debtAgorot > 0 ? formatAgorot(debtAgorot) : null}
+      unreadCount={notificationCount}
+      todayKey={studioDayKey(new Date())}
+      writer={{
+        reportAbsence: (sessionId, studentId, reason) =>
+          makeIntentClient(apiFetch).reportAbsence(sessionId, studentId, reason),
+        // FLOW B's one read. The home holds the two weeks fetched above; a range outside
+        // it has to be asked for, or a family away for a month reports nothing at all and
+        // is told it worked. `scope=mine` and the guardian narrowing are the schedule
+        // client's — this names no group and no student, same as every other call.
+        lessonsInRange: (from, to) =>
+          scheduleClient.listSessions({ from, to }).then((rows) =>
+            rows
+              .filter((row) => row.status !== 'completed')
+              .map((row) => ({
+                id: row.id,
+                startsAt: row.starts_at,
+                endsAt: row.ends_at,
+                groupName: row.group_name,
+                locationName: row.location_name,
+                coachName:
+                  row.staff.find((member) => member.role === 'lead_coach')?.display_name ?? null,
+                status: row.status,
+                cancelReason: row.cancel_reason,
+              })),
+          ),
+      }}
+      cancelReasonLabel={(reason) => cancelReasonLabel(locale, reason)}
+      onAbsenceReported={() => setIntentEpoch((n) => n + 1)}
+      onRetry={() => {
+        setLessonsFailed(false)
+        setIntentEpoch((n) => n + 1)
+      }}
     />
   )
 }

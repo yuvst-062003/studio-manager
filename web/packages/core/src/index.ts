@@ -42,11 +42,15 @@ export { AGOROT_PER_SHEKEL, MoneyFormatError, agorotFromShekels, formatAgorot, p
 export {
   STUDIO_TIMEZONE,
   formatDateInStudioZone,
+  formatDayAndMonth,
+  formatDayHeadline,
   formatMonthLabel,
   formatSessionWhen,
   formatTimeInStudioZone,
   studioDayKey,
   studioWallTimeToUtc,
+  weekdayInitialOf,
+  weekdayInitials,
 } from './datetime'
 export type { Locale } from './datetime'
 export { appendPage, hasNextPage, mergeCursorPages } from './pagination'

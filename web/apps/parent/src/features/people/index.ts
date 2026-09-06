@@ -1,15 +1,10 @@
 export { StudentCard } from './StudentCard'
 export type { StudentCardSectionProps } from './StudentCard'
 export { registerPeopleSections } from './register'
-export { FirstRegistration } from './FirstRegistration'
-export type { FirstRegistrationSource } from './FirstRegistration'
 export { TrialHome, daysUntil } from './TrialHome'
 export { JoinTheClub } from './JoinTheClub'
 export { JoinClubSection } from './JoinClubSection'
 export type { JoinGroupOption } from './JoinTheClub'
-export { ProfileAndLeave, GuardianRow, chipToneFor } from './ProfileAndLeave'
-export { GuardianSettings } from './GuardianSettings'
-export { ProfileSection } from './ProfileSection'
 export { StatusHistorySection } from './sections/StatusHistorySection'
 export {
   makePeopleClient,

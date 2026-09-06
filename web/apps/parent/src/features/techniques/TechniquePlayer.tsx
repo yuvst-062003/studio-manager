@@ -14,10 +14,10 @@
  * page children use, and the two commands needed here are three lines of postMessage.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { SegmentedControl } from '@studio/ui'
 import { formatSeconds } from './shelf'
-import { s } from './strings'
 
 const ORIGIN = 'https://www.youtube-nocookie.com'
 const SPEEDS = ['1', '0.75', '0.5'] as const
@@ -91,7 +91,7 @@ export function TechniquePlayer({
 
       <div className="studio-technique__controls">
         <SegmentedControl
-          legend={s(locale, 'video.speed')}
+          legend={t(locale, 'techniques.video.speed')}
           legendVisible
           onValueChange={(next) => {
             setSpeed(next)
@@ -104,8 +104,8 @@ export function TechniquePlayer({
         <div className="studio-technique__start">
           <span className="studio-technique__start-label">
             {startAt > 0
-              ? `${s(locale, 'video.startsAt')} ${formatSeconds(startAt)}`
-              : s(locale, 'video.startsAtBeginning')}
+              ? `${t(locale, 'techniques.video.startsAt')} ${formatSeconds(startAt)}`
+              : t(locale, 'techniques.video.startsAtBeginning')}
           </span>
           <span className="studio-technique__start-actions">
             <button
@@ -115,7 +115,7 @@ export function TechniquePlayer({
               onClick={() => onStartAtChange(current)}
               type="button"
             >
-              {s(locale, 'video.startHere')}
+              {t(locale, 'techniques.video.startHere')}
             </button>
             {startAt > 0 ? (
               <button
@@ -124,7 +124,7 @@ export function TechniquePlayer({
                 onClick={() => onStartAtChange(null)}
                 type="button"
               >
-                {s(locale, 'video.startReset')}
+                {t(locale, 'techniques.video.startReset')}
               </button>
             ) : null}
           </span>

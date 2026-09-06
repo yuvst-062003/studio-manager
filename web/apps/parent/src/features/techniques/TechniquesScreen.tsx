@@ -5,19 +5,20 @@
  * one reference.
  */
 import { useMemo, useState } from 'react'
+import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { EmptyState, PageHeader, SectionHeader, SegmentedControl, TextField } from '@studio/ui'
 import { familiesOf, searchTechniques, techniqueBySlug } from './data'
 import { loadShelf, saveShelf, toggleFavourite } from './shelf'
 import type { Category, Technique } from './types'
-import { fill, fillGroup, s } from './strings'
+import { fill, fillGroup } from './format'
 import './techniques.css'
 
 function GokyoMark({ locale, group }: { locale: Locale; group: number | null }) {
   const outside = group === null
   return (
     <span
-      aria-label={outside ? s(locale, 'gokyo.none') : fillGroup(s(locale, 'gokyo.group'), group)}
+      aria-label={outside ? t(locale, 'techniques.gokyo.none') : fillGroup(t(locale, 'techniques.gokyo.group'), group)}
       className="studio-gokyo"
       data-outside={outside || undefined}
       role="img"
@@ -66,7 +67,7 @@ function TechniqueRow({
       {/* The name is IN the label. A hundred rows each offering "add" gives a screen
           reader user a hundred identical controls and no way to tell them apart. */}
       <button
-        aria-label={fill(s(locale, saved ? 'shelf.remove.named' : 'shelf.add.named'), {
+        aria-label={fill(t(locale, saved ? 'techniques.shelf.remove.named' : 'techniques.shelf.add.named'), {
           name: technique.nameRomaji,
         })}
         aria-pressed={saved}
@@ -110,30 +111,30 @@ export function TechniquesScreen({ locale }: { locale: Locale }) {
 
   return (
     <div className="studio-techniques">
-      <PageHeader title={s(locale, 'title')} />
+      <PageHeader title={t(locale, 'techniques.title')} />
 
       <TextField
-        label={s(locale, 'search.placeholder')}
+        label={t(locale, 'techniques.search.placeholder')}
         onChange={(event) => setQuery(event.target.value)}
-        placeholder={s(locale, 'search.example')}
+        placeholder={t(locale, 'techniques.search.example')}
         type="search"
         value={query}
       />
 
       <SegmentedControl
-        legend={s(locale, 'title')}
+        legend={t(locale, 'techniques.title')}
         onValueChange={(next) => setCategory(next as Category)}
         options={[
-          { value: 'nage-waza', label: s(locale, 'category.nage-waza.short') },
-          { value: 'katame-waza', label: s(locale, 'category.katame-waza.short') },
+          { value: 'nage-waza', label: t(locale, 'techniques.category.nage-waza.short') },
+          { value: 'katame-waza', label: t(locale, 'techniques.category.katame-waza.short') },
         ]}
         value={category}
       />
 
       {mine.length > 0 && query === '' ? (
         <section className="studio-techniques__family" data-testid="my-techniques">
-          <SectionHeader level={3} title={s(locale, 'shelf.title')} />
-          <p className="studio-techniques__shelf-hint">{s(locale, 'shelf.hint')}</p>
+          <SectionHeader level={3} title={t(locale, 'techniques.shelf.title')} />
+          <p className="studio-techniques__shelf-hint">{t(locale, 'techniques.shelf.hint')}</p>
           <div className="studio-techniques__rows">
             {mine.map((technique) => (
               <TechniqueRow
@@ -150,22 +151,22 @@ export function TechniquesScreen({ locale }: { locale: Locale }) {
 
       {nothingAnywhere ? (
         <EmptyState
-          description={s(locale, 'search.empty.hint')}
-          title={s(locale, 'search.empty.title')}
+          description={t(locale, 'techniques.search.empty.hint')}
+          title={t(locale, 'techniques.search.empty.title')}
         />
       ) : families.length === 0 ? (
         /* Matches exist, just not on this side of the switch. Without this the screen
            renders a search box over nothing at all, which reads as "no such technique"
            when the technique is one tap away. */
         <EmptyState
-          description={s(locale, 'search.elsewhere.hint')}
-          title={s(locale, 'search.elsewhere.title')}
+          description={t(locale, 'techniques.search.elsewhere.hint')}
+          title={t(locale, 'techniques.search.elsewhere.title')}
         />
       ) : (
         <div className="studio-techniques__families" data-testid="technique-families">
           {families.map((family) => (
             <section className="studio-techniques__family" key={family.subcategory}>
-              <SectionHeader level={3} title={s(locale, `family.${family.subcategory}`)} />
+              <SectionHeader level={3} title={t(locale, `techniques.family.${family.subcategory}`)} />
               <div className="studio-techniques__rows">
                 {family.techniques.map((technique) => (
                   <TechniqueRow

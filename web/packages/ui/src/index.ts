@@ -103,6 +103,9 @@ export type { SwitchableStudio } from './shell/StudioSwitcher'
 // four screens; only the branch AFTER sign-in differs, and that lives in each app's own
 // features/identity/Resolve.tsx.
 export { LanguagePicker } from './first-run/LanguagePicker'
+// The one list of language endonyms. `GuardianSettings` kept its own copy only because
+// this line did not exist; two spellings of Русский is a real outcome of that.
+export { ENDONYM } from './first-run/LanguagePicker'
 export { SignIn } from './first-run/SignIn'
 export type { SignInProvider } from './first-run/SignIn'
 // The staff app's own face on the same flow — docs/design "Gladiator Manager Sign In".

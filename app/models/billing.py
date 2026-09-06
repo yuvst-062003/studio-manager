@@ -206,6 +206,13 @@ class Product(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     sizes: Mapped[list[str]] = mapped_column(
         JSONB, nullable=False, default=list, server_default="[]"
     )
+    #: Where this product's photo lives in `app/core/storage.py`, or NULL for "the manager
+    #: has not uploaded one" -- which the parent app draws as the default tile rather than a
+    #: broken image. A KEY and not a URL, exactly as `Studio.logo_object_key` is: the URL is
+    #: whatever the app serves the bytes at today, and storing one would freeze this table's
+    #: rows against a routing decision. The object is deleted with the row's own service, not
+    #: by a cascade -- the store is not the database.
+    image_object_key: Mapped[str | None] = mapped_column(String(500))
 
 
 class Charge(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
@@ -283,6 +290,23 @@ class Charge(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     original_amount_agorot: Mapped[int | None] = mapped_column(Integer)
     #: 'בגין 3 מתוך 8 שיעורים' -- human-readable, shown to the parent.
     proration_note: Mapped[str | None] = mapped_column(String(200))
+    #: The catalogue item this charge PAYS FOR, when it is a shop order. NULL for every
+    #: other charge, which is most of them.
+    #:
+    #: Added 2026-09-06 because the parent app's "ההזמנות שלי" could not be built without
+    #: it. A shop order writes `kind='manual'`, and so does a manager's ad-hoc charge --
+    #: including §5.10's *negative* credit or discount. Nothing on the row said which was
+    #: which, so a discount would have appeared in a family's purchase history as a
+    #: purchase of minus two hundred shekels. `created_by` is provenance and cannot answer
+    #: it: both really are manual.
+    #:
+    #: RESTRICT and not CASCADE: §11.4's rule that a financial row is never deleted applies
+    #: to what it points at as well. A club retires a product with `is_active`, which is why
+    #: `Product` has no delete path at all -- and if one is ever added, a charge naming that
+    #: product must block it rather than lose what the family bought.
+    product_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("product.id", ondelete="RESTRICT")
+    )
     due_date: Mapped[date] = mapped_column(Date, nullable=False)
     #: **A derived cache.** Maintained only in `recompute_charge_status`.
     status: Mapped[str] = mapped_column(String(12), nullable=False, default="open")

@@ -1,5 +1,6 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { t } from '@studio/i18n'
 import App from './App'
 
 // §6.1 step 6 / §5.5's parent-side hard gate, asserted against the SHELL rather than the
@@ -143,29 +144,44 @@ describe('the §6.1 health gate, mounted in the shell', () => {
 })
 
 describe('the tab bar, in the shell where 1a draws it', () => {
-  it('badges the messages tab with the unread count', async () => {
+  it('badges the updates tab with the unread count', async () => {
     // `2a` §7 — "four tabs, with an unread badge on messages". The count is fetched by the
     // SHELL, not by the inbox: a badge that only appeared once you had already opened the
     // inbox would tell you nothing you did not just find out.
+    //
+    // The redesign renamed the tab (הודעות → עדכונים) and not the fact: the same
+    // `/me/notifications` read feeds it, and the badge is still the shell's.
     stubChildren('signed', 'active', [note('n1', false), note('n2', false), note('n3', true)])
     render(<App />)
-    await waitFor(() => expect(screen.getByTestId('tab-messages-badge')).toHaveTextContent('2'))
+    await waitFor(() => expect(screen.getByTestId('tab-updates-badge')).toHaveTextContent('2'))
   })
 
   it('shows no badge when everything has been read', async () => {
     stubChildren('signed', 'active', [note('n1', true)])
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('tab-bar')).toBeInTheDocument())
-    expect(screen.queryByTestId('tab-messages-badge')).toBeNull()
+    expect(screen.queryByTestId('tab-updates-badge')).toBeNull()
   })
 
   it('renders the four tabs on a signed family and none while the gate holds', async () => {
     stubChildren('signed')
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('tab-bar')).toBeInTheDocument())
-    for (const key of ['home', 'payments', 'messages', 'profile']) {
-      expect(screen.getByTestId(`tab-${key}`)).toBeInTheDocument()
+    // The redesign's four (§4): בית · חנות המועדון · עדכונים · פרופיל. Payments left the
+    // bar for Profile and the shop took its slot; asserting the HREFs and not just the
+    // presence is what would have caught a tab that renders and leads nowhere.
+    const expected = {
+      home: '#/',
+      shop: '#/shop',
+      updates: '#/announcements',
+      profile: '#/profile',
     }
+    for (const [key, href] of Object.entries(expected)) {
+      expect(screen.getByTestId(`tab-${key}`)).toHaveAttribute('href', href)
+    }
+    // The drawer the bar replaced. `common.nav.menu` was its trigger's accessible name,
+    // and nothing in the parent app may render it again.
+    expect(screen.queryByRole('button', { name: t('he', 'common.nav.menu') })).toBeNull()
     cleanup()
 
     // "No other screen is reachable" (§6.1) includes the bar that reaches them.

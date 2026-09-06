@@ -5,13 +5,14 @@
  * past the answer to reach it.
  */
 import { useState } from 'react'
+import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { Button, DetailRow, EmptyState } from '@studio/ui'
 import { ijfUrl, techniqueBySlug } from './data'
 import { IjfSheet } from './IjfSheet'
 import { TechniquePlayer } from './TechniquePlayer'
 import { loadShelf, saveShelf, setStartAt, toggleFavourite } from './shelf'
-import { fillGroup, s } from './strings'
+import { fillGroup } from './format'
 import './techniques.css'
 
 export function TechniqueDetail({ locale, slug }: { locale: Locale; slug: string }) {
@@ -27,10 +28,10 @@ export function TechniqueDetail({ locale, slug }: { locale: Locale; slug: string
       <EmptyState
         action={
           <Button onClick={() => { globalThis.location.hash = '#/techniques' }} variant="secondary">
-            {s(locale, 'detail.back')}
+            {t(locale, 'techniques.detail.back')}
           </Button>
         }
-        title={s(locale, 'search.empty.title')}
+        title={t(locale, 'techniques.search.empty.title')}
       />
     )
   }
@@ -56,12 +57,12 @@ export function TechniqueDetail({ locale, slug }: { locale: Locale; slug: string
       </header>
 
       <div className="studio-technique__chips">
-        <span className="studio-technique__chip">{s(locale, `category.${technique.category}`)}</span>
-        <span className="studio-technique__chip">{s(locale, `family.${technique.subcategory}`)}</span>
+        <span className="studio-technique__chip">{t(locale, `techniques.category.${technique.category}`)}</span>
+        <span className="studio-technique__chip">{t(locale, `techniques.family.${technique.subcategory}`)}</span>
         <span className="studio-technique__chip" data-gokyo={technique.gokyoGroup !== null || undefined}>
           {technique.gokyoGroup === null
-            ? s(locale, 'gokyo.none')
-            : fillGroup(s(locale, 'gokyo.group'), technique.gokyoGroup)}
+            ? t(locale, 'techniques.gokyo.none')
+            : fillGroup(t(locale, 'techniques.gokyo.group'), technique.gokyoGroup)}
         </span>
       </div>
 
@@ -70,18 +71,18 @@ export function TechniqueDetail({ locale, slug }: { locale: Locale; slug: string
           phone having no signal, and a child deserves to be told which. */}
       {technique.youtubeId === null ? (
         <p className="studio-technique__player-missing" data-testid="video-missing">
-          {s(locale, 'video.missing')}
+          {t(locale, 'techniques.video.missing')}
         </p>
       ) : offline ? (
         <p className="studio-technique__player-missing" data-testid="video-offline">
-          {s(locale, 'video.offline')}
+          {t(locale, 'techniques.video.offline')}
         </p>
       ) : (
         <TechniquePlayer
           locale={locale}
           onStartAtChange={(seconds) => update(setStartAt(shelf, technique.slug, seconds))}
           startAt={shelf.startAt[technique.slug] ?? 0}
-          title={s(locale, 'video.title')}
+          title={t(locale, 'techniques.video.title')}
           videoId={technique.youtubeId}
         />
       )}
@@ -99,7 +100,7 @@ export function TechniqueDetail({ locale, slug }: { locale: Locale; slug: string
         <svg aria-hidden="true" fill={saved ? 'currentColor' : 'none'} height="17" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.7" viewBox="0 0 24 24" width="17">
           <path d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z" />
         </svg>
-        {saved ? s(locale, 'shelf.saved') : s(locale, 'shelf.add')}
+        {saved ? t(locale, 'techniques.shelf.saved') : t(locale, 'techniques.shelf.add')}
       </button>
 
       {/* Ours, written from the Kodokan's definition of the MOVEMENT. Their sentences are
@@ -111,25 +112,25 @@ export function TechniqueDetail({ locale, slug }: { locale: Locale; slug: string
       ) : null}
 
       <div>
-        <DetailRow label={s(locale, 'detail.category')}>
-          {s(locale, `category.${technique.category}`)}
+        <DetailRow label={t(locale, 'techniques.detail.category')}>
+          {t(locale, `techniques.category.${technique.category}`)}
         </DetailRow>
-        <DetailRow label={s(locale, 'detail.subcategory')}>
-          {s(locale, `family.${technique.subcategory}`)}
+        <DetailRow label={t(locale, 'techniques.detail.subcategory')}>
+          {t(locale, `techniques.family.${technique.subcategory}`)}
         </DetailRow>
-        <DetailRow label={s(locale, 'detail.gokyo')}>
+        <DetailRow label={t(locale, 'techniques.detail.gokyo')}>
           {technique.gokyoGroup === null
-            ? s(locale, 'detail.gokyo.outside')
-            : fillGroup(s(locale, 'detail.gokyo.value'), technique.gokyoGroup)}
+            ? t(locale, 'techniques.detail.gokyo.outside')
+            : fillGroup(t(locale, 'techniques.detail.gokyo.value'), technique.gokyoGroup)}
         </DetailRow>
-        <DetailRow label={s(locale, 'detail.meaning')}>{technique.meaning}</DetailRow>
+        <DetailRow label={t(locale, 'techniques.detail.meaning')}>{technique.meaning}</DetailRow>
       </div>
 
       {/* Offered ONLY where seeding confirmed the page returns 200. A control that opens
           a blank frame is worse than no control. */}
       {ijf ? (
         <Button data-testid="open-ijf" onClick={() => setSheetOpen(true)} variant="secondary">
-          {s(locale, 'ijf.open')}
+          {t(locale, 'techniques.ijf.open')}
         </Button>
       ) : null}
 

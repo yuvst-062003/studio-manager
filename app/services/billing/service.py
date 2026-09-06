@@ -83,6 +83,7 @@ class BillingService:
         *,
         student_id: uuid.UUID | None = None,
         event_id: uuid.UUID | None = None,
+        product_id: uuid.UUID | None = None,
     ) -> Charge:
         """Create one charge and return it. The single entry point for every route that
         puts money on a family's balance: the monthly run (§5.10 step 1), a manual charge,
@@ -114,6 +115,9 @@ class BillingService:
             payer_person_id=payer_person_id,
             student_id=student_id,
             kind=kind,
+            # Set only by the shop's order route. It is what makes a family's purchase
+            # history separable from a manager's manual charge -- see the column's own note.
+            product_id=product_id,
             # The due date is the only argument carrying a month, and the run dues every
             # tuition charge on the last day of the period it bills.
             period_year=due_date.year if periodic else None,

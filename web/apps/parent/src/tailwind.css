@@ -26,6 +26,24 @@
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
 
+/* THE `dark:` VARIANT, POINTED AT THE APP'S OWN THEME.
+ *
+ * Added for the parent-app redesign, which ports four screens that carry a `dark:` variant
+ * on nearly every element. The wizard needed none of this — it has no dark styling at all —
+ * so the question had not come up.
+ *
+ * Tailwind's default `dark` variant is `@media (prefers-color-scheme: dark)`, which reads
+ * the OPERATING SYSTEM. This app does not: `ThemeProvider` writes `data-theme="light|dark"`
+ * on `documentElement` from a stored preference whose default is `system`, and tokens.css
+ * matches `[data-theme="dark"]`. Left at the default, a parent who chose light on a phone
+ * set to dark would get a light design system and dark Tailwind on the same screen — and
+ * the theme switch in Profile would move half the pixels.
+ *
+ * `:where()` keeps the selector at zero specificity, so a `dark:` utility still weighs
+ * exactly what an undarkened one does and source order decides, as Tailwind intends. The
+ * prototype writes the same shape against its own `.dark` class. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /* THE TEN VARIABLES BOTH SYSTEMS NAME.
  *
  * Tailwind's theme defines 419 custom properties; ten of them are also design-system

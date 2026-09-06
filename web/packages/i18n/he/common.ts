@@ -95,6 +95,16 @@ export const common: Bundle = {
   'nav.myChildren': 'הילדים שלי',
   'nav.settings': 'הגדרות',
   'nav.signOut': 'התנתקות',
+  // -- the parent app's four tabs (the redesign of 2026-09-05) ------------------
+  // Separate from `nav.*`, which is the STAFF drawer's. Two products name the same
+  // destination differently: a coach's drawer says 'הודעות', the parent's tab bar says
+  // 'עדכונים', and one key for both would force one of them to be wrong.
+  'tabs.parentBarLabel': 'ניווט ראשי',
+  'tabs.parentHome': 'בית',
+  'tabs.parentShop': 'חנות המועדון',
+  'tabs.parentUpdates': 'עדכונים',
+  'tabs.parentTechniques': 'טכניקות',
+  'tabs.parentProfile': 'פרופיל',
   // §6.1's first run. The refusal wording is §6.1's own, verbatim.
   'language.title': 'שפה',
   // -- the parent app's sign-in face (owner's Stitch design, 2026-09-01) ---------
@@ -299,6 +309,7 @@ export const common: Bundle = {
   'setup.studio.name': 'שם המועדון',
   'setup.studio.sport': 'ענף',
   'setup.studio.address': 'כתובת',
+  'setup.studio.email': 'דוא״ל המועדון',
   'setup.studio.phone': 'טלפון',
   'setup.studio.parentLocales': 'שפות שההורים יראו',
   'setup.studio.locale.he': 'עברית',
@@ -520,8 +531,6 @@ export const common: Bundle = {
   'home.restOfWeek': 'בהמשך השבוע',
   'home.upcoming': 'השיעורים הקרובים',
   'home.alerts': 'התראות',
-  'home.noChildren': 'עדיין אין ילדים משויכים לחשבון הזה.',
-  'home.childrenComeLater': 'מנהל הסטודיו משייך ילד לחשבון בעת ההרשמה.',
   'home.noUpcoming': 'אין עדיין שיעורים מתוזמנים.',
   'home.noUpcomingWeek': 'אין שיעורים מתוזמנים בשבוע הקרוב.',
   'home.noAlerts': 'אין התראות פתוחות.',

@@ -11,14 +11,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { apiFetch, apiUrl, getAccessToken, refresh, useDisplayMode, useSession, switchStudio } from '@studio/core'
 import {
   AccessibilityMenu,
-  AccountDrawerFooter,
-  AppShell,
-  Icon,
   InstallBanner,
   InstallWalkthrough,
   LanguagePicker,
   SignIn,
-  TabBar,
   ThemeProvider,
   UpdateToast,
   useDocumentLocale,
@@ -27,6 +23,8 @@ import { DevBar } from '@studio/ui/dev-bar'
 import type { InstallPromptEvent } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { ParentShell } from './features/shell/ParentShell'
+import type { ParentTab } from './features/shell/ParentTabBar'
 import { AccessGate } from './features/identity/AccessGate'
 import type { InvitedStudent } from './features/identity/AccessGate'
 import { Resolve } from './features/identity/Resolve'
@@ -61,9 +59,15 @@ import {
   makeParentEventsClient,
 } from './features/events'
 import { BeltProgressScreen, makeParentBeltsClient, registerBeltSections } from './features/belts'
+// The judo technique library — the first screen in this app that belongs to the CHILD
+// rather than to the parent (its design's §1). Built unmounted while the shell was being
+// rewritten in parallel, and wired here by the merge of the two.
+import { TechniqueDetail, TechniquesScreen, matchTechniquesPath } from './features/techniques'
 import { BeltRouteResolver } from './features/belts/BeltRouteResolver'
-import { InboxScreen, makeParentCommsClient } from './features/comms'
-import { JoinClubSection, ProfileSection, makePeopleClient, registerPeopleSections } from './features/people'
+import { makeParentCommsClient } from './features/comms'
+import { UpdatesScreen } from './features/comms/redesign/UpdatesScreen'
+import { JoinClubSection, makePeopleClient, registerPeopleSections } from './features/people'
+import { ProfileScreen } from './features/people/redesign/ProfileScreen'
 // `2c` behind `#/student/<id>` — the composite card the slot system was built for (P2).
 import { StudentCardSection } from './features/people/StudentCardSection'
 import { registerBillingSections } from './features/billing/StudentCardBillingSection'
@@ -84,15 +88,12 @@ import { TrainingPlanSection } from './features/billing/TrainingPlanSection'
 import { PaymentSetupGate } from './features/billing/PaymentSetup'
 import type { SetupChild, StandingOrderLink } from './features/billing/PaymentSetup'
 import { makeParentBillingClient } from './features/billing/PaymentsSection'
-import { ShopSection } from './features/billing'
+import { ClubShop } from './features/billing/redesign/ClubShop'
 // §6.1 step 6 — the BLOCKING declaration. Mounted here because nothing imported it
 // (HB-w6-health-gate-unmounted): the gate, the form and the pad were built and tested in
 // W3 and a guardian with an unsigned declaration still reached home.
 import { HealthGate, firstStudentNeedingDeclaration, makeHealthClient, registerHealthSections } from './features/health'
 import type { GatedStudent } from './features/health'
-// The same predicate the gate uses. Two spellings of "does this child still owe
-// something" is how a drawer comes to disagree with the screen it links to.
-import { needsFullDeclaration } from './features/health/HealthGate'
 // §6.1 step 5 — the OTHER blocking gate, and the one that had never been built.
 // SPEC:1314 puts `5  אישורים  →  terms of service + privacy policy` in the BLOCKING band
 // and SPEC:1327 says steps 5 and 6 are the only hard gates. M4 shipped step 6 and not
@@ -115,34 +116,19 @@ registerBeltSections()
 registerAttendanceSections()
 registerHealthSections()
 
-const NAV = [
-  { key: 'myChildren', labelKey: 'common.nav.myChildren', href: '/' },
-  { key: 'calendar', labelKey: 'schedule.calendar.title', href: '#/calendar' },
-  // A hash, not a path. `/payments` matched nothing: `matchLandingPath` accepts only
-  // `/t/<slug>` (features/landing/route.ts, and route.test.ts:21 asserts
-  // `matchLandingPath('/payments')` is null), so the link fell through `navigateFallback`
-  // to index.html and put the parent back on home. The same correction both W2 lanes made
-  // for their own entries.
-  { key: 'payments', labelKey: 'common.nav.payments', href: '#/payments' },
-  // A hash, and mounted below. `/announcements` matched nothing — `matchLandingPath`
-  // accepts only `/t/<slug>` — so the link fell through `navigateFallback` to index.html
-  // and put the parent back on home. `InboxScreen` (§5.11's one-way inbox, artboard `2b`)
-  // existed and was tested but was never imported by anything, so the whole screen was
-  // unreachable in a running app. Same defect and same correction as `/payments`.
-  { key: 'announcements', labelKey: 'common.nav.announcements', href: '#/announcements' },
-  // 12h's list. Mounted below since W4 and linked from NOWHERE: the only `#/events` in the
-  // app was the per-child invite hash that this screen itself writes, so a parent could
-  // reach an invite from a push notification and never find the list it came from. Same
-  // defect and same correction as `/payments` and `/announcements` above.
-  { key: 'events', labelKey: 'events.title', href: '#/events' },
-  { key: 'shop', labelKey: 'billing.shop.title', href: '#/shop' },
-  { key: 'addChild', labelKey: 'people.sibling.title', href: '#/add-child' },
-  // NO settings entry. `/settings` matched no route in either app, so the link fell
-  // through the service worker's navigateFallback to index.html and put the user back
-  // on home in silence. Artboard 2e draws these controls in the DRAWER, not on a
-  // page, and that is where they now are — see `AccountDrawerFooter`, passed as
-  // `drawerFooter` below, under the studio switcher `AppShell` already renders.
-]
+// NO `NAV` ARRAY, AND NO DRAWER FOR IT TO SIT IN.
+//
+// Seven entries stood here — myChildren, calendar, payments, announcements, events, shop,
+// addChild — behind a hamburger. §4 of the redesign deletes the drawer: "Four tabs, no side
+// menu." Where each one went, and why, is the table in
+// docs/design/parent-app-shell-map.md; the short version is that four became tabs, two
+// became parts of a screen, and one (events) folds into Home beside every other session.
+//
+// The comments this array carried are not lost with it: each recorded a route that had
+// shipped mounted and unreachable, and `routes.reachable.test.ts` is the guard those
+// lessons turned into. It still runs, and it is what proves the drawer's removal did not
+// strand anything — `#/calendar` and `#/add-child` were the only two routes it linked
+// alone, and both are held by `AccountControls` until their own screen is ported.
 
 /**
  * Lane SCHEDULE's screens route on `location.hash`, matching the dashboard: real `<a href>`
@@ -611,6 +597,42 @@ function AuthedApp() {
   // The training plan, per child: what 300 / 400 / 550 ₪ buys, this week's extras, and the
   // upgrade offer §5.1 computes.
   const planStudentId = hash.startsWith('#/plan/') ? hash.slice('#/plan/'.length) : ''
+  // The technique library's two routes. Both hashes are named HERE, in this file's own
+  // `hash === …` / `hash.startsWith(…)` shapes, and only then handed to the feature's
+  // matcher — `routes.reachable.test.ts` reads the route table out of THIS file by looking
+  // for exactly those two shapes, so a route parsed entirely behind a helper is a route
+  // that guard cannot arm on, which is the defect it exists to catch. What the matcher
+  // owns is what each hash MEANS: a bare `#/techniques/` is the list, not a detail screen
+  // for an empty slug.
+  const techniquesRoute =
+    hash === '#/techniques' || hash.startsWith('#/techniques/') ? matchTechniquesPath(hash) : null
+
+  /**
+   * Which of the five tabs the current hash belongs to.
+   *
+   * `null` — no tab current — is a real answer and not a fallback, and it is why this is a
+   * derived value rather than a piece of state. A student card, the privacy screen, the
+   * absence report and uPay's return all sit BESIDE the tabs rather than inside one:
+   * the bar still shows, so the parent can leave, but marking a tab `aria-current="page"`
+   * on a screen that tab does not lead to is a lie told to a screen reader.
+   *
+   * Home takes the empty hash as well as `#/` and `#`, because that is where an unknown
+   * hash falls through to — see the routing block below.
+   */
+  const activeTab: ParentTab | null = onShop
+    ? 'shop'
+    : onAnnouncements
+      ? 'updates'
+      : // A technique's detail screen counts as INSIDE its tab, unlike a student card:
+        // it is reached only from the list and its own back control returns there, so the
+        // tab it came from is genuinely the current one.
+        techniquesRoute !== null
+        ? 'techniques'
+        : onProfile
+          ? 'profile'
+          : hash === '' || hash === '#' || hash === '#/'
+            ? 'home'
+            : null
 
   useEffect(() => {
     const onPrompt = (event: Event): void => {
@@ -659,99 +681,18 @@ function AuthedApp() {
         // confirmed `session.access.parent`, so a hash typed by a refused visitor
         // (`#/absence`, `#/student/<id>`, …) can no longer reach a screen behind it either.
         <AccessGate session={session} locale={locale} onInvitedStudent={setInvitedStudent}>
-        <AppShell
-          title={session.activeStudioName ?? ''}
-          items={NAV}
+        <ParentShell
+          activeTab={activeTab}
           locale={locale}
+          updatesBadgeCount={pendingCount}
+          // The bar hides while EITHER of §6.1's gates holds — "no other screen is
+          // reachable" includes the bar that reaches them. Step 5 is `consentStatus`,
+          // step 6 is `gatedChildren`. Same condition the old `tabBar` prop carried.
           tabBar={
-            // 1a draws the four-tab bar on EVERY screen, and it hides while EITHER of
-            // §6.1's gates holds — "no other screen is reachable" includes the bar that
-            // reaches them. Step 5 is `consentStatus`, step 6 is `gatedChildren`.
             consentStatus === 'open' &&
             gatedChildren !== null &&
-            firstStudentNeedingDeclaration(gatedChildren) === null ? (
-              <TabBar
-                label={t(locale, 'common.home.title')}
-                items={[
-                  {
-                    key: 'home',
-                    label: t(locale, 'common.home.tab.home'),
-                    href: '#/',
-                    icon: <Icon name="home" size={20} />,
-                    active: hash === '' || hash === '#/' || hash === '#',
-                  },
-                  {
-                    key: 'payments',
-                    label: t(locale, 'common.home.tab.payments'),
-                    href: '#/payments',
-                    icon: <Icon name="payments" size={20} />,
-                    active: onPayments,
-                  },
-                  {
-                    key: 'messages',
-                    label: t(locale, 'common.home.tab.messages'),
-                    href: '#/announcements',
-                    icon: <Icon name="messages" size={20} />,
-                    active: onAnnouncements,
-                    badge: pendingCount,
-                  },
-                  {
-                    key: 'profile',
-                    label: t(locale, 'common.home.tab.profile'),
-                    href: '#/profile',
-                    icon: <Icon name="profile" size={20} />,
-                    active: onProfile,
-                  },
-                ]}
-              />
-            ) : undefined
+            firstStudentNeedingDeclaration(gatedChildren) === null
           }
-          drawerFooter={
-            <>
-              {/* 2e's counts (P9): the children and the missing declarations, above the
-                  shared language/theme footer. */}
-              {gatedChildren !== null && gatedChildren.length > 0 ? (
-                <div data-testid="drawer-counts">
-                  <p style={{ margin: 0 }}>
-                    {t(locale, 'common.nav.myChildren')} · {gatedChildren.length}
-                  </p>
-                  {gatedChildren.some(needsFullDeclaration) ? (
-                    <p style={{ margin: 0 }}>
-                      {t(locale, 'health.declaration.title')} ·{' '}
-                      {t(locale, 'people.document.missingCount').replace(
-                        '{n}',
-                        String(gatedChildren.filter(needsFullDeclaration).length),
-                      )}
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
-              {/* §11's screen, in the drawer 2e draws these controls in. A link and not a
-                  NAV entry: NAV is the family's four working surfaces, and privacy is a
-                  settings control — the same place the language and theme switches live.
-                  `routes.reachable.test.ts` requires this to exist somewhere in the app,
-                  because three screens have already shipped mounted and unreachable. */}
-              <p style={{ margin: 0 }}>
-                <a href="#/privacy">{t(locale, 'reports.privacy.title')}</a>
-              </p>
-              <AccountDrawerFooter
-                locale={locale}
-                onChooseLocale={setLocale}
-                onSignOut={() => {
-                  clearAllJoinDrafts()
-                  void session.signOut()
-                }}
-                accountName={session.displayName}
-              />
-            </>
-          }
-          studios={session.studios.map((s) => ({
-            studioId: s.studio_id,
-            studioName: s.studio_name,
-            studioIsDemo: s.studio_is_demo,
-          }))}
-          activeStudioId={session.activeStudioId}
-          onSwitchStudio={(studioId) => void switchStudio(studioId)}
           devBar={
             <DevBar
               identity={
@@ -886,7 +827,16 @@ function AuthedApp() {
             // 404 and the section renders nothing rather than another family's plan.
             <TrainingPlanSection locale={locale} studentId={planStudentId} />
           ) : onShop ? (
-            <ShopSection locale={locale} />
+            // Checkpoint 4 of the parent-app redesign. `ShopSection` + `OrderItemsScreen`
+            // are replaced by the port of the prototype's `GearScreen`; both stay on disk
+            // until the redesign is accepted end to end.
+            <ClubShop locale={locale} />
+          ) : techniquesRoute !== null ? (
+            techniquesRoute.kind === 'detail' ? (
+              <TechniqueDetail locale={locale} slug={techniquesRoute.slug} />
+            ) : (
+              <TechniquesScreen locale={locale} />
+            )
           ) : onDirections ? (
             <DirectionsScreen locale={locale} />
           ) : onInstall ? (
@@ -915,7 +865,31 @@ function AuthedApp() {
               }
             />
           ) : onProfile ? (
-            <ProfileSection locale={locale} onLocaleChange={setLocale} />
+            // The drawer's two orphans — sign-out and the studio switcher — arrive here as
+            // props rather than being read again inside the screen: `useSession()` is
+            // called ONCE for this whole route (see F1/F10 above), and a second call in a
+            // tab would put a second `/auth/refresh` on every visit to it.
+            // Checkpoint 5 of the parent-app redesign — the last of the four tabs.
+            // `ProfileSection` + `GuardianSettings` are replaced by the port of the
+            // prototype's `ProfileScreen`; both stay on disk until the redesign is
+            // accepted end to end.
+            <ProfileScreen
+              locale={locale}
+              onLocaleChange={setLocale}
+              account={{
+                studios: session.studios.map((s) => ({
+                  studioId: s.studio_id,
+                  studioName: s.studio_name,
+                  studioIsDemo: s.studio_is_demo,
+                })),
+                activeStudioId: session.activeStudioId,
+                onSwitchStudio: (studioId: string) => void switchStudio(studioId),
+                onSignOut: () => {
+                  clearAllJoinDrafts()
+                  void session.signOut()
+                },
+              }}
+            />
           ) : joiningClub ? (
             // INSIDE the gates, like every other branch: a trial family passes both today
             // (§5.5 does not hold `trial_signed` while the child is still on a trial), and
@@ -965,9 +939,19 @@ function AuthedApp() {
               studentId={invite[1]!}
             />
           ) : onAnnouncements ? (
-            <InboxScreen
+            // Checkpoint 3 of the parent-app redesign. `InboxScreen` (screen 7 of the
+            // superseded Stitch pass) is replaced by the port of the prototype's
+            // `UpdatesScreen` — three labelled sections and a filter strip in place of the
+            // one-card queue. It stays on disk until the redesign is accepted end to end,
+            // and this file still imports its `ACTIONS` map, which is the one place a
+            // notification kind is mapped to a screen.
+            <UpdatesScreen
               client={commsClient}
               locale={locale}
+              childrenById={Object.fromEntries(
+                setupChildren.map((child) => [child.id, child.first_name]),
+              )}
+              childNames={setupChildren.map((child) => child.first_name)}
               onReadChange={() => setNotificationsRead((n) => n + 1)}
             />
           ) : onEvents ? (
@@ -988,14 +972,16 @@ function AuthedApp() {
                   globalThis.location.hash = '#/install'
                 }}
               />
-              <Resolve session={session} locale={locale} />
+              {/* The unread count the tab badge already has — passed down so בית's bell
+                  shows the same number rather than fetching it a second time. */}
+              <Resolve session={session} locale={locale} notificationCount={pendingCount} />
             </>
           )}
           </PaymentSetupGate>
           </HealthGate>
           </ConsentGate>
           )}
-        </AppShell>
+        </ParentShell>
         </AccessGate>
       ) : null}
     </ThemeProvider>

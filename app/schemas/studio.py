@@ -79,6 +79,8 @@ class StudioOut(BaseModel):
     sport: str | None = None
     address: str | None = None
     phone: str | None = None
+    #: The club's own address for enquiries. Shown to parents in the contact sheet.
+    email: str | None = None
     parent_locales: list[str]
     landing: StudioLandingContent = Field(default_factory=StudioLandingContent)
     #: The strip the הגדרות panel manages; served publicly, listed here for the editor.
@@ -94,6 +96,7 @@ class StudioUpdate(BaseModel):
     sport: str | None = Field(default=None, max_length=80)
     address: str | None = Field(default=None, max_length=300)
     phone: str | None = Field(default=None, max_length=40)
+    email: str | None = Field(default=None, max_length=254)
     parent_locales: list[str] | None = None
     #: Merged into `settings.landing`, key by key — never replacing the blob.
     landing: StudioLandingContent | None = None

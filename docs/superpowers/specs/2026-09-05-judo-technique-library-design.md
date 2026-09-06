@@ -24,6 +24,8 @@ how and why they are stored the way they are.
 - The **tab wiring**. A parallel session owns `web/apps/parent/src/App.tsx`; two sessions
   editing the shell is how a branch spends its afternoon on a merge. The feature exports
   everything the wiring needs (§6) and touches no shared file.
+  **Landed 2026-09-06** in the commit that merged the two branches — §6 below records
+  what that merge made stale.
 - **Belt-test classification** — which techniques a studio requires for each grade. Wanted
   next, and it is the part that is genuinely per-studio. §7 says what this design leaves
   ready for it.
@@ -210,29 +212,53 @@ wires the tab.
 
 No string is inlined in a component, which is the rule that actually matters.
 
-## 6 · What is left wired for the fifth tab
+**Done (2026-09-06).** `techniques` is the tenth namespace: `packages/i18n/{he,en,ru}/
+techniques.ts`, registered in `types.ts` and `index.ts`, and every call site now reads
+`t(locale, 'techniques.…')` rather than the feature's own `s()`. `strings.ts` is gone;
+`format.ts` keeps `fill`/`fillGroup`, which are formatting and not translation. Two guards
+came with it: `apps/parent/src/i18nKeys.test.ts` now checks the keys the screens build from
+the dataset's unions (`techniques.family.${sub}`, `techniques.category.${cat}`), and
+`web/scripts/i18n-parity.mjs techniques` passes with `en` complete.
 
-The bottom bar has four slots today and the owner has decided the library gets a fifth —
-בית · תשלומים · הודעות · **טכניקות** · פרופיל, displacing nothing.
+## 6 · The fifth tab, as designed and as landed
 
-That is cheap: `.studio-tabbar__list` is `display: flex` with `flex: 1` per slot, nothing
-hardcodes four, and no test asserts four. The tab array is inline at `App.tsx:677`.
+**As designed.** The bottom bar had four slots and the owner decided the library gets a
+fifth — בית · תשלומים · הודעות · **טכניקות** · פרופיל, displacing nothing. `features/
+techniques/index.ts` exported `TechniquesScreen`, `TechniqueDetail`, `matchTechniquesPath`
+and a ready-made `techniquesTab(locale, active)`, so the wiring commit would be one import,
+one array entry and one route branch.
 
-`features/techniques/index.ts` therefore exports, ready to use:
+**As landed (2026-09-06).** Three of those four assumptions had expired by the time the
+branches met, because the parallel session did not just own the shell — it replaced it.
+`@studio/ui`'s `TabBar` and the seven-entry drawer above it are both gone (§4 of the
+parent-app redesign: *"Four tabs, no side menu"*), and `ParentTabBar` is a Tailwind port
+that builds its own items from records keyed by tab.
 
-- `TechniquesScreen` and `TechniqueDetailScreen`
-- `matchTechniquesPath(hash)` — the route matcher for `#/techniques` and `#/techniques/<slug>`
-- `techniquesTabItem(locale, active)` — a ready-made `TabBarItem`
+| Written here | What actually happened |
+|---|---|
+| a fifth entry in `App.tsx`'s inline `TabBar` array | five one-line rows in `ParentTabBar`'s records, and `'techniques'` in its `ParentTab` union |
+| an entry in `NAV` so the drawer reaches it | **there is no drawer.** The bar is the only home |
+| `techniquesTab(locale, active)`, ready to drop in | deleted — it built an item for a `TabBar` this app no longer mounts |
+| a `techniques` icon added to `packages/ui`'s `Icon.tsx` | **not moved.** `Icon` takes `size` and `style` and no `className`, and the new bar styles its glyphs entirely by className (`stroke-[2.4]` and a fill on the active tab). An icon moved there could not be styled by the only caller it would have, in a package staff and dashboard also load. It stays in `features/techniques/icon.tsx` and now takes the props a `lucide-react` glyph takes |
 
-The wiring commit is one import, one array entry and one route branch. **Two things it must
-also do:** add a `techniques` icon to `Icon.tsx` (23 names exist, none fits — `belts` is
-closest and already means something else), and check the label at a 360px viewport, where
-five tabs give each ~72px against תשלומים's current ~90px. If **טכניקות** truncates,
-shorten the label rather than shrink the type.
+What survived intact: `matchTechniquesPath` still decides what each hash MEANS. `App.tsx`
+names both hashes itself before calling it, because `routes.reachable.test.ts` reads the
+route table out of that file by looking for `hash === '#/…'` and `hash.startsWith('#/…/')`
+— a route parsed entirely behind a helper is a route that guard cannot arm on, which is the
+defect it exists to catch. Both routes are now guarded and both pass.
 
-`routes.reachable.test.ts` reads its route table out of `App.tsx`, so it stays green and
-untouched while this feature is unmounted, and begins guarding the route the moment the
-wiring lands.
+**The label at 360px, which this section asked for and which was the real risk.** Measured
+in the running app with all five tabs: בית 24px · חנות המועדון 60px · עדכונים 36px ·
+טכניקות 39px · פרופיל 30px — 190px of the 312px between the bar's own padding. Every label
+on one line, none clipped, no sideways page scroll, light and dark.
+`docs/screenshots/technique-library/step-5/`. Nothing needed shortening.
+
+**One thing that look found and this feature did not cause:** at both 360px and 390px the
+accessibility FAB sits directly on top of the בית tab — `elementFromPoint` at the centre of
+that tab returns the FAB, so Home is untappable from the bar. It is unchanged by the fifth
+slot (`justify-between` pins the first item to the bar's inline start whether there are four
+items or five; measured at x=312 w=24 either way), so it predates this and belongs to
+whoever owns the shell.
 
 ## 7 · What this leaves ready for belt classification
 

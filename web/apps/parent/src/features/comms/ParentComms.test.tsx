@@ -17,8 +17,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
 import { CalendarSync } from './CalendarSync'
 import { EventCalendarButtons, eventIcsUrl } from './EventCalendarButtons'
-import { InboxScreen } from './InboxScreen'
 import { PushDisabledBanner } from './PushDisabledBanner'
+import { UpdatesScreen } from './redesign/UpdatesScreen'
 import { platformOf, urlBase64ToUint8Array } from './usePushRegistration'
 import type { NotificationOut, ParentCommsClient } from './commsClient'
 import { googleSubscribeUrl, webcalUrl } from './commsClient'
@@ -94,320 +94,34 @@ afterEach(() => {
 })
 
 // -- D9.1: the inbox, and the thing that is not in it -------------------------
-describe('the club inbox (2b)', () => {
-  it('renders the updates list and nothing that could send a message', async () => {
-    // D9.1 and §2.3. No textbox to type into, no reply control, no sender on a row — a
-    // conversation thread with the office is a third level and §5.11 permits two.
-    const client = makeClient({
-      inbox: vi.fn().mockResolvedValue({
-        items: [note()],
-        next_cursor: null,
-        has_more: false,
-      }),
-    })
-    render(<InboxScreen client={client} locale="he" userAgent={ANDROID} />)
-
-    expect(await screen.findByText('ביטול שיעור')).toBeInTheDocument()
-    expect(screen.getByText(t('he', 'comms.inbox.title'))).toBeInTheDocument()
-    expect(screen.queryByRole('textbox')).toBeNull()
-    expect(screen.queryByRole('button', { name: /שיחה/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: /השב|תשובה/ })).toBeNull()
-  })
-
-  it('shows the empty state rather than an empty box', async () => {
-    render(<InboxScreen client={makeClient()} locale="he" userAgent={ANDROID} />)
-    expect(await screen.findByText(t('he', 'comms.inbox.empty'))).toBeInTheDocument()
-    expect(screen.getByText(t('he', 'comms.inbox.emptyHint'))).toBeInTheDocument()
-  })
-
-  it('marks a message read when it is opened, and only once', async () => {
-    const markRead = vi.fn().mockResolvedValue(note({ read_at: '2026-11-12T16:00:00Z' }))
-    const client = makeClient({
-      inbox: vi.fn().mockResolvedValue({ items: [note()], next_cursor: null, has_more: false }),
-      markRead,
-    })
-    render(<InboxScreen client={client} locale="he" userAgent={ANDROID} />)
-
-    const row = await screen.findByTestId('inbox-row-n1')
-    await userEvent.click(row)
-    await userEvent.click(row)
-    // The second tap is a no-op locally as well as server-side: the row is already read, and
-    // §5.11's badge would otherwise flicker under a parent's thumb.
-    expect(markRead).toHaveBeenCalledTimes(1)
-  })
-
-  it('says which rows are new in words and not only with a dot', async () => {
-    // A coloured dot is invisible to a screen reader and to anyone who reads it as
-    // decoration. `inbox.new` carries the same fact.
-    const client = makeClient({
-      inbox: vi.fn().mockResolvedValue({ items: [note()], next_cursor: null, has_more: false }),
-    })
-    render(<InboxScreen client={client} locale="he" userAgent={ANDROID} />)
-    const row = await screen.findByTestId('inbox-row-n1')
-    expect(within(row).getByText(new RegExp(t('he', 'comms.inbox.new')))).toBeInTheDocument()
-  })
-
-  it('offers no bulk control that wipes the only signal on the screen', async () => {
-    // Screen 7 removed `סימון הכל כנקרא`. It was the most prominent control on the page and
-    // its entire effect was to erase the difference between a read row and an unread one —
-    // on a screen whose complaint was that the difference was invisible.
-    const client = makeClient({
-      inbox: vi.fn().mockResolvedValue({
-        items: [note({ read_at: '2026-11-12T16:00:00Z' })],
-        next_cursor: null,
-        has_more: false,
-      }),
-    })
-    render(<InboxScreen client={client} locale="he" userAgent={ANDROID} />)
-    await screen.findByTestId('inbox-row-n1')
-    expect(screen.queryByRole('button', { name: t('he', 'comms.inbox.markAllRead') })).toBeNull()
-  })
-
-  it('renders every row as a real control a keyboard can reach', async () => {
-    const client = makeClient({
-      inbox: vi.fn().mockResolvedValue({ items: [note()], next_cursor: null, has_more: false }),
-    })
-    render(<InboxScreen client={client} locale="he" userAgent={ANDROID} />)
-    const row = await screen.findByTestId('inbox-row-n1')
-    expect(row.tagName).toBe('BUTTON')
-    expect(row).toHaveAccessibleName(/ביטול שיעור/)
-  })
-})
-
-// -- §6.5: two platforms, two paths ------------------------------------------
-describe('a message that can DO something (2026-08-30)', () => {
-  it('pins "איך היה?" with a button that goes where the payload says', async () => {
-    // §5.4a ④ has sent this on days 1, 3 and 7 since M3 carrying a booking id, a day
-    // number and nothing to press. The product asked a family whether they enjoyed
-    // themselves, three times, and offered them no way to answer.
-    const client = makeClient({
-      inbox: vi.fn().mockResolvedValue({
-        items: [
-          note({
-            id: 'n7',
-            kind: 'trial.followup',
-            title: 'איך היה?',
-            payload: { trial_booking_id: 'b1', day: 1, route: '#/join' },
-            action: { kind: 'trial_join', outstanding: true, settled_at: null, subject_name: null },
-          }),
-        ],
-        next_cursor: null,
-        has_more: false,
-      }),
-    })
-    render(<InboxScreen client={client} locale="he" userAgent={ANDROID} />)
-    await userEvent.click(await screen.findByTestId('inbox-act-n7'))
-    expect(globalThis.location.hash).toBe('#/join')
-  })
-
-  it('pins nothing for a message with no route — a no-show gets no join button', async () => {
-    // `trial.no_show` is untouched, deliberately: the worker sends that family a different
-    // message on the stated ground that "איך היה?" to somebody who did not come is worse
-    // than silence. A join button is the same mistake with money attached.
-    const client = makeClient({
-      inbox: vi.fn().mockResolvedValue({
-        items: [
-          note({
-            id: 'n8',
-            kind: 'trial.no_show',
-            title: 'התגעגענו אליכם',
-            payload: { trial_booking_id: 'b1', day: 1 },
-          }),
-        ],
-        next_cursor: null,
-        has_more: false,
-      }),
-    })
-    render(<InboxScreen client={client} locale="he" userAgent={ANDROID} />)
-    await screen.findByTestId('inbox-row-n8')
-    expect(screen.queryByTestId('inbox-act-n8')).toBeNull()
-    expect(screen.queryByTestId('inbox-queue')).toBeNull()
-  })
-})
-
-describe('what is WAITING, which is not what is unread (screen 7)', () => {
-  const declaration = (over = {}) =>
-    note({
-      id: 'w1',
-      kind: 'health.declaration_missing',
-      title: 'נדרשת הצהרת בריאות',
-      body: 'כדי להמשיך, מלאו את הצהרת הבריאות של הילד',
-      payload: { student_id: 's1', day: 3 },
-      action: {
-        kind: 'health_declaration',
-        outstanding: true,
-        settled_at: null,
-        subject_name: 'דנה',
-      },
-      ...over,
-    })
-
-  const inboxOf = (...items: NotificationOut[]) =>
-    makeClient({
-      inbox: vi.fn().mockResolvedValue({ items, next_cursor: null, has_more: false }),
-    })
-
-  it('keeps a READ notice in the queue while the club is still waiting', async () => {
-    // The axis, at the seam. A parent who opened this and pressed `אחר כך` has signed
-    // nothing — the shipped screen cleared the demand anyway, which is the defect screen 7
-    // exists to fix.
-    render(
-      <InboxScreen
-        client={inboxOf(declaration({ read_at: '2026-11-12T16:00:00Z' }))}
-        locale="he"
-        userAgent={ANDROID}
-      />,
-    )
-    expect(await screen.findByTestId('inbox-waiting-w1')).toBeInTheDocument()
-    expect(screen.getByTestId('inbox-waiting-count')).toHaveTextContent('1')
-  })
-
-  it('drops an UNREAD notice out of the queue once the record says it is done', async () => {
-    // The other direction: signed from §6.1's gate, never opened here.
-    render(
-      <InboxScreen
-        client={inboxOf(
-          declaration({
-            action: {
-              kind: 'health_declaration',
-              outstanding: false,
-              settled_at: '2026-11-10T08:00:00Z',
-              subject_name: 'דנה',
-            },
-          }),
-        )}
-        locale="he"
-        userAgent={ANDROID}
-      />,
-    )
-    expect(await screen.findByTestId('inbox-row-w1')).toBeInTheDocument()
-    expect(screen.queryByTestId('inbox-queue')).toBeNull()
-    expect(screen.getByTestId('inbox-settled-w1')).toHaveTextContent(t('he', 'comms.inbox.settled'))
-  })
-
-  it('prints an outstanding notice ONCE — in the queue and not again in the feed', async () => {
-    // Eight notices produced ten cards before: the pinned cards were re-rendered in the
-    // list below them.
-    render(<InboxScreen client={inboxOf(declaration())} locale="he" userAgent={ANDROID} />)
-    expect(await screen.findByTestId('inbox-waiting-w1')).toBeInTheDocument()
-    expect(screen.queryByTestId('inbox-row-w1')).toBeNull()
-  })
-
-  it('names the child, so two identical demands are not identical cards', async () => {
-    render(
-      <InboxScreen
-        client={inboxOf(
-          declaration(),
-          declaration({
-            id: 'w2',
-            payload: { student_id: 's2', day: 3 },
-            action: {
-              kind: 'health_declaration',
-              outstanding: true,
-              settled_at: null,
-              subject_name: 'יוסי',
-            },
-          }),
-        )}
-        locale="he"
-        userAgent={ANDROID}
-      />,
-    )
-    expect(within(await screen.findByTestId('inbox-waiting-w1')).getByText('דנה')).toBeInTheDocument()
-    expect(within(screen.getByTestId('inbox-waiting-w2')).getByText('יוסי')).toBeInTheDocument()
-  })
-
-  it('queues oldest first, so the longest wait is the one you meet', async () => {
-    render(
-      <InboxScreen
-        client={inboxOf(
-          declaration({ id: 'new', created_at: '2026-11-12T09:00:00Z' }),
-          declaration({ id: 'old', created_at: '2026-10-01T09:00:00Z' }),
-        )}
-        locale="he"
-        userAgent={ANDROID}
-      />,
-    )
-    const queue = await screen.findByTestId('inbox-queue')
-    const cards = within(queue).getAllByTestId(/^inbox-waiting-/)
-    expect(cards.map((card) => card.dataset.testid)).toEqual([
-      'inbox-waiting-old',
-      'inbox-waiting-new',
-    ])
-  })
-
-  it('counts what is waiting, not what is unread', async () => {
-    render(
-      <InboxScreen
-        client={inboxOf(
-          declaration(),
-          // Unread, but nothing is waiting on it.
-          note({ id: 'a1', title: 'אין אימונים ביום ראשון' }),
-        )}
-        locale="he"
-        userAgent={ANDROID}
-      />,
-    )
-    expect(await screen.findByTestId('inbox-waiting-count')).toHaveTextContent('1')
-  })
-
-  it('sends the action where the kind says, and marks it read on the way', async () => {
-    const markRead = vi.fn().mockResolvedValue(note())
-    const client = makeClient({
-      inbox: vi.fn().mockResolvedValue({
-        items: [
-          note({
-            id: 'p1',
-            kind: 'billing.reminder',
-            title: 'תזכורת תשלום',
-            action: { kind: 'payment', outstanding: true, settled_at: null, subject_name: null },
-          }),
-        ],
-        next_cursor: null,
-        has_more: false,
-      }),
-      markRead,
-    })
-    render(<InboxScreen client={client} locale="he" userAgent={ANDROID} />)
-    await userEvent.click(await screen.findByTestId('inbox-act-p1'))
-    expect(globalThis.location.hash).toBe('#/payments')
-    expect(markRead).toHaveBeenCalledWith('p1')
-  })
-
-  it('says so above the queue when something was settled today', async () => {
-    // The feed is in date order, so a twelve-day-old notice settled this morning would
-    // rejoin it twelve days down. The confirmation lives where the action did.
-    vi.setSystemTime(new Date('2026-11-12T12:00:00Z'))
-    render(
-      <InboxScreen
-        client={inboxOf(
-          declaration(),
-          declaration({
-            id: 'w9',
-            action: {
-              kind: 'health_declaration',
-              outstanding: false,
-              settled_at: '2026-11-12T09:00:00Z',
-              subject_name: 'יוסי',
-            },
-          }),
-        )}
-        locale="he"
-        userAgent={ANDROID}
-      />,
-    )
-    expect(await screen.findByTestId('inbox-just-settled')).toHaveTextContent(
-      t('he', 'comms.inbox.settled'),
-    )
-    vi.useRealTimers()
-  })
-})
+/**
+ * The screen that replaced `InboxScreen`. These blocks are about PUSH and about rendered
+ * CSS, not about the inbox's arrangement — both still true of עדכונים — so they were
+ * repointed rather than deleted with the screen they happened to be written against.
+ */
+function Updates({
+  client,
+  userAgent,
+}: {
+  client: ParentCommsClient
+  userAgent: string
+}) {
+  return (
+    <UpdatesScreen
+      client={client}
+      locale="he"
+      childrenById={{}}
+      childNames={[]}
+      userAgent={userAgent}
+    />
+  )
+}
 
 describe('asking for push permission', () => {
   it('teaches the install on iOS in a tab instead of offering a button that cannot work', async () => {
     // §12 — in a Safari tab the Push API is ABSENT, not denied. There is nothing to request.
     setDisplayMode('browser')
-    render(<InboxScreen client={makeClient()} locale="he" userAgent={IPHONE} />)
+    render(<Updates client={makeClient()} userAgent={IPHONE} />)
 
     expect(await screen.findByTestId('push-disabled-banner')).toBeInTheDocument()
     expect(screen.getByText(t('he', 'comms.push.iosTabHasNoApi'))).toBeInTheDocument()
@@ -418,7 +132,7 @@ describe('asking for push permission', () => {
     // The other half of the branch. Android Chrome allows Web Push in a normal tab, so the
     // install is not a precondition and gating on it would cost real subscriptions.
     setDisplayMode('browser')
-    render(<InboxScreen client={makeClient()} locale="he" userAgent={ANDROID} />)
+    render(<Updates client={makeClient()} userAgent={ANDROID} />)
     expect(
       await screen.findByRole('button', { name: t('he', 'comms.push.enable') }),
     ).toBeInTheDocument()
@@ -430,7 +144,7 @@ describe('asking for push permission', () => {
     // parent has been told what it buys them.
     const requestPermission = vi.fn().mockResolvedValue('denied')
     vi.stubGlobal('Notification', { permission: 'default', requestPermission })
-    render(<InboxScreen client={makeClient()} locale="he" userAgent={ANDROID} />)
+    render(<Updates client={makeClient()} userAgent={ANDROID} />)
 
     await userEvent.click(await screen.findByRole('button', { name: t('he', 'comms.push.enable') }))
     expect(screen.getByTestId('push-pre-prompt')).toBeInTheDocument()
@@ -447,7 +161,7 @@ describe('asking for push permission', () => {
   it('declining the pre-prompt does not spend the one OS prompt', async () => {
     const requestPermission = vi.fn()
     vi.stubGlobal('Notification', { permission: 'default', requestPermission })
-    render(<InboxScreen client={makeClient()} locale="he" userAgent={ANDROID} />)
+    render(<Updates client={makeClient()} userAgent={ANDROID} />)
 
     await userEvent.click(await screen.findByRole('button', { name: t('he', 'comms.push.enable') }))
     await userEvent.click(
@@ -462,7 +176,7 @@ describe('asking for push permission', () => {
       permission: 'denied',
       requestPermission: vi.fn(),
     })
-    render(<InboxScreen client={makeClient()} locale="he" userAgent={ANDROID} />)
+    render(<Updates client={makeClient()} userAgent={ANDROID} />)
     expect(await screen.findByTestId('push-disabled-banner')).toBeInTheDocument()
     expect(screen.getByText(t('he', 'comms.pushDisabled.body'))).toBeInTheDocument()
   })
@@ -483,7 +197,7 @@ describe('asking for push permission', () => {
     stubServiceWorker(subscribe)
     const client = makeClient()
 
-    render(<InboxScreen client={client} locale="he" userAgent={ANDROID} />)
+    render(<Updates client={client} userAgent={ANDROID} />)
     await userEvent.click(await screen.findByRole('button', { name: t('he', 'comms.push.enable') }))
     await userEvent.click(
       screen.getByRole('button', { name: t('he', 'comms.push.prePrompt.accept') }),
@@ -510,7 +224,7 @@ describe('asking for push permission', () => {
     stubServiceWorker(subscribe)
     const client = makeClient({ vapidPublicKey: vi.fn().mockResolvedValue({ public_key: null }) })
 
-    render(<InboxScreen client={client} locale="he" userAgent={ANDROID} />)
+    render(<Updates client={client} userAgent={ANDROID} />)
     await userEvent.click(await screen.findByRole('button', { name: t('he', 'comms.push.enable') }))
     await userEvent.click(
       screen.getByRole('button', { name: t('he', 'comms.push.prePrompt.accept') }),
@@ -697,8 +411,8 @@ describe('layout', () => {
     const client = makeClient({
       inbox: vi.fn().mockResolvedValue({ items: [note()], next_cursor: null, has_more: false }),
     })
-    const { container } = render(<InboxScreen client={client} locale="he" userAgent={ANDROID} />)
-    await screen.findByTestId('inbox-row-n1')
+    const { container } = render(<Updates client={client} userAgent={ANDROID} />)
+    await screen.findByTestId('updates-row-n1')
     for (const element of container.querySelectorAll<HTMLElement>('[style]')) {
       const style = element.getAttribute('style') ?? ''
       expect(style).not.toMatch(/(^|;)\s*(margin|padding|border)-(left|right)\s*:/)
@@ -707,3 +421,8 @@ describe('layout', () => {
     }
   })
 })
+
+// The three `InboxScreen` blocks were deleted with that screen. עדכונים replaces it, and
+// what they were really about — that `outstanding` and `read_at` are different questions —
+// is held by `features/comms/redesign/classify.test.ts`, which tests the rule rather than
+// one rendering of it.

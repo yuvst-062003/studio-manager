@@ -161,7 +161,7 @@ def current_logo_url(session: Session, *, studio_id: uuid.UUID) -> str | None:
 # -- step 1's fields, and the הגדרות panel that reads the same row ------------
 #: What `PATCH /studio` puts in the JSONB rather than in a column. §4.3 pins the column
 #: list, and "settings includes:" describes what the column holds rather than closing it.
-SETTINGS_FIELDS = ("sport", "address", "phone", "parent_locales")
+SETTINGS_FIELDS = ("sport", "address", "phone", "email", "parent_locales")
 
 
 def studio_public_fields(studio: Studio) -> dict[str, Any]:
@@ -187,6 +187,11 @@ def studio_public_fields(studio: Studio) -> dict[str, Any]:
         "sport": blob.get("sport"),
         "address": blob.get("address"),
         "phone": blob.get("phone"),
+        #: 2026-09-06 — the parent app's יצירת קשר sheet offers WhatsApp, a call and now
+        #: email, and there was no email anywhere on a studio. In the JSONB beside the
+        #: address and the phone, so no migration and no column: §4.3 pins the COLUMN list,
+        #: and "settings includes:" is deliberately open.
+        "email": blob.get("email"),
         "parent_locales": blob.get("parent_locales") or list(SUPPORTED_LOCALES),
         # The הגדרות panel reads current landing copy back; a writer whose reads come
         # back empty looks like a save that failed.

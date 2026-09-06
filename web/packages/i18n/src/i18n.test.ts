@@ -14,10 +14,15 @@ describe('locale direction (SPEC §9)', () => {
 })
 
 describe('Seam 3 — namespaces exist for every vertical in every locale', () => {
-  it('lists all nine namespaces', () => {
+  it('lists all ten namespaces', () => {
     expect([...NAMESPACES]).toEqual([
       'common', 'schedule', 'people', 'health',
       'attendance', 'billing', 'events', 'comms', 'reports',
+      // Not one of SPEC's nine verticals: the judo technique library is the first feature
+      // whose strings are the CHILD's rather than the club's, and it earned a namespace of
+      // its own rather than a corner of `common` for the same reason as the other nine —
+      // one file per feature is what stops two lanes editing one bundle.
+      'techniques',
     ])
   })
 

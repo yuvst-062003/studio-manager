@@ -140,9 +140,16 @@ const run = async () => {
 
       // Per SIGNING PERSON, so only the first child is ever asked. Posted for each anyway:
       // the endpoint is idempotent and the status read below is the authority.
+      //
+      // The version is READ, never hardcoded. It was `version: 1` until the club's terms
+      // reached 2, after which every post answered 422 `club_terms_version_mismatch` and
+      // the gate this script exists to clear stayed shut — with the capture run reporting
+      // a design defect (no tab bar) that was really a stale constant. The endpoint that
+      // enforces the version is the one asked for it.
+      const before = await get(`/api/v1/students/${id}/agreement`)
       const terms = await send(`/api/v1/students/${id}/agreement/club-terms`, 'POST', {
         accepted: true,
-        version: 1,
+        version: before.club_terms_version,
       })
 
       const status = await get(`/api/v1/students/${id}/agreement`)

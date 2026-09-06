@@ -87,6 +87,13 @@ export const common: Bundle = {
   'nav.myChildren': 'my children',
   'nav.settings': 'settings',
   'nav.signOut': 'sign out',
+  // -- the parent app's four tabs (the redesign of 2026-09-05) ------------------
+  'tabs.parentBarLabel': 'main navigation',
+  'tabs.parentHome': 'Home',
+  'tabs.parentShop': 'Club shop',
+  'tabs.parentUpdates': 'Updates',
+  'tabs.parentTechniques': 'Techniques',
+  'tabs.parentProfile': 'Profile',
   // §6.1's first run.
   'language.title': 'language',
   // -- the parent app's sign-in face (owner's Stitch design, 2026-09-01) ---------
@@ -269,6 +276,7 @@ export const common: Bundle = {
   'setup.studio.name': 'Club name',
   'setup.studio.sport': 'Discipline',
   'setup.studio.address': 'Address',
+  'setup.studio.email': 'Club email',
   'setup.studio.phone': 'Phone',
   'setup.studio.parentLocales': 'Languages parents will see',
   'setup.studio.locale.he': 'Hebrew',
@@ -460,8 +468,6 @@ export const common: Bundle = {
   'home.restOfWeek': 'Later this week',
   'home.upcoming': 'Upcoming lessons',
   'home.alerts': 'Alerts',
-  'home.noChildren': 'No children are linked to this account yet.',
-  'home.childrenComeLater': 'The club links a child to your account when they enrol.',
   'home.noUpcoming': 'No lessons are scheduled yet.',
   'home.noUpcomingWeek': 'No lessons are scheduled in the coming week.',
   'home.noAlerts': 'Nothing needs your attention.',

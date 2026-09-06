@@ -15,6 +15,9 @@ import { describe, expect, it } from 'vitest'
 
 const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '')
 const css = strip(readFileSync(resolve(process.cwd(), 'apps/parent/src/tailwind.css'), 'utf-8'))
+const primitives = strip(
+  readFileSync(resolve(process.cwd(), 'packages/ui/src/primitives/primitives.css'), 'utf-8'),
+)
 
 //: Every preflight rule that is an element selector. If one of these ever appears
 //: unscoped, it reaches the whole app.
@@ -129,3 +132,61 @@ describe('§9 — Tailwind coexists with @studio/ui', () => {
     expect(css).toMatch(/font:\s*inherit/)
   })
 })
+
+// ---------------------------------------------------------------------------------
+// THE OTHER DIRECTION, which the contract above never checked.
+//
+// Everything above asks "does Tailwind leak OUT of the scope". The parent-app redesign
+// found the leak going the other way: @studio/ui's own stylesheet carries bare element
+// selectors too, and it is UNLAYERED -- so an unlayered `a { color: var(--accent) }` beat
+// `text-slate-400` on a ported tab-bar link and painted the whole bar accent green. No
+// `@layer` can answer an unlayered rule, so neither Tailwind's utilities nor the scoped
+// preflight could have fixed it.
+//
+// One bare element selector matched inside the scope; this is what fails if another
+// appears. Class rules (`.studio-*`) are exempt and always were -- they cannot match ported
+// markup, which carries no `studio-` class.
+describe('§9, the other direction — @studio/ui does not leak INTO .tw-scope', () => {
+  /** Top-level bare-element rules in primitives.css: a selector list of nothing but
+   *  element names, pseudo-classes and combinators — no class, no id, no attribute. */
+  function bareElementSelectors(source: string): string[] {
+    return [...source.matchAll(/(^|\n)([^{}@\n][^{}]*)\{/g)]
+      .flatMap((match) => match[2]!.split(','))
+      .map((selector) => selector.trim())
+      .filter((selector) => selector !== '' && !/[.#[]/.test(selector))
+  }
+
+  it.each(bareElementSelectors(primitives))(
+    '`%s` is excluded from .tw-scope, or matches nothing a ported screen renders',
+    (selector) => {
+      // `:not(.tw-scope a)` is the exclusion this file's own note describes. A selector
+      // that already carries one is fine; one that does not must not name an element the
+      // ported screens actually use.
+      if (selector.includes('.tw-scope')) return
+      const elements = selector.match(/\b[a-z]+\b/g) ?? []
+      expect(elements.filter((element) => PORTED_ELEMENTS.has(element))).toEqual([])
+    },
+  )
+})
+
+/** The elements the ported Tailwind screens render and style with utilities. A rule in
+ *  primitives.css that names one of these reaches into the scope and wins, because that
+ *  file is unlayered. */
+const PORTED_ELEMENTS = new Set([
+  'a',
+  'button',
+  'img',
+  'svg',
+  'input',
+  'select',
+  'textarea',
+  'ul',
+  'ol',
+  'li',
+  'p',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'table',
+])

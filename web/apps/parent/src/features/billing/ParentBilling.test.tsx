@@ -13,7 +13,6 @@ import { PaymentsScreen } from './PaymentsScreen'
 import type { DebtRow } from './PaymentsScreen'
 import { PaymentHistoryScreen } from './PaymentHistoryScreen'
 import { PaymentCompleteScreen } from './PaymentCompleteScreen'
-import { OrderItemsScreen } from './OrderItemsScreen'
 import { PaymentStrip } from './PaymentStrip'
 import { instalmentSplit, oldestMonths, selectionTotal } from './billingClient'
 import type { BillingClient, ChargeOut, PaymentOut, PaymentPromiseOut } from './billingClient'
@@ -823,134 +822,6 @@ describe('the return from uPay', () => {
   })
 })
 
-describe('12e — ordering items', () => {
-  // The old fixture called the first item `גי מידה 140` — the size baked into the NAME,
-  // which is what a club had to do while `product` had no sizes: one row per size, each
-  // its own catalogue entry. `sizes` is the fix, and the fixture is the before/after.
-  const PRODUCTS = [
-    {
-      id: 'p1',
-      name: 'גי',
-      description: null,
-      price_agorot: 18_000,
-      is_active: true,
-      sizes: ['120', '140', '160'],
-    },
-    {
-      id: 'p2',
-      name: 'חגורה',
-      description: null,
-      price_agorot: 6_000,
-      is_active: true,
-      sizes: [],
-    },
-  ]
-
-  it('shows no stock count, no availability and says so', () => {
-    // §5.10 and §4.3 both: 'no stock counts, no inventory — that is a different product'.
-    // D-M6-14 settles the conflict with `11a`, which draws inventory: the spec wins.
-    const { container } = render(
-      <OrderItemsScreen locale={LOCALE} products={PRODUCTS} onOrder={vi.fn()} />,
-    )
-    expect(screen.getByTestId('no-stock-hint')).toHaveTextContent(
-      'אין ניהול מלאי — בחירת פריט יוצרת חיוב בלבד',
-    )
-    expect(container.textContent).not.toMatch(/במלאי|נותרו|\bN left\b/)
-  })
-
-  it('cannot order nothing', () => {
-    render(<OrderItemsScreen locale={LOCALE} products={PRODUCTS} onOrder={vi.fn()} />)
-    expect(screen.getByTestId('order-button')).toBeDisabled()
-  })
-
-  it('totals the selection in agorot', async () => {
-    render(<OrderItemsScreen locale={LOCALE} products={PRODUCTS} onOrder={vi.fn()} />)
-    await userEvent.click(within(screen.getAllByTestId('product-row')[0]!).getByRole('checkbox'))
-    const amounts = [...document.querySelectorAll('.studio-money')]
-    expect(amounts[amounts.length - 1]?.textContent).toContain('180')
-  })
-
-  it('renders the empty state when the club sells nothing', () => {
-    render(<OrderItemsScreen locale={LOCALE} products={[]} onOrder={vi.fn()} />)
-    expect(screen.getByText('לא הוגדרו פריטים')).toBeInTheDocument()
-  })
-
-  // -- sizes (2026-08-29) ------------------------------------------------------
-  const pick = (index: number) =>
-    userEvent.click(within(screen.getAllByTestId('product-row')[index]!).getByRole('checkbox'))
-
-  it('asks for a size only once a sized item is chosen', async () => {
-    // Every picker at once would be a dozen radio groups on a phone to sell one belt, and
-    // one under an unchosen item asks a question nobody has reached yet.
-    render(<OrderItemsScreen locale={LOCALE} products={PRODUCTS} onOrder={vi.fn()} />)
-    expect(screen.queryByRole('radio', { name: '140' })).toBeNull()
-    await pick(0)
-    expect(screen.getByRole('radio', { name: '140' })).toBeInTheDocument()
-  })
-
-  it('never asks for a size on an item that has none', async () => {
-    // A חגורה. Asking would be a question with no answer, and sending one is refused by
-    // the route anyway.
-    render(<OrderItemsScreen locale={LOCALE} products={PRODUCTS} onOrder={vi.fn()} />)
-    await pick(1)
-    expect(within(screen.getAllByTestId('product-row')[1]!).queryByRole('radio')).toBeNull()
-  })
-
-  it('will not order a sized item until the size is answered, and says why', async () => {
-    // The server's `size_required` 422, moved to before the press — this screen's next
-    // step is a payment page, and a parent should not be bounced off it.
-    const onOrder = vi.fn()
-    render(<OrderItemsScreen locale={LOCALE} products={PRODUCTS} onOrder={onOrder} />)
-    await pick(0)
-    expect(screen.getByTestId('order-button')).toBeDisabled()
-    expect(screen.getByTestId('choose-size-first')).toBeInTheDocument()
-
-    await userEvent.click(screen.getByRole('radio', { name: '140' }))
-    expect(screen.getByTestId('order-button')).toBeEnabled()
-    expect(screen.queryByTestId('choose-size-first')).toBeNull()
-  })
-
-  it('sends the chosen size per line, and null for an item with none', async () => {
-    const onOrder = vi.fn().mockResolvedValue(undefined)
-    render(<OrderItemsScreen locale={LOCALE} products={PRODUCTS} onOrder={onOrder} />)
-    await pick(0)
-    await userEvent.click(screen.getByRole('radio', { name: '160' }))
-    await pick(1)
-    await userEvent.click(screen.getByTestId('order-button'))
-
-    expect(onOrder).toHaveBeenCalledWith([
-      { productId: 'p1', size: '160', quantity: 1, note: null },
-      // `null`, never `''` — an empty string is a size the parent did not choose, and the
-      // route refuses any size at all against a sizeless item.
-      { productId: 'p2', size: null, quantity: 1, note: null },
-    ])
-  })
-
-  it('remembers a size across unticking and reticking the item', async () => {
-    // Re-asking would read as the app having lost it; the parent has not changed their
-    // mind about the size just because they changed it about the item.
-    const onOrder = vi.fn().mockResolvedValue(undefined)
-    render(<OrderItemsScreen locale={LOCALE} products={PRODUCTS} onOrder={onOrder} />)
-    await pick(0)
-    await userEvent.click(screen.getByRole('radio', { name: '120' }))
-    await pick(0)
-    await pick(0)
-    expect(screen.getByTestId('order-button')).toBeEnabled()
-    await userEvent.click(screen.getByTestId('order-button'))
-    expect(onOrder).toHaveBeenCalledWith([{ productId: 'p1', size: '120', quantity: 1, note: null }])
-  })
-
-  it('still says nothing about availability, now that there are sizes to say it about', () => {
-    // §5.10 did not move because the catalogue grew a column. Which sizes the club OFFERS
-    // is not which sizes it HAS.
-    const { container } = render(
-      <OrderItemsScreen locale={LOCALE} products={PRODUCTS} onOrder={vi.fn()} />,
-    )
-    expect(container.textContent).not.toMatch(/במלאי|נותרו|אזל/)
-    expect(container.querySelectorAll('[data-disabled="true"]')).toHaveLength(0)
-  })
-})
-
 describe('the student-card payment strip', () => {
   it('shows nothing when the family owes nothing', () => {
     // D2 keeps the debt alert on `1a`. A strip announcing a zero balance is noise on a card
@@ -967,53 +838,6 @@ describe('the student-card payment strip', () => {
   })
 })
 
-describe('quantity and the parent’s note (2026-08-30)', () => {
-  const PRODUCTS = [
-    { id: 'p1', name: 'גי', price_agorot: 18_000, sizes: [] },
-    { id: 'p2', name: 'חגורה', price_agorot: 4_000, sizes: [] },
-  ]
-
-  it('a chosen item grows a quantity field, and the total follows it', async () => {
-    render(<OrderItemsScreen locale={LOCALE} products={PRODUCTS} onOrder={vi.fn()} />)
-    await userEvent.click(within(screen.getAllByTestId('product-row')[0]!).getByRole('checkbox'))
-    await userEvent.selectOptions(
-      screen.getByLabelText(t(LOCALE, 'billing.product.quantity')),
-      '3',
-    )
-    const amounts = [...document.querySelectorAll('.studio-money')]
-    expect(amounts[amounts.length - 1]?.textContent).toContain('540')
-  })
-
-  it('quantity and note travel on the order line', async () => {
-    const onOrder = vi.fn(() => Promise.resolve())
-    render(<OrderItemsScreen locale={LOCALE} products={PRODUCTS} onOrder={onOrder} />)
-    await userEvent.click(within(screen.getAllByTestId('product-row')[0]!).getByRole('checkbox'))
-    await userEvent.selectOptions(
-      screen.getByLabelText(t(LOCALE, 'billing.product.quantity')),
-      '2',
-    )
-    await userEvent.type(
-      screen.getByLabelText(t(LOCALE, 'billing.product.noteLabel')),
-      'רקמה: יוסי',
-    )
-    await userEvent.click(screen.getByTestId('order-button'))
-    expect(onOrder).toHaveBeenCalledWith([
-      { productId: 'p1', size: null, quantity: 2, note: 'רקמה: יוסי' },
-    ])
-  })
-
-  it('an unchosen item asks neither quantity nor note', () => {
-    render(<OrderItemsScreen locale={LOCALE} products={PRODUCTS} onOrder={vi.fn()} />)
-    expect(screen.queryByLabelText(t(LOCALE, 'billing.product.quantity'))).toBeNull()
-    expect(screen.queryByLabelText(t(LOCALE, 'billing.product.noteLabel'))).toBeNull()
-  })
-})
-
-// -- the card buys months forward (owner request, 2026-08-30) -----------------
-//
-// "when want to pay with card should have an option to choose number of month; there is
-// only one available. user can pay with card 3 month ahead and the payment will be
-// nummonth * payment options."
 describe('1b — the card route pays months forward', () => {
   const TERMS = { cashMonths: 3, chequeMonths: 12, monthlyTotalAgorot: 30_000 }
 
@@ -1080,3 +904,8 @@ describe('1b — the card route pays months forward', () => {
     expect(within(control).queryByRole('radio', { name: '3' })).toBeNull()
   })
 })
+
+// The two `OrderItemsScreen` blocks were deleted with that screen. חנות המועדון replaces
+// it, and the server-side rules they exercised — pricing from the catalogue, the size
+// pairing, the quantity ceiling — are held where they are enforced, in
+// `tests/billing/test_shop.py`.

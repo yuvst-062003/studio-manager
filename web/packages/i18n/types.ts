@@ -9,6 +9,7 @@ export type Locale = (typeof LOCALES)[number]
 export const NAMESPACES = [
   'common', 'schedule', 'people', 'health',
   'attendance', 'billing', 'events', 'comms', 'reports',
+  'techniques',
 ] as const
 export type Namespace = (typeof NAMESPACES)[number]
 

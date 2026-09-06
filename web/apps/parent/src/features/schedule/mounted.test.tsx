@@ -5,10 +5,9 @@
 // imported nothing from this folder. A component test renders the component directly,
 // which is exactly the thing a guardian cannot do. This one renders `App` and navigates
 // the way a guardian does — by the hash, and by the nav drawer.
-import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { t } from '@studio/i18n'
 import App from '../../App'
 
 const STUDIO = {
@@ -77,16 +76,23 @@ describe('the parent app mounts lane SCHEDULE', () => {
     await waitFor(() => expect(screen.getByTestId('child-calendar')).toBeInTheDocument())
   })
 
-  it('offers the calendar in the nav drawer, so the hash is not the only way in', async () => {
-    // A screen reachable only by typing a URL is not reachable on a phone. The drawer
-    // renders nothing while closed, so this opens it the way a guardian does.
-    globalThis.location.hash = ''
+  it('offers the calendar from a screen, so the hash is not the only way in', async () => {
+    // A screen reachable only by typing a URL is not reachable on a phone. This used to
+    // open the nav drawer; the redesign deleted it (§4), and the owner's review of
+    // 2026-09-06 turned פרופיל into a card of button-rows — so the link now sits inside the
+    // הגדרות sheet, as §5.12's CALENDAR FEED. That is what `#/calendar` still exists for
+    // now that בית draws the month itself in a modal.
+    //
+    // The test WALKS that path rather than asserting the link is on the surface: one tap is
+    // reachable, and a test that demanded no taps would be asserting a layout instead of
+    // the property it was written for — that something in the running app leads here.
+    globalThis.location.hash = '#/profile'
     vi.stubGlobal('fetch', signedInAs({ parent: true }))
 
     render(<App />)
 
-    await userEvent.click(await screen.findByRole('button', { name: t('he', 'common.nav.menu') }))
-    const link = await screen.findByRole('link', { name: t('he', 'schedule.calendar.title') })
+    await userEvent.click(await screen.findByTestId('profile-row-settings'))
+    const link = await screen.findByTestId('link-calendar')
     expect(link).toHaveAttribute('href', '#/calendar')
   })
 

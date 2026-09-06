@@ -118,6 +118,12 @@ export type DashboardBillingClient = {
   /** Partial. Omitting `sizes` leaves them alone; sending `[]` clears them, which is what
    *  "it turned out not to come in sizes" has to be able to save. */
   updateProduct(productId: string, input: Partial<ProductInput>): Promise<ProductOut>
+  /** The manager's photo of an item. Multipart, and the browser sets its own boundary —
+   *  passing a Content-Type here would produce one without a boundary and a 422 nobody
+   *  could read. Uploading is a SECOND step after the item exists, because the object is
+   *  keyed by the product's id. */
+  uploadProductImage(productId: string, file: File): Promise<ProductOut>
+  deleteProductImage(productId: string): Promise<void>
   paymentPromises(status?: string, method?: PromiseMethod): Promise<ManagerPaymentPromiseOut[]>
   planChanges(): Promise<ManagerPlanChangeOut[]>
   settlePlanChange(changeId: string): Promise<void>
@@ -376,6 +382,20 @@ export function makeDashboardBillingClient(fetcher: Fetcher): DashboardBillingCl
           body: JSON.stringify(body),
         }),
       )
+    },
+    async uploadProductImage(productId, file) {
+      const body = new FormData()
+      body.append('file', file)
+      // No `headers` at all: `fetch` derives `multipart/form-data; boundary=…` from the
+      // FormData, and setting the header by hand omits the boundary.
+      return json<ProductOut>(
+        await fetcher(`/api/v1/products/${productId}/image`, { method: 'POST', body }),
+      )
+    },
+    async deleteProductImage(productId) {
+      const response = await fetcher(`/api/v1/products/${productId}/image`, { method: 'DELETE' })
+      // 204, and 404 means it is already gone — which is the state the caller wanted.
+      if (!response.ok && response.status !== 404) throw new Error(String(response.status))
     },
   }
 }

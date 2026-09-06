@@ -215,3 +215,104 @@ export function studioWallTimeToUtc(dayKey: string, time: string): string {
   }
   return new Date(guess).toISOString()
 }
+
+/* ── A DAY KEY IS NOT AN INSTANT ───────────────────────────────────────────────────────
+ *
+ * The three below take a `YYYY-MM-DD` day key rather than an ISO instant, because that is
+ * what a calendar grid, a week strip and a day headline actually hold — the parent app's
+ * home tab picks a DAY and then asks what is on it. Passing an instant would mean every
+ * caller inventing a time of day first, and inventing midnight is the one choice that
+ * breaks: `2026-08-25T00:00:00Z` is still 25 August in Jerusalem but only just, and the
+ * same expression a zone west of UTC would read as the 24th. They are all built at
+ * **midday UTC**, which no real-world offset can push into an adjacent date.
+ *
+ * They exist at all because the parent redesign shipped with a hard-coded Hebrew
+ * `MONTH_NAME` array and a hard-coded `WEEKDAY_LETTER` array, and composed its headline as
+ * `יום ${letter} • ${day} ב${month} ${year}` — a sentence with a Hebrew preposition glued
+ * on by hand, which is untranslatable by construction. `Intl` produces every one of those
+ * strings exactly, including the Russian genitive month ("25 августа", not "25 август")
+ * that a key-per-month table would have got wrong.
+ */
+
+const narrowWeekdayFormatters = new Map<string, Intl.DateTimeFormat>()
+const dayMonthFormatters = new Map<string, Intl.DateTimeFormat>()
+const shortWeekdayFormatters = new Map<string, Intl.DateTimeFormat>()
+
+function formatterFor(
+  cache: Map<string, Intl.DateTimeFormat>,
+  locale: Locale,
+  options: Intl.DateTimeFormatOptions,
+): Intl.DateTimeFormat {
+  let formatter = cache.get(locale)
+  if (!formatter) {
+    // `timeZone: 'UTC'`, unlike every formatter above it: these read a day key that is
+    // ALREADY a Jerusalem calendar day (`studioDayKey` made it one), so re-projecting it
+    // into Jerusalem would shift it a second time.
+    formatter = new Intl.DateTimeFormat(locale, { timeZone: 'UTC', ...options })
+    cache.set(locale, formatter)
+  }
+  return formatter
+}
+
+/** A `YYYY-MM-DD` day key → the midday-UTC instant that names it. */
+function middayOf(dayKey: string): Date {
+  const [year, month, day] = dayKey.split('-').map(Number)
+  return new Date(Date.UTC(year ?? 1970, (month ?? 1) - 1, day ?? 1, 12))
+}
+
+/**
+ * The seven weekday initials, **Sunday first**, for a calendar grid's header row and a
+ * week strip's day buttons.
+ *
+ * Sunday-first because the studio's week is: `group_schedule_rule.weekday` is 0 for Sunday
+ * and every grid in this product is laid out that way. `Intl`'s own first-day-of-week
+ * differs by locale and is deliberately not consulted — the ORDER is the schema's, only
+ * the letters are the locale's.
+ *
+ * An initial is ambiguous in some languages (English has two `T`s and two `S`s, Russian
+ * two `В` and two `С`), which is why these are only ever rendered under an element that
+ * also carries the full date as its accessible name.
+ */
+export function weekdayInitials(locale: Locale): readonly string[] {
+  const formatter = formatterFor(narrowWeekdayFormatters, locale, { weekday: 'narrow' })
+  // 4 January 2026 is a Sunday.
+  return Array.from({ length: 7 }, (_, index) =>
+    formatter.format(new Date(Date.UTC(2026, 0, 4 + index, 12))),
+  )
+}
+
+/** A day key → its weekday initial, the one `weekdayInitials` would give at that index. */
+export function weekdayInitialOf(dayKey: string, locale: Locale): string {
+  return formatterFor(narrowWeekdayFormatters, locale, { weekday: 'narrow' }).format(
+    middayOf(dayKey),
+  )
+}
+
+/** A day key → `25 באוגוסט` / `August 25` / `25 августа`. No year: for a heading whose
+ *  year is already on screen, or where the day is within the month being browsed. */
+export function formatDayAndMonth(dayKey: string, locale: Locale): string {
+  return formatterFor(dayMonthFormatters, locale, { day: 'numeric', month: 'long' }).format(
+    middayOf(dayKey),
+  )
+}
+
+/**
+ * A day key → `יום ג׳ • 25 באוגוסט 2026`.
+ *
+ * Composed from two formatters rather than one `weekday: 'short'` format, because the
+ * separator is the design's: `Intl`'s own would put a comma there, and the bullet is what
+ * the parent home's day headline has. Same shape as `formatSessionWhen`, which composes
+ * `·` between a date and a time for the same reason.
+ */
+export function formatDayHeadline(dayKey: string, locale: Locale): string {
+  const date = middayOf(dayKey)
+  const weekday = formatterFor(shortWeekdayFormatters, locale, { weekday: 'short' }).format(date)
+  const rest = formatterFor(dateFormattersUtc, locale, {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(date)
+  return `${weekday} • ${rest}`
+}
+
+const dateFormattersUtc = new Map<string, Intl.DateTimeFormat>()

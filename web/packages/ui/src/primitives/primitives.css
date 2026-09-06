@@ -931,8 +931,24 @@ button.studio-row:focus-visible {
  * default blue — which fails WCAG AA on the dark ground (axe: color-contrast on the
  * parent home's settings link). The accent holds AA on both surfaces: #1f6b3f on
  * #fffefb is 6.4:1, #4a9b5e on #1e1d1a is 4.9:1. Visited keeps the same color on
- * purpose — these are app-chrome links, not a document's trail. */
-a {
+ * purpose — these are app-chrome links, not a document's trail.
+ *
+ * NOT inside `.tw-scope`. That is the parent app's ported-Tailwind subtree, and this rule
+ * is UNLAYERED — so it beat `text-slate-400` on a tab-bar link and painted the whole bar
+ * accent green, which is a colour the design never asked for. Unlayered declarations
+ * outrank every `@layer`, so neither Tailwind's `utilities` layer nor the scoped preflight
+ * in apps/parent/src/tailwind.css could answer it; the fix has to be here, at the rule
+ * that reaches where it should not.
+ *
+ * The same oversight the tailwind.css header records for custom properties, one level
+ * down: class names were compared and cannot collide, variable names were compared later,
+ * and BARE ELEMENT SELECTORS in this file were never compared at all — only preflight's
+ * were. This is the only one that currently matches inside the scope; `tailwind.isolation`
+ * now has a test that fails if another appears.
+ *
+ * A no-op for staff and dashboard, which have no `.tw-scope`, and for every parent screen
+ * that is still design-system styled. */
+a:not(.tw-scope a) {
   color: var(--accent);
 }
 
@@ -1758,6 +1774,13 @@ a.studio-stat-tile:focus-visible {
   transition: none !important;
 }
 
+/* stylelint-disable-next-line no-descending-specificity --
+ * The rule this is "out of order" with is `a:not(.tw-scope a)` at line ~950, and the two
+ * set DIFFERENT properties — that one `color`, this one `text-decoration`. The lint is a
+ * heuristic for a cascade conflict, and there is none to have: no declaration here can be
+ * overridden by that one, in either order. The accessibility preference deliberately still
+ * reaches inside `.tw-scope`, because a reader who asked for underlined links wants them on
+ * every screen, ported or not. */
 [data-a11y-links='underline'] a {
   text-decoration: underline;
 }

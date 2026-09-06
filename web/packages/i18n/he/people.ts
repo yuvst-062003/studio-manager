@@ -419,11 +419,6 @@ export const people: Bundle = {
   // the card lines up against them, so a label that wraps moves every row beside it.
   'card.membership': 'חברות',
   'card.plan': 'מסלול',
-  // 12j's "what happens next" line. Asked for by FirstRegistration since it was
-  // written and translated nowhere, so a parent who had just registered read the key
-  // itself on the screen that told them they were done (2026-08-31).
-  'card.sectionsComeLater':
-    'שאר המסכים — לוח השיעורים, הנוכחות והתשלומים — נפתחים באפליקציה אחרי חתימה על הצהרת הבריאות.',
   'alerts.title': 'מרכז התראות',
   'alerts.empty': 'אין התראות שדורשות טיפול',
   'alerts.pendingRequests': 'בקשות הצטרפות ממתינות',
@@ -513,34 +508,98 @@ export const people: Bundle = {
   // child this caller is not a guardian of would disclose that they train here.
   'sibling.duplicate': 'נראה שהילד/ה כבר רשומים במועדון. פנו למועדון כדי לוודא.',
 
-  // -- screen 8: the guardian's own settings -------------------------------------
+  // -- פרופיל, the redesigned parent profile tab (2026-09-05, reordered 2026-09-06) --
   //
-  // The profile tab shipped titled `student.plural`, listing children, with the only
-  // per-child control being the destructive one. These are the keys that make it a screen
-  // about the PARENT: their own record, the app's settings, and the ways onward.
+  // This REPLACES the block `ProfileSection` used. That screen laid nine sections end to
+  // end and ran to four thousand pixels; the owner's review asked for "a card of buttons,
+  // so the screen isn't full and stacked", so a row now carries its title and nothing else
+  // and each one opens a sheet. 'profile.title' below is the section's accessible name and
+  // is the only key that survived the rewrite unchanged.
   'profile.title': 'פרופיל',
-  'profile.account': 'החשבון שלי',
-  'profile.app': 'האפליקציה',
-  'profile.family': 'המשפחה',
-  'profile.club': 'המועדון',
-  'profile.privacy': 'פרטיות',
-  'profile.name': 'שם',
-  'profile.email': 'אימייל',
-  'profile.phone': 'טלפון',
-  'profile.notSet': 'לא הוגדר',
-  'profile.edit': 'עריכה',
-  'profile.save': 'שמירה',
-  'profile.saveFailed': 'לא הצלחנו לשמור את הפרטים. נסו שוב.',
-  'profile.language': 'שפה',
-  'profile.theme': 'ערכת נושא',
-  'profile.notifications': 'התראות',
-  'profile.notifications.hint': 'עדכונים על ביטולי שיעורים',
-  'profile.notifications.on': 'פעילות',
-  'profile.notifications.off': 'כבויות',
-  'profile.paymentMethod': 'אמצעי התשלום שלי',
-  'profile.children': 'הילדים שלי',
-  'profile.leaveHint': 'עזיבת המועדון נעשית מתוך כרטיס החניך',
-  'profile.address': 'כתובת',
+  // -- the family header. The club's name is the studio's, never a constant, and there is
+  //    no season line: the API has no training-year label and this will not invent one --
+  'profile.familyTitle': 'משפחת {{name}}',
+  'profile.familyTitleUnknown': 'הפרופיל שלי',
+  'profile.familySubtitle': 'הגדרות, תשלומים והמתאמנים שלכם',
+  // -- the menu. A row shows its title and, when something needs the parent, a red dot.
+  //    The dot is a colour, so `needsAttention` goes into the accessible name too --
+  'profile.menuPersonal': 'פרטים אישיים',
+  'profile.menuTrainees': 'המתאמנים שלי',
+  'profile.menuPayments': 'תשלומים',
+  'profile.menuClub': 'המועדון',
+  'profile.menuSettings': 'הגדרות',
+  'profile.needsAttention': 'דורש טיפול',
+  // -- תשלומים. A SENTENCE about whether the family is straight with the club, not a
+  //    charged-versus-paid summary: a cheque payer settled the season in one go and has
+  //    nothing to do, and a bookkeeper's pair of totals never told them that --
+  'profile.coverageOwedTitle': 'יתרה לתשלום',
+  // `{{month}}` arrives already localized (`formatMonthLabel`), so no month-name table.
+  'profile.coverageCovered': 'משולם עד {{month}}',
+  'profile.coverageCoveredNote': 'אין מה לעשות — הכול מסודר',
+  'profile.coverageSettled': 'אין יתרה פתוחה',
+  'profile.coverageSettledNote': 'אין חיובים פתוחים על שמכם',
+  'profile.allTransactions': 'כל התנועות',
+  'profile.billingTitle': 'תשלומים',
+  'profile.openCharges': '{{count}} חיובים פתוחים',
+  'profile.openChargeOne': 'חיוב פתוח אחד',
+  'profile.payNow': 'לתשלום',
+  'profile.paymentMethod': 'אמצעי תשלום',
+  'profile.paymentMethodNone': 'לא הוגדר',
+  'profile.paymentMethodUpdate': 'עדכון',
+  // Said out loud, because the prototype's own modal asks for card digits and this one
+  // cannot: the card form is uPay's, on uPay's origin.
+  'profile.paymentMethodHint': 'פרטי האשראי נמסרים בעמוד המאובטח של חברת הסליקה — האפליקציה לא רואה אותם ולא שומרת אותם.',
+  // -- המועדון: the dojo and the contact actions, merged. Both answer "how do I reach the
+  //    club", and two rows for one question is the kind of thing that fills a screen --
+  'profile.clubTitle': 'המועדון',
+  'profile.contactTitle': 'יצירת קשר',
+  'profile.contactWhatsApp': 'ווטסאפ',
+  'profile.contactCall': 'שיחה',
+  'profile.contactEmail': 'דוא״ל',
+  'profile.contactNone': 'המועדון עדיין לא הגדיר פרטי יצירת קשר',
+  'profile.dojoNoAddress': 'המועדון לא הגדיר כתובת',
+  'profile.directions': 'הוראות הגעה',
+  // -- פרטים אישיים: the guardian's OWN record. Not in the prototype at all — that design
+  //    shows a family's children and never the parent. Owner review, 2026-09-06 --
+  'profile.personalTitle': 'פרטים אישיים',
+  'profile.personalEdit': 'עריכה',
+  'profile.personalName': 'שם',
+  'profile.personalFirstName': 'שם פרטי',
+  'profile.personalLastName': 'שם משפחה',
+  'profile.personalEmail': 'דוא״ל',
+  'profile.personalPhone': 'טלפון',
+  'profile.personalNotSet': 'לא הוזן',
+  'profile.personalSheetTitle': 'עריכת פרטים אישיים',
+  'profile.personalSave': 'שמירה',
+  'profile.personalSaving': 'שומר…',
+  'profile.personalCancel': 'ביטול',
+  'profile.personalSaveFailed': 'השמירה נכשלה. נסו שוב.',
+  // -- המתאמנים שלי. The attendance percentage lives HERE, on the child's own row, and
+  //    nowhere else on this tab: it is a per-child number, and a family screen showing one
+  //    needed a child picker, which is the tell that it was on the wrong screen --
+  'profile.traineesTitle': 'המתאמנים שלי',
+  'profile.traineesSub': 'לחיצה על מתאמן פותחת את הכרטיס המלא',
+  'profile.attendanceLabel': 'נוכחות',
+  'profile.beltUnset': 'טרם נקבעה חגורה',
+  'profile.needsDeclaration': 'חסרה הצהרת בריאות',
+  'profile.addChild': 'הוספת מתאמן',
+  // -- הגדרות --
+  'profile.preferencesTitle': 'שפה ותצוגה',
+  'profile.languageLabel': 'שפת האפליקציה',
+  'profile.themeLabel': 'מצב תצוגה',
+  'profile.themeLight': 'בהיר',
+  'profile.themeDark': 'כהה',
+  'profile.themeAuto': 'אוטומטי',
+  'profile.privacy': 'פרטיות והנתונים שלי',
+  'profile.calendarFeed': 'סנכרון יומן',
+  'profile.close': 'סגירה',
+  'profile.loading': 'טוען…',
+  // -- when a פרופיל sheet's own read failed --------------------------------------
+  // Each of the screen's reads used to end `.catch(() => setChildren([]))`, so a network
+  // failure told a family they had no trainees, and the payments sheet span on 'טוען…'
+  // for ever. An empty list is an ANSWER; a failed read is not one.
+  'profile.sheetFailed': 'לא הצלחנו לטעון את הפרטים',
+  'profile.sheetRetry': 'נסו שוב',
 
   // -- the join wizard (task 6) -- moved verbatim from
   // web/apps/parent/src/features/onboarding/wizard/content.ts. Order mirrors the

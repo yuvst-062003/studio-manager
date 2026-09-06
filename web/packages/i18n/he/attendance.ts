@@ -203,4 +203,107 @@ export const attendance: Bundle = {
   // `{{counts}}` is an ltr island the caller substitutes — bare digits in an RTL paragraph
   // reorder, and `1/9` would render `9/1`.
   'report.markedOfSessions': 'סומנו {{counts}} שיעורים',
+  // -- the parent home's absence sheets (the redesign of 2026-09-05) -------------
+  //
+  // SEPARATE from `absence.*` above, which is `#/absence`'s own screen and still shipping.
+  // Several strings read like duplicates: `absence.tooLate` and `dayAbsence.resultTooLate`
+  // are both about a lesson that already began, but one is a refusal on a form and one is
+  // a row in a results list, and rewording either must not silently reword the other.
+  'absenceSheet.title': 'דיווח היעדרות מאימון',
+  'absenceSheet.subtitle': 'עדכון מהיר לצוות המאמנים',
+  'absenceSheet.close': 'סגירה',
+  'absenceSheet.reasonLegend': 'סיבת ההיעדרות:',
+  'absenceSheet.reasonHint': 'יש לבחור סיבה אחת',
+  'absenceSheet.noteLabel': 'הערה למאמן (אופציונלי):',
+  'absenceSheet.noteRecommended': "מומלץ אם נבחר 'אחר'",
+  'absenceSheet.notePlaceholder': 'פרטים נוספים לצוות האימון...',
+  'absenceSheet.submit': 'אישור ושליחת דיווח',
+  'absenceSheet.submitting': 'שולח…',
+  'absenceSheet.cancel': 'ביטול',
+  // -- every way the write can be refused. The prototype has none of these because it has
+  //    no server; each one is a state a parent can actually reach. `offline` is not a
+  //    network error message but a RULE: §10.2 says a pre-report requires a connection on
+  //    purpose, because it is time-critical and worthless if it lands after the lesson --
+  'absenceSheet.failure.too_late': 'השיעור כבר התחיל, ולא ניתן לדווח עליו מראש. אפשר לעדכן את המאמן ישירות.',
+  'absenceSheet.failure.already_marked': 'כבר דיווחתם על השיעור הזה.',
+  'absenceSheet.failure.offline': 'דיווח היעדרות דורש חיבור לאינטרנט. הדיווח לא יישמר במצב לא מקוון — נסו שוב כשיש חיבור.',
+  'absenceSheet.failure.unknown': 'הדיווח לא נשלח. נסו שוב.',
+  // -- FLOW A2: one report for every lesson the family has on a chosen day --------
+  'dayAbsence.title': 'דיווח היעדרות לכל הילדים',
+  'dayAbsence.subtitle': 'עדכון מרוכז לכל צוות המאמנים',
+  // `{{names}}` is the children's list, already joined by the caller.
+  'dayAbsence.targetOne': 'ילד אחד: {{names}}',
+  'dayAbsence.targetMany': 'כל {{count}} הילדים: {{names}}',
+  'dayAbsence.targetNote': 'היעדרות מכלל האימונים המתוכננים',
+  'dayAbsence.openCta': 'דיווח היעדרות לכל הילדים ביום זה',
+  'dayAbsence.openDone': 'היעדרות כל הילדים נרשמה ✓',
+  'dayAbsence.submit': 'שליחת דיווח לכל האימונים',
+  'dayAbsence.submitting': 'שולח…',
+  // -- the RESULT list, which the prototype has no need for: this is N separate writes and
+  //    they do not all have to succeed. A sheet that closed on "done" would tell a parent
+  //    they had reported three absences when the club heard about two --
+  'dayAbsence.resultsTitle': 'תוצאות הדיווח',
+  'dayAbsence.resultRecorded': 'נשלח',
+  'dayAbsence.resultTooLate': 'השיעור כבר התחיל',
+  'dayAbsence.resultAlready': 'כבר דווח',
+  'dayAbsence.resultFailed': 'לא נשלח',
+  'dayAbsence.resultsAllOk': 'כל הדיווחים נשלחו',
+  'dayAbsence.resultsSomeFailed': 'חלק מהדיווחים לא נשלחו. אפשר לנסות שוב מכרטיס האימון.',
+  'dayAbsence.done': 'סגירה',
+  'dayAbsence.nothingToReport': 'אין אימונים מתוכננים ביום זה',
+  // -- the six reasons the prototype offers.
+  //
+  //    `reason.<key>.label` IS ALSO WHAT GETS STORED. `POST /absence-reports` has one
+  //    free-text `reason` column and no enum, and a coach reads the value on the mat. So
+  //    the sheet renders the PARENT's locale and sends the HEBREW — `t('he', ...)` at the
+  //    one call site that builds the payload. A Russian-speaking family choosing 'Болезнь'
+  //    must not put a word the coach cannot read into the register.
+  'reason.sick.label': 'מחלה',
+  'reason.sick.sub': 'לא מרגיש טוב / חום',
+  'reason.family.label': 'אירוע משפחתי',
+  'reason.family.sub': 'שמחה משפחתית',
+  'reason.school.label': 'עומס לימודי',
+  'reason.school.sub': 'מבחנים / לימודים',
+  'reason.injury.label': 'פציעה / כאבים',
+  'reason.injury.sub': 'התאוששות ומנוחה',
+  'reason.vacation.label': 'נסיעה / חופשה',
+  'reason.vacation.sub': 'חופשה מחוץ לבית',
+  'reason.other.label': 'אחר',
+  'reason.other.sub': 'פירוט חופשי בהערה',
+  // -- FLOW B, the prototype's דיווח היעדרות תקופתי: a holiday, exams, a week away ------
+  //
+  // Two things it does that the prototype's version does not, because the prototype has no
+  // server: it FETCHES the sessions in the chosen range (the home holds two weeks, and a
+  // family away for a month would otherwise report nothing at all and be told it worked),
+  // and it reports per write, because N writes do not all have to succeed.
+  'rangeAbsence.title': 'דיווח היעדרות תקופתי',
+  'rangeAbsence.subtitle': 'חופשה, מבחנים או היעדרות מרובת ימים',
+  'rangeAbsence.whoLegend': 'עבור מי ההיעדרות?',
+  'rangeAbsence.selectAll': 'סימון כל הילדים',
+  'rangeAbsence.clearAll': 'ניקוי הבחירה',
+  'rangeAbsence.whoRequired': 'יש לבחור לפחות ילד אחד',
+  'rangeAbsence.presetsLegend': 'טווח מהיר:',
+  'rangeAbsence.presetToday': 'היום',
+  'rangeAbsence.presetWeekend': 'סופ״ש הקרוב',
+  'rangeAbsence.presetWeek': 'שבוע שלם',
+  'rangeAbsence.from': 'מתאריך:',
+  'rangeAbsence.to': 'עד תאריך:',
+  // The range is checked before anything is written. A backwards range is a typo, and a
+  // very long one is almost always a year typed into the month field — both are refused
+  // with the reason rather than turned into a hundred writes.
+  'rangeAbsence.rangeBackwards': 'תאריך הסיום מוקדם מתאריך ההתחלה',
+  'rangeAbsence.rangeTooLong': 'אפשר לדווח על טווח של עד {{days}} ימים',
+  'rangeAbsence.submit': 'עדכון היעדרות במערכת',
+  'rangeAbsence.submitting': 'בודק אילו אימונים בטווח…',
+  // NOT named `loadFailed`, and `tools/__tests__/load-failed-recovery.test.ts` is why:
+  // that guard reads a `*.loadFailed` key as "this SCREEN could not load" and requires the
+  // `LoadFailed` primitive with its retry. This is a sheet's own refusal — the parent is
+  // still on the form, the submit is still there, and the range they typed is still in the
+  // fields. Naming it `loadFailed` would have been a claim about the screen that is false.
+  'rangeAbsence.rangeReadFailed': 'לא הצלחנו לקרוא את האימונים בטווח. נסו שוב.',
+  // The range HAS no lessons in it. Said plainly rather than reported as a success: a
+  // parent told "הדיווח נשלח" over zero writes believes the club was told.
+  'rangeAbsence.nothingInRange': 'אין אימונים מתוכננים בטווח שנבחר לילדים שנבחרו',
+  'rangeAbsence.foundOne': 'נמצא אימון אחד בטווח',
+  'rangeAbsence.foundMany': 'נמצאו {{count}} אימונים בטווח',
 }

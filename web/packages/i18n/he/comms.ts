@@ -169,4 +169,42 @@ export const comms: Bundle = {
   // sessions — so the panel says which one you are looking at.
   'calendar.coachSubtitle': 'השיעורים שאתם מעבירים יופיעו ביומן שלכם',
   'inbox.joinClub': 'הצטרפות למועדון',
+  // -- עדכונים, the redesigned parent updates tab (2026-09-05) -------------------
+  //
+  // Separate from `inbox.*` above, which is the screen this replaced. Several strings look
+  // like duplicates and are not: `inbox.new` and `updates.isNew` are both 'חדש' today, but
+  // one marks a row in a one-card queue and the other a row in a labelled section, and a
+  // rewording of either must not silently reword the other.
+  'updates.title': 'לוח עדכונים והודעות',
+  // NOT the prototype's 'דורשים טיפול'. "Require handling" is true of an outstanding
+  // action and false of an unopened announcement, and this counts both — because the tab
+  // bar's badge does, and the two are on screen together. 'ממתינים לכם' is true of both.
+  'updates.pendingCount': '{{count}} ממתינים לכם',
+  'updates.allClear': 'הכל מעודכן ✓',
+  // -- the filter strip --
+  'updates.filterLabel': 'פילטר קטגוריות',
+  'updates.filterAll': 'הכל',
+  'updates.filterAction': 'דורש פעולה',
+  'updates.filterClub': 'מועדון',
+  // -- the three section headings, each with the prototype's trailing caption --
+  'updates.urgentHeading': 'דורש פעולה מיידית',
+  'updates.urgentNote': 'חובה להסדיר',
+  'updates.clubHeading': 'הודעות המועדון',
+  'updates.clubNote': 'כלל המתאמנים',
+  'updates.personalHeading': 'עדכונים אישיים',
+  'updates.personalNote': 'מעקב ילדים',
+  // -- row marks --
+  'updates.isNew': 'חדש',
+  // Not in the prototype. A notice that asks for nothing can never be settled by doing it,
+  // so this is the only thing that clears its mark.
+  'updates.markAllRead': 'סימון הכול כנקרא',
+  'updates.settled': 'טופל',
+  // -- the empty feed, and the states the prototype has no server to produce --
+  'updates.emptyTitle': 'אין עדכונים חדשים',
+  'updates.emptyBody': 'כשהמועדון ישלח הודעה, היא תופיע כאן.',
+  'updates.emptyFiltered': 'אין עדכונים בקטגוריה הזו',
+  'updates.loading': 'טוען עדכונים…',
+  'updates.loadFailed': 'לא הצלחנו לטעון את העדכונים',
+  'updates.retry': 'נסו שוב',
+  'updates.loadMore': 'טעינת עדכונים קודמים',
 }
