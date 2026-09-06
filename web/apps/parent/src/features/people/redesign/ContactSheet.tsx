@@ -1,6 +1,12 @@
-// "יצירת קשר" — ported from the prototype's ProfileScreen MODAL 1.
+// "צור קשר עם המועדון" — the three ways to reach the club, drawn as one row.
 //
-// ALL THREE ACTIONS the prototype offers — WhatsApp, a call and email.
+// ALL THREE ACTIONS the prototype offers — email, WhatsApp and a call, in that order
+// (owner review, 2026-09-06). Email leads because it is the one that does not interrupt
+// anybody: a parent with a question at 22:00 should meet it first.
+//
+// The dialog this file used to export went with that review — פרטי הגעה and יצירת קשר
+// merged into one המועדון sheet, so the buttons live inside a panel `sheets.tsx` owns and
+// the wrapper had no caller left.
 //
 // Email was missing on the first pass because a studio had nowhere to keep one. Owner
 // review, 2026-09-06: "צור קשר צריך להכיל גם מייל". The club's address and phone already
@@ -14,10 +20,9 @@
 // All three are ordinary links with a scheme the phone already knows — `https://wa.me/…`,
 // `tel:` and `mailto:` — so they work with no permission, no SDK and no JS, and a
 // long-press "copy" behaves the way a parent expects.
-import { Mail, MessageCircle, Phone, X } from 'lucide-react'
+import { Mail, MessageCircle, Phone } from 'lucide-react'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { useDialog } from '../../onboarding/wizard/useDialog'
 import type { ClubDetails } from './types'
 
 /**
@@ -45,7 +50,8 @@ export function whatsappNumber(phone: string | null): string | null {
  *
  * Extracted when פרופיל's דוג׳ו and יצירת קשר merged into one המועדון sheet (owner review,
  * 2026-09-06): that sheet needs the buttons inside a panel it already owns, and a second
- * `useDialog` nested in the first would fight the same focus trap.
+ * `useDialog` nested in `Sheet`'s would fight the same focus trap. `DirectionsActions`
+ * beside it is a disclosure for the same reason.
  */
 export function ContactActions({
   club,
@@ -62,6 +68,16 @@ export function ContactActions({
     <>
         {hasAny ? (
       <div className={`grid gap-2.5 ${count >= 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        {club?.email ? (
+          <a
+            href={`mailto:${club.email}`}
+            data-testid="profile-contact-email"
+            className="flex flex-col items-center gap-1.5 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold active:scale-95 transition-all cursor-pointer"
+          >
+            <Mail className="w-6 h-6" />
+            <span>{t(locale, 'people.profile.contactEmail')}</span>
+          </a>
+        ) : null}
         {wa ? (
           <a
             href={`https://wa.me/${wa}`}
@@ -84,16 +100,6 @@ export function ContactActions({
             <span>{t(locale, 'people.profile.contactCall')}</span>
           </a>
         ) : null}
-        {club?.email ? (
-          <a
-            href={`mailto:${club.email}`}
-            data-testid="profile-contact-email"
-            className="flex flex-col items-center gap-1.5 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold active:scale-95 transition-all cursor-pointer"
-          >
-            <Mail className="w-6 h-6" />
-            <span>{t(locale, 'people.profile.contactEmail')}</span>
-          </a>
-        ) : null}
       </div>
     ) : (
       // The honest state, and a real one: a club that has not filled in its phone
@@ -103,63 +109,5 @@ export function ContactActions({
       </p>
     )}
     </>
-  )
-}
-
-export function ContactSheet({
-  club,
-  locale,
-  onClose,
-}: {
-  club: ClubDetails | null
-  locale: Locale
-  onClose: () => void
-}) {
-  const dialogRef = useDialog(true, onClose)
-
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-950/60 flex items-end sm:items-center justify-center p-0 sm:p-4 modal-backdrop-blur transition-all duration-300">
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="contact-title"
-        tabIndex={-1}
-        data-testid="profile-contact-sheet"
-        className="bg-white dark:bg-slate-900 w-full max-w-md rounded-t-[2rem] sm:rounded-[2rem] p-5 sm:p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto border border-slate-100 dark:border-slate-800"
-      >
-        <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto -mt-1 sm:hidden" />
-
-        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-          <div className="text-start">
-            <h3
-              id="contact-title"
-              className="text-base font-bold text-slate-900 dark:text-slate-50 leading-tight"
-            >
-              {t(locale, 'people.profile.contactTitle')}
-            </h3>
-            {club ? (
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">{club.name}</p>
-            ) : null}
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t(locale, 'people.profile.close')}
-            className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <ContactActions club={club} locale={locale} />
-
-        {club?.address ? (
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 text-center">
-            {club.address}
-          </p>
-        ) : null}
-      </div>
-    </div>
   )
 }

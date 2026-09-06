@@ -559,6 +559,15 @@ export const people: Bundle = {
   'profile.contactNone': 'המועדון עדיין לא הגדיר פרטי יצירת קשר',
   'profile.dojoNoAddress': 'המועדון לא הגדיר כתובת',
   'profile.directions': 'הוראות הגעה',
+  //: The two group headings inside the המועדון sheet. Not 'יצירת קשר' any more --
+  //: the owner asked for the club to be named, so a parent scanning the sheet reads
+  //: who it reaches rather than what the control does.
+  'profile.contactGroup': 'צור קשר עם המועדון',
+  'profile.directionsGroup': 'פרטי הגעה',
+  //: Product names, untranslated in every locale -- a parent looks for the app's own
+  //: name on their phone, and 'ווייז' is not what is written on the icon.
+  'profile.routeWaze': 'Waze',
+  'profile.routeMaps': 'Google Maps',
   // -- פרטים אישיים: the guardian's OWN record. Not in the prototype at all — that design
   //    shows a family's children and never the parent. Owner review, 2026-09-06 --
   'profile.personalTitle': 'פרטים אישיים',

@@ -1,7 +1,8 @@
 // The four sheets פרופיל's menu opens. Each wraps markup that already existed as a section
 // on the old stacked screen — the reorder of 2026-09-06 changed where they live, not what
 // they look like inside.
-import { Award, ChevronLeft, MapPin, Navigation, Plus } from 'lucide-react'
+import { Award, ChevronLeft, Plus } from 'lucide-react'
+import { AccessibilityMenu } from '@studio/ui'
 import { fill } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -9,6 +10,7 @@ import { Sheet } from './Sheet'
 import { SheetFailed } from './SheetFailed'
 import { ProfilePreferences } from './ProfileTop'
 import { ContactActions } from './ContactSheet'
+import { DirectionsActions } from './DirectionsActions'
 import { AccountControls } from '../../shell/AccountControls'
 import type { AccountControlsProps } from '../../shell/AccountControls'
 import type { Coverage } from './derive'
@@ -235,6 +237,11 @@ export function PaymentsSheet({
 /* ── המועדון ──────────────────────────────────────────────────────────────────────────
  * The dojo and the contact actions, merged: both answer "how do I reach the club", and two
  * rows for one question is what fills a screen.
+ *
+ * **Two LABELLED groups inside it, though** (owner review, 2026-09-06). Merging the sheets
+ * was right; letting the buttons run together was not. "Send the club an email" and "drive
+ * to the club" are different errands, and an unlabelled row of five made the parent read
+ * every icon to find out which was which. Each group now says what it is for.
  */
 export function ClubSheet({
   club,
@@ -261,22 +268,28 @@ export function ClubSheet({
     >
       {failed ? <SheetFailed locale={locale} onRetry={onRetry} /> : null}
 
-      <ContactActions club={club} locale={locale} />
-
-      <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700 text-start space-y-2">
-        <p className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300">
-          <MapPin className="w-4 h-4 text-[#0056c5] dark:text-blue-300 shrink-0 mt-0.5" aria-hidden="true" />
-          <span>{club?.address ?? t(locale, 'people.profile.dojoNoAddress')}</span>
-        </p>
-        <a
-          href="#/directions"
-          data-testid="sheet-club-directions"
-          className="inline-flex items-center gap-1 text-xs font-bold text-[#0056c5] dark:text-blue-300 cursor-pointer"
+      {/* `<section aria-labelledby>` and not a bare heading: a screen reader user moving by
+          landmark meets "צור קשר עם המועדון" and "פרטי הגעה" as two places, which is what
+          the sighted parent sees. */}
+      <section aria-labelledby="club-contact-heading" className="space-y-2.5">
+        <h4
+          id="club-contact-heading"
+          className="text-xs font-bold text-slate-500 dark:text-slate-400 text-start"
         >
-          <Navigation className="w-3.5 h-3.5" aria-hidden="true" />
-          <span>{t(locale, 'people.profile.directions')}</span>
-        </a>
-      </div>
+          {t(locale, 'people.profile.contactGroup')}
+        </h4>
+        <ContactActions club={club} locale={locale} />
+      </section>
+
+      <section aria-labelledby="club-directions-heading" className="space-y-2.5">
+        <h4
+          id="club-directions-heading"
+          className="text-xs font-bold text-slate-500 dark:text-slate-400 text-start"
+        >
+          {t(locale, 'people.profile.directionsGroup')}
+        </h4>
+        <DirectionsActions address={club?.address ?? null} locale={locale} />
+      </section>
     </Sheet>
   )
 }
@@ -335,6 +348,26 @@ export function SettingsSheet({
           <span>{t(locale, 'people.profile.calendarFeed')}</span>
           <ChevronLeft className="w-4 h-4 text-slate-400" aria-hidden="true" />
         </a>
+        {/* נגישות. The SAME control the signed-out screens float in the corner — the panel,
+            the adjustments and the legally required statement are all `AccessibilityMenu`'s;
+            only the opener is drawn here, so this row cannot drift from that one. It sits
+            beside privacy on purpose: both are rights rather than preferences. */}
+        <AccessibilityMenu
+          locale={locale}
+          renderTrigger={({ open, toggle }) => (
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              aria-expanded={open}
+              data-testid="a11y-open"
+              onClick={toggle}
+              className="w-full flex items-center justify-between px-3.5 py-3 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer"
+            >
+              <span>{t(locale, 'common.a11y.title')}</span>
+              <ChevronLeft className="w-4 h-4 text-slate-400" aria-hidden="true" />
+            </button>
+          )}
+        />
       </div>
 
       <AccountControls {...account} />

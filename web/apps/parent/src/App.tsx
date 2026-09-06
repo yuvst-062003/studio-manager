@@ -655,7 +655,14 @@ function AuthedApp() {
   // install wall between the tap and the form is where a migration cohort evaporates.
   return (
     <ThemeProvider>
-      <AccessibilityMenu locale={locale} />
+      {/* נגישות, SIGNED OUT ONLY (owner review, 2026-09-06). The floating button is right on
+          a public page and wrong behind the tab bar: at phone widths it came to rest ON TOP
+          of the בית tab, so Home could not be pressed from the bar at all — `.studio-a11y__fab`
+          publishes an `--a11y-fab-clearance` for exactly this and the redesigned Tailwind bar
+          does not read it. Signed in, the same menu is a row in פרופיל → הגדרות, one tap away.
+          The sign-in wall, the join wall and the landing keep the button, because that is
+          where IS 5568 bites hardest — a stranger with low vision has no profile to go to. */}
+      {session.status !== 'signed-in' ? <AccessibilityMenu locale={locale} /> : null}
       {/* New-build toast — floats over whatever is open, in every session state. */}
       <UpdateToast locale={locale} />
       {session.status === 'anonymous' ? (

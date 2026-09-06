@@ -1353,3 +1353,34 @@ describe('§3 Door C — /?invite=<token> opens the shared wizard, not the old g
     }
   }, 20000)
 })
+
+// נגישות: on the public surfaces, off the signed-in ones (owner review, 2026-09-06).
+//
+// The floating button came to rest ON TOP of the בית tab at phone widths, so Home could not
+// be pressed from the bar. `.studio-a11y__fab` publishes an `--a11y-fab-clearance` for
+// exactly that and the redesigned Tailwind bar does not read it. Moving the control into
+// פרופיל → הגדרות solves it — but the same move could quietly drop a legally required
+// statement from the pages a stranger sees, so BOTH halves are pinned here.
+describe('where the accessibility button lives', () => {
+  it('floats on the sign-in screen, where a visitor has no profile to go to', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) =>
+        String(input).includes('/auth/refresh')
+          ? new Response('', { status: 401 })
+          : new Response(JSON.stringify({ items: [] }), { status: 200 }),
+      ),
+    )
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('sign-in')).toBeInTheDocument())
+    expect(screen.getByTestId('a11y-open')).toBeInTheDocument()
+  })
+
+  it('does not float over the signed-in app, where it covered the first tab', async () => {
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('tab-bar')).toBeInTheDocument())
+    // Not "no accessibility menu anywhere" — פרופיל → הגדרות carries it, and
+    // `ProfileScreen.test.tsx` proves that row opens the real panel.
+    expect(screen.queryByTestId('a11y-open')).toBeNull()
+  })
+})

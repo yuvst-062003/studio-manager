@@ -8,7 +8,17 @@
 // stranger with low vision meets the product first — carries the same button with no
 // per-app wiring. State persists per browser in localStorage and is applied as data
 // attributes + a root font-size, which the token layer (rem-based throughout) scales by.
+//
+// **`renderTrigger` lets an app draw its own opener** (2026-09-06). The floating button is
+// right for a public page and wrong inside an app with a fixed bottom bar: in the parent
+// app it came to rest ON TOP of the first tab, so Home was untappable from the bar — the
+// F5 clearance rule below `.studio-a11y__fab` exists for exactly that and the redesigned
+// Tailwind bar does not read it. The parent app therefore keeps the FAB while signed OUT,
+// where the law cares most and there is no bar, and passes a settings ROW while signed in.
+// Only the trigger varies; the panel, the settings and the statement are the same
+// everywhere, which is what keeps this one control rather than two.
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { Button } from './Button'
@@ -63,7 +73,16 @@ export function applyA11ySettings(settings: A11ySettings): void {
 
 const SCALES: readonly A11ySettings['textScale'][] = [100, 112, 125]
 
-export function AccessibilityMenu({ locale }: { locale: Locale }) {
+export function AccessibilityMenu({
+  locale,
+  renderTrigger,
+}: {
+  locale: Locale
+  /** Draw the opener yourself. Omit it for the floating button, which is still the right
+   *  answer on a public page. Whatever you return MUST be the accessible control — carry
+   *  `aria-haspopup="dialog"` and the `open` state, or a screen reader is told nothing. */
+  renderTrigger?: (props: { open: boolean; toggle: () => void }) => ReactNode
+}) {
   const [open, setOpen] = useState(false)
   const [settings, setSettings] = useState<A11ySettings>(read)
   const dialogRef = useModalDialog(open, () => setOpen(false))
@@ -77,15 +96,20 @@ export function AccessibilityMenu({ locale }: { locale: Locale }) {
     }
   }, [settings])
 
+  const toggle = () => setOpen((current) => !current)
+
   return (
     <>
+      {renderTrigger ? (
+        renderTrigger({ open, toggle })
+      ) : (
       <button
         type="button"
         className="studio-a11y__fab"
         aria-haspopup="dialog"
         aria-expanded={open}
         data-testid="a11y-open"
-        onClick={() => setOpen((current) => !current)}
+        onClick={toggle}
       >
         {/* The international accessibility symbol, drawn — never an emoji (repo rule). */}
         <svg
@@ -106,6 +130,7 @@ export function AccessibilityMenu({ locale }: { locale: Locale }) {
         </svg>
         <span className="studio-visually-hidden">{t(locale, 'common.a11y.button')}</span>
       </button>
+      )}
 
       {open ? (
         <div
