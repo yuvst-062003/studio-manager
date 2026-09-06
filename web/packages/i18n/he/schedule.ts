@@ -124,12 +124,25 @@ export const schedule: Bundle = {
   'session.confirmedCount': '{{confirmed}} מתוך {{total}} אישרו הגעה',
   'session.notAnsweredCount': '{{count}} משפחות טרם ענו',
   'session.notAnsweredCount.one': 'משפחה אחת טרם ענתה',
-  'session.chaseButton': '{{count}} משפחות שלא ענו — יצירת קשר',
-  'session.chaseButton.one': 'משפחה אחת שלא ענתה — יצירת קשר',
+  // C4 (owner review, 2026-09-06) — this button's own label used to spell out the whole
+  // fact ("{{count}} משפחות שלא ענו — יצירת קשר") because it stood alone as the card's
+  // biggest control. It is now the emerald half of a two-up grid beside attendance, and
+  // the prototype's own label is this short — the count in parentheses, exactly like
+  // `שלח תזכורת (5)`. No `.one` sibling: a numeral in parentheses needs no plural form.
+  'session.chaseButton': 'שלח תזכורת ({{count}})',
   // `{{group}}` and `{{time}}` are the session's own real data — never a hardcoded club
   // name (decision 18: this is the same reminder mechanism the session card and the task
   // card both use, and the club's name belongs to the studio record, not this string).
   'session.chaseMessage': 'תזכורת: השיעור של {{group}} מתקיים היום בשעה {{time}}. נשמח אם תאשרו הגעה באפליקציה.',
+  // -- the active card's progress block, and the honest fallback when a roster is not
+  //    cached (C3, 2026-09-06) — the prototype's "on the mat" wording assumes physical
+  //    check-in, which this app does not have; every number here is `confirmationCounts`
+  //    off the same cached roster the bottom cluster already reads, never invented.
+  'session.remainingMinutes': 'נותרו {{minutes}} דק׳',
+  'session.confirmedPercent': '{{percent}}% אישרו הגעה',
+  'session.progressConfirmedLabel': 'אישרו הגעה',
+  'session.progressNotAnsweredLabel': 'טרם ענו',
+  'session.rosterUnavailable': 'נתוני האישורים לא נשמרו על המכשיר הזה',
   'session.status.scheduled': 'מתוכנן',
   'session.status.cancelled': 'בוטל',
   'session.status.completed': 'הסתיים',

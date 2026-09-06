@@ -490,3 +490,28 @@ bites hardest.
 The opener is drawn per surface; the panel, the adjustments and the legally required statement
 stay inside `AccessibilityMenu`, so a row and a floating button cannot drift apart. Tests in both
 apps fail if the floating button becomes unconditional again, or if the row disappears.
+
+## D17 — an alert that has a tab does not also need a banner
+
+**Decided:** 2026-09-06 · owner decision, in session
+
+The staff app's `staff-alerts` banner sits above every screen. It was built when the at-risk
+warning had nowhere else to go, and its own comment says why: a coach mid-register on a mat
+must see a conflict "not behind a navigation the coach has no reason to make".
+
+The five-tab redesign gives at-risk a home with a badge on it, so the coach now has a reason.
+Leaving it in both places put the same student on one screen twice — visible the moment the
+at-risk worker was fixed and the banner started rendering at all.
+
+**The rule.** The banner carries only what must interrupt: the offline sync conflicts, which
+appear while a coach is marking a register and cannot wait for a navigation. Everything a badge
+can advertise lives behind the badge.
+
+**What this cost, and why it was still right.** Deleting the banner's card nearly lost a
+capability — it offered a one-tap `tel:` from the notification's own payload, and the tasks row
+had only a WhatsApp share. The dial and the `noPhone` sentence were ported into the task card
+before the component was deleted. A screen that replaces another has to be checked against it
+feature by feature, not assumed to cover it.
+
+The dashboard's own at-risk card is a different component on a different slot and is untouched.
+Its i18n keys are shared and were kept.

@@ -95,9 +95,15 @@ export const schedule: Bundle = {
   'session.confirmedCount': '{{confirmed}} of {{total}} confirmed',
   'session.notAnsweredCount': '{{count}} families have not answered',
   'session.notAnsweredCount.one': 'One family has not answered',
-  'session.chaseButton': '{{count}} families have not answered — contact them',
-  'session.chaseButton.one': 'One family has not answered — contact them',
+  // C4 — the emerald half of the two-up grid beside attendance; short, count in
+  // parentheses, matching the prototype's own label exactly. No `.one` sibling needed.
+  'session.chaseButton': 'Send reminder ({{count}})',
   'session.chaseMessage': 'Reminder: {{group}} is on today at {{time}}. We would love a confirmation in the app.',
+  'session.remainingMinutes': '{{minutes}} min left',
+  'session.confirmedPercent': '{{percent}}% confirmed',
+  'session.progressConfirmedLabel': 'confirmed',
+  'session.progressNotAnsweredLabel': 'not answered yet',
+  'session.rosterUnavailable': 'Confirmation data is not cached on this device',
   'session.status.scheduled': 'Scheduled',
   'session.status.cancelled': 'Cancelled',
   'session.status.completed': 'Completed',

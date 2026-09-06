@@ -33,8 +33,13 @@
 // `boxShadow: inset 0 0 0 1px var(--belt-ring)` — the same technique `BeltBar` uses, so a
 // white belt on a light ground does not sit at 1.08:1.
 //
-// **The chart is not built.** §9 — the prototype's `AttendanceTrendChart` draws seven
-// months of invented numbers, and nothing computes a club-wide monthly trend.
+// **2026-09-06: the statistics section is built after all.** §9 called the prototype's
+// `AttendanceTrendChart` out for drawing seven months of invented numbers and left it
+// unbuilt. The owner's review asked for the section anyway — right call, wrong section: a
+// club-wide monthly trend is still nothing this app computes for a coach, but the roster
+// already carries a true CURRENT snapshot (`attendance_percent`, `group_names`,
+// `health_status`), and `StudentsStatistics` (this directory) draws that instead of a
+// history. See its own file header for what is real and what is deliberately not drawn.
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowUpDown, ChevronLeft } from 'lucide-react'
 import { Alert, EmptyState, LoadFailed, TextField } from '@studio/ui'
@@ -42,6 +47,7 @@ import { useNetworkMode } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { GroupOut, StaffPeopleClient, StudentSummary } from './peopleClient'
+import { StudentsStatistics } from './StudentsStatistics'
 
 /**
  * §5.4a's statuses on `StatusChip`'s six tones — kept even though this screen no longer
@@ -268,6 +274,16 @@ export function StudentsSearch({
             </button>
           ))}
         </div>
+      ) : null}
+
+      {students !== null && students.length > 0 ? (
+        <StudentsStatistics
+          locale={locale}
+          students={students}
+          groups={groups}
+          selectedGroupId={groupTab}
+          onSelectGroup={setGroupTab}
+        />
       ) : null}
 
       {missingHealth > 0 ? (

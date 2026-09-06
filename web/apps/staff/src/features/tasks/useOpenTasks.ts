@@ -97,10 +97,10 @@ export function useOpenTasks({
 
   // §4.4 — "the app has no way to know whether the coach phoned", so this is the one
   // action that removes a card itself rather than waiting for the next fetch to agree.
-  // Optimistic, the same shape `AtRiskAlert.acknowledge` already uses: filtered locally
-  // first, `markRead` fired after and its failure swallowed — a lost mark-read leaves the
-  // notification unread server-side, which is the safe direction to fail in (the coach
-  // sees it again rather than a call quietly going untracked).
+  // Optimistic: filtered locally first, `markRead` fired after and its failure swallowed
+  // — a lost mark-read leaves the notification unread server-side, which is the safe
+  // direction to fail in (the coach sees it again rather than a call quietly going
+  // untracked).
   const tick = useCallback(
     (notificationId: string) => {
       setCallParent((current) => current.filter((card) => card.id !== `call-parent:${notificationId}`))

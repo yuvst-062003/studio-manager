@@ -66,7 +66,7 @@ import { TrialSection } from './features/people/TrialSection'
 import { StudentCardRoute } from './features/people/StudentCardRoute'
 import { useQueueFlusher } from './features/attendance/useQueueFlusher'
 import { registerHealthSections } from './features/health'
-import { AtRiskAlert, makeStaffCommsClient, registerCommsSections } from './features/comms'
+import { makeStaffCommsClient } from './features/comms'
 // §16's operator view of §11.3 and §11.4. Nothing in either app rendered a `privacy.*`
 // string before this wave, so a complete he/en/ru copy set sat behind no screen and four
 // working endpoints sat behind no caller.
@@ -98,11 +98,19 @@ registerItemsWizardStep(makeWizardItemsClient(apiFetch))
 // wizard steps are: the slots must be populated before anything renders. The containers
 // themselves are never reopened — that is what seam 4 buys.
 registerAttendanceSections()
-// The two registrations nothing called (S1). Without the first, a coach taking a register
-// saw no health flag on any row — §5.5's coach-facing safety surface, absent from the
-// running app because the function that connects fill to container was never invoked.
+// The registration nothing called (S1). Without it, a coach taking a register saw no
+// health flag on any row — §5.5's coach-facing safety surface, absent from the running
+// app because the function that connects fill to container was never invoked.
 registerHealthSections()
-registerCommsSections(AtRiskAlert)
+// `registerCommsSections(AtRiskAlert)` used to sit here too, filling `staff-alerts` with
+// the same at-risk card the tasks tab (`features/tasks`) now derives from the same
+// `commsClient.atRisk()` inbox. Both were correct built alone; together they put the same
+// student on screen twice — once as a banner, once as a task card. Owner decision
+// (2026-09-06): at-risk lives in the tasks tab ONLY. The banner keeps
+// `registerAttendanceSections`'s `ConflictSection`, which is what it was actually built
+// for — a sync conflict a coach must see mid-register, without navigating anywhere.
+// `AtRiskAlert.tsx` is deleted rather than left registered-nowhere; its one-tap `tel:`
+// dial moved into the tasks tab's own call-parent card (`TasksScreen.tsx`).
 
 // NO `NAV` ARRAY, AND NO DRAWER FOR IT TO SIT IN.
 //

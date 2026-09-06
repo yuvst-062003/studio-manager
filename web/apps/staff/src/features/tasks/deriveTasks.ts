@@ -84,6 +84,28 @@ export type TaskCard = {
   /** Cash only — a `MoneyDisplay` amount the card renders beside the subtitle. Kept off
    *  every other kind's shape rather than becoming an optional field nothing else sets. */
   moneyAgorot?: number
+  /** The card's two-letter initials avatar (§9's design pass) — set only by the three
+   *  kinds whose row is about one specific student (health form, call-parent,
+   *  health-review). `closeSessionTasks` is about a session, not a child, and
+   *  `cashPendingTasks` is one aggregate row for the whole club, so neither sets this. */
+  avatarInitials?: string
+  /**
+   * Call-parent only — `payload.contact_phone`, straight off the notification, so the card
+   * can offer the same one-tap `tel:` dial the deleted `AtRiskAlert` banner used to (see
+   * `features/comms/index.ts`'s own header for why that component is gone). `undefined` on
+   * every other kind (the field does not apply); `null` specifically means THIS family has
+   * no number on file, which the row must say plainly rather than rendering a dead link —
+   * `AtRiskAlert` set that rule and it still holds.
+   */
+  contactPhone?: string | null
+}
+
+/** The card's initials avatar, off a full display name — the same "first letter of the
+ *  first two words" a Hebrew name and a Latin one both resolve sensibly with. Exported so
+ *  a card kind that needs the same avatar elsewhere is not tempted to re-derive it. */
+export function initialsOf(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean)
+  return `${words[0]?.[0] ?? ''}${words[1]?.[0] ?? ''}`
 }
 
 /**
@@ -157,6 +179,7 @@ export function missingHealthFormTasks(
         title: row.display_name,
         subtitle: t(locale, 'tasks.healthForm.subtitle'),
         alertText: t(locale, 'tasks.healthForm.alert'),
+        avatarInitials: initialsOf(row.display_name),
         primaryAction: {
           kind: 'contact',
           triggerLabel: t(locale, 'tasks.healthForm.action'),
@@ -202,6 +225,8 @@ export function callParentTasks(
           ? plural(locale, 'tasks.callParent.missedCount', payload.missed_count)
           : '',
       alertText: t(locale, 'tasks.callParent.alert'),
+      avatarInitials: initialsOf(name),
+      contactPhone: payload.contact_phone ?? null,
       primaryAction: {
         kind: 'contact',
         triggerLabel: t(locale, 'tasks.callParent.action'),
@@ -268,7 +293,7 @@ export function cashPendingTasks(promises: StaffPromiseRow[], locale: Locale): T
  * out of this checkpoint's scope entirely. The honest action available on a phone is
  * opening the child's own card, which both kinds' payloads carry a `student_id` for —
  * `onOpen` marks the notification read the moment that link is taken, the same shape
- * `AtRiskAlert` already uses for its own `tel:` link.
+ * `callParentTasks`'s own `contactPhone` (above) carries for its `tel:` link.
  */
 export function healthReviewTasks(
   rows: NotificationOut[],
@@ -287,6 +312,7 @@ export function healthReviewTasks(
       title: name,
       subtitle: row.title,
       alertText: row.body,
+      avatarInitials: initialsOf(name),
       primaryAction: {
         kind: 'link' as const,
         label: t(locale, 'tasks.healthReview.action'),

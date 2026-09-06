@@ -8,9 +8,15 @@ export {
   cashPendingTasks,
   closeSessionTasks,
   healthReviewTasks,
+  initialsOf,
   missingHealthFormTasks,
   openTaskCount,
 } from './deriveTasks'
 export type { TaskBucket, TaskCard, TaskKind, TaskPrimaryAction, TaskTick } from './deriveTasks'
 export { makeTasksClient, HEALTH_REVIEW_PENDING_KIND, HEALTH_TRIAL_FLAGGED_KIND } from './tasksClient'
 export type { TasksClient } from './tasksClient'
+// The birthday section (2026-09-06) — deliberately its own exports, not folded into the
+// task ones above: see `deriveBirthdays.ts`'s header for why a birthday is not a task.
+export { upcomingBirthdays } from './deriveBirthdays'
+export type { BirthdayRow } from './deriveBirthdays'
+export { useBirthdays } from './useBirthdays'

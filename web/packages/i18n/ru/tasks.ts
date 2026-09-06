@@ -53,4 +53,21 @@ export const tasks: Bundle = {
   'healthReview.scope': 'Одобрение менеджера',
   'healthReview.badge': 'Ожидает проверки',
   'healthReview.action': 'Открыть карточку ученика',
+
+  'birthday.sectionTitle': 'Дни рождения на этой неделе',
+  'birthday.sectionHint': 'Напоминание поддержать личную связь и поздравить на татами',
+  'birthday.countBadge': '{{count}} учеников',
+  'birthday.countBadge.one': 'Один ученик',
+  'birthday.noGroup': 'Без группы',
+  'birthday.turningAge': 'Исполняется {{age}}',
+  'birthday.today': 'Сегодня!',
+  'birthday.inDays': 'Через {{count}} дней',
+  'birthday.inDays.one': 'Завтра',
+  'birthday.greetAction': 'Поздравить в WhatsApp',
+  'birthday.greetAgain': 'Поздравить снова',
+  'birthday.tickLabel': 'Отметить, что вы поздравили {{name}}',
+  'birthday.tickLabelUndo': 'Отменить отметку поздравления для {{name}}',
+  'birthday.greetedHint': 'Вы отметили, что поздравили',
+  'birthday.greetingMessage':
+    'Привет, {{name}}! С днём рождения — сегодня тебе исполняется {{age}}! Желаем отличного года труда, постоянства и здоровья на татами. Мы гордимся тобой!',
 }

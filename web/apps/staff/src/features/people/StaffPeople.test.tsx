@@ -543,7 +543,9 @@ describe('StudentsSearch — S8', () => {
       ),
     })
     render(<StudentsSearch locale="he" client={client} now="2027-02-10T12:00:00Z" />)
-    const row = await screen.findByText(/92%/)
+    // Scoped to the row itself, not a bare /92%/ text search: C4's statistics section (§9)
+    // legitimately shows the same figure again, in its own KPI and bar-chart value.
+    const row = (await screen.findByText('נועה לוי')).closest('button')
     expect(row).toHaveTextContent('מתחילים · 5 חודשים · 92%')
   })
 })

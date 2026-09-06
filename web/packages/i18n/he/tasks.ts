@@ -10,6 +10,10 @@ import type { Bundle } from '../types'
  * nothing else can tell the app the call happened, and `cash`/`healthReview` are the two
  * manager rows. `{{name}}` and `{{count}}` are interpolated the same way every other
  * namespace already does it — `t(...).replace('{{name}}', ...)` or `plural(...)`.
+ *
+ * `birthday.*` (2026-09-06, decision reversed — see `deriveBirthdays.ts`) is a sixth,
+ * separate vocabulary: birthdays are not a task kind (nothing about one is "completed"),
+ * so these keys carry no `scope`/`badgeText` pair the way the five above do.
  */
 export const tasks: Bundle = {
   'title': 'משימות לטיפול',
@@ -63,4 +67,27 @@ export const tasks: Bundle = {
   'healthReview.scope': 'אישור מנהל',
   'healthReview.badge': 'ממתין לבדיקה',
   'healthReview.action': 'פתח כרטיס חניך',
+
+  // The birthday section (2026-09-06 — decision reversed, see `deriveBirthdays.ts`'s own
+  // header for why). Not a task kind: no badge/scope pair above, its own small vocabulary
+  // instead.
+  'birthday.sectionTitle': 'חוגגים יום הולדת השבוע',
+  'birthday.sectionHint': 'תזכורת לחזק את הקשר האישי ולברך על המזרן',
+  'birthday.countBadge': '{{count}} חניכים',
+  'birthday.countBadge.one': 'חניך אחד',
+  'birthday.noGroup': 'ללא קבוצה',
+  'birthday.turningAge': 'חוגג/ת {{age}}',
+  'birthday.today': 'היום!',
+  'birthday.inDays': 'בעוד {{count}} ימים',
+  'birthday.inDays.one': 'מחר',
+  'birthday.greetAction': 'ברך בוואטסאפ',
+  'birthday.greetAgain': 'ברך שוב',
+  // Never "נשלח"/"sent" — §4.9's rule 2 (`ContactFamiliesButton`'s own header): opening
+  // WhatsApp is not proof anything was sent. This is an honest, smaller claim: the coach
+  // marked THIS as done, not that a message reached anyone.
+  'birthday.tickLabel': 'סמן שבירכת את {{name}}',
+  'birthday.tickLabelUndo': 'בטל סימון ברכה ל{{name}}',
+  'birthday.greetedHint': 'סימנת שבירכת',
+  'birthday.greetingMessage':
+    'היי {{name}} היקר/ה! מזל טוב ליום הולדתך ה־{{age}}! מאחלים לך שנה מצוינת של איפונים, התמדה ובריאות על המזרן. גאים בך!',
 }

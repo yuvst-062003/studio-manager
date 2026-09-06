@@ -111,6 +111,15 @@ describe('TodayScreen (9a / 1d)', () => {
     expect(screen.getByTestId('day-chip-2026-11-03')).toHaveAttribute('aria-current', 'date')
   })
 
+  it('shows the היום pill beside the calendar icon even while already on today (C3)', async () => {
+    // The prototype draws it there unconditionally; a coach should not have to leave
+    // today first to discover the control exists.
+    render(screenFor())
+    const pill = await screen.findByTestId('back-to-today')
+    expect(pill).toBeInTheDocument()
+    expect(pill).toBeDisabled()
+  })
+
   it('refetches when another day in the strip is chosen', async () => {
     const client = stub()
     render(screenFor({ client }))
@@ -199,9 +208,16 @@ describe('TodayScreen (9a / 1d)', () => {
     // 10 November 2026 is a Tuesday; the title names the day being looked at, not היום.
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('יום שלישי')
     expect(screen.queryByRole('heading', { level: 1, name: 'היום' })).toBeNull()
+    // C3 — the `היום` pill sits beside the calendar icon unconditionally now, matching the
+    // prototype; while looking at a different day it stays a real, clickable affordance.
+    expect(screen.getByTestId('back-to-today')).not.toBeDisabled()
     await userEvent.click(screen.getByTestId('back-to-today'))
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('היום')
-    expect(screen.queryByTestId('back-to-today')).toBeNull()
+    // Once today is already on screen, the pill has nowhere left to take you — it stays
+    // visible (never disappears, unlike the old back-to-today-only affordance) and marks
+    // that plainly by disabling itself rather than pretending a click would do something.
+    expect(screen.getByTestId('back-to-today')).toBeInTheDocument()
+    expect(screen.getByTestId('back-to-today')).toBeDisabled()
   })
 
   it('says there are no sessions today, and why', async () => {
@@ -454,5 +470,147 @@ describe('TodayScreen — who has confirmed, from the offline cache (§4.1)', ()
     render(screenFor({ client: stub([TODAY_SESSION]) }))
     await screen.findByTestId('session-confirmed')
     expect(screen.queryByTestId('contact-open')).toBeNull()
+  })
+})
+
+// C3 — the anatomy pass told the four states apart in colour and words, but drew every
+// card the same shape. These lock in the three fixes: the active card's own frame and its
+// progress block (real `confirmationCounts` + real `ends_at - today`), and the ended-but-
+// unclosed card refusing to stand a headcount in for a roster it never cached.
+describe('TodayScreen — the session happening now gets its own card (C3)', () => {
+  let store: OfflineStore
+  const NOW = '2026-11-03T12:00:00Z'
+
+  const ACTIVE: SessionRow = {
+    ...base,
+    id: 's-active',
+    group_name: 'נבחרת נוער',
+    // Spans `NOW` (12:00Z): started an hour ago, an hour left — a round 60 for the assertion.
+    starts_at: '2026-11-03T11:00:00Z',
+    ends_at: '2026-11-03T13:00:00Z',
+    status: 'scheduled',
+  }
+
+  const ENDED: SessionRow = {
+    ...base,
+    id: 's-ended',
+    group_name: 'ילדים מתחילים',
+    starts_at: '2026-11-03T09:00:00Z',
+    ends_at: '2026-11-03T10:00:00Z',
+    attendance_taken: false,
+    status: 'scheduled',
+  }
+
+  const rosterRow = (overrides: Partial<RosterRowData> = {}): RosterRowData => ({
+    student_id: 'stu-1',
+    display_name: 'ילד',
+    belt_color_hex: null,
+    belt_name: null,
+    health_status: 'missing',
+    derived_flags: {},
+    status: 'unmarked',
+    source: null,
+    has_absence_report: false,
+    absence_reason: null,
+    ...overrides,
+  })
+
+  const cachedSessionFor = (session: SessionRow) => ({
+    id: session.id,
+    group_id: 'g1',
+    group_name: session.group_name,
+    starts_at: session.starts_at,
+    ends_at: session.ends_at,
+    location_name: null,
+    status: 'scheduled' as const,
+    attendance_taken: session.attendance_taken,
+  })
+
+  beforeEach(() => {
+    store = memoryStore()
+    setOfflineStore(store)
+  })
+
+  afterEach(() => {
+    setOfflineStore(null)
+  })
+
+  it("draws the session happening now in the prototype's own blue frame, not the ordinary hairline", async () => {
+    render(screenFor({ client: stub([ACTIVE]) }))
+    const row = await screen.findByTestId('session-row')
+    const card = row.querySelector('article')
+    expect(card).not.toBeNull()
+    expect(card!.className).toContain('border-2')
+    expect(card!.className).toContain('border-blue-500')
+  })
+
+  it('shows present-of-total, a percentage, and the real minutes remaining — all from confirmationCounts and ends_at - today', async () => {
+    await writeWindow(store, {
+      server_time: NOW,
+      from_time: NOW,
+      to_time: NOW,
+      sessions: [cachedSessionFor(ACTIVE)],
+      rosters: {
+        [ACTIVE.id]: [
+          rosterRow({ student_id: '1', has_confirmation: true }),
+          rosterRow({ student_id: '2', has_confirmation: true }),
+          rosterRow({ student_id: '3' }),
+          rosterRow({ student_id: '4' }),
+        ],
+      },
+    })
+
+    render(screenFor({ client: stub([ACTIVE]) }))
+
+    // `findByTestId` on the (already-present, either way) `session-progress` container
+    // would resolve the instant it mounts showing "not cached yet" — the roster arrives
+    // an effect-tick later. Waiting on the count itself is what actually waits for it.
+    const count = await screen.findByTestId('session-progress-count')
+    // 2 of 4 confirmed — a real 50%, not a guess.
+    expect(count).toHaveTextContent('2')
+    expect(count).toHaveTextContent('4')
+    expect(screen.getByTestId('session-progress-percent')).toHaveTextContent('50%')
+    // `ends_at` (13:00Z) minus `today` (12:00Z, `screenFor`'s default) — a real 60 minutes.
+    expect(screen.getByTestId('session-remaining')).toHaveTextContent('60')
+  })
+
+  it('says the roster is not cached rather than drawing a bar at 0% (the active card)', async () => {
+    render(screenFor({ client: stub([ACTIVE]) }))
+    const progress = await screen.findByTestId('session-progress')
+    expect(within(progress).queryByTestId('session-progress-count')).toBeNull()
+    expect(progress).toHaveTextContent(t('he', 'schedule.session.rosterUnavailable'))
+  })
+
+  it('the ended-but-unclosed card names its roster as not cached, never a headcount standing in for it', async () => {
+    render(screenFor({ client: stub([ENDED]) }))
+    await screen.findByTestId('session-row')
+    expect(screen.getByTestId('session-roster-unavailable')).toHaveTextContent(
+      t('he', 'schedule.session.rosterUnavailable'),
+    )
+    expect(screen.queryByTestId('session-headcount')).toBeNull()
+  })
+
+  it('the ended-but-unclosed card renders its two-line count once the roster IS cached', async () => {
+    await writeWindow(store, {
+      server_time: NOW,
+      from_time: NOW,
+      to_time: NOW,
+      sessions: [cachedSessionFor(ENDED)],
+      rosters: {
+        [ENDED.id]: [
+          rosterRow({ student_id: '1', has_confirmation: true }),
+          rosterRow({ student_id: '2' }),
+          rosterRow({ student_id: '3' }),
+        ],
+      },
+    })
+
+    render(screenFor({ client: stub([ENDED]) }))
+
+    const notAnswered = await screen.findByTestId('session-not-answered')
+    expect(notAnswered).toHaveTextContent('2')
+    expect(screen.getByTestId('session-confirmed')).toHaveTextContent('1')
+    expect(screen.getByTestId('session-confirmed')).toHaveTextContent('3')
+    expect(screen.queryByTestId('session-roster-unavailable')).toBeNull()
   })
 })

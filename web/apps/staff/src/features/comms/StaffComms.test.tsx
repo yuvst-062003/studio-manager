@@ -1,21 +1,18 @@
-// M8's staff surface — no artboard, and four real deliverables (conflict **C2**).
+// M8's staff surface — no artboard, and three real deliverables (conflict **C2**).
 //
-// The two load-bearing tests are §5.14's one-tap contact and §5.11's transactional exemption.
-// Both are places where a screen that looked right would be wrong: a phone number rendered as
-// text is not one tap, and a switch that silently refuses to move teaches a coach the screen
-// is broken.
+// The load-bearing tests here are §5.11's transactional exemption and §5.12's one-tap
+// subscribe. (§5.14's at-risk card — the fourth deliverable — moved to `features/tasks`
+// on 2026-09-06; see `./index.ts`'s own header for why, and `../tasks/TasksScreen.test.tsx`
+// / `../tasks/deriveTasks.test.ts` for its tests now.)
 import { act, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { clearSlot, useSlot } from '@studio/ui'
 import { t } from '@studio/i18n'
-import { AtRiskAlert, byMostMissed } from './AtRiskAlert'
 import { CoachCalendarFeed } from './CoachCalendarFeed'
 import { NotificationPreferences } from './NotificationPreferences'
-import { registerCommsSections, AT_RISK_ORDER } from './register'
 import { staffPlatformOf, urlBase64ToUint8Array, useStaffPushRegistration } from './useStaffPushRegistration'
-import type { NotificationOut, StaffCommsClient } from './staffCommsClient'
-import { AT_RISK_KIND, webcalUrl } from './staffCommsClient'
+import type { StaffCommsClient } from './staffCommsClient'
+import { webcalUrl } from './staffCommsClient'
 
 const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15'
 const ANDROID = 'Mozilla/5.0 (Linux; Android 14) Chrome/120'
@@ -23,6 +20,13 @@ const ANDROID = 'Mozilla/5.0 (Linux; Android 14) Chrome/120'
 //: A syntactically valid VAPID public key shape (base64url, no padding) -- not a real key.
 const FAKE_VAPID_PUBLIC_KEY =
   'BMBSB_lN3YIV7yLYWgOrfmzIoKyIHn5aJTenMlE99lC_DhRMryn3tcVzr3LuHLXFLIfIv_-tpfUSBE51uKeNbZY'
+
+const COACH_FEED = {
+  id: 'f1',
+  subject_type: 'coach' as const,
+  url: 'https://api.example.test/api/v1/calendar/xyz.ics',
+  rotated_at: null,
+}
 
 /** jsdom carries no `navigator.serviceWorker`. */
 function stubServiceWorker(subscribe: (options: unknown) => unknown) {
@@ -32,29 +36,10 @@ function stubServiceWorker(subscribe: (options: unknown) => unknown) {
   })
 }
 
-function alert(over: Partial<NotificationOut> = {}): NotificationOut {
-  return {
-    id: 'a1',
-    kind: AT_RISK_KIND,
-    title: 'תלמיד בסיכון',
-    body: 'דנה נעדרה 3 שיעורים ברצף',
-    payload: {
-      student_id: 's1',
-      group_id: 'g1',
-      contact_person_id: 'p1',
-      contact_phone: '054-1234567',
-      missed_count: 3,
-    },
-    read_at: null,
-    created_at: '2026-11-12T09:00:00Z',
-    ...over,
-  }
-}
-
 function makeClient(over: Partial<StaffCommsClient> = {}): StaffCommsClient {
   return {
     atRisk: vi.fn().mockResolvedValue({ items: [] }),
-    markRead: vi.fn().mockResolvedValue(alert()),
+    markRead: vi.fn().mockResolvedValue({}),
     vapidPublicKey: vi.fn().mockResolvedValue({ public_key: FAKE_VAPID_PUBLIC_KEY }),
     registerPush: vi.fn().mockResolvedValue({}),
     preferences: vi.fn().mockResolvedValue({ groups: [] }),
@@ -66,98 +51,16 @@ function makeClient(over: Partial<StaffCommsClient> = {}): StaffCommsClient {
 }
 
 afterEach(() => {
-  clearSlot('staff-alerts')
   vi.restoreAllMocks()
 })
 
-// -- §5.14's at-risk alert ----------------------------------------------------
-describe('the at-risk alert', () => {
-  it('gives it a one-tap call to the parent', async () => {
-    // §5.14 — "with a one-tap צור קשר עם ההורה — it is not left sitting in a report nobody
-    // opens." A `tel:` href, so one tap dials on a phone held beside a mat.
-    const client = makeClient({ atRisk: vi.fn().mockResolvedValue({ items: [alert()] }) })
-    render(<AtRiskAlert client={client} locale="he" />)
-
-    const link = await screen.findByTestId('at-risk-call-a1')
-    expect(link).toHaveAttribute('href', 'tel:054-1234567')
-    expect(link).toHaveAccessibleName(t('he', 'comms.atRisk.contactParent'))
-  })
-
-  it('says so plainly when the payload carries no number', async () => {
-    // A dead `tel:` link is worse than a sentence — it looks like it should work.
-    const client = makeClient({
-      atRisk: vi
-        .fn()
-        .mockResolvedValue({
-          items: [alert({ payload: { missed_count: 3, contact_phone: null } })],
-        }),
-    })
-    render(<AtRiskAlert client={client} locale="he" />)
-
-    expect(await screen.findByText(t('he', 'comms.atRisk.noPhone'))).toBeInTheDocument()
-    expect(screen.queryByTestId('at-risk-call-a1')).toBeNull()
-  })
-
-  it('renders nothing at all when nobody is at risk', async () => {
-    // Not an empty panel. §5.14's alert centre is "everything that requires a decision", and
-    // a permanent "no students at risk" card is a row that never requires one — which is how
-    // an alert centre becomes a list nobody scans.
-    //
-    // This is also the state the whole card is in until lane REPORTS merges: M9's job is what
-    // raises `attendance.at_risk`, and the callee half of a caller/callee pair merges first.
-    render(<AtRiskAlert client={makeClient()} locale="he" />)
-    await waitFor(() => expect(screen.queryByTestId('at-risk-alert')).toBeNull())
-  })
-
-  it('sorts the worst case first', () => {
-    const rows = [
-      alert({ id: 'a1', payload: { missed_count: 3 } }),
-      alert({ id: 'a2', payload: { missed_count: 7 } }),
-    ]
-    expect(byMostMissed(rows).map((row) => row.id)).toEqual(['a2', 'a1'])
-  })
-
-  it('reads its rows from this coach s own inbox, filtered by kind', async () => {
-    // Not from a report. A card that queried a report would show a coach every at-risk student
-    // in the club, including the ones in groups they do not teach — §5.11's fan-out already
-    // decided who should be told.
-    const atRisk = vi.fn().mockResolvedValue({ items: [] })
-    render(<AtRiskAlert client={makeClient({ atRisk })} locale="he" />)
-    await waitFor(() => expect(atRisk).toHaveBeenCalled())
-  })
-
-  it('stops showing an alert once the coach has acted on it', async () => {
-    const markRead = vi.fn().mockResolvedValue(alert())
-    const client = makeClient({
-      atRisk: vi.fn().mockResolvedValue({ items: [alert()] }),
-      markRead,
-    })
-    render(<AtRiskAlert client={client} locale="he" />)
-    await userEvent.click(await screen.findByTestId('at-risk-call-a1'))
-    expect(markRead).toHaveBeenCalledWith('a1')
-  })
-})
-
-// -- the slot ------------------------------------------------------------------
-describe('the staff-alerts registration', () => {
-  it('registers into staff-alerts and into nothing else', () => {
-    // `staff-alerts`, not `alert-centre` — that container exists only in the DASHBOARD
-    // bundle, so the old target could render nowhere in this app (S1).
-    registerCommsSections(AtRiskAlert as never)
-    expect(useSlot('staff-alerts').map((entry) => entry.key)).toEqual(['comms-at-risk'])
-    expect(useSlot('alert-centre')).toHaveLength(0)
-    expect(useSlot('student-card')).toHaveLength(0)
-    expect(useSlot('roster-row')).toHaveLength(0)
-  })
-
-  it('sits between unsynced work and the trial queue', () => {
-    // M5's conflicts are 5 ("a coach's lost register cannot wait an hour"); M3's pending
-    // requests are 20. A child who has missed three lessons is urgent in a different sense,
-    // and §5.14 built this feature against alerts that sit unread.
-    expect(AT_RISK_ORDER).toBeGreaterThan(5)
-    expect(AT_RISK_ORDER).toBeLessThan(20)
-  })
-})
+// §5.14's at-risk card and its `staff-alerts` registration used to be tested here
+// (`AtRiskAlert.tsx` / `register.ts`). Both were deleted 2026-09-06 — the same
+// `attendance.at_risk` notification was rendering twice, once as this banner and once as
+// a `features/tasks` task card, and the owner's call was "tasks tab only". Their coverage
+// moved with them: the one-tap `tel:` dial, the "no number on file" sentence, and the
+// worst-first sort are now `../tasks/TasksScreen.test.tsx`'s and
+// `../tasks/deriveTasks.test.ts`'s (`callParentTasks`, `byMostMissed`).
 
 // -- §5.11's eight switches ----------------------------------------------------
 describe('notification preferences (the 9e drawer)', () => {
@@ -237,24 +140,17 @@ describe('notification preferences (the 9e drawer)', () => {
 
 // -- §5.12's coach feed ---------------------------------------------------------
 describe('the coach calendar feed', () => {
-  const feed = {
-    id: 'f1',
-    subject_type: 'coach' as const,
-    url: 'https://api.example.test/api/v1/calendar/xyz.ics',
-    rotated_at: null,
-  }
-
   it('offers the coach their own subscription and says what is in it', async () => {
     // §5.12's two feeds carry different things. `calendar.coachSubtitle` is how the person
     // holding the phone knows which one this is.
-    const client = makeClient({ calendarFeeds: vi.fn().mockResolvedValue({ feeds: [feed] }) })
+    const client = makeClient({ calendarFeeds: vi.fn().mockResolvedValue({ feeds: [COACH_FEED] }) })
     render(<CoachCalendarFeed client={client} locale="he" />)
 
     expect(await screen.findByTestId('coach-feed')).toBeInTheDocument()
     expect(screen.getByText(t('he', 'comms.calendar.coachSubtitle'))).toBeInTheDocument()
     expect(screen.getByRole('link', { name: t('he', 'comms.calendar.addApple') })).toHaveAttribute(
       'href',
-      webcalUrl(feed.url),
+      webcalUrl(COACH_FEED.url),
     )
   })
 
@@ -316,9 +212,12 @@ describe('push registration', () => {
 // -- G12 ------------------------------------------------------------------------
 describe('layout', () => {
   it('uses no physical CSS properties', async () => {
-    const client = makeClient({ atRisk: vi.fn().mockResolvedValue({ items: [alert()] }) })
-    const { container } = render(<AtRiskAlert client={client} locale="he" />)
-    await screen.findByTestId('at-risk-alert')
+    // Was `AtRiskAlert` (deleted 2026-09-06, see this file's own header); `CoachCalendarFeed`
+    // is the remaining fill in this feature built the same way — inline `CSSProperties`
+    // objects rather than a stylesheet — so it still exercises the same check.
+    const client = makeClient({ calendarFeeds: vi.fn().mockResolvedValue({ feeds: [COACH_FEED] }) })
+    const { container } = render(<CoachCalendarFeed client={client} locale="he" />)
+    await screen.findByTestId('coach-feed')
     for (const element of container.querySelectorAll<HTMLElement>('[style]')) {
       const style = element.getAttribute('style') ?? ''
       expect(style).not.toMatch(/(^|;)\s*(margin|padding|border)-(left|right)\s*:/)

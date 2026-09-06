@@ -53,4 +53,21 @@ export const tasks: Bundle = {
   'healthReview.scope': 'Manager approval',
   'healthReview.badge': 'Awaiting review',
   'healthReview.action': 'Open student card',
+
+  'birthday.sectionTitle': 'Birthdays this week',
+  'birthday.sectionHint': 'A reminder to keep the personal connection and greet them on the mat',
+  'birthday.countBadge': '{{count}} students',
+  'birthday.countBadge.one': 'One student',
+  'birthday.noGroup': 'No group',
+  'birthday.turningAge': 'Turning {{age}}',
+  'birthday.today': 'Today!',
+  'birthday.inDays': 'In {{count}} days',
+  'birthday.inDays.one': 'Tomorrow',
+  'birthday.greetAction': 'Greet on WhatsApp',
+  'birthday.greetAgain': 'Greet again',
+  'birthday.tickLabel': 'Mark that you greeted {{name}}',
+  'birthday.tickLabelUndo': 'Undo the greeting mark for {{name}}',
+  'birthday.greetedHint': 'You marked this as greeted',
+  'birthday.greetingMessage':
+    'Hi {{name}}! Happy birthday — {{age}} today! Wishing you a great year of hard work, consistency and health on the mat. We are proud of you!',
 }

@@ -889,4 +889,19 @@ export const people: Bundle = {
   'staffCard.contactParentsMessage': 'Hello, a message from the club about {{name}}.',
   'staffCard.guardiansTitle': 'Contacts and parents',
   'staffCard.noGuardians': 'No guardians linked to this student',
+
+  // -- 9h's statistics section (owner review 2026-09-06). See the he.ts note.
+  'stats.title': 'Attendance statistics',
+  'stats.subtitle': 'A current snapshot — not a monthly history',
+  'stats.collapse': 'Collapse attendance statistics',
+  'stats.expand': 'Expand attendance statistics',
+  'stats.clubAverage': 'Average attendance',
+  'stats.clubAverageOf': 'of {{count}} students with recorded attendance',
+  'stats.needAttention': 'Need attention',
+  'stats.needAttentionBreakdown': '{{below}} below {{threshold}}% attendance · {{missing}} missing a health declaration',
+  'stats.allGroups': 'Whole club',
+  'stats.chipsLabel': 'Filter the chart by group',
+  'stats.chartLabel': 'Average attendance compared across groups',
+  'stats.noData': 'No attendance data to show yet',
+  'stats.footer': 'Figures reflect the students currently shown and attendance recorded so far — not a monthly trend.',
 }

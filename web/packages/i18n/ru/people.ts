@@ -891,4 +891,19 @@ export const people: Bundle = {
   'staffCard.contactParentsMessage': 'Здравствуйте, сообщение от клуба по поводу {{name}}.',
   'staffCard.guardiansTitle': 'Контакты и родители',
   'staffCard.noGuardians': 'К ученику не привязаны родители',
+
+  // -- 9h's statistics section (owner review 2026-09-06). See the he.ts note.
+  'stats.title': 'Статистика посещаемости',
+  'stats.subtitle': 'Текущий срез — не история по месяцам',
+  'stats.collapse': 'Свернуть статистику посещаемости',
+  'stats.expand': 'Развернуть статистику посещаемости',
+  'stats.clubAverage': 'Средняя посещаемость',
+  'stats.clubAverageOf': 'из {{count}} учеников с учтённой посещаемостью',
+  'stats.needAttention': 'Требуют внимания',
+  'stats.needAttentionBreakdown': '{{below}} ниже {{threshold}}% посещаемости · {{missing}} без медицинской декларации',
+  'stats.allGroups': 'Весь клуб',
+  'stats.chipsLabel': 'Фильтр графика по группе',
+  'stats.chartLabel': 'Сравнение средней посещаемости по группам',
+  'stats.noData': 'Пока нет данных о посещаемости',
+  'stats.footer': 'Цифры отражают учеников, показанных сейчас, и посещаемость, отмеченную на данный момент — а не помесячную тенденцию.',
 }

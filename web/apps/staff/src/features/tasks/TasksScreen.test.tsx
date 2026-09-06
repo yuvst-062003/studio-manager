@@ -8,9 +8,10 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { memoryStore, setOfflineStore, writeWindow } from '@studio/core'
 import type { OfflineStore } from '@studio/core'
+import { t } from '@studio/i18n'
 import { TasksScreen } from './TasksScreen'
 import type { StaffScheduleClient, SessionRow } from '../schedule/client'
-import type { StaffPeopleClient } from '../people'
+import type { StaffPeopleClient, StudentSummary } from '../people'
 import type { StaffCommsClient } from '../comms'
 import type { PromiseClient } from '../billing/promiseClient'
 import type { TasksClient } from './tasksClient'
@@ -52,8 +53,30 @@ function scheduleStub(sessions: SessionRow[]): StaffScheduleClient {
 function peopleStub(overrides: Partial<StaffPeopleClient> = {}): StaffPeopleClient {
   return {
     student: vi.fn(async () => ({ guardians: [] }) as never),
+    // The birthday section's own fetch (`useBirthdays.ts`) — the same `search('')` call
+    // `StudentsSearch.tsx` already makes. Empty by default so every test above this
+    // section's own `describe` block, written before the birthday section existed,
+    // keeps rendering nothing for it without having to know it now exists.
+    search: vi.fn(async () => ({ items: [] })),
     ...overrides,
   } as StaffPeopleClient
+}
+
+/** A minimal `StudentSummaryOut` for the birthday tests below — every field the type
+ *  requires, with `birthdate` the one callers actually vary. */
+function studentSummary(overrides: Partial<StudentSummary> = {}): StudentSummary {
+  return {
+    id: 'st1',
+    person_id: 'p1',
+    first_name: 'נועה',
+    last_name: 'לוי',
+    birthdate: null,
+    health_status: 'signed',
+    joined_on: null,
+    left_on: null,
+    status: 'active',
+    ...overrides,
+  }
 }
 
 function commsStub(overrides: Partial<StaffCommsClient> = {}): StaffCommsClient {
@@ -101,6 +124,10 @@ let store: OfflineStore
 beforeEach(() => {
   store = memoryStore()
   setOfflineStore(store)
+  // The birthday section's own greeted tick lives in real `localStorage` (see
+  // `birthdayGreetings.ts`), which jsdom keeps for the whole test file rather than
+  // resetting per test — cleared here so one test's tick cannot leak into the next.
+  globalThis.localStorage?.clear()
 })
 
 afterEach(() => {
@@ -245,6 +272,49 @@ describe('the tasks tab — checkpoint 8', () => {
     await waitFor(() => expect(screen.queryByTestId('task-call-parent:n1')).toBeNull())
   })
 
+  // 2026-09-06 — ported from the deleted `features/comms/AtRiskAlert.tsx` banner (see
+  // `../comms/index.ts`'s own header for why it is gone): the one-tap `tel:` dial that
+  // banner gave a coach standing beside a mat now lives on this card instead, so nothing
+  // was lost in folding the two surfaces into one.
+  it('gives the call-parent card its own one-tap dial to the family', async () => {
+    const notification = {
+      id: 'n2',
+      kind: 'attendance.at_risk',
+      title: 'תלמיד בסיכון',
+      body: 'נועה גל — 4 היעדרויות רצופות',
+      created_at: NOW,
+      payload: { contact_person_id: 'p2', contact_phone: '054-1234567', missed_count: 4 },
+    }
+    renderScreen({
+      commsClient: commsStub({ atRisk: vi.fn(async () => ({ items: [notification] })) }),
+    })
+    const link = await waitFor(() => screen.getByTestId('task-call-call-parent:n2'))
+    expect(link).toHaveAttribute('href', 'tel:054-1234567')
+    expect(link).toHaveAccessibleName(t('he', 'comms.atRisk.contactParent'))
+    // The tick is a separate control — §4.4's own rule that nothing here can know whether
+    // the coach actually called, so dialing must not silently mark the card done.
+    expect(screen.getByTestId('task-call-parent:n2')).toBeInTheDocument()
+  })
+
+  it('says so plainly on the card when the family has no number on file', async () => {
+    const notification = {
+      id: 'n3',
+      kind: 'attendance.at_risk',
+      title: 'תלמיד בסיכון',
+      body: 'עומר לביא — 3 היעדרויות רצופות',
+      created_at: NOW,
+      payload: { contact_person_id: 'p3', missed_count: 3 },
+    }
+    renderScreen({
+      commsClient: commsStub({ atRisk: vi.fn(async () => ({ items: [notification] })) }),
+    })
+    await waitFor(() => expect(screen.getByTestId('task-call-parent:n3')).toBeInTheDocument())
+    expect(screen.getByTestId('task-no-phone-call-parent:n3')).toHaveTextContent(
+      t('he', 'comms.atRisk.noPhone'),
+    )
+    expect(screen.queryByTestId('task-call-call-parent:n3')).toBeNull()
+  })
+
   it('does not fetch the manager-only rows for a non-manager', () => {
     const pending = vi.fn(async () => [])
     renderScreen({ viewerIsManager: false, promiseClient: promiseStub({ pending }) })
@@ -311,5 +381,50 @@ describe('the tasks tab — checkpoint 8', () => {
     const action = within(card).getByTestId('task-action-close-session:s1')
     expect(action.tagName).toBe('A')
     expect(action.getAttribute('href')).not.toBe('')
+  })
+})
+
+describe('the birthday section — decision reversed 2026-09-06', () => {
+  // NOW is 2026-11-03 in the studio's own timezone (Asia/Jerusalem) — see `deriveBirthdays.ts`.
+  it('surfaces a birthday row for a child whose birthdate falls this week, and not one whose does not — through the real fetch', async () => {
+    renderScreen({
+      peopleClient: peopleStub({
+        search: vi.fn(async () => ({
+          items: [
+            studentSummary({ id: 'this-week', first_name: 'עדן', last_name: 'כהן', birthdate: '2015-11-03' }),
+            studentSummary({ id: 'not-this-week', first_name: 'רוני', last_name: 'שגיא', birthdate: '2015-01-15' }),
+          ],
+        })),
+      }),
+    })
+    await waitFor(() => expect(screen.getByTestId('birthday-row-this-week')).toBeInTheDocument())
+    expect(screen.queryByTestId('birthday-row-not-this-week')).toBeNull()
+  })
+
+  it('renders nothing when no student on the roster has a birthday this week', async () => {
+    renderScreen()
+    // Let the (empty) fetch resolve before asserting the negative.
+    await waitFor(() => expect(screen.getByTestId('staff-tasks')).toBeInTheDocument())
+    expect(screen.queryByTestId('birthday-section')).toBeNull()
+  })
+
+  it('the greeted tick is a local acknowledgement that survives a reload, and never claims a message was sent', async () => {
+    const search = vi.fn(async () => ({
+      items: [studentSummary({ id: 'bday-1', first_name: 'תום', last_name: 'לוי', birthdate: '2015-11-03' })],
+    }))
+    const { unmount } = renderScreen({ peopleClient: peopleStub({ search }) })
+    const tick = await waitFor(() => screen.getByTestId('birthday-tick-bday-1'))
+    expect(tick).toHaveAttribute('aria-pressed', 'false')
+    // Never "sent" — §4.9's own rule, restated for this tick: opening WhatsApp is not
+    // proof anything was sent, so the mark is only ever about what the coach did.
+    expect(tick.getAttribute('aria-label') ?? '').not.toMatch(/נשלח|sent/i)
+
+    await userEvent.click(tick)
+    expect(tick).toHaveAttribute('aria-pressed', 'true')
+    unmount()
+
+    renderScreen({ peopleClient: peopleStub({ search }) })
+    const tickAfterReload = await waitFor(() => screen.getByTestId('birthday-tick-bday-1'))
+    expect(tickAfterReload).toHaveAttribute('aria-pressed', 'true')
   })
 })

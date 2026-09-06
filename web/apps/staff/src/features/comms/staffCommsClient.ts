@@ -38,6 +38,22 @@ export type AtRiskPayload = {
 
 export const AT_RISK_KIND = 'attendance.at_risk'
 
+/**
+ * Sorted worst-first: the child who has missed most is the call to make today.
+ *
+ * Moved here from the deleted `AtRiskAlert.tsx` (2026-09-06, see `index.ts`'s own header)
+ * — the banner card that once rendered this is gone, but the sort itself is not
+ * component-specific, and `features/tasks/deriveTasks.ts::callParentTasks` still needs it
+ * for the same reason the banner did: the worst case is the one to lead with.
+ */
+export function byMostMissed(rows: NotificationOut[]): NotificationOut[] {
+  return [...rows].sort(
+    (a, b) =>
+      ((b.payload as AtRiskPayload)?.missed_count ?? 0) -
+      ((a.payload as AtRiskPayload)?.missed_count ?? 0),
+  )
+}
+
 export function makeStaffCommsClient(fetcher: Fetcher) {
   return {
     /** §5.14's alerts, from this coach's own inbox rather than from a report. */

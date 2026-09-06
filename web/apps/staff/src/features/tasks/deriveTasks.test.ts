@@ -179,6 +179,36 @@ describe('callParentTasks — coach row 3, the one with a tick', () => {
   it('produces nothing once the inbox no longer contains it — the disappearance the tick buys', () => {
     expect(callParentTasks([], 'he', vi.fn())).toHaveLength(0)
   })
+
+  // 2026-09-06 — ported from the deleted `features/comms/AtRiskAlert.tsx` (see
+  // `features/comms/index.ts`'s own header): the same at-risk notification used to render
+  // twice, once as that banner and once as this card, so the owner's call was "tasks tab
+  // only" and this row picked up the banner's own behaviour rather than losing it.
+  it('carries the family phone for the card\'s own one-tap dial', () => {
+    const tasks = callParentTasks([notification()], 'he', vi.fn())
+    expect(tasks[0]!.contactPhone).toBe('050-0000000')
+  })
+
+  it('carries null, not undefined, when the family has no number on file', () => {
+    const tasks = callParentTasks(
+      [notification({ payload: { contact_person_id: 'p1', missed_count: 3 } })],
+      'he',
+      vi.fn(),
+    )
+    expect(tasks[0]!.contactPhone).toBeNull()
+  })
+
+  it('sorts the worst case first — the call to make today leads the list', () => {
+    const tasks = callParentTasks(
+      [
+        notification({ id: 'n1', payload: { contact_person_id: 'p1', missed_count: 3 } }),
+        notification({ id: 'n2', payload: { contact_person_id: 'p1', missed_count: 7 } }),
+      ],
+      'he',
+      vi.fn(),
+    )
+    expect(tasks.map((task) => task.id)).toEqual(['call-parent:n2', 'call-parent:n1'])
+  })
 })
 
 describe('cashPendingTasks — manager row 1', () => {

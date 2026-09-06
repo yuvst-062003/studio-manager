@@ -1009,4 +1009,23 @@ export const people: Bundle = {
   'staffCard.contactParentsMessage': 'שלום, פנייה מהמועדון בנוגע ל{{name}}.',
   'staffCard.guardiansTitle': 'אנשי קשר והורים',
   'staffCard.noGuardians': 'לא משויכים הורים לחניך/ה',
+
+  // -- 9h's statistics section (owner review 2026-09-06). Replaces the prototype's
+  // `AttendanceTrendChart`, whose seven months of bars were invented — see
+  // `StudentsSearch.tsx`'s own note. Built instead from the CURRENT snapshot the roster
+  // already fetches: no monthly history, so no delta and no trend line, and both the
+  // subtitle and the footer say so out loud.
+  'stats.title': 'נתוני נוכחות',
+  'stats.subtitle': 'תמונת מצב נוכחית — לא היסטוריה חודשית',
+  'stats.collapse': 'צמצום נתוני הנוכחות',
+  'stats.expand': 'הרחבת נתוני הנוכחות',
+  'stats.clubAverage': 'ממוצע נוכחות',
+  'stats.clubAverageOf': 'מתוך {{count}} חניכים עם נוכחות רשומה',
+  'stats.needAttention': 'זקוקים לתשומת לב',
+  'stats.needAttentionBreakdown': '{{below}} מתחת ל-{{threshold}}% נוכחות · {{missing}} ללא הצהרת בריאות',
+  'stats.allGroups': 'כל המועדון',
+  'stats.chipsLabel': 'סינון הגרף לפי קבוצה',
+  'stats.chartLabel': 'השוואת ממוצע נוכחות בין קבוצות',
+  'stats.noData': 'עדיין אין נתוני נוכחות להצגה',
+  'stats.footer': 'הנתונים משקפים את החניכים המוצגים כרגע ואת הנוכחות שנרשמה עד כה — לא מגמה חודשית.',
 }

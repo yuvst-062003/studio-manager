@@ -32,7 +32,7 @@
 // coach actually asks to chase them. A caller that already has its contacts synchronously
 // (a student card, say) satisfies the same prop with `() => Promise.resolve(families)`.
 import { useCallback, useState } from 'react'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { Button, useModalDialog } from '@studio/ui'
 import { phoneList, whatsappShareUrl } from '@studio/core'
 import { plural, t } from '@studio/i18n'
@@ -122,10 +122,13 @@ export function ContactFamiliesButton({
   title,
   message,
   resolveFamilies,
+  renderTrigger,
 }: {
   locale: Locale
   /** The trigger button's own label — callers differ (a session says how many have not
-   *  confirmed; a student card would just say "contact"), so it is never invented here. */
+   *  confirmed; a student card would just say "contact"), so it is never invented here.
+   *  Still read even when `renderTrigger` is given (most callers pass it straight through
+   *  into their own trigger's visible text), so it stays required rather than optional. */
   triggerLabel: string
   /** The panel's heading, and half of what `whatsappShareUrl` sends — the group name, the
    *  student's name, whatever names the audience for whoever opens the shared link. */
@@ -134,6 +137,13 @@ export function ContactFamiliesButton({
    *  says "pre-composed", not "composer". */
   message: string
   resolveFamilies: () => Promise<ContactFamily[]>
+  /** Draw the opener yourself — the same escape hatch `AccessibilityMenu`'s own
+   *  `renderTrigger` already gives this app, so a caller whose design calls for a
+   *  differently shaped trigger (the schedule card's filled, two-up-grid button, 2026-09-06)
+   *  never has to fork this component to get it. Omit it for the plain `Button` below,
+   *  still the right answer for a caller with no opinion. Whatever you return MUST be the
+   *  accessible control — carry `onClick={onOpen}`, or nothing ever opens the panel. */
+  renderTrigger?: (props: { open: boolean; onOpen: () => void }) => ReactNode
 }) {
   const [open, setOpen] = useState(false)
   const [families, setFamilies] = useState<ContactFamily[] | null>(null)
@@ -172,9 +182,13 @@ export function ContactFamiliesButton({
 
   return (
     <>
-      <Button variant="secondary" data-testid="contact-open" onClick={onOpen}>
-        {triggerLabel}
-      </Button>
+      {renderTrigger ? (
+        renderTrigger({ open, onOpen })
+      ) : (
+        <Button variant="secondary" data-testid="contact-open" onClick={onOpen}>
+          {triggerLabel}
+        </Button>
+      )}
       {open ? (
         <div
           role="dialog"
