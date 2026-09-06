@@ -947,6 +947,10 @@ class OnboardingService:
                 "address": signer["address"],
                 "city": signer["city"],
                 "grade": "" if is_self else str(child.get("grade") or ""),
+                #: The student's own year. `None` for a self-guarding adult, whose one year
+                #: arrives as the signer's -- see `save_registration`'s note on why that
+                #: order matters when both write the same row.
+                "aliyah_year": None if is_self else child.get("aliyah_year"),
                 "phone_home": signer.get("phone_home"),
                 "phone": parent.phone,
                 "email": parent.email,

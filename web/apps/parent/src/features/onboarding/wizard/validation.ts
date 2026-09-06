@@ -55,6 +55,8 @@ export type FieldKey =
   | 'guardianNationalId'
   | 'guardianPhone'
   | 'guardianEmail'
+  | 'otherParentNationalId'
+  | 'otherParentPhone'
   | 'pickupExtraName'
   | 'groupId'
   | 'planId'
@@ -130,6 +132,20 @@ export function fieldError(
       if (!minor) return null
       if (!student.guardianEmail.trim()) return VALIDATION_COPY.guardianEmailRequired
       return EMAIL.test(student.guardianEmail.trim()) ? null : VALIDATION_COPY.emailInvalid
+    // הורה 2 is optional whole, so an ABSENT second parent is valid and an absent FIELD is
+    // valid. What is not valid is a ת.ז. or a phone typed WRONG: an optional field still has
+    // to be right when it is filled, and a mistyped second-parent ת.ז. is one the club can
+    // never match to a person.
+    case 'otherParentNationalId': {
+      const value = student.otherParent?.nationalId.trim() ?? ''
+      if (!value) return null
+      return isValidNationalId(value) ? null : VALIDATION_COPY.idInvalid
+    }
+    case 'otherParentPhone': {
+      const value = student.otherParent?.phone.trim() ?? ''
+      if (!value) return null
+      return digitsOf(value).length >= 9 ? null : VALIDATION_COPY.phoneInvalid
+    }
     case 'pickupExtraName':
       if (!minor || student.pickup.parentOnly) return null
       return student.pickup.extraName.trim() ? null : VALIDATION_COPY.pickupNameRequired
@@ -176,6 +192,8 @@ export const FIELDS_BY_PART: Record<FormPart, readonly FieldKey[]> = {
     'guardianNationalId',
     'guardianPhone',
     'guardianEmail',
+    'otherParentNationalId',
+    'otherParentPhone',
     'pickupExtraName',
   ],
   2: ['groupId'],

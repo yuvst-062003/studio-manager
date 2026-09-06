@@ -42,6 +42,10 @@ class ChildDetailsIn(BaseModel):
     phone_home: str | None = Field(default=None, max_length=32)
     phone: str | None = Field(default=None, max_length=32)
     email: str | None = Field(default=None, max_length=320)
+    #: The STUDENT's own `שנת עליה` (2026-09-06). The signer's lives on `ParentDetailsIn`
+    #: and always did; this is the field that was missing, and unlike the legacy family
+    #: fields above it this one really is a child fact.
+    aliyah_year: str | None = Field(default=None, max_length=8)
 
 
 class ParentDetailsIn(BaseModel):

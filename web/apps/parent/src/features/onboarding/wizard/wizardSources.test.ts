@@ -49,6 +49,7 @@ const REGISTER_PAYLOAD: RegisterPayload = {
       self_student: false,
       national_id: '100000017',
       grade: 'grade_3',
+      aliyah_year: null,
       price_plan_id: 'plan-1',
       other_parent: null,
       pickup_contacts: [],

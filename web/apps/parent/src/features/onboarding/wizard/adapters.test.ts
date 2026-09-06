@@ -3,7 +3,8 @@
 // a crash on the wizard's first screen rather than an empty label.
 import { describe, expect, it } from 'vitest'
 import type { ApiGroup } from './adapters'
-import { toWizardGroup } from './adapters'
+import { toRegisterPayload, toWizardGroup } from './adapters'
+import { emptyStudent } from './types'
 
 const FULL_GROUP: ApiGroup = {
   id: 'g1',
@@ -54,5 +55,102 @@ describe('toWizardGroup', () => {
   it('a group with no training days at all gets an empty schedule label, not a lone session count', () => {
     const group = toWizardGroup({ ...FULL_GROUP, weekdays: [] })
     expect(group.scheduleLabel).toBe('')
+  })
+})
+
+// The three fields the 2026-09-06 review added, asserted at the SEAM rather than on the
+// form: a field collected and then dropped on the way to the write passes every component
+// test there is. CLAUDE.md names this one directly.
+describe('toRegisterPayload — שנת עליה and הורה 2', () => {
+  const OPTIONS = { templateId: 'tmpl-1', clubTermsAccepted: true }
+
+  /** A minor with everything the review asked for filled in. */
+  function minorDraft() {
+    return {
+      ...emptyStudent('s1'),
+      firstName: 'אנה',
+      lastName: 'לוי',
+      birthDate: '2015-05-05',
+      nationalId: '100000009',
+      address: 'יפו 1',
+      city: 'תל אביב',
+      grade: 'grade_3' as const,
+      aliyahYear: '2014',
+      guardianFirstName: 'מרינה',
+      guardianLastName: 'לוי',
+      guardianNationalId: '100000025',
+      guardianPhone: '050-1234567',
+      guardianEmail: 'marina@example.invalid',
+      guardianAliyahYear: '1998',
+      otherParent: {
+        firstName: 'סרגיי',
+        lastName: 'לוי',
+        nationalId: '100000033',
+        phone: '052-7654321',
+      },
+    }
+  }
+
+  it('sends the student’s year and the guardian’s year as two different values', () => {
+    const payload = toRegisterPayload([minorDraft()], OPTIONS)
+    expect(payload.children[0]!.aliyah_year).toBe('2014')
+    expect(payload.signer.aliyah_year).toBe('1998')
+  })
+
+  it('sends the second parent on the child, with only the fields that were filled', () => {
+    const payload = toRegisterPayload([minorDraft()], OPTIONS)
+    expect(payload.children[0]!.other_parent).toEqual({
+      first_name: 'סרגיי',
+      last_name: 'לוי',
+      national_id: '100000033',
+      phone: '052-7654321',
+    })
+  })
+
+  it('sends no second parent for a tab that was opened and left blank', () => {
+    // An empty second parent is NO second parent. The API requires a first name of one that
+    // exists at all, so sending `{first_name: ''}` would be a 422 for a family that simply
+    // changed their mind.
+    const student = { ...minorDraft(), otherParent: { firstName: '  ', lastName: '', nationalId: '', phone: '' } }
+    expect(toRegisterPayload([student], OPTIONS).children[0]!.other_parent).toBeNull()
+  })
+
+  it('asks an adult member for one year, and sends it as the signer’s', () => {
+    // §5.3's adult member is one `Person` in both roles, so the child write and the signer
+    // write land on the same row. Sending the year twice is two writes to one column where
+    // whichever ran last wins — the form asks once, and this is the seam that proves it.
+    const adult = {
+      ...emptyStudent('s2'),
+      firstName: 'איגור',
+      lastName: 'פטרוב',
+      birthDate: '1996-02-02',
+      nationalId: '100000009',
+      address: 'יפו 1',
+      city: 'תל אביב',
+      aliyahYear: '1999',
+    }
+    const payload = toRegisterPayload([adult], OPTIONS)
+    expect(payload.children[0]!.self_student).toBe(true)
+    expect(payload.children[0]!.aliyah_year).toBeNull()
+    expect(payload.signer.aliyah_year).toBe('1999')
+  })
+
+  it('never sends a second parent for an adult member', () => {
+    // Nobody else's name belongs on an adult's own registration — the same rule the server
+    // enforces in `_apply_family_details` regardless of what is sent.
+    const adult = {
+      ...emptyStudent('s3'),
+      firstName: 'איגור',
+      lastName: 'פטרוב',
+      birthDate: '1996-02-02',
+      address: 'יפו 1',
+      city: 'תל אביב',
+      otherParent: { firstName: 'מישהו', lastName: '', nationalId: '', phone: '' },
+    }
+    expect(toRegisterPayload([adult], OPTIONS).children[0]!.other_parent).toBeNull()
+  })
+
+  it('never sends a home phone, because the form no longer asks for one', () => {
+    expect(toRegisterPayload([minorDraft()], OPTIONS).signer.phone_home).toBeNull()
   })
 })

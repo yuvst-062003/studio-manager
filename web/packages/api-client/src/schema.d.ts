@@ -6486,6 +6486,8 @@ export interface components {
         ChildDetailsIn: {
             /** Address */
             address: string;
+            /** Aliyah Year */
+            aliyah_year?: string | null;
             /** City */
             city: string;
             /** Email */
@@ -8929,6 +8931,8 @@ export interface components {
         };
         /** OnboardingChildIn */
         OnboardingChildIn: {
+            /** Aliyah Year */
+            aliyah_year?: string | null;
             /** Birthdate */
             birthdate?: string | null;
             /** First Name */

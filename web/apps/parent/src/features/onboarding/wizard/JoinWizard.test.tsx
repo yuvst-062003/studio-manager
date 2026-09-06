@@ -157,7 +157,12 @@ function renderWizard(
 /** Fills the real step-2 form (`StudentFormSheet`, all five parts) for ONE minor child and
  *  presses through to step 3's decision sub-view. Assumes step 2's family list is already
  *  on screen. Every field is the minimum `validation.ts` requires. */
-async function fillOneChildAndContinue(user: ReturnType<typeof userEvent.setup>) {
+async function fillOneChildAndContinue(
+  user: ReturnType<typeof userEvent.setup>,
+  /** 2026-09-06's optional fields. Off by default so every existing test still drives the
+   *  minimum the form requires, which is what they are about. */
+  extras: { aliyah?: boolean; secondParent?: boolean } = {},
+) {
   await screen.findByTestId('join-family-step')
   await user.click(screen.getByRole('button', { name: STEP2_COPY.addStudent }))
 
@@ -186,6 +191,17 @@ async function fillOneChildAndContinue(user: ReturnType<typeof userEvent.setup>)
   await fill(STUDENT_FORM_COPY.guardianNationalId, '100000017')
   await fill(STUDENT_FORM_COPY.guardianPhone, '0501234567')
   await fill(STUDENT_FORM_COPY.guardianEmail, 'dana@example.com')
+  if (extras.aliyah) {
+    await fill(STUDENT_FORM_COPY.aliyahYear, '2014')
+    await fill(STUDENT_FORM_COPY.guardianAliyahYear, '1998')
+  }
+  if (extras.secondParent) {
+    await user.click(within(dialog).getByTestId('other-parent-add'))
+    await fill(STUDENT_FORM_COPY.otherParentFirstName, 'סרגיי')
+    await fill(STUDENT_FORM_COPY.otherParentLastName, 'כהן')
+    await fill(STUDENT_FORM_COPY.otherParentNationalId, '100000033')
+    await fill(STUDENT_FORM_COPY.otherParentPhone, '0527654321')
+  }
   await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next1 }))
 
   // Part 2 — the one group in the fixture.
@@ -946,4 +962,57 @@ describe('JoinWizard -- a failed read is recoverable, not a dead end', () => {
       onLine.mockRestore()
     }
   })
+})
+
+// The 2026-09-06 fields, driven through the REAL form rather than by building a draft.
+// CLAUDE.md's rule: a field added to an API is not proven by a test that constructs the
+// props by hand — assert the mapping that carries it, or a field dropped between the input
+// and the payload passes every other test in this file.
+describe('שנת עליה and הורה 2 reach the write', () => {
+  it('carries the student’s year, the guardian’s year and the second parent into register', async () => {
+    const user = userEvent.setup()
+    const { source } = renderWizard()
+    await screen.findByTestId('join-welcome')
+    await user.click(screen.getByLabelText(STEP1_COPY.agree))
+    await user.click(screen.getByRole('button', { name: STEP1_COPY.continue }))
+    await fillOneChildAndContinue(user, { aliyah: true, secondParent: true })
+    await chooseMethodAndSubmit(user, STEP3_COPY.methodCash)
+
+    await waitFor(() => expect(source.register).toHaveBeenCalled())
+    const body = vi.mocked(source.register).mock.calls[0]![0]
+    const [child] = body.children
+    expect(child!.aliyah_year).toBe('2014')
+    expect(body.signer.aliyah_year).toBe('1998')
+    expect(child!.other_parent).toEqual({
+      first_name: 'סרגיי',
+      last_name: 'כהן',
+      national_id: '100000033',
+      phone: '0527654321',
+    })
+    // The field the owner removed. Asserted, not assumed: `phone_home` is still a nullable
+    // column, so nothing would fail if the form quietly started sending one again.
+    expect(body.signer.phone_home).toBeNull()
+    // Both tests here drive the REAL five-part form end to end and legitimately take the
+    // better part of a second; under a loaded full parallel run that passes vitest's 5s
+    // default and times out with nothing hung. Headroom on the test rather than a global
+    // bump, exactly as the install-walkthrough test above already does — a raised global
+    // would mask an unrelated test that really is stuck. Do not "tidy" this away.
+  }, 20000)
+
+  it('lets a family submit with no second parent at all, and sends null', async () => {
+    // One-parent families are not incomplete families, and the tab must not become a
+    // required section by accident.
+    const user = userEvent.setup()
+    const { source } = renderWizard()
+    await screen.findByTestId('join-welcome')
+    await user.click(screen.getByLabelText(STEP1_COPY.agree))
+    await user.click(screen.getByRole('button', { name: STEP1_COPY.continue }))
+    await fillOneChildAndContinue(user)
+    await chooseMethodAndSubmit(user, STEP3_COPY.methodCash)
+
+    await waitFor(() => expect(source.register).toHaveBeenCalled())
+    const body = vi.mocked(source.register).mock.calls[0]![0]
+    expect(body.children[0]!.other_parent).toBeNull()
+    expect(body.children[0]!.aliyah_year).toBeNull()
+  }, 20000)
 })

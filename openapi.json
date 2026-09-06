@@ -1926,6 +1926,18 @@
             "title": "Address",
             "type": "string"
           },
+          "aliyah_year": {
+            "anyOf": [
+              {
+                "maxLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aliyah Year"
+          },
           "city": {
             "maxLength": 80,
             "minLength": 1,
@@ -7404,6 +7416,18 @@
       },
       "OnboardingChildIn": {
         "properties": {
+          "aliyah_year": {
+            "anyOf": [
+              {
+                "maxLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aliyah Year"
+          },
           "birthdate": {
             "anyOf": [
               {

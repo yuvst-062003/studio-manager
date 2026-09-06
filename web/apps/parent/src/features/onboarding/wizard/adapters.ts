@@ -89,8 +89,14 @@ export type RegisterPayload = {
     self_student: boolean
     national_id: string | null
     grade: string | null
+    aliyah_year: string | null
     price_plan_id: string | null
-    other_parent: null
+    other_parent: {
+      first_name: string
+      last_name: string | null
+      national_id: string | null
+      phone: string | null
+    } | null
     pickup_contacts: { name: string; phone: string }[]
     health: {
       template_id: string
@@ -124,8 +130,16 @@ export function toRegisterPayload(
       national_id: signerSource.guardianNationalId || signerSource.nationalId,
       address: signerSource.address,
       city: signerSource.city,
+      //: NOT COLLECTED, and that is a decision rather than an omission (owner, 2026-09-06).
+      //: The paper form asks for a home phone; nobody has a landline to give and the old
+      //: registration screen asked for one anyway. The API keeps the nullable column, so
+      //: records that already carry one are untouched.
       phone_home: null,
-      aliyah_year: null,
+      //: The GUARDIAN's year for a family with a minor, and the ADULT's own when the
+      //: signer is the student -- `signerSource` above is a minor's row when there is one
+      //: and the first student otherwise, so the fallback is exactly the adult case.
+      aliyah_year:
+        signerSource.guardianAliyahYear.trim() || signerSource.aliyahYear.trim() || null,
       relation: 'mother',
     },
     club_terms_accepted: options.clubTermsAccepted,
@@ -143,8 +157,27 @@ export function toRegisterPayload(
         //: `REQUIRED_REGISTRATION_FIELDS_SELF` drops the school class for an adult, and
         //: the form does not ask them for one.
         grade: minor ? student.grade || null : null,
+        //: `שנת עליה`, the student's own -- and NOT sent for an adult member. §5.3 makes
+        //: them one `Person` in both roles, so the child write and the signer write below
+        //: land on the same row; the form asks them once and it travels as the signer's.
+        //: Sending it in both places would be two writes to one column where whichever ran
+        //: last wins. The server enforces the same rule (`_apply_family_details`).
+        aliyah_year: minor ? student.aliyahYear.trim() || null : null,
         price_plan_id: student.planId || null,
-        other_parent: null,
+        //: הורה 2, per CHILD rather than per family: two siblings in one submission can
+        //: genuinely have different second parents, which is what F7 made the API's own
+        //: shape per-child for. `first_name` is what the API requires of a second parent
+        //: that exists at all, so a tab opened and left entirely blank sends `null` -- an
+        //: empty second parent is no second parent, not an empty one.
+        other_parent:
+          minor && student.otherParent && student.otherParent.firstName.trim()
+            ? {
+                first_name: student.otherParent.firstName.trim(),
+                last_name: student.otherParent.lastName.trim() || null,
+                national_id: student.otherParent.nationalId.trim() || null,
+                phone: student.otherParent.phone.trim() || null,
+              }
+            : null,
         pickup_contacts:
           minor && !student.pickup.parentOnly && student.pickup.extraName
             ? [{ name: student.pickup.extraName, phone: student.pickup.extraPhone }]

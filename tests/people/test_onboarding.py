@@ -3036,3 +3036,124 @@ def test_an_enqueue_that_raises_does_not_fail_the_registration(
         select(Guardian).where(Guardian.student_id == flagged_student_id)
     ).scalar_one()
     assert guardian.person_id == parent.id
+
+
+# -- שנת עליה, per PERSON rather than per family ---------------------------------------
+def test_the_child_and_the_signer_each_keep_their_own_aliyah_year(
+    tenant_session, app_session, studio, a_group, twice_weekly
+):
+    """Owner decision 2026-09-06: aliyah year is asked of the student AND of the guardian,
+    optional for both.
+
+    `שנת עליה` used to be the SIGNER's alone -- block 4 of the paper form -- so a child who
+    made aliyah in a different year to their parent had that fact recorded against the
+    parent and nowhere else. Both rows are asserted here, with different values, because a
+    single implementation that wrote one field twice would pass an assertion on either one
+    alone.
+    """
+    from app.models.identity import AuthIdentity
+
+    identity = AuthIdentity(
+        provider="google",
+        provider_subject=f"aliyah-{uuid.uuid4().hex[:8]}",
+        email="aliyah@example.invalid",
+        email_verified=True,
+        is_private_relay=False,
+        is_developer=False,
+    )
+    app_session.add(identity)
+    app_session.commit()
+
+    parent, student_ids, _, _ = OnboardingService.register(
+        tenant_session,
+        studio_id=studio.id,
+        identity_id=identity.id,
+        first_name="מרינה",
+        last_name="לוי",
+        phone="050-1234567",
+        email="aliyah@example.invalid",
+        children=[
+            {
+                "first_name": "אנה",
+                "last_name": "לוי",
+                "birthdate": date(2015, 5, 5),
+                "group_ids": [a_group],
+                "self": False,
+                "grade": "ג",
+                "national_id": "100000009",
+                "aliyah_year": "2014",
+            }
+        ],
+        signer={
+            "national_id": "100000025",
+            "address": "יפו 1",
+            "city": "תל אביב",
+            "relation": "mother",
+            "aliyah_year": "1998",
+        },
+        other_parent=None,
+        pickup_contacts=[],
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+
+    student = tenant_session.get(Student, student_ids[0])
+    child_person = tenant_session.get(Person, student.person_id)
+    assert child_person.aliyah_year_encrypted == "2014"
+    assert tenant_session.get(Person, parent.id).aliyah_year_encrypted == "1998"
+
+
+def test_an_adult_member_keeps_one_aliyah_year_on_the_one_row_they_are(
+    tenant_session, app_session, studio, a_group, twice_weekly
+):
+    """§5.3's adult member is ONE `Person` in both roles, so the student and the signer are
+    the same row and the year is asked once. The risk this pins is the opposite of the test
+    above: two writes to one row, where whichever ran last silently wins."""
+    from app.models.identity import AuthIdentity
+
+    identity = AuthIdentity(
+        provider="google",
+        provider_subject=f"aliyah-self-{uuid.uuid4().hex[:8]}",
+        email="adult@example.invalid",
+        email_verified=True,
+        is_private_relay=False,
+        is_developer=False,
+    )
+    app_session.add(identity)
+    app_session.commit()
+
+    parent, student_ids, _, _ = OnboardingService.register(
+        tenant_session,
+        studio_id=studio.id,
+        identity_id=identity.id,
+        first_name="איגור",
+        last_name="פטרוב",
+        phone="050-7654321",
+        email="adult@example.invalid",
+        children=[
+            {
+                "first_name": "איגור",
+                "last_name": "פטרוב",
+                "birthdate": date(1996, 2, 2),
+                "group_ids": [a_group],
+                "self": True,
+            }
+        ],
+        signer={
+            "national_id": "100000025",
+            "address": "יפו 1",
+            "city": "תל אביב",
+            "relation": "other",
+            "aliyah_year": "1999",
+        },
+        other_parent=None,
+        pickup_contacts=[],
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+
+    student = tenant_session.get(Student, student_ids[0])
+    assert student.person_id == parent.id, "the adult member is one person in both roles"
+    assert tenant_session.get(Person, parent.id).aliyah_year_encrypted == "1999"

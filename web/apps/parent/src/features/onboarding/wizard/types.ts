@@ -50,6 +50,17 @@ export type PickupArrangement = {
   extraPhone: string
 }
 
+/** הורה 2. Every field optional, including the name — a family with one parent is not an
+ *  incomplete family, and the API's `other_parent` is `null` for exactly that. Held as a
+ *  nested object rather than four more flat `otherParent*` keys so "is there a second
+ *  parent at all" is one question with one answer, which is what the tab strip asks. */
+export type OtherParentDraft = {
+  firstName: string
+  lastName: string
+  nationalId: string
+  phone: string
+}
+
 export type StudentDraft = {
   id: string
   firstName: string
@@ -61,11 +72,22 @@ export type StudentDraft = {
   email: string
   grade: GradeKey | ''
   beltId: string
+  /** `שנת עליה`, the STUDENT's own. Optional and free-form, like the paper form's block 4.
+   *  A self-guarding adult is asked once and it travels as the signer's — see
+   *  `toRegisterPayload`, and the note in the API's `save_registration` on why that
+   *  matters when both write the same `Person` row. */
+  aliyahYear: string
   guardianFirstName: string
   guardianLastName: string
   guardianNationalId: string
   guardianPhone: string
   guardianEmail: string
+  /** The GUARDIAN's `שנת עליה`. Optional, and asked only when there is a guardian block to
+   *  ask it in — an adult member answers the student one above and nothing else. */
+  guardianAliyahYear: string
+  /** הורה 2, or `null` when the family has not added one. Minors only: nobody else's name
+   *  belongs on an adult's own registration. */
+  otherParent: OtherParentDraft | null
   pickup: PickupArrangement
   groupId: string
   planId: string
@@ -134,11 +156,14 @@ export function emptyStudent(id: string, defaults?: Partial<StudentDraft>): Stud
     email: '',
     grade: '',
     beltId: '',
+    aliyahYear: '',
     guardianFirstName: '',
     guardianLastName: '',
     guardianNationalId: '',
     guardianPhone: '',
     guardianEmail: '',
+    guardianAliyahYear: '',
+    otherParent: null,
     pickup: { parentOnly: true, extraName: '', extraPhone: '' },
     groupId: '',
     planId: '',

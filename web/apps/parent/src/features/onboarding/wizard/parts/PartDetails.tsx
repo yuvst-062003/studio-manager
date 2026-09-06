@@ -7,6 +7,7 @@
 import { School, User, Users } from 'lucide-react'
 import type { Locale } from '@studio/i18n'
 import { SectionBand, SelectField, TextField } from './Field'
+import { OtherParentTabs } from './OtherParentTabs'
 import { gradeOptions, beltOptions, studentFormCopy } from '../copy'
 import { ageFrom, isMinor } from '../types'
 import type { StudentDraft } from '../types'
@@ -113,6 +114,20 @@ export function PartDetails({ locale, student, onChange, errorFor, onBlurField }
           onChange={(event) => onChange({ email: event.target.value })}
           onBlur={() => onBlurField('email')}
         />
+        {/* `שנת עליה` — the STUDENT's own, and optional. Block 4 of the paper form asked
+            only the signing parent, so a child who made aliyah in a different year had that
+            recorded against their parent and nowhere else. Free text and not a number
+            input: the form accepts what a family writes, and a spinner on a year is a
+            control nobody wants. */}
+        <TextField
+          label={copy.aliyahYear}
+          dir="ltr"
+          inputMode="numeric"
+          value={student.aliyahYear}
+          placeholder={copy.aliyahYearHint}
+          error={null}
+          onChange={(event) => onChange({ aliyahYear: event.target.value })}
+        />
       </div>
 
       {/* §5.2 — required by the server, absent from the prototype's form entirely. On the
@@ -189,16 +204,38 @@ export function PartDetails({ locale, student, onChange, errorFor, onBlurField }
               onBlur={() => onBlurField('guardianPhone')}
             />
           </div>
-          <TextField
-            label={copy.guardianEmail}
-            required
-            type="email"
-            dir="ltr"
-            value={student.guardianEmail}
-            placeholder={copy.emailPlaceholder}
-            error={errorFor('guardianEmail')}
-            onChange={(event) => onChange({ guardianEmail: event.target.value })}
-            onBlur={() => onBlurField('guardianEmail')}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <TextField
+              label={copy.guardianEmail}
+              required
+              type="email"
+              dir="ltr"
+              value={student.guardianEmail}
+              placeholder={copy.emailPlaceholder}
+              error={errorFor('guardianEmail')}
+              onChange={(event) => onChange({ guardianEmail: event.target.value })}
+              onBlur={() => onBlurField('guardianEmail')}
+            />
+            {/* The guardian's own year. Asked ONLY here, so an adult member — who has no
+                guardian block — is asked once, above, and that one answer travels as the
+                signer's. See `toRegisterPayload`. */}
+            <TextField
+              label={copy.guardianAliyahYear}
+              dir="ltr"
+              inputMode="numeric"
+              value={student.guardianAliyahYear}
+              placeholder={copy.aliyahYearHint}
+              error={null}
+              onChange={(event) => onChange({ guardianAliyahYear: event.target.value })}
+            />
+          </div>
+
+          <OtherParentTabs
+            copy={copy}
+            errorFor={errorFor}
+            onBlurField={onBlurField}
+            onChange={onChange}
+            student={student}
           />
 
           <div className="p-3.5 rounded-xl bg-[#f2f3ff] border border-[#e9edff] flex flex-col gap-3">

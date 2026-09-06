@@ -711,6 +711,26 @@ export const people: Bundle = {
   'joinWizard.form.guardianNationalId': 'תעודת זהות של ההורה',
   'joinWizard.form.guardianPhone': 'טלפון נייד',
   'joinWizard.form.guardianEmail': 'דוא״ל של ההורה',
+  //: `שנת עליה` — block 4 of the club's paper form, asked of the student and of the
+  //: guardian, optional for both. An adult member is one person in both roles and is
+  //: asked once.
+  'joinWizard.form.aliyahYear': 'שנת עלייה',
+  'joinWizard.form.aliyahYearHint': 'לא חובה',
+  'joinWizard.form.guardianAliyahYear': 'שנת עלייה של ההורה',
+  //: הורה 2. A tab and not a second section, so a one-parent family sees one tab and
+  //: nothing that looks unfinished.
+  'joinWizard.form.parentTab1': 'הורה 1',
+  'joinWizard.form.parentTab2': 'הורה 2',
+  'joinWizard.form.parentTabAdd': 'הוספת הורה שני',
+  'joinWizard.form.parentTabRemove': 'הסרת הורה שני',
+  //: Named for הורה 2 explicitly, not a bare 'שם פרטי'. The student and the guardian
+  //: already use the short labels, and three identical field names in one form is a form a
+  //: screen reader cannot describe — the visual section heading is not in the label list.
+  'joinWizard.form.otherParentFirstName': 'שם פרטי של הורה 2',
+  'joinWizard.form.otherParentLastName': 'שם משפחה של הורה 2',
+  'joinWizard.form.otherParentNationalId': 'ת״ז של הורה 2',
+  'joinWizard.form.otherParentPhone': 'טלפון של הורה 2',
+  'joinWizard.form.otherParentOptional': 'אפשר להשאיר ריק — הורה אחד מספיק',
   'joinWizard.form.phonePlaceholder': '050-0000000',
   'joinWizard.form.pickupTitle': 'הסדרי איסוף',
   'joinWizard.form.pickupParentOnly': 'הורים בלבד',

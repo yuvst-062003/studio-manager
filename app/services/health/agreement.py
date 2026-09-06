@@ -469,6 +469,17 @@ class AgreementService:
 
         # -- the child ------------------------------------------------------------------
         _set_national_id(child_person, child.get("national_id"), field="child_national_id")
+        # `שנת עליה`, the STUDENT's own (owner decision 2026-09-06). It used to be the
+        # signer's alone -- block 4 of the paper form asks the signing parent -- so a child
+        # who made aliyah in a different year to their parent had that fact recorded against
+        # the parent and nowhere else.
+        #
+        # Guarded on truthiness for the same reason the signer's is, and here it is
+        # load-bearing rather than tidy: §5.3's adult member is ONE `Person` in both roles,
+        # so this line and the signer's below write the SAME row. The form asks an adult
+        # once, sends it as the signer's, and a blank child value must not then erase it.
+        if child.get("aliyah_year"):
+            child_person.aliyah_year_encrypted = str(child["aliyah_year"]).strip()
         # NULL rather than "" when there is no school class to record: an empty string is a
         # value, and `bool(student.grade)` above would read it the same either way while a
         # roster would print it as a blank כיתה rather than omitting the field.

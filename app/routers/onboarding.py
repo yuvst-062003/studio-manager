@@ -165,6 +165,12 @@ class OnboardingChildIn(BaseModel):
     self_student: bool = False
     national_id: str | None = Field(default=None, max_length=20)
     grade: str | None = Field(default=None, max_length=20)
+    #: `שנת עליה` for the STUDENT (owner decision 2026-09-06). Optional and free-form, the
+    #: same shape and reasoning as `OnboardingSignerIn.aliyah_year` above: block 4 of the
+    #: paper form accepts a year written however a family writes it, and it is stored
+    #: encrypted either way. A self-guarding adult sends theirs as the SIGNER's, because
+    #: that is the one row they are.
+    aliyah_year: str | None = Field(default=None, max_length=8)
     #: B2 -- null when this child's declaration is already on file (a resubmission of a
     #: kid who signed one in an earlier pass through this same wizard run) or, for a
     #: door that skips health entirely, never asked at all.
@@ -473,6 +479,7 @@ def register(
                         "self": child.self_student,
                         "national_id": child.national_id,
                         "grade": child.grade,
+                        "aliyah_year": child.aliyah_year,
                         "health": (
                             {
                                 "template_id": child.health.template_id,
@@ -709,6 +716,7 @@ def register_additional_child(
                     "self": child.self_student,
                     "national_id": child.national_id,
                     "grade": child.grade,
+                    "aliyah_year": child.aliyah_year,
                     "health": (
                         {
                             "template_id": child.health.template_id,
