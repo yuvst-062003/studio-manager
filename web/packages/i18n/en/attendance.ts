@@ -20,6 +20,7 @@ export const attendance: Bundle = {
   'roster.notExpectedToday': 'Not expected today',
   'roster.notExpectedHint': 'They can still be marked — a child who turns up is a real child',
   'roster.markAllPresent': 'Mark everyone present',
+  'roster.presentOfTotal': '{{present}}/{{total}} present',
   'roster.markAllPresentHint': 'Will not overwrite a guardian report or an existing mark',
   'roster.longPressToOverride': 'Long-press to change a guardian report',
   'roster.tapToToggle': 'Tap a row to change it',

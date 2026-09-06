@@ -7,30 +7,21 @@
 //
 // **No money.** `EventRegistrationOut` carries `charge_id` and no amount, and this screen
 // renders neither — §3.2's rule is kept by omission, same as the events list.
+//
+// **C3 (2026-09-06) gave this screen the session register's card shapes** — the rounded-3xl
+// header, the rounded-2xl rows, the hairline borders and `shadow-xs` `RosterScreen.tsx`
+// carries — so the two read as one screen, per §4.3: "This same screen shape serves an
+// event's register." Deliberately NOT the same component: an event's row has no mark to
+// cycle, no belt, no health flag and no offline queue behind it (§6.5 is what adds that,
+// checkpoint 13, alone) — only an RSVP and, where the event asks for one, a consent chip.
+// Nothing below this note touches `client.read`/`client.registrations`, the failure path
+// or the consent predicate; this pass is markup and class names only.
 import { useEffect, useState } from 'react'
-import type { CSSProperties } from 'react'
 import { EmptyState, LoadFailed, StatusChip } from '@studio/ui'
 import { useNetworkMode } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { EventRegistrationOut, StaffEventsClient } from './client'
-
-const listStyle: CSSProperties = {
-  listStyle: 'none',
-  margin: 0,
-  padding: 0,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--space-2)',
-}
-
-const rowStyle: CSSProperties = {
-  alignItems: 'center',
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 'var(--space-2)',
-  minBlockSize: '44px',
-}
 
 function rsvpTone(rsvp: EventRegistrationOut['rsvp']): 'paid' | 'cancelled' | 'pending' {
   if (rsvp === 'yes') return 'paid'
@@ -82,15 +73,29 @@ export function EventRosterScreen({
   }
 
   return (
-    <section aria-labelledby="event-roster-title" data-testid="event-roster">
-      <h1 id="event-roster-title">{t(locale, 'events.roster.title')}</h1>
+    <section
+      aria-labelledby="event-roster-title"
+      className="flex flex-col gap-4 px-4 pt-4"
+      data-testid="event-roster"
+    >
+      <header className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs">
+        <h1 className="text-base font-black text-slate-900" id="event-roster-title">
+          {t(locale, 'events.roster.title')}
+        </h1>
+      </header>
       {rows === null ? null : rows.length === 0 ? (
         <EmptyState title={t(locale, 'events.roster.empty')} />
       ) : (
-        <ul style={listStyle}>
+        <ul className="flex flex-col gap-2">
           {rows.map((row) => (
-            <li key={row.id} style={rowStyle} data-testid="event-roster-row">
-              <bdi>{row.student_display_name}</bdi>
+            <li
+              className="flex min-h-11 flex-wrap items-center gap-2 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-xs"
+              data-testid="event-roster-row"
+              key={row.id}
+            >
+              <bdi className="me-auto text-sm font-bold text-slate-900">
+                {row.student_display_name}
+              </bdi>
               <StatusChip
                 label={t(locale, `events.rsvp.${row.rsvp}`)}
                 status={rsvpTone(row.rsvp)}

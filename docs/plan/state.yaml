@@ -932,7 +932,21 @@ waves:
         on: 2026-09-06
       - id: C3
         title: The attendance screen restyled, session and event
-        status: pending
+        why: >-
+          A restyle of the register with none of the machinery moved: marks still go to the
+          queue rather than the network, the roster is still read cache-first, and the offline
+          suite ran green alongside the rest.
+
+          It gained a live present-of-total counter the artboard never drew, and the row gained
+          a belt chip built from fields already on the wire and never rendered. The prototype's
+          reset button was not built: no bulk-absent endpoint exists behind it, and drawing one
+          would be a dead control.
+
+          Left undone and recorded rather than invented: marking attendance for an EVENT. The
+          screen lists registrations and POST /events/{id}/attendance exists, but no mark control
+          was ever wired. Pre-existing, not a regression from this pass.
+        status: shipped
+        on: 2026-09-07
       - id: C4
         title: The students tab and the student detail sheet
         why: >-
@@ -956,7 +970,23 @@ waves:
         on: 2026-09-06
       - id: C5
         title: The schema contract — one revision carrying unavailability, the briefing column, and the removal of the coach-substituted switch
-        status: pending
+        why: >-
+          One revision, 0023, off 0022: the coach_constraint table and its three indexes, the
+          session_note.kind column backfilled explicitly before being made NOT NULL, and the
+          removal of coach_substituted — rows deleted BEFORE the check constraint is narrowed,
+          which is the only order that survives live data.
+
+          Verified on the dev database: 347 preference rows became 341, exactly the six naming a
+          switch nothing has ever sent. The downgrade restores the schema including the
+          eight-group constraint, and says in a comment that it cannot restore those rows.
+
+          It failed on its first run. Alembic re-applies the naming convention to a name passed
+          bare, so dropping a constraint whose name already carried the prefix produced a
+          doubled, hash-truncated name that did not exist. Postgres rolled the revision back
+          whole. The file's own docstring warns about this class of bug biting 0009, and used
+          op.f() on every constraint it creates but not on the one it drops.
+        status: shipped
+        on: 2026-09-07
       - id: C6
         title: Session briefings — written for the session, read on the mat
         status: pending

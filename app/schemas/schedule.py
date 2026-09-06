@@ -27,6 +27,15 @@ TRAINING_YEAR_STATUS_PATTERN = r"^(draft|active|closed)$"
 CLOSURE_SOURCE_PATTERN = r"^(holiday_preset|manual)$"
 SESSION_STAFF_ROLE_PATTERN = r"^(lead_coach|assistant_coach)$"
 
+#: §6.2 of the staff app redesign — `session_note.kind`.
+SESSION_NOTE_KIND_PATTERN = r"^(plan|summary)$"
+
+#: §6.1 of the staff app redesign — `coach_constraint.reason` / `.status`.
+COACH_CONSTRAINT_REASON_PATTERN = (
+    r"^(reserve_duty|competition|studies|illness|vacation|family|other)$"
+)
+COACH_CONSTRAINT_STATUS_PATTERN = r"^(pending|approved|refused|withdrawn)$"
+
 
 class SessionStaffOut(BaseModel):
     person_id: uuid.UUID
@@ -320,7 +329,12 @@ class SessionCancelIn(BaseModel):
 
 
 class SessionNoteCreate(BaseModel):
+    """§6.2 — `kind` defaults to `summary`, which is what every note was before the
+    briefing distinction existed. Who may write `plan` (`owner`, `manager`, `lead_coach`)
+    is a role check the endpoint makes, not something this shape can express."""
+
     body: str = Field(min_length=1)
+    kind: str = Field(default="summary", pattern=SESSION_NOTE_KIND_PATTERN)
 
 
 class SessionNoteOut(BaseModel):
@@ -328,7 +342,41 @@ class SessionNoteOut(BaseModel):
     session_id: uuid.UUID
     author_person_id: uuid.UUID
     body: str
+    kind: str = Field(pattern=SESSION_NOTE_KIND_PATTERN)
     created_at: datetime
 
 
 SessionNotePage = CursorPage[SessionNoteOut]
+
+
+class CoachConstraintCreate(BaseModel):
+    """§6.1 — filing unavailability. `all_day` travels alongside real timestamps rather
+    than replacing them, so the server never has to guess which day "all day" means in a
+    time zone it is not the one evaluating in."""
+
+    starts_at: datetime
+    ends_at: datetime
+    all_day: bool = False
+    reason: str = Field(pattern=COACH_CONSTRAINT_REASON_PATTERN)
+    note: str | None = Field(default=None, max_length=2000)
+    substitute_person_id: uuid.UUID | None = None
+
+    @model_validator(mode="after")
+    def _time_range(self) -> CoachConstraintCreate:
+        if self.ends_at <= self.starts_at:
+            raise ValueError("ends_at must be after starts_at")
+        return self
+
+
+class CoachConstraintOut(BaseModel):
+    id: uuid.UUID
+    person_id: uuid.UUID
+    starts_at: datetime
+    ends_at: datetime
+    all_day: bool
+    reason: str = Field(pattern=COACH_CONSTRAINT_REASON_PATTERN)
+    note: str | None
+    status: str = Field(pattern=COACH_CONSTRAINT_STATUS_PATTERN)
+    substitute_person_id: uuid.UUID | None
+    decided_by_person_id: uuid.UUID | None
+    decided_at: datetime | None

@@ -38,6 +38,10 @@ export const attendance: Bundle = {
   'roster.notExpectedToday': 'לא אמורים להגיע היום',
   'roster.notExpectedHint': 'אפשר לסמן גם אותם — ילד שהגיע ביום נוסף הוא ילד אמיתי',
   'roster.markAllPresent': 'סימון כולם כנוכחים',
+  // C3 — the redesign's header counter: "present of total", over the same expected-only
+  // denominator the three tiles below use. `{{present}}`/`{{total}}` are both bare digits;
+  // the caller wraps the whole resolved string in `font-mono`.
+  'roster.presentOfTotal': '{{present}}/{{total}} נוכחים',
   // `9f` finding 1 — the button as DRAWN overwrites every parent's advance notice, under a
   // hint row announcing those notices. This is the label that tells the truth about what the
   // server does, and `source.preReportedHint` is the sentence it is agreeing with.

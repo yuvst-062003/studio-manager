@@ -13,8 +13,27 @@
 //     what the server actually does.
 //   * `1c` finding 4 — the sync badge's copy counts *sessions* while its key counts *marks*.
 //     `attendance.sync.pendingCount` interpolates marks, so the badge counts marks.
+//
+// **C3 (2026-09-06) restyled this screen onto the redesign's prototype**
+// (`~/Downloads/staff-app/src/components/AttendanceModal.tsx`), taking its row anatomy,
+// its quick actions and its counter — never its sheet chrome, because a register on a mat
+// is a full screen here, not a bottom sheet a coach can swipe away mid-lesson. This is the
+// OFFLINE-CRITICAL screen and its machinery does not move: `queueMark`, the stale-queue
+// block, `readRoster`/`readSession`'s cache-first read and the bulk predicate below are
+// untouched by this pass — every edit past this note is markup, class names and one new
+// header element (the live present/total counter `9f` never draws but the prototype does).
+//
+// The prototype's quick-action strip draws a PAIR — "סמן כולם" and "אפס" (mark all /
+// reset). Only the first has an endpoint: `bulkPresent` below calls the real
+// `attendance.bulk` op, which is why it exists at all rather than a client-side loop (it
+// also has to skip a parent's advance notice, which a loop over `onCycle` could not do
+// atomically with the server). A "reset" that marked everyone absent has nothing behind
+// it — no bulk-absent op, no `PendingOpKind` for one — so it is not drawn. Half a pair,
+// deliberately, rather than a button whose tap would silently do nothing.
+import { CheckCheck, ClipboardList, Package, UserPlus } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Button } from '@studio/ui'
+import type { ReactNode } from 'react'
+import { Alert } from '@studio/ui'
 import { plural, t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import {
@@ -31,6 +50,27 @@ import {
 import type { RosterRow as RosterRowData } from '@studio/core'
 import { RosterRow } from './RosterRow'
 import type { StaffAttendanceClient } from './client'
+
+/**
+ * Isolates digit runs (and the `/` between two of them, so a "3/12" counter reads as one
+ * mono block rather than two) into their own `font-mono` span, leaving the rest of an
+ * already-translated string untouched. `TodayScreen.tsx` carries the same shape for the
+ * identical reason and is not imported from here — that file is out of scope for this
+ * lane, and splitting/rejoining a string changes none of its characters, so duplicating
+ * ~10 lines is cheaper than a cross-lane import for one helper.
+ */
+function withMonoNumerals(text: string): ReactNode {
+  const parts = text.split(/(\d+(?:\/\d+)?)/g)
+  return parts.map((part, index) =>
+    /^\d/.test(part) ? (
+      <span className="font-mono" key={index}>
+        {part}
+      </span>
+    ) : (
+      part
+    ),
+  )
+}
 
 /** §5.7's roster is split in two: the students expected today, and
  *  `לא אמורים להגיע היום` beneath them. The second is collapsed and still markable —
@@ -172,51 +212,92 @@ export function RosterScreen({
   // first mark rather than after a day.
   if (stale?.blocking === true || (pending > 0 && !offlineStorageIsDurable())) {
     return (
-      <section data-testid="roster-stale-block">
+      <section className="flex flex-col gap-3 px-4 pt-4" data-testid="roster-stale-block">
         <Alert iconLabel={t(locale, 'attendance.sync.staleWarning')} live tone="danger">
           <strong>{t(locale, 'attendance.sync.staleWarning')}</strong>
           <span>{t(locale, 'attendance.sync.staleBody')}</span>
         </Alert>
-        <p data-testid="roster-stale-count">
+        <p className="text-xs font-semibold text-slate-500" data-testid="roster-stale-count">
           {plural(locale, 'attendance.sync.pendingCount', pending)}
         </p>
       </section>
     )
   }
 
+  const totalExpected = split.expected.length
+
   return (
-    <section aria-labelledby="roster-title" data-testid="roster-screen">
-      <header>
-        <h1 id="roster-title">{t(locale, 'attendance.roster.title')}</h1>
-        {header ? (
-          <p data-testid="roster-session">
-            {/* S6 — `יום א׳ · 17:00 · אולם א׳`. The weekday and the hall are for the coach
-                covering for someone: the day comes from the studio's calendar day, never
-                the device's UTC date, and the hall renders only when the session has one. */}
-            {t(locale, 'attendance.roster.dayLabel').replace(
-              '{{weekday}}',
-              t(locale, `schedule.weekday.${sessionWeekday(header.startsAt)}`),
-            )}{' '}
-            · {formatTimeInStudioZone(header.startsAt, locale)} · <bdi>{header.groupName}</bdi>
-            {header.locationName ? <> · <bdi>{header.locationName}</bdi></> : null}
-          </p>
-        ) : null}
+    <section
+      aria-labelledby="roster-title"
+      className="flex flex-col gap-4 px-4 pt-4"
+      data-testid="roster-screen"
+    >
+      <header className="flex flex-col gap-3 rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-base font-black text-slate-900" id="roster-title">
+              {t(locale, 'attendance.roster.title')}
+            </h1>
+            {header ? (
+              <p
+                className="mt-0.5 text-xs font-semibold text-slate-400"
+                data-testid="roster-session"
+              >
+                {/* S6 — `יום א׳ · 17:00 · אולם א׳`. The weekday and the hall are for the coach
+                    covering for someone: the day comes from the studio's calendar day, never
+                    the device's UTC date, and the hall renders only when the session has one. */}
+                {t(locale, 'attendance.roster.dayLabel').replace(
+                  '{{weekday}}',
+                  t(locale, `schedule.weekday.${sessionWeekday(header.startsAt)}`),
+                )}{' '}
+                · <span className="font-mono">{formatTimeInStudioZone(header.startsAt, locale)}</span> ·{' '}
+                <bdi>{header.groupName}</bdi>
+                {header.locationName ? (
+                  <>
+                    {' '}
+                    · <bdi>{header.locationName}</bdi>
+                  </>
+                ) : null}
+              </p>
+            ) : null}
+          </div>
+
+          {/* The redesign's live counter — "present of total", which `9f` never drew.
+              Scoped to the SAME expected-only denominator the three tiles below use
+              (§5.7 — a not-expected child who has not come has not missed anything), so
+              this number and `roster-counts`' own present tile never disagree. */}
+          <div className="shrink-0 text-end" data-testid="roster-live-count">
+            <p className="text-sm font-black text-slate-900">
+              {withMonoNumerals(
+                t(locale, 'attendance.roster.presentOfTotal')
+                  .replace('{{present}}', String(counts.present))
+                  .replace('{{total}}', String(totalExpected)),
+              )}
+            </p>
+          </div>
+        </div>
 
         {/* `1c`'s three count tiles. */}
         {/* 1c draws each tile as the number over its label, the number in the tile's
             own semantic colour — the styling pass (2026-08-27) made the markup match. */}
-        <ul data-testid="roster-counts">
-          <li data-count="present">
-            <span className="count-number">{counts.present}</span>
-            <span className="count-label">{t(locale, 'attendance.roster.present')}</span>
+        <ul className="grid grid-cols-3 gap-2" data-testid="roster-counts">
+          <li className="rounded-2xl border p-2.5 text-center" data-count="present">
+            <span className="count-number block font-mono text-lg">{counts.present}</span>
+            <span className="count-label mt-0.5 block text-[11px] font-semibold text-slate-500">
+              {t(locale, 'attendance.roster.present')}
+            </span>
           </li>
-          <li data-count="absent">
-            <span className="count-number">{counts.absent}</span>
-            <span className="count-label">{t(locale, 'attendance.roster.absent')}</span>
+          <li className="rounded-2xl border p-2.5 text-center" data-count="absent">
+            <span className="count-number block font-mono text-lg">{counts.absent}</span>
+            <span className="count-label mt-0.5 block text-[11px] font-semibold text-slate-500">
+              {t(locale, 'attendance.roster.absent')}
+            </span>
           </li>
-          <li data-count="unmarked">
-            <span className="count-number">{counts.unmarked}</span>
-            <span className="count-label">{t(locale, 'attendance.roster.unmarked')}</span>
+          <li className="rounded-2xl border p-2.5 text-center" data-count="unmarked">
+            <span className="count-number block font-mono text-lg">{counts.unmarked}</span>
+            <span className="count-label mt-0.5 block text-[11px] font-semibold text-slate-500">
+              {t(locale, 'attendance.roster.unmarked')}
+            </span>
           </li>
         </ul>
 
@@ -235,26 +316,36 @@ export function RosterScreen({
         ) : null}
       </header>
 
-      <Button
-        onClick={() => {
-          void bulkPresent()
-        }}
-        variant="primary"
-      >
-        {t(locale, 'attendance.roster.markAllPresent')}
-      </Button>
-      {/* `9f` finding 1 — "if the action skips pre-reported marks, **the button's own copy
-          should say so**." Unconditional, and not only when a parent has reported: a coach
-          decides whether to tap this before knowing whether anybody reported, and a
-          reassurance that appears only sometimes is one nobody learns to rely on. The
-          dashboard's `1e` copy says the same thing beside the same button. */}
-      <p data-testid="roster-bulk-hint">{t(locale, 'attendance.roster.markAllPresentHint')}</p>
+      {/* The prototype's quick-action strip. Only its "mark all" half is drawn — see this
+          file's own header note on why "reset" has nothing behind it. */}
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/60 bg-slate-50 px-4 py-2.5">
+        {/* `9f` finding 1 — "if the action skips pre-reported marks, **the button's own copy
+            should say so**." Unconditional, and not only when a parent has reported: a coach
+            decides whether to tap this before knowing whether anybody reported, and a
+            reassurance that appears only sometimes is one nobody learns to rely on. The
+            dashboard's `1e` copy says the same thing beside the same button. */}
+        <p className="text-xs font-medium text-slate-500" data-testid="roster-bulk-hint">
+          {t(locale, 'attendance.roster.markAllPresentHint')}
+        </p>
+        <button
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-emerald-700 shadow-2xs transition-all active:scale-95 hover:bg-emerald-50"
+          onClick={() => {
+            void bulkPresent()
+          }}
+          type="button"
+        >
+          <CheckCheck aria-hidden="true" className="h-3.5 w-3.5" />
+          <span>{t(locale, 'attendance.roster.markAllPresent')}</span>
+        </button>
+      </div>
 
       {roster.length === 0 ? (
-        <p data-testid="roster-empty">{t(locale, 'attendance.roster.empty')}</p>
+        <p className="text-sm text-slate-500" data-testid="roster-empty">
+          {t(locale, 'attendance.roster.empty')}
+        </p>
       ) : null}
 
-      <ul data-testid="roster-list">
+      <ul className="flex flex-col gap-2" data-testid="roster-list">
         {split.expected.map((row) => (
           <li key={row.student_id}>
             <RosterRow
@@ -271,9 +362,14 @@ export function RosterScreen({
           collapsed section beneath it, and can still be marked." A <details>, so it is
           collapsed by default, reachable by keyboard, and needs no state of its own. */}
       {split.notExpected.length > 0 ? (
-        <details data-testid="roster-not-expected">
-          <summary>{t(locale, 'attendance.roster.notExpectedToday')}</summary>
-          <ul>
+        <details
+          className="rounded-2xl border border-slate-200/60 bg-slate-50/60 px-3"
+          data-testid="roster-not-expected"
+        >
+          <summary className="text-sm font-semibold">
+            {t(locale, 'attendance.roster.notExpectedToday')}
+          </summary>
+          <ul className="flex flex-col gap-2 pb-3">
             {split.notExpected.map((row) => (
               <li key={row.student_id}>
                 <RosterRow
@@ -288,14 +384,38 @@ export function RosterScreen({
         </details>
       ) : null}
 
-      <footer>
-        <p data-testid="roster-edit-anytime">{t(locale, 'attendance.roster.editAnytime')}</p>
+      <footer className="flex flex-col gap-3 pb-2">
+        <p className="text-center text-xs font-medium text-slate-400" data-testid="roster-edit-anytime">
+          {t(locale, 'attendance.roster.editAnytime')}
+        </p>
         {/* S2 — the register's exits. `9g` is the step after taking a register; `11a`
             and `11b` are in-lesson actions and belong on the session, not on `#/cash`. */}
-        <nav aria-label={t(locale, 'attendance.summary.whatNext')} data-testid="roster-actions">
-          <a href={`#/attendance/${sessionId}/summary`}>{t(locale, 'attendance.summary.title')}</a>
-          <a href={`#/attendance/${sessionId}/handover`}>{t(locale, 'billing.product.handOut')}</a>
-          <a href={`#/attendance/${sessionId}/trial`}>{t(locale, 'people.trial.addDuringClass')}</a>
+        <nav
+          aria-label={t(locale, 'attendance.summary.whatNext')}
+          className="grid grid-cols-3 gap-2"
+          data-testid="roster-actions"
+        >
+          <a
+            className="flex flex-col items-center gap-1 rounded-2xl border border-slate-200/80 bg-white px-2 py-2.5 text-center text-[11px] font-bold text-slate-600 shadow-2xs transition-all active:scale-95 hover:bg-slate-50"
+            href={`#/attendance/${sessionId}/summary`}
+          >
+            <ClipboardList aria-hidden="true" className="h-4 w-4 text-blue-600" />
+            {t(locale, 'attendance.summary.title')}
+          </a>
+          <a
+            className="flex flex-col items-center gap-1 rounded-2xl border border-slate-200/80 bg-white px-2 py-2.5 text-center text-[11px] font-bold text-slate-600 shadow-2xs transition-all active:scale-95 hover:bg-slate-50"
+            href={`#/attendance/${sessionId}/handover`}
+          >
+            <Package aria-hidden="true" className="h-4 w-4 text-blue-600" />
+            {t(locale, 'billing.product.handOut')}
+          </a>
+          <a
+            className="flex flex-col items-center gap-1 rounded-2xl border border-slate-200/80 bg-white px-2 py-2.5 text-center text-[11px] font-bold text-slate-600 shadow-2xs transition-all active:scale-95 hover:bg-slate-50"
+            href={`#/attendance/${sessionId}/trial`}
+          >
+            <UserPlus aria-hidden="true" className="h-4 w-4 text-blue-600" />
+            {t(locale, 'people.trial.addDuringClass')}
+          </a>
         </nav>
       </footer>
     </section>

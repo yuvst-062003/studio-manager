@@ -2,7 +2,7 @@
 health-declaration and payment-failure notices, which are transactional."
 
 Two sentences, and the second is the one a schema forgets. A settings screen that offers
-eight switches and honours seven is worse than one that offers seven, because the parent who
+seven switches and honours six is worse than one that offers six, because the parent who
 turned off health reminders believes they did.
 
 **§4.3 has no table for this and W5's contract commit landed none.** Revision 0010 adds it,
@@ -20,13 +20,15 @@ from app.services.comms.preferences import NotificationPreferenceService
 from sqlalchemy.exc import IntegrityError
 
 
-def test_the_eight_groups_are_the_eight_the_settings_screen_renders() -> None:
+def test_the_seven_groups_are_the_seven_the_settings_screen_renders() -> None:
     """`web/packages/i18n/he/comms.ts` carries exactly these under `preferences.kind.*`. A
     group in one list and not the other is either a switch with no label or a label with no
-    switch, and both ship silently."""
+    switch, and both ship silently.
+
+    `coach_substituted` is gone (§6.4 of the staff app redesign) -- nothing ever sent a
+    notification of that kind, so the switch was permanently a no-op."""
     assert PREFERENCE_GROUPS == (
         "session_cancelled",
-        "coach_substituted",
         "announcement",
         "event",
         "payment",
@@ -40,7 +42,7 @@ def test_a_preference_is_one_row_per_person_per_group(tenant_session, as_manager
     """One switch per group, not one per kind.
 
     §5.11's trigger table has fifteen rows and grows every milestone; the screen offers
-    eight. A row per kind would make "turn off payment reminders" a five-row write that can
+    seven. A row per kind would make "turn off payment reminders" a five-row write that can
     half-succeed, and a parent would then be muted for the day-3 reminder and not the day-7.
     """
     tenant_session.add(
@@ -91,7 +93,7 @@ def test_a_group_the_screen_does_not_offer_is_refused_by_the_database(
 def test_absence_is_the_default_and_no_row_is_written_at_sign_up(
     tenant_session, as_manager
 ) -> None:
-    """A new guardian receives everything without eight inserts, and a group added in a later
+    """A new guardian receives everything without seven inserts, and a group added in a later
     milestone defaults to on for people who never saw it. This asserts the *absence*, which
     is the part a later refactor would helpfully break by seeding defaults."""
     rows = (
@@ -209,7 +211,7 @@ def test_setting_the_same_group_twice_updates_rather_than_duplicating(
     assert len(rows) == 1
 
 
-def test_the_screen_is_handed_all_eight_groups_in_order_whatever_is_stored(
+def test_the_screen_is_handed_all_seven_groups_in_order_whatever_is_stored(
     tenant_session, as_manager
 ) -> None:
     """A screen that rendered only stored rows would show a new guardian nothing at all, and

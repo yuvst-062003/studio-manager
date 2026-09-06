@@ -1,6 +1,6 @@
 """Which switch governs which notification, and the two that no switch governs.
 
-§5.11's trigger table has fifteen rows and the settings screen offers eight switches, so
+§5.11's trigger table has fifteen rows and the settings screen offers seven switches, so
 something has to map one onto the other. The mapping is the KIND PREFIX -- everything before
 the first dot -- because that is the convention the three callers who already exist chose:
 `billing.overdue.day3`, `health.declaration_missing`, `trial.reminder`. Reading the prefix
@@ -35,7 +35,6 @@ from app.services.comms.preferences import NotificationPreferenceService
     [
         ("session.cancelled", "session_cancelled"),
         ("session.moved", "session_cancelled"),
-        ("coach.substituted", "coach_substituted"),
         ("announcement.published", "announcement"),
         ("event.published", "event"),
         ("event.rsvp_deadline", "event"),
@@ -68,6 +67,16 @@ def test_a_kind_with_no_group_is_ungoverned_rather_than_muted() -> None:
     assert group_for("something.nobody.has.written.yet") is None
 
 
+def test_the_coach_prefix_is_ungoverned_now_that_its_group_is_gone() -> None:
+    """§6.4 of the staff app redesign removed `coach_substituted` from PREFERENCE_GROUPS
+    (decision 13) because nothing had ever sent a notification under it. `_GROUP_BY_PREFIX`
+    lost its `"coach"` entry in the same change, so a `coach.*` kind is now ungoverned --
+    the same fate as `trial.*` above -- rather than silently muted by a switch that no
+    longer exists. §6.1's own coach-facing notification ("your leave request was answered")
+    is deliberately a DIFFERENT prefix for exactly this reason."""
+    assert group_for("coach.substituted") is None
+
+
 def test_every_group_the_mapping_produces_is_one_the_screen_can_render() -> None:
     """A group here that is missing from PREFERENCE_GROUPS is a notification nobody can
     switch off through a screen that claims to offer every switch."""
@@ -75,7 +84,6 @@ def test_every_group_the_mapping_produces_is_one_the_screen_can_render() -> None
         group_for(kind)
         for kind in (
             "session.cancelled",
-            "coach.substituted",
             "announcement.published",
             "event.published",
             "billing.overdue.day3",

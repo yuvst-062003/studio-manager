@@ -63,6 +63,29 @@ SESSION_STATUSES = ("scheduled", "cancelled", "completed")
 #: leading the session.
 SESSION_STAFF_ROLES = ("lead_coach", "assistant_coach")
 
+#: §6.1 of the staff app redesign — `coach_constraint  reason`. A CODE, not a Hebrew
+#: string: the client renders the label, the same rule the inbox actions already follow.
+#: `other` is the escape hatch the form's `note` field backs up.
+COACH_CONSTRAINT_REASONS = (
+    "reserve_duty",
+    "competition",
+    "studies",
+    "illness",
+    "vacation",
+    "family",
+    "other",
+)
+
+#: §6.1 — `coach_constraint  status`. `withdrawn` is the filer's own retraction, not a row
+#: deletion — the manager's queue and the coach's own history both read this table, and a
+#: withdrawn row still has to explain why an alert that once existed no longer does.
+COACH_CONSTRAINT_STATUSES = ("pending", "approved", "refused", "withdrawn")
+
+#: §6.2 — `session_note  kind`. A `plan` is written BEFORE the lesson, for whoever ends up
+#: on the mat; a `summary` is written after it, which is what every row was before this
+#: column existed. Revision 0023 backfills every existing row to `summary` explicitly.
+SESSION_NOTE_KINDS = ("plan", "summary")
+
 
 class TrainingYear(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     """§4.3 — `training_year  studio_id, name, starts_on, ends_on, status`.
@@ -239,15 +262,29 @@ class SessionStaff(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
 
 
 class SessionNote(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
-    """§4.3 — `session_note  session_id, author_person_id, body, deleted_at?`.
+    """§4.3 — `session_note  session_id, author_person_id, body, deleted_at?`. §6.2 of the
+    staff app redesign adds `kind`.
 
     §5.13's coach note on a session (staff `9g` סיכום מפגש). G15 — soft-deleted, because
     it is user-generated content about a child and a hard delete would remove the audit
     trail along with the text.
+
+    **`kind` distinguishes a briefing from a wrap-up** (redesign decision 16). A `plan` is
+    written BEFORE the lesson, for whoever ends up on the mat; a `summary` is written after
+    it — which is what every row here was before this column existed, so revision 0023
+    backfills every existing row to `summary` explicitly rather than leaning on the column
+    default to do it silently. The two are shown separately and never merged into one list:
+    "work on grips today" next to "Daniel hurt his shoulder" would erase the distinction
+    this column exists to keep.
+
+    Who may write which is a service-level rule, not a database one — writing a `plan` is
+    `owner`, `manager`, `lead_coach`; writing a `summary` stays any staff, as today. Reading
+    stays any staff either way, which is what makes leaving a note for an assistant work.
     """
 
     __tablename__ = "session_note"
     __tenant_table_args__ = (
+        CheckConstraint("kind IN ('plan', 'summary')", name="session_note_kind"),
         Index("ix_session_note_session_id_created_at", "session_id", "created_at"),
     )
 
@@ -258,4 +295,66 @@ class SessionNote(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
         PGUUID(as_uuid=True), ForeignKey("person.id", ondelete="RESTRICT"), nullable=False
     )
     body: Mapped[str] = mapped_column(Text, nullable=False)
+    kind: Mapped[str] = mapped_column(String(10), nullable=False, default="summary")
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class CoachConstraint(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
+    """§6.1 of the staff app redesign — a coach's filed unavailability: reserve duty,
+    illness, a competition, and the rest of `COACH_CONSTRAINT_REASONS`.
+
+    **Times, not dates.** The form supports a window inside a day and the schedule this
+    feeds is in times, so an "all day" request is still midnight-to-midnight IN THE
+    STUDIO'S TIME ZONE, stored as the UTC instants that produces (G3). `all_day` is kept as
+    its own column deliberately: a genuine 00:00–23:59 request and a true all-day one
+    round-trip to the same two timestamps, and without the flag the two are indistinguishable
+    on the way back out.
+
+    **A coach sees only their own** — "No screen in the design shows a colleague's."
+    `ix_coach_constraint_studio_id_person_id` is that read (`GET /coach-constraints?mine=
+    true`); the pending queue behind the manager's alert is the other one this table serves
+    (`ix_coach_constraint_studio_id_status`, `GET /coach-constraints?status=pending`).
+
+    **`substitute_person_id` is a suggestion, not a decision.** The filer may name who they
+    think should cover; `decided_by_person_id` and `decided_at` record who actually ruled on
+    the request and when, and stay null while it sits `pending`. Approving may confirm the
+    filer's suggestion, pick someone else, or leave it empty — the dashboard's resolution
+    popup is where that choice is made, not here.
+
+    **Withdrawing is a status, not a delete** — see `COACH_CONSTRAINT_STATUSES`.
+    """
+
+    __tablename__ = "coach_constraint"
+    __tenant_table_args__ = (
+        CheckConstraint(
+            "reason IN ('reserve_duty', 'competition', 'studies', 'illness', 'vacation', "
+            "'family', 'other')",
+            name="coach_constraint_reason",
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'approved', 'refused', 'withdrawn')",
+            name="coach_constraint_status",
+        ),
+        CheckConstraint("ends_at > starts_at", name="coach_constraint_time_range"),
+        # A coach's own -- GET /coach-constraints?mine=true.
+        Index("ix_coach_constraint_studio_id_person_id", "studio_id", "person_id"),
+        # The pending queue behind the manager's alert -- GET /coach-constraints?status=pending.
+        Index("ix_coach_constraint_studio_id_status", "studio_id", "status"),
+    )
+
+    person_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("person.id", ondelete="RESTRICT"), nullable=False
+    )
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    all_day: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    reason: Mapped[str] = mapped_column(String(20), nullable=False)
+    note: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(10), nullable=False, default="pending")
+    substitute_person_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("person.id", ondelete="SET NULL")
+    )
+    decided_by_person_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("person.id", ondelete="SET NULL")
+    )
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

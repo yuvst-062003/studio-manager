@@ -1,6 +1,6 @@
 """Which switch governs which notification, and the two that no switch governs.
 
-§5.11's trigger table has fifteen rows; the settings screen offers eight switches. Something
+§5.11's trigger table has fifteen rows; the settings screen offers seven switches. Something
 has to map one onto the other, and this is it.
 
 **The map is on the kind's PREFIX**, everything before the first dot -- because that is the
@@ -22,9 +22,15 @@ the trial ladder without accidentally muting a payment failure.
 from __future__ import annotations
 
 #: Kind prefix -> §5.11 preference group. See the module docstring for why it is the prefix.
+#:
+#: **No `"coach"` entry.** §6.4 of the staff app redesign removed `coach_substituted` from
+#: `PREFERENCE_GROUPS` -- nothing had ever sent a notification under that prefix, so there
+#: was nothing to leave ungoverned. If a `coach.*` kind is ever introduced (§6.1's "your
+#: leave request was answered" is deliberately a DIFFERENT prefix, not this one), it falls
+#: through to `group_for` returning `None` and is ungoverned rather than muted, exactly like
+#: `trial.*` below.
 _GROUP_BY_PREFIX: dict[str, str] = {
     "session": "session_cancelled",
-    "coach": "coach_substituted",
     "announcement": "announcement",
     "event": "event",
     "billing": "payment",

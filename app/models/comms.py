@@ -74,7 +74,7 @@ PUSH_PLATFORMS = ("ios", "android", "web")
 #: all their students' sessions and events, a coach's carries every session they staff.
 FEED_SUBJECTS = ("guardian", "coach")
 
-#: §5.11's eight switches, in the order `web/packages/i18n/he/comms.ts` renders them under
+#: §5.11's seven switches, in the order `web/packages/i18n/he/comms.ts` renders them under
 #: `preferences.kind.*`. A group and not a kind: §5.11's trigger table has fifteen rows and
 #: grows every milestone, and a parent does not think in `billing.overdue.day7`.
 #:
@@ -82,11 +82,18 @@ FEED_SUBJECTS = ("guardian", "coach")
 #: render them to say why. §5.11: "except health-declaration and payment-failure notices,
 #: which are transactional" -- `health` refuses to be turned off at all, and inside the
 #: mutable `payment` group the single kind `billing.payment_failed` still delivers. Omitting
-#: them from this tuple would leave a parent looking at six switches and wondering which
+#: them from this tuple would leave a parent looking at five switches and wondering which
 #: notifications the missing two are.
+#:
+#: **`coach_substituted` was here and is gone.** §6.4 of the staff app redesign, decision
+#: 13: nothing ever sent a notification of that kind -- `_set_staff` in
+#: `app/services/schedule/service.py` notifies nobody when a session's coach changes, so the
+#: switch was a dead affordance parents and staff could toggle for years without effect.
+#: Revision 0023 deletes the rows that had toggled it and narrows the CHECK constraint to
+#: match, in that order: recreating the constraint first would reject the very rows the
+#: DELETE has to remove.
 PREFERENCE_GROUPS = (
     "session_cancelled",
-    "coach_substituted",
     "announcement",
     "event",
     "payment",
@@ -324,7 +331,7 @@ class NotificationPreference(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base
     lies to the person holding it.
 
     **Absence means on.** A row exists only once somebody has changed something. That way a
-    new guardian receives everything without eight inserts at sign-up, and a preference group
+    new guardian receives everything without seven inserts at sign-up, and a preference group
     added in a later milestone defaults to on for people who never saw the screen -- rather
     than being silently off for every existing user because nobody backfilled them.
 
@@ -340,7 +347,7 @@ class NotificationPreference(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base
     __tablename__ = "notification_preference"
     __tenant_table_args__ = (
         CheckConstraint(
-            "kind_group IN ('session_cancelled', 'coach_substituted', 'announcement', "
+            "kind_group IN ('session_cancelled', 'announcement', "
             "'event', 'payment', 'belt', 'attendance', 'health')",
             name="notification_preference_kind_group",
         ),

@@ -20,6 +20,7 @@ export const attendance: Bundle = {
   'roster.notExpectedToday': 'Сегодня не ожидаются',
   'roster.notExpectedHint': 'Их тоже можно отметить — ребёнок, который пришёл, тоже настоящий',
   'roster.markAllPresent': 'Отметить всех присутствующими',
+  'roster.presentOfTotal': '{{present}}/{{total}} присутствуют',
   'roster.markAllPresentHint': 'Не перезапишет сообщение родителя или уже сделанную отметку',
   'roster.longPressToOverride': 'Долгое нажатие, чтобы изменить сообщение родителя',
   'roster.tapToToggle': 'Нажатие на строку меняет состояние',

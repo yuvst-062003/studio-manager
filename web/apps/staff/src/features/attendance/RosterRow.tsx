@@ -19,8 +19,27 @@
 // chip, and this row is mark → flag + name + note → belt with no chip. The mismatch is
 // precisely why `roster-row` is a slot rather than a prop. `AttendanceMark` and `BeltBar`
 // are reused; the composite is built here.
+//
+// **C3 (2026-09-06) restyled this row onto the redesign's prototype**
+// (`~/Downloads/staff-app/src/components/AttendanceModal.tsx`) — its row anatomy, not its
+// sheet chrome (that file is a bottom sheet; this is a full screen, because a register on
+// a mat is not a modal). Three things ported from it: the tap target's whole-row card
+// shape, a background TINT that differs per `data-status` (present/absent/notified/
+// unmarked), and the belt swatch beside the name. Nothing below this comment touches the
+// tap cycle, the long-press guard or `onOverride` — those are §5.7's machinery and this
+// pass is markup and class names only.
+//
+// **The belt chip is drawn here, not through a slot.** The container's own docstring above
+// still promises M7 a `roster-row` slot entry for the belt bar, and that promise is
+// unchanged — a future belt-specific fill (a ladder position, a "close to grading" flag)
+// still lands through `sections.map` below with zero conflict. What is drawn here is only
+// `BeltBar` + `belt_name`, which were ALREADY on `RosterRowData` (the W3 contract commit)
+// and rendered nowhere — the redesign's own row anatomy asks for a "belt chip with D7's
+// ring" and there is no reason to block that on a slot nobody has written yet. `BeltBar`
+// carries D7's ring unconditionally (see that file), so importing it — never redrawing a
+// second bar — is what keeps that guarantee here too.
 import { useRef } from 'react'
-import { AttendanceMark, Icon, useSlot } from '@studio/ui'
+import { AttendanceMark, BeltBar, Icon, useSlot } from '@studio/ui'
 import type { AttendanceState } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -80,6 +99,23 @@ const MARK_LABEL: Record<RosterRowData['status'], string> = {
   absent_excused: 'attendance.roster.absentExcused',
 }
 
+/**
+ * The prototype's row card carries a background tint that follows the mark — never the
+ * ONLY thing distinguishing one state from another (SC 1.4.1; `AttendanceMark`'s own four
+ * SHAPES already carry that weight, unchanged by this file), only a second, faster read
+ * down a roster of thirty. Tailwind's literal hues, same choice `TodayScreen`'s own
+ * `CARD_FRAME` makes for the identical reason: this tint is illustrative, not the
+ * semantic band D2 freezes (`debt · paid · pending · cancelled · danger · focus`), so it
+ * does not borrow `--paid`/`--danger`/`--pending` the way the count tiles beside this row
+ * still do.
+ */
+const ROW_TONE: Record<RosterRowData['status'], string> = {
+  present: 'bg-emerald-50/60 border-emerald-200',
+  absent_unexcused: 'bg-rose-50/60 border-rose-200',
+  absent_excused: 'bg-amber-50/60 border-amber-200',
+  unmarked: 'bg-white border-slate-200/80',
+}
+
 /** §5.7's own words: "requires a long-press to override". Register follow-up — this used
  *  to fire `onOverride` on an ordinary click, so a thumb brushing the list erased the exact
  *  notice it was meant to protect. Half a second is long enough that a brush or a slow
@@ -126,9 +162,9 @@ export function RosterRow({
   // the inline end. A shell div holds the two, because a control inside a control is
   // invalid HTML and unreachable to assistive tech.
   return (
-    <div className="roster-row-shell">
+    <div className="roster-row-shell flex items-stretch gap-1.5">
       <button
-        className="roster-row"
+        className={`roster-row flex items-center gap-3 rounded-2xl border p-3 text-start transition-colors ${ROW_TONE[row.status]} ${preReported ? 'cursor-default' : 'cursor-pointer'}`}
         data-pre-reported={preReported ? 'true' : undefined}
         data-status={row.status}
         data-testid={`roster-row-${row.student_id}`}
@@ -172,7 +208,21 @@ export function RosterRow({
         <span className="roster-row__text">
           {/* <bdi>, as StudentRow already does: this row is Hebrew on 1c, and M3 fills it
               with Latin names too. Mixed-direction text reorders without isolation (§9). */}
-          <bdi className="roster-row__name">{row.display_name}</bdi>
+          <bdi className="roster-row__name block text-sm font-bold text-slate-900">
+            {row.display_name}
+          </bdi>
+          {/* The redesign's row anatomy puts the belt right under the name. `BeltBar`'s
+              ring (D7) is unconditional on every fill, including a white belt — see that
+              file. Both fields are optional on the wire (a student with no grade yet), so
+              this renders nothing rather than a ring around an invented colour. */}
+          {row.belt_color_hex && row.belt_name ? (
+            <span className="roster-row__belt inline-flex items-center gap-1.5">
+              <BeltBar colorHex={row.belt_color_hex} label={row.belt_name} />
+              <span className="roster-row__belt-label text-xs font-medium text-slate-400">
+                {row.belt_name}
+              </span>
+            </span>
+          ) : null}
           {/* `9f`'s per-row note line, whose text depends on state. The health flag is NOT
               here — it arrives through the slot below, from M4's own file. */}
           {preReported ? (
@@ -205,7 +255,7 @@ export function RosterRow({
           screen reader, the exact class `1c`'s a11y finding flags for icon-only controls. */}
       <a
         aria-label={`${t(locale, 'people.card.open')} · ${row.display_name}`}
-        className="roster-row__open-card"
+        className="roster-row__open-card rounded-2xl transition-colors hover:bg-slate-100 active:scale-95"
         data-testid={`roster-open-card-${row.student_id}`}
         href={`#/students/${row.student_id}`}
       >

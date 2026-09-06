@@ -8,22 +8,6 @@
  * checkbox-on-the-left roster (9f), and it gets that from DOM order plus `dir` with no
  * physical offset anywhere in this file. */
 
-.roster-row {
-  display: flex;
-  gap: var(--space-3);
-  align-items: center;
-  inline-size: 100%;
-  padding-block: var(--space-3);
-  padding-inline: var(--space-3);
-  border: 0;
-  border-block-end: var(--border-width-hairline) solid var(--border);
-  background: transparent;
-  color: var(--fg);
-  font: inherit;
-  text-align: start;
-  cursor: pointer;
-}
-
 .roster-row__text {
   display: flex;
   flex: 1;
@@ -38,6 +22,17 @@
   white-space: nowrap;
 }
 
+/* C3 — the redesign's belt swatch. `BeltBar`'s own default (42×8px, `1c`'s roster size) is
+ * drawn for a full-width row like `StudentRow`'s; this row already spends its width on the
+ * mark, the name and the health badge, so it gets the same SMALLER override `.studio-row
+ * .studio-belt-bar` already carries in primitives.css — proven safe there, copied here
+ * rather than given a size prop `BeltBar` deliberately does not have (D7's ring has no
+ * off switch, and a size prop would be the first place someone reached for one). */
+.roster-row__belt .studio-belt-bar {
+  block-size: 18px;
+  inline-size: 5px;
+}
+
 .roster-row__note {
   color: var(--text-secondary);
   font-size: var(--text-caption);
@@ -49,17 +44,16 @@
   color: var(--pending);
 }
 
-/* §5.7 — an excused absence "requires a long-press to override". The row is still a button
- * and still reachable; the cursor says the ordinary tap does something different here. */
-.roster-row[data-pre-reported='true'] {
-  cursor: default;
-}
-
 /* 1c's three count tiles. Finding 6 on that spec: --paid and --pending have no tint tokens
  * and the tiles need both. Until the token layer grows them, the tile carries a semantic
  * BORDER — which 1c's own table lists ("the absent tile" under --debt/--danger) and which
- * needs no new token. */
-[data-testid='roster-counts'],
+ * needs no new token.
+ *
+ * C3 — `roster-counts` itself moved onto Tailwind's `rounded-2xl`/`shadow-xs` shapes (see
+ * `RosterScreen.tsx`), so it dropped out of the two rules below. `summary-counts` (9g) did
+ * not restyle in this pass and keeps the ORIGINAL flat tile exactly as it was. The colour
+ * rules further down stay shared: both screens' tiles carry `data-count`, and that
+ * attribute selector was never scoped to either test id. */
 [data-testid='summary-counts'] {
   display: flex;
   gap: var(--space-3);
@@ -68,7 +62,6 @@
   list-style: none;
 }
 
-[data-testid='roster-counts'] li,
 [data-testid='summary-counts'] li {
   flex: 1;
   padding: var(--space-3);
@@ -82,7 +75,6 @@
 
 /* 1c's tile anatomy: the count large and in the tile's own semantic colour, the label
  * small and muted underneath. The colour rides `data-count`, same as the border. */
-[data-testid='roster-counts'] .count-number,
 [data-testid='summary-counts'] .count-number {
   display: block;
 
@@ -92,7 +84,6 @@
   line-height: var(--leading-tight);
 }
 
-[data-testid='roster-counts'] .count-label,
 [data-testid='summary-counts'] .count-label {
   display: block;
   margin-block-start: var(--space-1);
@@ -198,8 +189,11 @@
   display: inline-flex;
   align-items: center;
   padding-inline: var(--space-2);
-  border-radius: var(--radius-md);
   color: var(--text-muted);
   min-inline-size: 44px;
   justify-content: center;
+
+  /* Radius is Tailwind's `rounded-2xl` in the JSX (C3) — left off this unlayered rule on
+   * purpose, since an unlayered declaration here would always beat that utility class
+   * regardless of source order (tailwind.css's own header explains why). */
 }
