@@ -16,6 +16,7 @@ import { t } from '@studio/i18n'
 import type { BillingClient, ChargeOut } from '../../billing/billingClient'
 import type { StandingOrderLink } from '../../billing/PaymentSetup'
 import { toWizardGroup, toWizardPlan } from './adapters'
+import { VALIDATION_COPY } from './validation'
 import { step1Copy, step2Copy, step3Copy, step4Copy, studentFormCopy, wizardFlowCopy } from './copy'
 import { Step1Agreements } from './Step1Agreements'
 import { Step3Payment } from './Step3Payment'
@@ -59,12 +60,25 @@ const PLAN: WizardPlan = toWizardPlan({
   monthlyAmountAgorot: 30_000,
 })
 
+// **Shaped like the template the app actually ships**, clause question included. It was
+// one boolean and nothing else, and that omission is the whole reason nothing here caught
+// the wizard being unable to complete a registration at all: the real `full` template
+// carries a `clause` question, `PartHealth` rendered it as a text box, and the server
+// refused every submission with `answers_incomplete: clause_confirmed`. A fixture that is
+// simpler than production is a fixture that tests a product nobody runs.
 const HEALTH_SCHEMA = {
   sections: [
     {
       id: 'medical_history',
       title: 'רקע רפואי',
       questions: [{ id: 'asthma', type: 'boolean' as const, label: 'אסתמה', flag: true }],
+    },
+    {
+      id: 'declaration',
+      title: 'הצהרה',
+      questions: [
+        { id: 'clause_confirmed', type: 'clause' as const, label: 'אני מאשר/ת', required: true },
+      ],
     },
   ],
 }
@@ -154,6 +168,15 @@ function renderWizard(
   return { billingClient, standingOrderLinks, source }
 }
 
+/** Confirms the club's health declaration on part 4.
+ *
+ *  Its own helper because three separate fill sequences in this file need it, and because
+ *  the clause is not answered the way the questions above it are: it is DERIVED from those
+ *  answers, so it is always a tick and never a typed value. */
+async function tickClause(user: ReturnType<typeof userEvent.setup>, root: HTMLElement) {
+  await user.click(within(root).getByTestId('wizard-declaration-clause').querySelector('input')!)
+}
+
 /** Fills the real step-2 form (`StudentFormSheet`, all five parts) for ONE minor child and
  *  presses through to step 3's decision sub-view. Assumes step 2's family list is already
  *  on screen. Every field is the minimum `validation.ts` requires. */
@@ -161,6 +184,41 @@ async function fillOneChildAndContinue(
   user: ReturnType<typeof userEvent.setup>,
   /** 2026-09-06's optional fields. Off by default so every existing test still drives the
    *  minimum the form requires, which is what they are about. */
+  extras: { aliyah?: boolean; secondParent?: boolean } = {},
+) {
+  const dialog = await fillUpToHealthPart(user, extras)
+  const field = (text: string) =>
+    within(dialog).getByLabelText(
+      new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\*?$`),
+    )
+  const fill = (text: string, value: string) => user.type(field(text), value)
+
+  await tickClause(user, dialog)
+  await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next4 }))
+
+  // Part 5 — emergency contact, health fund, attestation and signature.
+  await fill(STUDENT_FORM_COPY.emergencyPhone, '0507654321')
+  await user.selectOptions(field(STUDENT_FORM_COPY.healthFund), 'clalit')
+  await user.click(
+    within(dialog).getByRole('checkbox', { name: new RegExp(STUDENT_FORM_COPY.attestCheckbox) }),
+  )
+  const canvas = dialog.querySelector('canvas')
+  if (!canvas) throw new Error('signature canvas not found')
+  fireEvent.pointerDown(canvas, { clientX: 100, clientY: 100, pointerId: 1 })
+  fireEvent.pointerMove(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
+  fireEvent.pointerUp(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
+
+  await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.save }))
+
+  await user.click(screen.getByRole('button', { name: STEP2_COPY.continueToStep3 }))
+}
+
+/** Parts 1 to 3, then the healthy preset on part 4 — stopping with the club's declaration
+ *  NOT yet confirmed, which is the state the clause tests are about. Split out of the
+ *  filler above rather than duplicated: the part tabs validate on the way forward, so
+ *  there is no jumping to part 4 with part 1 empty. */
+async function fillUpToHealthPart(
+  user: ReturnType<typeof userEvent.setup>,
   extras: { aliyah?: boolean; secondParent?: boolean } = {},
 ) {
   await screen.findByTestId('join-family-step')
@@ -212,25 +270,10 @@ async function fillOneChildAndContinue(
   await user.click(within(dialog).getByRole('radio'))
   await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next3 }))
 
-  // Part 4 — the healthy preset clears every boolean question in one press.
+  // Part 4 — the healthy preset clears every boolean question in one press. The club's own
+  // declaration is deliberately NOT confirmed here; the caller does that.
   await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.healthYes }))
-  await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next4 }))
-
-  // Part 5 — emergency contact, health fund, attestation and signature.
-  await fill(STUDENT_FORM_COPY.emergencyPhone, '0507654321')
-  await user.selectOptions(field(STUDENT_FORM_COPY.healthFund), 'clalit')
-  await user.click(
-    within(dialog).getByRole('checkbox', { name: new RegExp(STUDENT_FORM_COPY.attestCheckbox) }),
-  )
-  const canvas = dialog.querySelector('canvas')
-  if (!canvas) throw new Error('signature canvas not found')
-  fireEvent.pointerDown(canvas, { clientX: 100, clientY: 100, pointerId: 1 })
-  fireEvent.pointerMove(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
-  fireEvent.pointerUp(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
-
-  await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.save }))
-
-  await user.click(screen.getByRole('button', { name: STEP2_COPY.continueToStep3 }))
+  return dialog
 }
 
 /** Drives the real step-1 agreement, then `fillOneChildAndContinue`, leaving the wizard on
@@ -451,6 +494,7 @@ describe('JoinWizard -- wiring submitJoin into the screens', () => {
 
     // Part 4 -- healthy.
     await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.healthYes }))
+    await tickClause(user, dialog)
     await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next4 }))
 
     // Part 5.
@@ -490,6 +534,10 @@ describe('JoinWizard -- wiring submitJoin into the screens', () => {
     // provably this child's own answers.
     await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.healthYes }))
     await user.click(within(dialog).getByRole('radio', { name: STUDENT_FORM_COPY.answerYes }))
+    // The declaration is confirmed AFTER the answer, not before: the clause is derived from
+    // the answers, so flipping one clears a tick made against the old set. That is the
+    // point of the rule, and doing it in this order is what a family actually does.
+    await tickClause(user, dialog)
     await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next4 }))
 
     // Part 5 -- a different health fund from child 1's, same reasoning again.
@@ -708,6 +756,7 @@ describe('StudentFormSheet -- the duplicate-check warning (task 10 item 4)', () 
     await user.click(within(dialog).getByRole('radio'))
     await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next3 }))
     await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.healthYes }))
+    await tickClause(user, dialog)
     await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next4 }))
     await fill(STUDENT_FORM_COPY.emergencyPhone, '0507654321')
     await user.selectOptions(field(STUDENT_FORM_COPY.healthFund), 'clalit')
@@ -1014,5 +1063,69 @@ describe('שנת עליה and הורה 2 reach the write', () => {
     const body = vi.mocked(source.register).mock.calls[0]![0]
     expect(body.children[0]!.other_parent).toBeNull()
     expect(body.children[0]!.aliyah_year).toBeNull()
+  }, 20000)
+})
+
+// The club's own health clause — the gap that stopped the wizard working at all.
+//
+// `PartHealth` fell through to its TEXT input for a `clause` question, so a family saw a
+// box, typed nothing the server would accept, and the ENTIRE registration was refused at
+// step 3's final button with `answers_incomplete: clause_confirmed`. Reproduced against the
+// live API before the fix: a wizard-shaped payload with every boolean answered and no
+// clause came back 422. Nothing in this file caught it because the fixture schema carried
+// no clause question — it does now, which is why every sequence above ticks one.
+describe('the health declaration clause', () => {
+  /** Step 1, then the whole student form up to part 4's questions, clause unconfirmed. */
+  async function reachHealthPart(user: ReturnType<typeof userEvent.setup>) {
+    await screen.findByTestId('join-welcome')
+    await user.click(screen.getByLabelText(STEP1_COPY.agree))
+    await user.click(screen.getByRole('button', { name: STEP1_COPY.continue }))
+    return fillUpToHealthPart(user)
+  }
+
+  it('will not leave part 4 until the family confirms the club’s declaration', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    const dialog = await reachHealthPart(user)
+
+    await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next4 }))
+
+    // Still on part 4, and told WHY — not the "answer every question" message, which would
+    // send a family back over questions they have already answered.
+    expect(within(dialog).getByTestId('wizard-declaration-clause')).toBeInTheDocument()
+    expect(within(dialog).getByText(VALIDATION_COPY.healthClauseRequired)).toBeInTheDocument()
+  }, 20000)
+
+  it('drops a confirmed clause when an answer it was derived from changes', async () => {
+    // A family who confirms "no limitations" and then answers כן to asthma would otherwise
+    // submit a false statement under a real signature. `verify_clause` is the server half;
+    // this is the client half that stops the family ever reaching it.
+    const user = userEvent.setup()
+    renderWizard()
+    const dialog = await reachHealthPart(user)
+    const clause = () =>
+      within(dialog).getByTestId('wizard-declaration-clause').querySelector('input')!
+
+    await user.click(clause())
+    expect(clause()).toBeChecked()
+
+    await user.click(within(dialog).getAllByText(STUDENT_FORM_COPY.answerYes)[0]!)
+    expect(clause()).not.toBeChecked()
+  }, 20000)
+
+  it('sends the clause the answers imply, so the server’s verify_clause accepts it', async () => {
+    const user = userEvent.setup()
+    const { source } = renderWizard()
+    await screen.findByTestId('join-welcome')
+    await user.click(screen.getByLabelText(STEP1_COPY.agree))
+    await user.click(screen.getByRole('button', { name: STEP1_COPY.continue }))
+    await fillOneChildAndContinue(user)
+    await chooseMethodAndSubmit(user, STEP3_COPY.methodCash)
+
+    await waitFor(() => expect(source.register).toHaveBeenCalled())
+    const body = vi.mocked(source.register).mock.calls[0]![0]
+    // Every boolean answered "no", so the applicable clause is `none` — the value the
+    // server derives independently and refuses any other.
+    expect(body.children[0]!.health!.answers.clause_confirmed).toBe('none')
   }, 20000)
 })

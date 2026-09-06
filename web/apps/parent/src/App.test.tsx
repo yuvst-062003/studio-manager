@@ -817,6 +817,10 @@ async function fillAndSaveOneChild(
   await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next3 }))
 
   await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.healthYes }))
+  // The club's declaration. Derived from the answers above, so it is always a tick and
+  // never a typed value — and required: the server refuses a declaration without it,
+  // which is what this file's mocked `register` could not tell us on its own.
+  await user.click(within(dialog).getByTestId('wizard-declaration-clause').querySelector('input')!)
   await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next4 }))
 
   await fill(STUDENT_FORM_COPY.emergencyPhone, '0507654321')
@@ -1225,6 +1229,10 @@ describe('§3 Door C — /?invite=<token> opens the shared wizard, not the old g
     await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next3 }))
 
     await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.healthYes }))
+    // The club's declaration. Derived from the answers above, so it is always a tick and
+    // never a typed value — and required: the server refuses a declaration without it,
+    // which is what this file's mocked `register` could not tell us on its own.
+    await user.click(within(dialog).getByTestId('wizard-declaration-clause').querySelector('input')!)
     await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next4 }))
 
     await fill(STUDENT_FORM_COPY.emergencyPhone, '0507654321')
@@ -1328,6 +1336,10 @@ describe('§3 Door C — /?invite=<token> opens the shared wizard, not the old g
     await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next3 }))
 
     await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.healthYes }))
+    // The club's declaration. Derived from the answers above, so it is always a tick and
+    // never a typed value — and required: the server refuses a declaration without it,
+    // which is what this file's mocked `register` could not tell us on its own.
+    await user.click(within(dialog).getByTestId('wizard-declaration-clause').querySelector('input')!)
     await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next4 }))
 
     await fill(STUDENT_FORM_COPY.emergencyPhone, '0507654321')

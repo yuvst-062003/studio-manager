@@ -7,6 +7,7 @@
 //    somebody else's identifier -- `isValidNationalId` is the check that catches it, and it
 //    already exists in this repo.
 import { isValidNationalId } from '../../health/nationalId'
+import { CLAUSE_QUESTION_ID } from '../../health/clauses'
 import { isMinor } from './types'
 import type { FormPart, StudentDraft } from './types'
 
@@ -33,6 +34,9 @@ export const VALIDATION_COPY = {
   planRequired: 'נא לבחור מסלול תשלום',
   healthPresetRequired: 'נא לסמן האם החניך כשיר לפעילות ספורטיבית או קיימת מגבלה',
   healthAnswersRequired: 'נא לסמן מענה "כן" או "לא" עבור כל שאלות הרקע הרפואי',
+  //: Its own message, not the one above. A family who answered every question and simply
+  //: did not tick the declaration would otherwise be told to answer the questions again.
+  healthClauseRequired: 'נא לאשר את ההצהרה כדי להמשיך',
   healthFundRequired: 'שדה חובה: נא לבחור קופת חולים',
   emergencyRequired: 'שדה חובה: נא להזין מספר טלפון חירום נוסף',
   attestRequired: 'חובה לאשר את הצהרת הבריאות והתקנון להשלמת הרישום',
@@ -62,6 +66,7 @@ export type FieldKey =
   | 'planId'
   | 'healthPreset'
   | 'healthAnswers'
+  | 'healthClause'
   | 'healthFund'
   | 'emergencyPhone'
   | 'attested'
@@ -158,9 +163,26 @@ export function fieldError(
     case 'healthAnswers': {
       if (student.healthyPreset === null) return null
       const unanswered = templateQuestionIds.some(
-        (id) => student.healthAnswers[id] === undefined || student.healthAnswers[id] === null,
+        (id) =>
+          //: The clause has its own rule below -- it is derived rather than answered, and
+          //: it needs its own message.
+          id !== CLAUSE_QUESTION_ID &&
+          (student.healthAnswers[id] === undefined || student.healthAnswers[id] === null),
       )
       return unanswered ? VALIDATION_COPY.healthAnswersRequired : null
+    }
+    //: The declaration itself. Required only when the template HAS a clause question --
+    //: v1 and the trial form have none, and the caller's id list is what says so, the same
+    //: shape the server's own check uses. `''` is what an unticked box holds, and it is not
+    //: an answer: without this the wizard let a family through step 4 and the whole
+    //: registration was then refused at the final button with
+    //: `answers_incomplete: clause_confirmed`.
+    case 'healthClause': {
+      if (student.healthyPreset === null) return null
+      if (!templateQuestionIds.includes(CLAUSE_QUESTION_ID)) return null
+      return student.healthAnswers[CLAUSE_QUESTION_ID]
+        ? null
+        : VALIDATION_COPY.healthClauseRequired
     }
     case 'healthFund':
       return student.healthFund ? null : VALIDATION_COPY.healthFundRequired
@@ -198,7 +220,7 @@ export const FIELDS_BY_PART: Record<FormPart, readonly FieldKey[]> = {
   ],
   2: ['groupId'],
   3: ['planId'],
-  4: ['healthPreset', 'healthAnswers'],
+  4: ['healthPreset', 'healthAnswers', 'healthClause'],
   5: ['healthFund', 'emergencyPhone', 'attested', 'signature'],
 }
 

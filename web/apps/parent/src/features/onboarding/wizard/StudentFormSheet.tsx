@@ -89,7 +89,13 @@ export function StudentFormSheet({
   const questionIds = useMemo(
     () =>
       healthSchema.sections.flatMap((section) =>
-        section.questions.filter((question) => question.type === 'boolean').map((q) => q.id),
+        section.questions
+          //: Booleans, and the CLAUSE. The clause is not answered the way the others are --
+          //: it is derived and confirmed -- but `partErrors` has to know the template
+          //: carries one, and this list is how it finds out. Text questions stay out: a
+          //: blank `special_notes` is a real answer.
+          .filter((question) => question.type === 'boolean' || question.type === 'clause')
+          .map((q) => q.id),
       ),
     [healthSchema],
   )
@@ -294,7 +300,11 @@ export function StudentFormSheet({
               student={student}
               onChange={change}
               presetError={errorFor('healthPreset')}
+              //: Both of part 4's messages, and the clause's own is NOT folded into the
+              //: other: a family who answered every question and simply did not tick the
+              //: declaration must not be told to answer the questions again.
               answersError={errorFor('healthAnswers')}
+              clauseError={errorFor('healthClause')}
             />
           ) : null}
           {part === 5 ? (

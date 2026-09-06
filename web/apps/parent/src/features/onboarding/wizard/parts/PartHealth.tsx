@@ -11,8 +11,10 @@
 // "no", so the whole safety declaration completes itself by pressing Next five times.
 import { AlertCircle, Check, CheckCircle2, Clock, HeartPulse } from 'lucide-react'
 import type { Locale } from '@studio/i18n'
+import { t } from '@studio/i18n'
 import { isVisible } from '../../../health/healthClient'
 import type { AnswerValue, TemplateSchema } from '../../../health/healthClient'
+import { applicableClause, clauseTextKey, CLAUSE_QUESTION_ID } from '../../../health/clauses'
 import { studentFormCopy } from '../copy'
 import { needsManagerReview } from '../types'
 import type { StudentDraft } from '../types'
@@ -24,6 +26,7 @@ export function PartHealth({
   onChange,
   presetError,
   answersError,
+  clauseError,
 }: {
   locale: Locale
   schema: TemplateSchema
@@ -31,12 +34,26 @@ export function PartHealth({
   onChange: (patch: Partial<StudentDraft>) => void
   presetError: string | null
   answersError: string | null
+  /** The club's declaration, unconfirmed. Its own prop rather than a second use of
+   *  `answersError`, because the two say different things to a family that is stuck. */
+  clauseError: string | null
 }) {
   const copy = studentFormCopy(locale)
   const flagged = needsManagerReview(student)
 
   const setAnswer = (id: string, value: AnswerValue) => {
     const answers = { ...student.healthAnswers, [id]: value }
+    //: **A confirmed clause does not survive a change to what it was confirmed against.**
+    //: The two clauses are alternatives and which one applies is DERIVED from the answers,
+    //: so a family who confirms "no limitations", then answers `כן` to asthma, would
+    //: otherwise submit a false statement under a real signature. Same rule the old
+    //: `DeclarationForm` carried; `verify_clause` is the server half that refuses it.
+    if (id !== CLAUSE_QUESTION_ID) {
+      const confirmed = answers[CLAUSE_QUESTION_ID]
+      if (confirmed && confirmed !== applicableClause(schema, answers)) {
+        answers[CLAUSE_QUESTION_ID] = ''
+      }
+    }
     //: A "yes" anywhere means the family is telling us about a limitation, so the preset
     //: follows the answers rather than fighting them.
     const anyYes = Object.values(answers).some((entry) => entry === true)
@@ -44,6 +61,8 @@ export function PartHealth({
   }
 
   const applyPreset = (healthy: boolean) => {
+    //: Starts from `{}`, so a clause confirmed before the preset was pressed is dropped
+    //: along with the answers it was derived from. Stated rather than incidental.
     const answers: Record<string, AnswerValue> = {}
     for (const section of schema.sections) {
       for (const question of section.questions) {
@@ -136,7 +155,56 @@ export function PartHealth({
             </legend>
             <div className="flex flex-col gap-2 text-[13px]">
               {questions.map((question) =>
-                question.type === 'boolean' ? (
+                //: **The clause is DERIVED, never typed.** `PartHealth` used to fall
+                //: through to the text input below for this question type, so the family
+                //: saw a box, typed nothing a server would accept, and the whole
+                //: registration was refused at the final button with `answers_incomplete:
+                //: clause_confirmed`. The old `DeclarationForm` rendered it correctly; this
+                //: is that behaviour brought across, and it is why the wizard could not
+                //: complete a registration against the real template at all.
+                question.type === 'clause' ? (
+                  (() => {
+                    const clause = applicableClause(schema, student.healthAnswers)
+                    const confirmed = student.healthAnswers[CLAUSE_QUESTION_ID] === clause
+                    return (
+                      // The input is a SIBLING of its label, associated by id — never
+                      // nested inside it. A control nested in its own label is activated
+                      // twice by one click (the control's own click, then the label
+                      // forwarding it), so the box ticked and immediately unticked and the
+                      // family could not get past this step at all. The radio answers above
+                      // are nested and safe only because a radio ignores the second
+                      // activation; a checkbox does not.
+                      <div
+                        key={question.id}
+                        className="flex items-start gap-2 py-1"
+                        data-testid="wizard-declaration-clause"
+                      >
+                        <input
+                          id={`clause-${student.id}`}
+                          type="checkbox"
+                          checked={confirmed}
+                          onChange={(event) =>
+                            setAnswer(CLAUSE_QUESTION_ID, event.target.checked ? clause : '')
+                          }
+                          className="mt-0.5 shrink-0"
+                        />
+                        <div className="flex flex-col gap-1">
+                          <label
+                            htmlFor={`clause-${student.id}`}
+                            className="text-[#161b28] leading-relaxed cursor-pointer"
+                          >
+                            {t(locale, clauseTextKey(clause))}
+                          </label>
+                          {clauseError ? (
+                            <span className="text-[12px] text-red-600 font-medium" role="alert">
+                              {clauseError}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    )
+                  })()
+                ) : question.type === 'boolean' ? (
                   <div
                     key={question.id}
                     className="flex items-center justify-between py-1 border-b border-[#dee2f4]/60 gap-2"
