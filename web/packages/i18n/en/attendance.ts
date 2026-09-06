@@ -113,6 +113,17 @@ export const attendance: Bundle = {
   'report.col.rate': 'Attendance rate',
   'report.col.coverage': 'Coverage',
   'report.rowActions': 'Actions for {{group}}',
+  // -- §6.2 of the staff app redesign — the briefing, distinct from `summary.*` below.
+  'briefing.title': 'Session briefing',
+  'briefing.placeholder': 'What should the coach on the mat know?',
+  'briefing.add': 'Add a briefing',
+  'briefing.edit': 'Edit briefing',
+  'briefing.cancel': 'Cancel',
+  'briefing.save': 'Save',
+  'briefing.saving': 'Saving…',
+  'briefing.saveFailed': 'Save failed. Try again.',
+  'briefing.empty': 'No briefing for this session',
+
   // -- 9g's injury report (S2): immediate, online-only, never queued -------------
   'summary.injury.title': 'Injury report',
   'summary.injury.who': 'Who was hurt?',

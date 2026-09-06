@@ -1028,7 +1028,12 @@ class ScheduleService:
 
     # -- notes ----------------------------------------------------------------------
     def list_notes(
-        self, session_id: uuid.UUID, *, cursor: uuid.UUID | None = None, limit: int = 50
+        self,
+        session_id: uuid.UUID,
+        *,
+        kind: str | None = None,
+        cursor: uuid.UUID | None = None,
+        limit: int = 50,
     ) -> tuple[list[SessionNote], uuid.UUID | None]:
         self.get_session(session_id)
         stmt = (
@@ -1036,16 +1041,62 @@ class ScheduleService:
             .where(SessionNote.session_id == session_id, SessionNote.deleted_at.is_(None))
             .order_by(SessionNote.id)
         )
+        # §6.2 — "shown separately and never merged into one list". `None` (the router's
+        # default) lists both kinds; a caller building the briefing view or the wrap-up view
+        # passes its own `kind` rather than filtering the page client-side.
+        if kind is not None:
+            stmt = stmt.where(SessionNote.kind == kind)
         rows = self.session.execute(_paged(stmt, cursor=cursor, limit=limit)).scalars().all()
         return _page_out(list(rows), limit)
 
     def add_note(
-        self, session_id: uuid.UUID, *, body: str, author_person_id: uuid.UUID, at: datetime
+        self,
+        session_id: uuid.UUID,
+        *,
+        body: str,
+        author_person_id: uuid.UUID,
+        at: datetime,
+        kind: str = "summary",
     ) -> SessionNote:
         self.get_session(session_id)
         row = SessionNote(
-            session_id=session_id, author_person_id=author_person_id, body=body, created_at=at
+            session_id=session_id,
+            author_person_id=author_person_id,
+            body=body,
+            kind=kind,
+            created_at=at,
         )
         self.session.add(row)
         self.session.flush()
         return row
+
+    def latest_plan_notes(self, session_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, str]:
+        """§6.2 — one `plan` string per session, for `build_bootstrap`.
+
+        A session can carry more than one `plan` row over time: notes are insert-only (never
+        edited in place, §4.3), so a coach revising a briefing posts a new row rather than
+        amending the old one. This returns the most recent non-deleted one per session — the
+        current briefing, not its history — which is the only thing `CachedSession.plan`
+        (§6.5) has room for: "one string per session, only the plan."
+
+        A single query over every session id in the caller's window, never one per session:
+        `project_sessions`'s own docstring is explicit that a per-row query here is "felt on
+        a phone on a bus," and this method exists to be called from the same kind of loop.
+        """
+        if not session_ids:
+            return {}
+        stmt = (
+            select(SessionNote)
+            .where(
+                SessionNote.session_id.in_(session_ids),
+                SessionNote.kind == "plan",
+                SessionNote.deleted_at.is_(None),
+            )
+            .order_by(SessionNote.session_id, SessionNote.created_at.desc(), SessionNote.id.desc())
+        )
+        latest: dict[uuid.UUID, str] = {}
+        for row in self.session.execute(stmt).scalars():
+            # Ordered newest-first per session, so the first row seen for a given id IS the
+            # latest — `setdefault` is what makes that "first wins" rather than "last wins".
+            latest.setdefault(row.session_id, row.body)
+        return latest

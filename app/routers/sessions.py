@@ -13,7 +13,12 @@ Three permission levels, and each is §3.2 or §5.6 verbatim:
   service narrows a guardian's query to the groups their children are enrolled in.
 * **changing one session** is owner, manager or lead coach — §5.6, 'A manager or lead coach
   can change any single session'.
-* **writing a note** is any staff role: §5.13's סיכום מפגש is the assistant coach's too.
+* **writing a note** SPLITS by `kind` (§6.2 of the staff app redesign, decision 16). A
+  `summary` — §5.13's סיכום מפגש — is still any staff role's, unchanged. A `plan`, the
+  briefing a senior coach or manager leaves for whoever ends up on the mat, is owner,
+  manager or lead coach — the same trio `ManagerOrLeadCoach` already expresses below, reused
+  rather than re-declared. **Reading** a note of either kind stays any staff role: that is
+  what makes leaving a `plan` for an assistant coach work at all.
 """
 
 from __future__ import annotations
@@ -48,7 +53,14 @@ router = APIRouter(tags=["coach", "schedule"])
 
 #: §5.6 — 'A manager or lead coach can change any single session.' An assistant coach reads
 #: the roster; they do not move the lesson.
-ManagerOrLeadCoach = Annotated[None, Depends(require_roles("owner", "manager", "lead_coach"))]
+#:
+#: The bare dependency function is kept at module level, not only wrapped in `Depends(...)`
+#: below, because §6.2's `add_note` needs to invoke the SAME check conditionally — a `plan`
+#: is gated on this trio, a `summary` is not, and the choice is only known once the request
+#: body is parsed. Calling `require_roles(...)` a second time there would build an equal but
+#: distinct closure: a role check written twice is answered twice.
+_require_manager_or_lead_coach = require_roles("owner", "manager", "lead_coach")
+ManagerOrLeadCoach = Annotated[None, Depends(_require_manager_or_lead_coach)]
 
 STAFF_ROLES = {"owner", "manager", "lead_coach", "assistant_coach"}
 
@@ -56,6 +68,9 @@ STAFF_ROLES = {"owner", "manager", "lead_coach", "assistant_coach"}
 #: `Literal["mine"]`: this module has `from __future__ import annotations`, so an inline one
 #: reaches Pydantic as the string `Literal[mine]` and fails to resolve `mine` at startup.
 SessionScope = Literal["mine"]
+
+#: `?kind=` on `GET .../notes` — same reasoning as `SessionScope` just above.
+NoteKind = Literal["plan", "summary"]
 
 
 def _not_found() -> HTTPException:
@@ -243,12 +258,15 @@ def list_notes(
     _: AnyStaff,
     session_id: uuid.UUID,
     session: TenantSessionDep,
+    # §6.2 — a briefing and a wrap-up are "shown separately and never merged into one list".
+    # `None` (the default) lists both, unfiltered, for a caller building its own split.
+    kind: NoteKind | None = None,
     cursor: uuid.UUID | None = None,
     limit: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> SessionNotePage:
     try:
         rows, next_cursor = ScheduleService(session).list_notes(
-            session_id, cursor=cursor, limit=limit
+            session_id, kind=kind, cursor=cursor, limit=limit
         )
     except NotFoundError as exc:
         raise _not_found() from exc
@@ -272,6 +290,14 @@ def add_note(
     session: TenantSessionDep,
     idempotency_key: IdempotencyKey = None,
 ) -> SessionNoteOut:
+    # §6.2, decision 16 — writing a `plan` needs the trio `PATCH /sessions` already admits;
+    # a `summary` needs only `AnyStaff`, already checked above. The kind is only known once
+    # the body is parsed, so this cannot be a second `Depends(...)` on the signature the way
+    # `ManagerOrLeadCoach` is for the endpoints above — it is the SAME dependency function,
+    # called directly, so a caller refused here sees the identical 401/403 shape every other
+    # manager-or-lead-coach endpoint answers with, never a bespoke third error shape.
+    if body.kind == "plan":
+        _require_manager_or_lead_coach(request)
     author = _person_id(request)
     if author is None:
         raise HTTPException(
@@ -280,7 +306,7 @@ def add_note(
         )
     try:
         row = ScheduleService(session).add_note(
-            session_id, body=body.body, author_person_id=author, at=now()
+            session_id, body=body.body, kind=body.kind, author_person_id=author, at=now()
         )
     except NotFoundError as exc:
         raise _not_found() from exc

@@ -149,6 +149,9 @@ export const schedule: Bundle = {
   'session.manuallyEdited': 'נערך ידנית',
   'session.manuallyEditedHint': 'שינוי בלו״ז לא ידרוס שיעור שנערך ידנית',
   'session.adHoc': 'שיעור חד־פעמי',
+  // §6.2 of the staff app redesign — a small marker, not the text itself: "do not render
+  // the text on a list." The briefing itself lives on the attendance screen.
+  'session.hasBriefing': 'יש תדריך',
   'session.cancel': 'ביטול שיעור',
   'session.cancelReason': 'סיבת הביטול',
   'session.cancelReasonRequired': 'יש לציין סיבה לביטול',
@@ -751,4 +754,62 @@ export const schedule: Bundle = {
   'reminder.icsEvent': 'אירוע:',
   'reminder.icsCoach': 'מאמן/ת:',
   'reminder.icsWhere': 'מיקום:',
+
+  // -- §6.1 of the staff app redesign — coach unavailability, `#/constraints` --------
+  // Ported from `~/Downloads/staff-app/src/components/CoachConstraintsScreen.tsx`; see
+  // that screen's own header for the three departures from it. The reason is a CODE
+  // server-side (`app/models/schedule.py::COACH_CONSTRAINT_REASONS`) — `reason.*` below
+  // is the client's translation of it, the same rule the cancel-reason tokens follow.
+  'constraint.title': 'הגשת אילוצים וזמינות',
+  'constraint.subtitle':
+    'עדכנו ימים שבהם לא תוכלו לאמן, כדי שההנהלה תיערך ותשבץ מחליף מראש.',
+  'constraint.back': 'חזרה לחשבון',
+  'constraint.step1.title': 'בחירת תאריך או טווח ימים',
+  'constraint.step1.single': 'יום בודד',
+  'constraint.step1.range': 'טווח תאריכים',
+  'constraint.step1.date': 'תאריך האילוץ',
+  'constraint.step1.rangeStart': 'מתאריך',
+  'constraint.step1.rangeEnd': 'עד תאריך',
+  'constraint.step1.scopeLegend': 'היקף שעות האילוץ',
+  'constraint.step1.allDay': 'כל היום',
+  'constraint.step1.specificHours': 'שעות מסוימות',
+  'constraint.step1.from': 'משעה',
+  'constraint.step1.to': 'עד שעה',
+  'constraint.step2.title': 'בחירת סיבת האילוץ',
+  // The note field renders — and is required — ONLY when the reason is `other`. The
+  // prototype rendered it for every reason via a tautology; this fixes that.
+  'constraint.step2.noteLabel': 'פרטו את סיבת האילוץ להנהלה (שדה חובה)',
+  'constraint.step2.notePlaceholder': 'למשל: טיפול רפואי בבוקר, אפשר להגיע רק מ-18:00…',
+  'constraint.step3.title': 'מחליף מוצע (רשות)',
+  'constraint.step3.placeholder': 'שם המאמן שיכול להחליף אתכם, אם יש',
+  'constraint.step3.hint': 'זו הצעה בלבד להנהלה — לא שיבוץ. ההנהלה תבחר את המחליף בפועל.',
+  'constraint.step3.notePrefix': 'מחליף מוצע: {{name}}',
+  'constraint.submit': 'שליחת האילוץ להנהלה',
+  'constraint.submitting': 'שולח…',
+  'constraint.submitFailed': 'לא הצלחנו לשלוח את האילוץ. נסו שוב.',
+  // Waiting, never settled — every constraint this screen files lands `pending`, and
+  // approval happens on the dashboard (C12), not here.
+  'constraint.filedToast': 'האילוץ נשלח וממתין לתשובת ההנהלה',
+  'constraint.validation.rangeOrder': 'תאריך הסיום חייב להיות אחרי תאריך ההתחלה',
+  'constraint.validation.timeOrder': 'שעת הסיום חייבת להיות אחרי שעת ההתחלה',
+  'constraint.validation.noteRequired': 'יש לפרט את סיבת האילוץ',
+  'constraint.history.title': 'ההיסטוריה שלי',
+  'constraint.history.empty': 'עדיין לא הגשתם אילוצים',
+  'constraint.history.emptyHint': 'אילוץ שתגישו יופיע כאן, עם מצב הטיפול בו',
+  'constraint.history.withdraw': 'משיכת האילוץ',
+  'constraint.reason.reserve_duty': 'מילואים / צו 8',
+  'constraint.reason.competition': 'תחרות / מחנה אימונים',
+  'constraint.reason.studies': 'מבחנים / לימודים',
+  'constraint.reason.illness': 'מחלה / פציעה',
+  'constraint.reason.vacation': 'חופשה פרטית',
+  'constraint.reason.family': 'אירוע משפחתי',
+  'constraint.reason.other': 'אחר',
+  // Never colour alone (SC 1.4.1) — the history badge's colour and this word both say it.
+  'constraint.status.pending': 'ממתין לתשובת ההנהלה',
+  'constraint.status.approved': 'אושר',
+  'constraint.status.refused': 'נדחה',
+  'constraint.status.withdrawn': 'בוטל על ידכם',
+  // The account tab's own link (`features/account/AccountScreen.tsx`).
+  'constraint.account.title': 'אילוצים וזמינות',
+  'constraint.account.subtitle': 'הגשת ימי היעדרות למאמנים',
 }

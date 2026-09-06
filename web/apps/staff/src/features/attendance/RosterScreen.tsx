@@ -87,6 +87,11 @@ export function RosterScreen({
    *  bootstrap payload does not carry `expected` per row, so the screen is told which ids
    *  are in the collapsed section rather than deriving a weekday rule of its own. */
   notExpectedIds = [],
+  /** §6.2 — `owner` / `manager` / `lead_coach`, the same trio the server's
+   *  `ManagerOrLeadCoach` checks. An assistant coach (the default, `false`) sees the
+   *  briefing below the header but no editor — decision 16, straight from the App shell's
+   *  own `viewerIsManager || roles.includes('lead_coach')` computation. */
+  canWritePlan = false,
 }: {
   sessionId: string
   locale: Locale
@@ -104,6 +109,7 @@ export function RosterScreen({
   clock?: () => string
   personId: string | null
   notExpectedIds?: string[]
+  canWritePlan?: boolean
 }) {
   const [roster, setRoster] = useState<RosterRowData[]>([])
   const [header, setHeader] = useState<{
@@ -111,6 +117,12 @@ export function RosterScreen({
     startsAt: string
     locationName: string | null
   } | null>(null)
+  // §6.2 — the briefing rides in with its session on `GET /sync/bootstrap` and is read off
+  // the cache, never fetched: unlike the roster above, this has no live-fetch counterpart to
+  // fall back FROM, because `GET /sessions/{id}/attendance` (`sessionRoster`) does not carry
+  // it at all. That is deliberate, not an oversight — "the plan comes down in the bootstrap
+  // with its session", so the one reader is the cache, online or off.
+  const [plan, setPlan] = useState<string | null>(null)
   const pending = usePendingCount()
   const stale = useStaleQueueWarning(clock)
 
@@ -154,6 +166,19 @@ export function RosterScreen({
       live = false
     }
   }, [client, sessionId])
+
+  // Independent of the fetch above and its catch branch: the briefing is cache-only
+  // regardless of whether the live roster read succeeds, so it must not live inside either
+  // branch of that effect.
+  useEffect(() => {
+    let live = true
+    void readSession(offlineStore(), sessionId).then((cached) => {
+      if (live) setPlan(cached?.plan ?? null)
+    })
+    return () => {
+      live = false
+    }
+  }, [sessionId])
 
   const split: Split = useMemo(() => {
     const notExpected = new Set(notExpectedIds)
@@ -316,6 +341,24 @@ export function RosterScreen({
         ) : null}
       </header>
 
+      {/* §6.2 — "shows the plan at the top, before the roster... that is the moment
+          someone on the mat needs it." Above the quick-action strip and the list both. */}
+      <SessionPlanCard
+        canWrite={canWritePlan}
+        locale={locale}
+        onSave={async (body) => {
+          // `addSessionNote` is optional on the interface (see `client.ts`'s own note on
+          // why) but never actually absent here: every real client implements it, and
+          // `canWritePlan` is what gates whether this card even offers the button that
+          // reaches this handler. A missing implementation refuses rather than silently
+          // updating local state for a write that never reached the server.
+          if (!client.addSessionNote) throw new Error('addSessionNote is not implemented')
+          await client.addSessionNote(sessionId, body, 'plan')
+          setPlan(body)
+        }}
+        plan={plan}
+      />
+
       {/* The prototype's quick-action strip. Only its "mark all" half is drawn — see this
           file's own header note on why "reset" has nothing behind it. */}
       <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/60 bg-slate-50 px-4 py-2.5">
@@ -445,6 +488,126 @@ export function RosterScreen({
       personId,
     })
   }
+}
+
+/**
+ * §6.2, decision 16 — the briefing, read from the cache and (for the trio permitted to)
+ * written straight to the API. Renders nothing at all when there is no briefing and the
+ * viewer cannot add one: an empty card with a title and no content would be noise on a
+ * screen a coach reads in the seconds before a class starts, and an assistant coach with
+ * nothing left for them should see nothing here rather than an invitation to write.
+ */
+function SessionPlanCard({
+  locale,
+  plan,
+  canWrite,
+  onSave,
+}: {
+  locale: Locale
+  plan: string | null
+  canWrite: boolean
+  onSave: (body: string) => Promise<void>
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(plan ?? '')
+  const [saving, setSaving] = useState(false)
+  const [failed, setFailed] = useState(false)
+
+  if (plan === null && !canWrite) return null
+
+  if (editing) {
+    return (
+      <section
+        className="flex flex-col gap-2 rounded-3xl border border-blue-200 bg-blue-50/70 p-4"
+        data-testid="session-plan-editor"
+      >
+        <label className="text-xs font-bold text-blue-900" htmlFor="session-plan-body">
+          {t(locale, 'attendance.briefing.title')}
+        </label>
+        <textarea
+          className="min-h-24 rounded-2xl border border-blue-200 bg-white p-3 text-sm text-slate-900"
+          data-testid="session-plan-input"
+          id="session-plan-body"
+          onChange={(event) => setDraft(event.target.value)}
+          placeholder={t(locale, 'attendance.briefing.placeholder')}
+          value={draft}
+        />
+        {failed ? (
+          <p className="text-xs font-semibold text-rose-600" role="alert">
+            {t(locale, 'attendance.briefing.saveFailed')}
+          </p>
+        ) : null}
+        <div className="flex items-center justify-end gap-2">
+          <button
+            className="rounded-xl px-3 py-1.5 text-xs font-bold text-slate-500 transition-all active:scale-95"
+            onClick={() => {
+              setEditing(false)
+              setFailed(false)
+              setDraft(plan ?? '')
+            }}
+            type="button"
+          >
+            {t(locale, 'attendance.briefing.cancel')}
+          </button>
+          <button
+            className="rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 disabled:opacity-60"
+            data-testid="session-plan-save"
+            disabled={saving || draft.trim().length === 0}
+            onClick={() => {
+              const body = draft.trim()
+              setSaving(true)
+              setFailed(false)
+              onSave(body)
+                .then(() => setEditing(false))
+                .catch(() => setFailed(true))
+                .finally(() => setSaving(false))
+            }}
+            type="button"
+          >
+            {t(locale, saving ? 'attendance.briefing.saving' : 'attendance.briefing.save')}
+          </button>
+        </div>
+      </section>
+    )
+  }
+
+  return (
+    <section
+      className="flex flex-col gap-1.5 rounded-3xl border border-blue-200 bg-blue-50/70 p-4"
+      data-testid="session-plan"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="flex items-center gap-1.5 text-xs font-bold text-blue-900">
+          <ClipboardList aria-hidden="true" className="h-3.5 w-3.5" />
+          {t(locale, 'attendance.briefing.title')}
+        </h2>
+        {/* Decision 16 — "an assistant coach sees the plan and no editor." This button, the
+            only way into `editing`, is the entire gate: no `canWrite` prop means no way to
+            reach a screen the server would refuse the save from anyway. */}
+        {canWrite ? (
+          <button
+            className="text-xs font-bold text-blue-700"
+            data-testid="session-plan-edit"
+            onClick={() => {
+              // Set here, on the transition into editing, rather than synced by an effect
+              // watching `plan` — the draft only matters while the editor is open, so there
+              // is nothing to keep synchronized while it is closed.
+              setDraft(plan ?? '')
+              setEditing(true)
+            }}
+            type="button"
+          >
+            {t(locale, plan ? 'attendance.briefing.edit' : 'attendance.briefing.add')}
+          </button>
+        ) : null}
+      </div>
+      {plan ? (
+        <p className="whitespace-pre-wrap text-sm text-slate-700">{plan}</p>
+      ) : (
+        <p className="text-xs text-slate-400">{t(locale, 'attendance.briefing.empty')}</p>
+      )}
+    </section>
+  )
 }
 
 /**

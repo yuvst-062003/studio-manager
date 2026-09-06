@@ -51,6 +51,22 @@ export interface StaffAttendanceClient {
     body: { client_mark_id_prefix: string; device_marked_at: string },
   ): Promise<BatchResult>
   studentAttendance(studentId: string, limit?: number): Promise<AttendanceRecord[]>
+  /**
+   * §6.2 — `POST /sessions/{id}/notes`. Immediate and online-only, never queued: like
+   * `SessionSummarySection`'s injury report, a note is not attendance and §10.3's offline
+   * guarantee is scoped to marks. `kind: 'plan'` is the briefing (`owner`/`manager`/
+   * `lead_coach` only, refused with a 403 otherwise); `kind: 'summary'` is the existing
+   * after-the-lesson note, any staff role's. Mirrors the dashboard's own
+   * `features/schedule/client.ts::addSessionNote`, not imported from there for the same
+   * cross-app-coupling reason this whole file states at its own header.
+   *
+   * Optional, not required, so `StudentCardRoute.test.tsx` (`features/people/`, out of
+   * scope for this pass) does not need a mechanical edit just to keep satisfying this
+   * interface — the real client built by `makeStaffAttendanceClient` below always
+   * implements it, and `RosterScreen`'s own caller refuses rather than silently no-ops
+   * when it is missing.
+   */
+  addSessionNote?(sessionId: string, body: string, kind: 'plan' | 'summary'): Promise<void>
 }
 
 /** Mirrors `app/schemas/attendance.py::AttendanceOut`, narrowed to what `2d` draws. */
@@ -99,6 +115,14 @@ export function makeStaffAttendanceClient(fetcher: Fetcher): StaffAttendanceClie
         `${API}/students/${studentId}/attendance?limit=${limit}`,
       )
       return body.items
+    },
+    async addSessionNote(sessionId, body, kind) {
+      const response = await fetcher(`${API}/sessions/${sessionId}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body, kind }),
+      })
+      if (!response.ok) throw new Error(String(response.status))
     },
   }
 }

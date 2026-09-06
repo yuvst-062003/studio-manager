@@ -157,6 +157,19 @@ export const attendance: Bundle = {
   // B1.3 — the unmarked row's `⋯` overflow control, once `סימון עכשיו` and
   // `תזכורת למאמן` move behind it. Accessible name, not visible text.
   'report.rowActions': 'פעולות עבור {{group}}',
+  // -- §6.2 of the staff app redesign — the briefing, distinct from `summary.*` below.
+  // Written by owner/manager/lead_coach only (decision 16); read by any staff role, and
+  // shown at the top of the register, never merged with the after-the-lesson summary.
+  'briefing.title': 'תדריך למפגש',
+  'briefing.placeholder': 'מה חשוב שהמאמן במשמרת ידע?',
+  'briefing.add': 'הוספת תדריך',
+  'briefing.edit': 'עריכת התדריך',
+  'briefing.cancel': 'ביטול',
+  'briefing.save': 'שמירה',
+  'briefing.saving': 'שומר…',
+  'briefing.saveFailed': 'השמירה נכשלה. נסו שוב.',
+  'briefing.empty': 'אין תדריך למפגש הזה',
+
   // -- 9g's injury report (S2): immediate, online-only, never queued -------------
   'summary.injury.title': 'דיווח פציעה',
   'summary.injury.who': 'מי נפצע?',

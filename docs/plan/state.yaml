@@ -989,7 +989,23 @@ waves:
         on: 2026-09-07
       - id: C6
         title: Session briefings — written for the session, read on the mat
-        status: pending
+        why: >-
+          A briefing is staff writing for staff, and the checkpoint's real work was deciding
+          who may read it. `/sync/bootstrap` also answers the parent app, so scoping the plan
+          to staff roles is what stops a coach's note about a child riding into that child's
+          guardian's offline cache beside the lesson time. The test builds a guardian whose
+          child IS enrolled — so they legitimately see the session — and asserts the briefing
+          text still does not reach them.
+
+          Writing a plan reuses the existing manager-or-lead-coach dependency rather than
+          declaring a second copy of the same trio; an assistant gets the same refusal shape
+          every other endpoint returns, never a silent downgrade to a summary.
+
+          It reaches the mat: the plan rides the bootstrap payload and is read from the cache,
+          so it works with no signal — which is the whole point of writing one for the person
+          standing in the room.
+        status: shipped
+        on: 2026-09-07
       - id: C7
         title: The at-risk worker reaches coaches and managers, as its own documentation says it does
         why: >-
@@ -1052,7 +1068,25 @@ waves:
         on: 2026-09-06
       - id: C10
         title: Coach unavailability — endpoints and the coach's own screen
-        status: pending
+        why: >-
+          Filing, withdrawing and reading, plus approve/refuse and `/staff/available`. The
+          dashboard that calls the last three is C12.
+
+          Withdrawal is a status transition, never a row deletion: the manager's queue and the
+          coach's own history both read this table afterwards.
+
+          All-day means midnight to midnight in the studio's zone, not UTC, and the conversion
+          reuses the DST-safe helper the dashboard's session popover already uses rather than a
+          fixed offset — the kind of thing that is silently wrong by an hour for half the year.
+
+          One honest scope cut: the prototype's substitute picker assumes a coach can choose a
+          colleague, but no endpoint an ordinary coach may call returns other staff members'
+          names — `/staff` and `/staff/available` are both manager-only. Rather than fabricate a
+          local roster, the field is free text folded into the note, and the screen says plainly
+          that it is a suggestion and not an assignment. `substitute_person_id` stays wired for
+          the dashboard.
+        status: shipped
+        on: 2026-09-07
       - id: C11
         title: The calendar — future sessions and events, with change-coach, cancel and move
         status: pending

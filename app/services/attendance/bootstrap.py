@@ -63,6 +63,7 @@ def build_bootstrap(
     visible_group_ids: set[uuid.UUID] | None,
     coach_person_id: uuid.UUID | None,
     now: datetime,
+    include_plans: bool = False,
 ) -> BootstrapPayload:
     """Everything the staff app needs before it loses the network.
 
@@ -70,6 +71,13 @@ def build_bootstrap(
     (§19.5) and `server_time` is what the client detects clock skew against — §10.5
     resolves conflicts on `device_marked_at`, and a device whose clock is an hour out would
     win or lose every conflict for the wrong reason.
+
+    `include_plans` is §6.2's briefing, `SessionOut.plan`. It is the CALLER's decision, not
+    this function's: `/sync/bootstrap` answers both staff and guardians (§10.2's read-only
+    parent cache is the same payload, narrowed), and the plan is a briefing staff write for
+    staff, not a fact a guardian's read of this same endpoint should carry. `sync.py` passes
+    `True` only for a caller holding a staff role, so a guardian gets `plan: None` on every
+    session here exactly as `list_sessions`/`get_session` already do everywhere else.
     """
     from_date, to_date = clamp_window(from_date, to_date)
     schedule = ScheduleService(session)
@@ -80,6 +88,10 @@ def build_bootstrap(
         visible_group_ids=visible_group_ids,
         limit=MAX_SESSIONS_IN_WINDOW,
     )
+
+    # One query for the whole window, never one per session -- the same reasoning
+    # `project_sessions`'s own docstring gives for its three batch queries.
+    plans_by_session = schedule.latest_plan_notes([row.id for row in rows]) if include_plans else {}
 
     sessions = []
     rosters: dict[uuid.UUID, list[RosterEntry]] = {}
@@ -93,6 +105,7 @@ def build_bootstrap(
         projected.attendance_taken = any(
             entry.status != "unmarked" for entry in roster_rows if entry.expected
         )
+        projected.plan = plans_by_session.get(row.id)
         sessions.append(projected)
         rosters[row.id] = [
             RosterEntry(

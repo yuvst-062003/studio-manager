@@ -38,6 +38,7 @@ import type { ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import {
   Accessibility,
+  CalendarX,
   Edit3,
   ChevronLeft,
   FileText,
@@ -407,6 +408,16 @@ export function AccountScreen({
             hue="blue"
             title={t(locale, 'common.install.title')}
             subtitle={t(locale, 'common.install.why')}
+          />
+          {/* §4.8 / §6.1 (checkpoint C10) — filing, withdrawing and reading a coach's own
+              unavailability. Every staff role, not manager-gated: it is the coach filing
+              against themself, the same reason `#/events` above is unconditional. */}
+          <Row
+            href="#/constraints"
+            icon={CalendarX}
+            hue="rose"
+            title={t(locale, 'schedule.constraint.account.title')}
+            subtitle={t(locale, 'schedule.constraint.account.subtitle')}
           />
         </RowCard>
       </section>

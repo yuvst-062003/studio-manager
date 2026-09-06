@@ -52,6 +52,92 @@ def test_the_roster_carries_the_seam_fields_so_the_badge_renders_offline(
     assert row["derived_flags"] == {}
 
 
+def test_a_sessions_briefing_rides_in_the_bootstrap_payload_for_any_staff(
+    client, as_lead_coach, as_assistant_coach, a_session
+):
+    """§6.2 — "the plan comes down in the bootstrap with its session... an assistant reads
+    it on the mat with no signal." A lead coach or manager writes the briefing; reading it
+    stays any staff role, which is the whole point of leaving one for an assistant."""
+    before = client.get(BOOTSTRAP, headers=as_assistant_coach.headers).json()
+    assert before["sessions"][0]["plan"] is None
+
+    written = client.post(
+        f"/api/v1/sessions/{a_session}/notes",
+        headers=as_lead_coach.headers,
+        json={"body": "היום נתמקד בהשלכות מעמידה", "kind": "plan"},
+    )
+    assert written.status_code == 201, written.text
+
+    after = client.get(BOOTSTRAP, headers=as_assistant_coach.headers).json()
+    assert after["sessions"][0]["plan"] == "היום נתמקד בהשלכות מעמידה"
+
+
+def test_a_summary_never_rides_as_the_bootstraps_plan(client, as_lead_coach, a_session):
+    """§6.2 — "one string per session, only the plan — not the summaries." A wrap-up note
+    must never leak into the field the mat-side briefing occupies."""
+    client.post(
+        f"/api/v1/sessions/{a_session}/notes",
+        headers=as_lead_coach.headers,
+        json={"body": "מפגש טוב, כולם השתתפו"},
+    )
+    body = client.get(BOOTSTRAP, headers=as_lead_coach.headers).json()
+    assert body["sessions"][0]["plan"] is None
+
+
+def test_a_guardian_who_can_see_the_session_still_gets_no_briefing_text(
+    client, app_session, studio, fake_provider, a_session, an_enrolled_student, as_lead_coach
+):
+    """The briefing is staff writing for staff. `/sync/bootstrap` also answers guardians
+    (§10.2's read-only parent cache), so a guardian whose child IS enrolled in this session
+    — and who therefore legitimately sees the session itself — must still not receive the
+    coach's internal briefing through the same payload that hands them the lesson time."""
+    import uuid
+
+    from app.models.identity import AuthIdentity
+    from app.models.person import Guardian, Person
+    from sqlalchemy import select
+    from tests.conftest import sign_in
+
+    client.post(
+        f"/api/v1/sessions/{a_session}/notes",
+        headers=as_lead_coach.headers,
+        json={"body": "לעבוד על אחיזות היום", "kind": "plan"},
+    )
+
+    subject = f"guardian-{uuid.uuid4()}"
+    code = f"code-{subject}"
+    fake_provider.register(code=code, subject=subject, email=f"{subject}@example.invalid")
+    sign_in(client, code=code, app_name="staff")
+    identity_id = app_session.execute(
+        select(AuthIdentity.id).where(AuthIdentity.provider_subject == subject)
+    ).scalar_one()
+    person = Person(
+        studio_id=studio.id, auth_identity_id=identity_id, first_name="הורה", last_name="בודק"
+    )
+    app_session.add(person)
+    app_session.flush()
+    app_session.add(
+        Guardian(
+            studio_id=studio.id,
+            student_id=an_enrolled_student,
+            person_id=person.id,
+            is_primary=True,
+            relation="parent",
+        )
+    )
+    app_session.commit()
+    rotated = client.post("/api/v1/auth/refresh")
+    assert rotated.status_code == 200, rotated.text
+    headers = {
+        "Authorization": f"Bearer {rotated.json()['access_token']}",
+        "X-Dev-Now": T0.isoformat(),
+    }
+
+    body = client.get(BOOTSTRAP, headers=headers).json()
+    assert [s["id"] for s in body["sessions"]] == [str(a_session)]
+    assert body["sessions"][0]["plan"] is None
+
+
 def test_server_time_comes_from_the_dev_clock_so_skew_is_detectable(client, as_lead_coach):
     """§10.5 resolves conflicts on `device_marked_at`, and a device whose clock is an hour
     out would win or lose every conflict for the wrong reason. `server_time` is what the

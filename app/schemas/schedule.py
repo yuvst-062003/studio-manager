@@ -70,6 +70,14 @@ class SessionOut(BaseModel):
     #: expect. Not a booking count and not capacity, so it does not contradict the note
     #: above: children are enrolled, and this is how many.
     headcount: int = 0
+    #: §6.2 of the staff app redesign — the session's briefing (`session_note.kind='plan'`),
+    #: for whoever ends up on the mat. `None` on every ordinary read of `SessionOut`
+    #: (`GET /sessions`, `GET /sessions/{id}`) exactly the way `attendance_taken` defaulted
+    #: to `False` everywhere until `bootstrap.py` started overwriting it — only
+    #: `build_bootstrap` fills this field, and only for a staff caller, because the text is a
+    #: briefing staff write for staff, not a fact a guardian's own `GET /sync/bootstrap` read
+    #: should carry even though that endpoint answers guardians too (§10.2).
+    plan: str | None = None
 
 
 class TrialSlotOut(BaseModel):
@@ -365,6 +373,12 @@ class CoachConstraintCreate(BaseModel):
     def _time_range(self) -> CoachConstraintCreate:
         if self.ends_at <= self.starts_at:
             raise ValueError("ends_at must be after starts_at")
+        # The model's own docstring: `note` is "required by the form when the reason is
+        # `other`" — the escape hatch has no meaning without the free text it exists to
+        # carry. Checked here rather than left to the client alone: a 422 that names the
+        # problem is cheaper than a `reason='other'` row nobody can ever explain.
+        if self.reason == "other" and not (self.note and self.note.strip()):
+            raise ValueError("note is required when reason is 'other'")
         return self
 
 
@@ -380,3 +394,46 @@ class CoachConstraintOut(BaseModel):
     substitute_person_id: uuid.UUID | None
     decided_by_person_id: uuid.UUID | None
     decided_at: datetime | None
+
+
+CoachConstraintPage = CursorPage[CoachConstraintOut]
+
+
+class CoachConstraintApprove(BaseModel):
+    """`POST /coach-constraints/{id}/approve`.
+
+    **Absence is not `null`**, the same rule `SessionPatch` states for `location_id`:
+    omitting `substitute_person_id` leaves the filer's own suggestion (or the empty
+    field) exactly as it was, while `substitute_person_id: null` clears it and a real id
+    sets it. `model_fields_set` is what lets the service tell "not mentioned" apart from
+    "explicitly cleared" — a plain `| None` field cannot.
+
+    A given, non-null id is validated by the service against §6.1's one rule: staff at
+    this studio, and free in the constraint's own window. That is a 422, not a shape this
+    schema can express.
+    """
+
+    substitute_person_id: uuid.UUID | None = None
+
+
+class CoachConstraintRefuse(BaseModel):
+    """`POST /coach-constraints/{id}/refuse`. The reason travels to the coach in their
+    notification and into the audit log; `coach_constraint` itself carries no column for
+    it (only who decided and when) — see that model's own docstring."""
+
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class StaffAvailabilityRow(BaseModel):
+    """One line of `GET /staff/available`'s answer. Decision 12: no ranking, and the busy
+    are not filtered out — `available=False` is a real row the resolution popup still
+    shows, greyed, because sometimes you ask the busy person anyway."""
+
+    person_id: uuid.UUID
+    display_name: str
+    roles: list[str]
+    available: bool
+
+
+class StaffAvailabilityOut(BaseModel):
+    items: list[StaffAvailabilityRow]

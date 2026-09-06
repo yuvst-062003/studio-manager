@@ -511,6 +511,89 @@ def test_a_coach_writes_a_session_summary_and_reads_it_back(client, as_lead_coac
     assert [n["body"] for n in listed["items"]] == ["עבדנו על או-סוטו-גארי"]
 
 
+def test_a_lead_coach_writes_a_briefing_and_it_carries_its_kind(client, as_lead_coach, a_session):
+    """§6.2, decision 16 — a briefing is `owner`, `manager` or `lead_coach`, and the trio
+    `PATCH /sessions` already admits is who this reuses. The response and the list both
+    carry `kind` so a client can tell a briefing from a wrap-up without a second endpoint."""
+    created = client.post(
+        f"{API}/sessions/{a_session.id}/notes",
+        headers=as_lead_coach.headers,
+        json={"body": "היום נתרגל השלכות מעמידה", "kind": "plan"},
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["kind"] == "plan"
+
+    listed = client.get(
+        f"{API}/sessions/{a_session.id}/notes", headers=as_lead_coach.headers
+    ).json()
+    assert [n["kind"] for n in listed["items"]] == ["plan"]
+
+
+def test_an_assistant_coach_may_write_a_summary_but_a_plan_is_refused_by_name(
+    client, as_assistant_coach, a_session
+):
+    """Decision 16's whole point — an assistant coach may leave the after-the-lesson
+    summary (unchanged, §5.13) but may not write the briefing meant to be left FOR them.
+    The refusal names the problem rather than silently downgrading `kind` to `summary`."""
+    summary = client.post(
+        f"{API}/sessions/{a_session.id}/notes",
+        headers=as_assistant_coach.headers,
+        json={"body": "מפגש טוב, כולם השתתפו"},
+    )
+    assert summary.status_code == 201, summary.text
+    assert summary.json()["kind"] == "summary"
+
+    plan = client.post(
+        f"{API}/sessions/{a_session.id}/notes",
+        headers=as_assistant_coach.headers,
+        json={"body": "לעבוד על אחיזות היום", "kind": "plan"},
+    )
+    assert plan.status_code == 403, plan.text
+    assert plan.json()["detail"]["code"] == "forbidden"
+
+    # And the refusal never fell through to a silent downgrade -- no `plan` row exists.
+    listed = client.get(
+        f"{API}/sessions/{a_session.id}/notes", headers=as_assistant_coach.headers
+    ).json()
+    assert [n["kind"] for n in listed["items"]] == ["summary"]
+
+
+def test_notes_are_filtered_by_kind_so_a_briefing_and_a_wrap_up_never_share_a_list(
+    client, as_lead_coach, a_session
+):
+    """§6.2 — "shown separately and never merged into one list". `?kind=` is what a client
+    builds each of those two views from, rather than filtering a mixed page itself."""
+    client.post(
+        f"{API}/sessions/{a_session.id}/notes",
+        headers=as_lead_coach.headers,
+        json={"body": "התדריך של היום", "kind": "plan"},
+    )
+    client.post(
+        f"{API}/sessions/{a_session.id}/notes",
+        headers=as_lead_coach.headers,
+        json={"body": "הסיכום של היום"},
+    )
+
+    plans = client.get(
+        f"{API}/sessions/{a_session.id}/notes",
+        headers=as_lead_coach.headers,
+        params={"kind": "plan"},
+    ).json()
+    assert [n["body"] for n in plans["items"]] == ["התדריך של היום"]
+
+    summaries = client.get(
+        f"{API}/sessions/{a_session.id}/notes",
+        headers=as_lead_coach.headers,
+        params={"kind": "summary"},
+    ).json()
+    assert [n["body"] for n in summaries["items"]] == ["הסיכום של היום"]
+
+    unfiltered = client.get(
+        f"{API}/sessions/{a_session.id}/notes", headers=as_lead_coach.headers
+    ).json()
+    assert len(unfiltered["items"]) == 2
+
+
 def test_a_session_in_another_studio_is_invisible(client, as_manager):
     assert (
         client.get(f"{API}/sessions/{uuid.uuid4()}", headers=as_manager.headers).status_code == 404

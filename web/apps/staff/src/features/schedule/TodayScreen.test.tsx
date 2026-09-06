@@ -473,6 +473,68 @@ describe('TodayScreen — who has confirmed, from the offline cache (§4.1)', ()
   })
 })
 
+describe('TodayScreen — a session carrying a briefing shows that it has one (§6.2)', () => {
+  let store: OfflineStore
+  const NOW = '2026-11-03T12:00:00Z'
+
+  const cachedSession = (plan: string | null) => ({
+    id: TODAY_SESSION.id,
+    group_id: 'g1',
+    group_name: TODAY_SESSION.group_name,
+    starts_at: TODAY_SESSION.starts_at,
+    ends_at: TODAY_SESSION.ends_at,
+    location_name: null,
+    status: 'scheduled' as const,
+    attendance_taken: false,
+    plan,
+  })
+
+  beforeEach(() => {
+    store = memoryStore()
+    setOfflineStore(store)
+  })
+
+  afterEach(() => {
+    setOfflineStore(null)
+  })
+
+  it('marks the card when the cached session carries a plan', async () => {
+    // `GET /sessions` (this screen's own fetch) never carries `plan` at all — only the
+    // bootstrap cache does — so this is a cache-only read, the same way the confirmation
+    // counts above are.
+    await writeWindow(store, {
+      server_time: NOW,
+      from_time: NOW,
+      to_time: NOW,
+      sessions: [cachedSession('היום נתרגל השלכות')],
+      rosters: {},
+    })
+    render(screenFor({ client: stub([TODAY_SESSION]) }))
+    const marker = await screen.findByTestId('session-has-briefing')
+    // The marker, never the text — "do not render the text on a list."
+    expect(marker).not.toHaveTextContent('היום נתרגל השלכות')
+  })
+
+  it('does not mark the card when the cached session carries no plan', async () => {
+    await writeWindow(store, {
+      server_time: NOW,
+      from_time: NOW,
+      to_time: NOW,
+      sessions: [cachedSession(null)],
+      rosters: {},
+    })
+    render(screenFor({ client: stub([TODAY_SESSION]) }))
+    await screen.findByText(TODAY_SESSION.group_name)
+    expect(screen.queryByTestId('session-has-briefing')).not.toBeInTheDocument()
+  })
+
+  it('does not mark the card when nothing is cached yet', async () => {
+    render(screenFor({ client: stub([TODAY_SESSION]) }))
+    await screen.findByText(TODAY_SESSION.group_name)
+    expect(screen.queryByTestId('session-has-briefing')).not.toBeInTheDocument()
+  })
+})
+
 // C3 — the anatomy pass told the four states apart in colour and words, but drew every
 // card the same shape. These lock in the three fixes: the active card's own frame and its
 // progress block (real `confirmationCounts` + real `ends_at - today`), and the ended-but-

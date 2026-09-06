@@ -176,6 +176,7 @@ describe('the student-card attendance strip', () => {
     sessionRoster: vi.fn(),
     bulkPresent: vi.fn(),
     studentAttendance: vi.fn().mockResolvedValue(rows),
+    addSessionNote: vi.fn(),
   })
 
   it('draws one mark per record, oldest at the reading start', async () => {
@@ -236,6 +237,7 @@ describe('§6.1 — offline priming blocks the first launch', () => {
     sessionRoster: vi.fn(),
     bulkPresent: vi.fn(),
     studentAttendance: vi.fn(),
+    addSessionNote: vi.fn(),
   })
 
   it('writes the window before the coach reaches Today', async () => {

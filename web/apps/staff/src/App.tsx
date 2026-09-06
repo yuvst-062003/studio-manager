@@ -78,6 +78,7 @@ import type { StaffTab } from './features/shell/StaffTabBar'
 import { AccountScreen } from './features/account/AccountScreen'
 import { TimerScreen } from './features/timer'
 import { TasksScreen, openTaskCount, useOpenTasks } from './features/tasks'
+import { CoachConstraintsScreen, makeCoachConstraintsClient } from './features/constraints'
 import './features/attendance/attendance.css'
 
 // §5.1 — 'the staff app and dashboard route them into a resumable wizard'. Both mount the
@@ -176,6 +177,7 @@ export default function App() {
   const attendanceClient = useMemo(() => makeStaffAttendanceClient(apiFetch), [])
   const commsClient = useMemo(() => makeStaffCommsClient(apiFetch), [])
   const privacyClient = useMemo(() => makeStaffPrivacyClient(apiFetch), [])
+  const constraintsClient = useMemo(() => makeCoachConstraintsClient(apiFetch), [])
   // §6.1 step 6 — "offline prime: today's and tomorrow's sessions + rosters are fetched and
   // written to IndexedDB BEFORE the coach reaches Today", and "the first launch BLOCKS on
   // this fetch". The gate below renders instead of the app while it runs.
@@ -211,6 +213,12 @@ export default function App() {
   // is about coach-scoped endpoints, and neither the entry nor the screen exists for a coach.
   const viewerIsManager =
     membership?.roles.some((role) => role === 'owner' || role === 'manager') ?? false
+  // §6.2, decision 16 — writing a briefing is `owner`/`manager`/`lead_coach`, the exact
+  // trio `PATCH /sessions` already admits and `StaffEventsScreen`'s own `canPublish` below
+  // computes inline for the identical reason. An assistant coach reads `RosterScreen`'s
+  // plan card with no editor rather than being refused a screen that would show them one.
+  const viewerCanWritePlan =
+    viewerIsManager || (membership?.roles.includes('lead_coach') ?? false)
   // §4.4 (checkpoint 8) — "no task table, rebuilt every time the tab opens". Called here,
   // once, rather than inside the tasks screen alone, because the tab bar's own badge is
   // visible on every screen and needs the same count `TasksScreen` renders; see
@@ -263,6 +271,9 @@ export default function App() {
   const onAccount = hash === '#/account'
   const onTimer = hash === '#/timer'
   const onTasks = hash === '#/tasks'
+  // §4.8 / §6.1 (checkpoint C10) — filing, withdrawing and reading a coach's own
+  // unavailability. Reached from the account tab's own row, not a tab of its own.
+  const onConstraints = hash === '#/constraints'
   // §5.7's register, opened from a session. The id is in the hash so the back button works
   // and a link survives a reload — the same shape both W2 lanes settled on, and the reason
   // NAV's `/attendance` entry became a hash below. A second segment picks the in-session
@@ -452,6 +463,12 @@ export default function App() {
               viewerIsManager={viewerIsManager}
               today={today}
             />
+          ) : session.access.staff && onConstraints ? (
+            // §4.8 / §6.1 (checkpoint C10) — a coach files their own unavailability.
+            // Every staff role, not manager-gated: approving it (C12) is the dashboard's,
+            // filing it is this screen's, and `#/account` links here for exactly that
+            // reason.
+            <CoachConstraintsScreen locale={locale} client={constraintsClient} today={today} />
           ) : onInstall ? (
             // Needs no access guard: installing the app is every signed-in person's
             // business, and the screen shows nothing from any studio.
@@ -507,6 +524,7 @@ export default function App() {
               />
             ) : (
               <RosterScreen
+                canWritePlan={viewerCanWritePlan}
                 client={attendanceClient}
                 locale={locale}
                 personId={membership?.person_id ?? null}

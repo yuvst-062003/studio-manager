@@ -113,4 +113,9 @@ def bootstrap(
         visible_group_ids=visible,
         coach_person_id=None,
         now=server_now,
+        # §6.2's briefing is staff-facing content; `roles & STAFF_ROLES` is the same test
+        # this function already used two lines up to pick the guardian's narrower scope, so
+        # a guardian on this same endpoint gets `plan: None` on every session rather than a
+        # coach's briefing riding along with the read-only cache §10.2 grants them.
+        include_plans=bool(roles & STAFF_ROLES),
     )

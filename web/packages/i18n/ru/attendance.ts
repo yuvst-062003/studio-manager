@@ -115,6 +115,17 @@ export const attendance: Bundle = {
   'report.col.rate': 'Процент посещаемости',
   'report.col.coverage': 'Охват',
   'report.rowActions': 'Действия для {{group}}',
+  // -- §6.2 of the staff app redesign — the briefing, distinct from `summary.*` below.
+  'briefing.title': 'Инструктаж к занятию',
+  'briefing.placeholder': 'Что должен знать тренер на татами?',
+  'briefing.add': 'Добавить инструктаж',
+  'briefing.edit': 'Редактировать инструктаж',
+  'briefing.cancel': 'Отмена',
+  'briefing.save': 'Сохранить',
+  'briefing.saving': 'Сохранение…',
+  'briefing.saveFailed': 'Не удалось сохранить. Попробуйте снова.',
+  'briefing.empty': 'Для этого занятия нет инструктажа',
+
   // -- 9g's injury report (S2): immediate, online-only, never queued -------------
   'summary.injury.title': 'Сообщение о травме',
   'summary.injury.who': 'Кто пострадал?',

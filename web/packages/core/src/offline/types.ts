@@ -128,6 +128,13 @@ export type CachedSession = {
   location_name: string | null
   status: 'scheduled' | 'cancelled' | 'completed'
   attendance_taken: boolean
+  /** §6.2 of the staff app redesign — the session's briefing, written by a senior coach or
+   *  manager for whoever ends up on the mat. Optional for the same reason `plan_name` and
+   *  `has_confirmation` are: every producer of this shape from before the field existed
+   *  still type-checks unchanged. `undefined` and `null` both mean "no briefing" — the
+   *  attendance screen and the schedule tab's card both read this straight off the cache,
+   *  never a fetch, which is the whole point of it riding down with its session. */
+  plan?: string | null
 }
 
 /** `GET /sync/bootstrap`'s body. §6.1's first launch blocks on this. */

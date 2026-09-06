@@ -112,6 +112,7 @@ import {
   formatTimeInStudioZone,
   offlineStore,
   readRoster,
+  readSession,
   studioDayKey,
   useNetworkMode,
 } from '@studio/core'
@@ -370,6 +371,11 @@ export function TodayScreen({
   // fetched again: keyed by session id so each card's counts travel from THIS session's
   // own cached roster, not a shared one.
   const [rosters, setRosters] = useState<Record<string, RosterRow[] | undefined>>({})
+  // §6.2 of the staff app redesign — "a session carrying a briefing shows that it has
+  // one." The briefing text itself rides in the same bootstrap cache `rosters` above
+  // already reads from; this keeps only the boolean the card's marker needs, never the
+  // text — "a small marker; do not render the text on a list."
+  const [plans, setPlans] = useState<Record<string, boolean>>({})
   // S11 — a failed read distinguishes offline from broken (S5's network state).
   const networkMode = useNetworkMode()
   const strip = useMemo(() => stripAround(initialDay ?? todayKey), [initialDay, todayKey])
@@ -456,6 +462,28 @@ export function TodayScreen({
         const next = { ...current }
         onThisDay.forEach((session, index) => {
           next[session.id] = loaded[index]
+        })
+        return next
+      })
+    })
+    return () => {
+      live = false
+    }
+  }, [onThisDay])
+
+  // §6.2 — the same cache, read the same way as the roster above, for whether THIS session
+  // carries a briefing. `GET /sessions` (this screen's live fetch, `client.listSessions`)
+  // never carries `plan` at all — only `build_bootstrap` fills it — so the marker has no
+  // live-fetch source to read from and is cache-only exactly like the confirmation counts.
+  useEffect(() => {
+    let live = true
+    const store = offlineStore()
+    Promise.all(onThisDay.map((session) => readSession(store, session.id))).then((loaded) => {
+      if (!live) return
+      setPlans((current) => {
+        const next = { ...current }
+        onThisDay.forEach((session, index) => {
+          next[session.id] = Boolean(loaded[index]?.plan)
         })
         return next
       })
@@ -654,6 +682,7 @@ export function TodayScreen({
               locale={locale}
               today={today}
               roster={item.kind === 'session' ? rosters[item.id] : undefined}
+              hasBriefing={item.kind === 'session' ? (plans[item.id] ?? false) : false}
               chaseFamilies={chaseFamilies}
             />
           ))}
@@ -669,6 +698,7 @@ function TimelineRow({
   locale,
   today,
   roster,
+  hasBriefing,
   chaseFamilies,
 }: {
   item: TimelineItem
@@ -676,6 +706,7 @@ function TimelineRow({
   locale: Locale
   today: string
   roster: RosterRow[] | undefined
+  hasBriefing: boolean
   chaseFamilies: (studentIds: string[]) => () => Promise<ContactFamily[]>
 }) {
   return (
@@ -693,6 +724,7 @@ function TimelineRow({
               locale={locale}
               today={today}
               roster={roster}
+              hasBriefing={hasBriefing}
               chaseFamilies={chaseFamilies}
             />
           ) : (
@@ -838,6 +870,7 @@ function SessionCard({
   locale,
   today,
   roster,
+  hasBriefing,
   chaseFamilies,
 }: {
   session: SessionRow
@@ -846,6 +879,9 @@ function SessionCard({
   /** An ISO instant — `ends_at - today` is the active card's own "נותרו X דק'" badge. */
   today: string
   roster: RosterRow[] | undefined
+  /** §6.2 — "a session carrying a briefing shows that it has one." Cache-only; see
+   *  `TodayScreen`'s own `plans` effect for why this is a boolean and not the text. */
+  hasBriefing: boolean
   chaseFamilies: (studentIds: string[]) => () => Promise<ContactFamily[]>
 }) {
   const counts = confirmationCounts(roster)
@@ -859,7 +895,8 @@ function SessionCard({
     session.attendance_taken ||
     session.staff[0]?.is_substitute ||
     (session.is_manually_edited && !session.is_ad_hoc) ||
-    session.is_ad_hoc
+    session.is_ad_hoc ||
+    hasBriefing
 
   // C3 — while a class is in progress, "45 דק׳" (its total length, unchanging) is less
   // useful than "נותרו 32 דק׳" (how much is left, which is the fact a coach checking the
@@ -976,6 +1013,17 @@ function SessionCard({
               <span>{t(locale, 'schedule.session.manuallyEditedHint')}</span>
             ) : null}
             {session.is_ad_hoc ? <span>{t(locale, 'schedule.session.adHoc')}</span> : null}
+            {/* §6.2 — the marker, never the text: "do not render the text on a list." The
+                briefing itself is read on the attendance screen, the moment it matters. */}
+            {hasBriefing ? (
+              <span
+                className="inline-flex items-center gap-1 font-bold text-blue-700"
+                data-testid="session-has-briefing"
+              >
+                <ClipboardList className="w-3 h-3" aria-hidden="true" />
+                {t(locale, 'schedule.session.hasBriefing')}
+              </span>
+            ) : null}
           </div>
         ) : null}
       </div>
