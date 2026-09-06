@@ -899,7 +899,37 @@ waves:
         on: 2026-09-06
       - id: C2
         title: The schedule tab — events merged into the session list, who has confirmed, and the contact actions
-        status: pending
+        why: >-
+          A restyle and an extension of TodayScreen, not a rebuild: the seven-day strip, the
+          coach filter and the cancelled-session handling already existed and were kept.
+
+          The timeline gained a rule the design does not have. The prototype draws four dot
+          colours for three states — red, green, then blue for one upcoming session and grey
+          for another, with nothing in the data telling them apart, because its cards are
+          hardcoded. Here blue is the next session up and grey is every one after it: four
+          colours, four meanings. Each dot also carries its state in words, because colour
+          alone fails SC 1.4.1.
+
+          No green token exists outside --paid, which this codebase treats as money-scoped by
+          repeated explicit convention. Rather than misuse it or add a global token and move
+          the six-palette audit, the states map onto --danger, --pending, --emphasis and
+          --border-strong.
+
+          Confirmation counts were free: has_confirmation and has_absence_report are already
+          on every cached roster row and were being thrown away.
+
+          Chasing families is §5.11's settled answer, not an integration — copy the numbers,
+          open WhatsApp with the message written. phoneList and whatsappShareUrl moved out of
+          the dashboard into @studio/core rather than being written a second time. Nothing
+          claims delivery: opening WhatsApp is not sending, and the screen says the message is
+          ready rather than sent.
+
+          The agent could not touch App.tsx, so events-merge and the chase action landed
+          behind optional props and would have shipped inert. Wired by hand in the same
+          commit — a prop is exactly the kind of dead wiring neither unreachable-screens nor
+          inert-buttons can see.
+        status: shipped
+        on: 2026-09-06
       - id: C3
         title: The attendance screen restyled, session and event
         status: pending
@@ -935,7 +965,29 @@ waves:
         status: pending
       - id: C9
         title: The timer tab — local presets, a wake lock, no backend
-        status: pending
+        why: >-
+          The one screen with no backend at all. The six built-in presets are ported as
+          written — they are the part a judo coach authored rather than a designer. Custom
+          presets live in IndexedDB rather than localStorage so they sit with the rest of the
+          app's local state, in a timer_presets table deliberately absent from EVICTABLE, for
+          the same reason pending_ops is: a coach's saved workouts are not a two-day cache of
+          server data. DB_VERSION rose to 2; the upgrade handler only creates stores it does
+          not find, so a queue full of unsynced marks survives it.
+
+          The screen holds a wake lock while running, which the prototype does not — a timer
+          whose screen sleeps mid-round is not a timer.
+
+          Not built, per §9: the music player and its provider switch, which are simulated
+          end to end in the source, and the settings button, which is an alert().
+
+          One defect found by re-running rather than by reading. The preset ordering test
+          passed about one run in two: a random suffix added to fix a same-millisecond key
+          collision then decided "oldest first", because the store sorts by key. Fixed by
+          making the save stamp monotonic and sorting on createdAt explicitly. A suite that is
+          green half the time is worse than one that fails, because it teaches people to
+          re-run it.
+        status: shipped
+        on: 2026-09-06
       - id: C10
         title: Coach unavailability — endpoints and the coach's own screen
         status: pending

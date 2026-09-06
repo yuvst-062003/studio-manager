@@ -60,6 +60,11 @@ export { downloadFile } from './download'
 export type { CursorPage } from './pagination'
 export { CAPABILITIES, MONEY_CAPABILITIES, can, isCoach } from './permissions'
 export type { Actor, Capability, Role, Scope } from './permissions'
+// §4.9/§5.11's contact hand-off — copy the numbers, open WhatsApp with the message ready.
+// Moved here from the dashboard so the staff app's schedule/student/task cards reuse the
+// exact same two functions rather than a second copy drifting beside them.
+export { phoneList, whatsappShareUrl } from './comms'
+export type { Contactable } from './comms'
 // `t()` returns the raw string with no interpolation. This is the shared home for that
 // fill-in going forward; the private copies in the schedule and rollover clients still
 // exist and were left untouched on purpose — see `./text.ts` for why. New callers use

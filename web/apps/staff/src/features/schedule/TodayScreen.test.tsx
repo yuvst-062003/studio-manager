@@ -5,14 +5,18 @@
 // test in this file is what keeps them from drifting apart.
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import { DIRECTION, t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { THEME_STORAGE_KEY, ThemeProvider } from '@studio/ui'
 import type { ResolvedTheme } from '@studio/ui'
+import { memoryStore, setOfflineStore, writeWindow } from '@studio/core'
+import type { OfflineStore, RosterRow as RosterRowData } from '@studio/core'
 import { TodayScreen } from './TodayScreen'
 import type { SessionRow, StaffScheduleClient } from './client'
+import type { EventOut, StaffEventsClient } from '../events/client'
+import type { StaffPeopleClient } from '../people'
 
 const base = {
   group_id: 'g1',
@@ -87,8 +91,11 @@ function screenFor(props: Record<string, unknown> = {}) {
 describe('TodayScreen (9a / 1d)', () => {
   it("renders today's sessions in the studio timezone", async () => {
     render(screenFor())
-    // 15:00Z on 3 November is 17:00 in Jerusalem — winter, UTC+2.
-    expect(await screen.findByText(/17:00/)).toBeInTheDocument()
+    // 15:00Z on 3 November is 17:00 in Jerusalem — winter, UTC+2. The time range's own
+    // span, not the timeline dot's beneath it — C2 restyled the card with a second,
+    // separate "17:00" (the dot's own start-time label), so the match is on the full
+    // range rather than the bare hour.
+    expect(await screen.findByText(/17:00–19:00/)).toBeInTheDocument()
   })
 
   it('files a 22:30Z session under tomorrow, not today', async () => {
@@ -280,5 +287,172 @@ describe('TodayScreen (9a / 1d)', () => {
     render(screenFor())
     await screen.findByTestId('session-row')
     expect(screen.queryByTestId('attendance-mark')).toBeNull()
+  })
+})
+
+// §4.1's merge: `GET /api/v1/events` alongside `GET /api/v1/sessions`, client-side, no new
+// endpoint. The seam under test is fetch (both clients) → merge → render order, not just
+// `mergeTimeline` in isolation (that lives in `timeline.test.ts`).
+describe('TodayScreen — events merged into the timeline (§4.1)', () => {
+  function eventsClientStub(events: EventOut[]): StaffEventsClient {
+    return {
+      list: vi.fn(async () => ({ items: events, next_cursor: null, has_more: false })),
+    } as unknown as StaffEventsClient
+  }
+
+  const EVENT: EventOut = {
+    id: 'ev1',
+    title: 'תחרות אזורית',
+    description: null,
+    type: 'competition',
+    status: 'published',
+    // 13:00Z is 15:00 in Jerusalem — before TODAY_SESSION's 17:00, so it must render first.
+    starts_at: '2026-11-03T13:00:00Z',
+    ends_at: null,
+    location_id: null,
+    location_text: 'היכל הספורט',
+    requires_consent: false,
+    consent_text: null,
+    consent_signed_count: 0,
+    rsvp_deadline: null,
+    rsvp_yes_count: 3,
+    rsvp_no_count: 1,
+    rsvp_pending_count: 2,
+    fee_agorot: null,
+  }
+
+  it('merges a session and an event into one list, ordered by start time', async () => {
+    render(screenFor({ client: stub([TODAY_SESSION]), eventsClient: eventsClientStub([EVENT]) }))
+    const rows = await screen.findAllByRole('listitem')
+    expect(rows).toHaveLength(2)
+    expect(within(rows[0]!).getByText('תחרות אזורית')).toBeInTheDocument()
+    expect(within(rows[1]!).getByTestId('session-duration')).toBeInTheDocument()
+  })
+
+  it("marks the event visually and opens its own roster screen, not a session's", async () => {
+    render(screenFor({ client: stub([]), eventsClient: eventsClientStub([EVENT]) }))
+    expect(await screen.findByText(t('he', 'events.type.competition'))).toBeInTheDocument()
+    expect(screen.getByTestId('open-event-roster')).toHaveAttribute('href', '#/events/ev1/roster')
+  })
+
+  it('renders no events at all when no eventsClient is supplied — unchanged from before C2', async () => {
+    render(screenFor({ client: stub([TODAY_SESSION]) }))
+    await screen.findByTestId('session-row')
+    expect(screen.queryByTestId('event-row')).toBeNull()
+  })
+})
+
+// §4.1's "the card also carries who has answered" — every roster row already carries
+// `has_confirmation`/`has_absence_report` in the offline cache primed at launch (§6.1).
+// The seam under test is fetch (the cache) → state → card, not just `confirmationCounts`
+// in isolation (that lives in `timeline.test.ts`).
+describe('TodayScreen — who has confirmed, from the offline cache (§4.1)', () => {
+  let store: OfflineStore
+  const NOW = '2026-11-03T12:00:00Z'
+
+  const rosterRow = (overrides: Partial<RosterRowData> = {}): RosterRowData => ({
+    student_id: 'stu-1',
+    display_name: 'ילד',
+    belt_color_hex: null,
+    belt_name: null,
+    health_status: 'missing',
+    derived_flags: {},
+    status: 'unmarked',
+    source: null,
+    has_absence_report: false,
+    absence_reason: null,
+    ...overrides,
+  })
+
+  const cachedSession = () => ({
+    id: TODAY_SESSION.id,
+    group_id: 'g1',
+    group_name: TODAY_SESSION.group_name,
+    starts_at: TODAY_SESSION.starts_at,
+    ends_at: TODAY_SESSION.ends_at,
+    location_name: null,
+    status: 'scheduled' as const,
+    attendance_taken: false,
+  })
+
+  beforeEach(() => {
+    store = memoryStore()
+    setOfflineStore(store)
+  })
+
+  afterEach(() => {
+    setOfflineStore(null)
+  })
+
+  it('reads has_confirmation off the cached roster and shows the counts on the card', async () => {
+    await writeWindow(store, {
+      server_time: NOW,
+      from_time: NOW,
+      to_time: NOW,
+      sessions: [cachedSession()],
+      rosters: {
+        [TODAY_SESSION.id]: [
+          rosterRow({ student_id: '1', has_confirmation: true }),
+          rosterRow({ student_id: '2', has_confirmation: true }),
+          rosterRow({ student_id: '3' }),
+        ],
+      },
+    })
+
+    render(screenFor({ client: stub([TODAY_SESSION]) }))
+
+    const confirmed = await screen.findByTestId('session-confirmed')
+    expect(confirmed).toHaveTextContent('2')
+    expect(confirmed).toHaveTextContent('3')
+    // One family unanswered — the `.one` plural form names it in words, the same rule
+    // `schedule.today.sessionCount.one` already sets for a single session.
+    expect(screen.getByTestId('session-not-answered')).toHaveTextContent(
+      t('he', 'schedule.session.notAnsweredCount.one'),
+    )
+  })
+
+  it('offers to chase the families who have not answered, resolving guardians only on tap', async () => {
+    await writeWindow(store, {
+      server_time: NOW,
+      from_time: NOW,
+      to_time: NOW,
+      sessions: [cachedSession()],
+      rosters: { [TODAY_SESSION.id]: [rosterRow({ student_id: 'stu-9' })] },
+    })
+
+    const student = vi.fn(async () => ({
+      guardians: [
+        {
+          person_id: 'p9',
+          display_name: 'הורה של דנה',
+          phone: '050-0000000',
+          is_primary: true,
+          student_id: 'stu-9',
+          relation: 'parent',
+        },
+      ],
+    }))
+    const peopleClient = { student } as unknown as StaffPeopleClient
+
+    render(screenFor({ client: stub([TODAY_SESSION]), peopleClient }))
+
+    const trigger = await screen.findByTestId('contact-open')
+    expect(student).not.toHaveBeenCalled()
+    await userEvent.click(trigger)
+    await waitFor(() => expect(student).toHaveBeenCalledWith('stu-9'))
+    expect(await screen.findByTestId('contact-message')).toHaveTextContent(TODAY_SESSION.group_name)
+  })
+
+  it('does not offer to chase anyone once every family has answered', async () => {
+    await writeWindow(store, {
+      server_time: NOW,
+      from_time: NOW,
+      to_time: NOW,
+      sessions: [cachedSession()],
+      rosters: { [TODAY_SESSION.id]: [rosterRow({ student_id: '1', has_confirmation: true })] },
+    })
+    render(screenFor({ client: stub([TODAY_SESSION]) }))
+    await screen.findByTestId('session-confirmed')
+    expect(screen.queryByTestId('contact-open')).toBeNull()
   })
 })

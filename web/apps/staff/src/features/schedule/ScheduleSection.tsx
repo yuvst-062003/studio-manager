@@ -17,6 +17,8 @@ import { DatePickerScreen } from './DatePickerScreen'
 import { TodayScreen } from './TodayScreen'
 import type { CoachOption } from './TodayScreen'
 import type { StaffScheduleClient } from './client'
+import type { StaffEventsClient } from '../events/client'
+import type { StaffPeopleClient } from '../people'
 
 const openPickerStyle: CSSProperties = {
   display: 'inline-block',
@@ -34,6 +36,8 @@ export function staffScheduleRoute(hash: string): StaffScheduleView {
 export function ScheduleSection({
   locale,
   client,
+  eventsClient,
+  peopleClient,
   hash,
   today,
   coaches = [],
@@ -42,6 +46,11 @@ export function ScheduleSection({
 }: {
   locale: Locale
   client: StaffScheduleClient
+  /** §4.1's merge — passed straight through to 9a/1d. Optional: see `TodayScreen`'s own
+   *  note on why a caller that has not wired one yet still works unchanged. */
+  eventsClient?: StaffEventsClient
+  /** §4.9's chase action, passed straight through. Same optionality as `eventsClient`. */
+  peopleClient?: StaffPeopleClient
   hash: string
   /** An ISO instant. A prop, not `new Date()`, all the way down. */
   today: string
@@ -76,6 +85,8 @@ export function ScheduleSection({
         key={picked ?? 'today'}
         locale={locale}
         client={client}
+        eventsClient={eventsClient}
+        peopleClient={peopleClient}
         today={today}
         // A day chosen in 9b wins over the clock until the coach navigates away — and
         // `חזרה להיום` on the screen itself walks back, because `today` stays honest.

@@ -76,6 +76,7 @@ import { NetworkStatus } from './NetworkStatus'
 import { StaffShell } from './features/shell/StaffShell'
 import type { StaffTab } from './features/shell/StaffTabBar'
 import { AccountScreen } from './features/account/AccountScreen'
+import { TimerScreen } from './features/timer'
 import './features/attendance/attendance.css'
 
 // §5.1 — 'the staff app and dashboard route them into a resumable wizard'. Both mount the
@@ -404,9 +405,10 @@ export default function App() {
               viewerIsManager={viewerIsManager}
             />
           ) : session.access.staff && onTimer ? (
-            <section aria-label={t(locale, 'timer.title')} data-testid="timer-placeholder">
-              <h1>{t(locale, 'timer.title')}</h1>
-            </section>
+            // §4.5 (checkpoint 9) — no backend, no model, no endpoint: a coach's own
+            // presets live on the device (decision 2). Self-contained; nothing else in
+            // this file changes to mount it.
+            <TimerScreen locale={locale} />
           ) : session.access.staff && onTasks ? (
             <section aria-label={t(locale, 'tasks.title')} data-testid="tasks-placeholder">
               <h1>{t(locale, 'tasks.title')}</h1>
@@ -484,6 +486,13 @@ export default function App() {
             <ScheduleSection
               locale={locale}
               client={scheduleClient}
+              // C2 — events share the session list (decision 4) and unanswered families can
+              // be chased from the card (§4.9). Both were built behind optional props and
+              // would have shipped inert without these two lines, which is precisely the
+              // failure `unreachable-screens.test.ts` and `inert-buttons.test.ts` exist for
+              // and precisely the one neither of them can see: a prop, not a component.
+              eventsClient={eventsClient}
+              peopleClient={peopleClient}
               hash={hash}
               today={today}
               viewerPersonId={membership?.person_id}

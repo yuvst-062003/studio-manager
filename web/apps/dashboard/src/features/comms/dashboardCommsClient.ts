@@ -5,6 +5,10 @@
 // the studio and a lead coach in their own groups, and both work here. The parent app has no
 // send method at all — §2.3 puts two-way chat out of scope.
 import type { components } from '@studio/api-client'
+// §4.9 moved these two to @studio/core so the staff app's schedule/student/task cards
+// reuse them rather than writing a second copy. Re-exported under their original names so
+// nothing importing from this module has to change.
+export { phoneList, whatsappShareUrl } from '@studio/core'
 
 export type AnnouncementOut = components['schemas']['AnnouncementOut']
 export type DeliveryReportOut = components['schemas']['DeliveryReportOut']
@@ -80,32 +84,3 @@ export function makeDashboardCommsClient(fetcher: Fetcher) {
 }
 
 export type DashboardCommsClient = ReturnType<typeof makeDashboardCommsClient>
-
-/**
- * §5.11's `שלח גם בוואטסאפ`, and §12 is why it is a URL rather than an integration.
- *
- * "The WhatsApp Groups API caps a group at 8 participants (the business number takes one) and
- * exposes NO endpoint to add a participant... Only a share-sheet handoff is viable." And the
- * unofficial libraries "violate WhatsApp ToS; the phone number gets banned" — unusable in a
- * product that would be risking *customers'* numbers.
- *
- * So: `https://wa.me/?text=`, which opens WhatsApp with the message pre-composed and lets the
- * manager pick the group themselves. No API, no cost, no dependency.
- */
-export function whatsappShareUrl(title: string, body: string): string {
-  return `https://wa.me/?text=${encodeURIComponent(`${title}\n\n${body}`)}`
-}
-
-/**
- * §5.11's `[ העתק מספרים ]` — "The manager pastes those numbers into the WhatsApp group the
- * club already has. Same outcome as automation, half a day of work, zero risk."
- *
- * Newline-separated, because that is what pastes usefully into a message. Families with no
- * number on file are dropped rather than pasted as a blank line.
- */
-export function phoneList(missed: readonly MissedRecipientOut[] | undefined): string {
-  return (missed ?? [])
-    .map((row) => row.phone)
-    .filter((phone): phone is string => Boolean(phone))
-    .join('\n')
-}

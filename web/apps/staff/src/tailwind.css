@@ -80,6 +80,67 @@
   --radius-xl: 0.75rem;
 }
 
+/* The timer tab's own small handful of classes Tailwind utilities cannot express --
+ * glows, a rotated ring and a pulsing pip -- ported verbatim from the prototype's own
+ * `src/index.css` (which is NOT `tailwind.css`; that repo keeps them beside its Tailwind
+ * import rather than inline per-component). `no-scrollbar` is the one addition: several
+ * already-ported staff and parent screens write the class on a horizontally-scrolling
+ * strip with no definition anywhere in either app's stylesheet, so it has been a silent
+ * no-op since the parent redesign; the timer's own preset strip is the same shape and
+ * this is where a real one is defined, not one more screen inheriting the gap.
+ *
+ * Placed BEFORE `@layer base` below, not after: `tailwind.isolation.test.ts`'s "every
+ * reset rule is scoped" check reads from the literal text "@layer base {" to the END OF
+ * THE FILE (its regex has no way to know where that layer's braces actually close), so
+ * anything appended after it would be swept into that scan and judged as a preflight
+ * reset rule. A keyframe's `0%`/`50%` stops are not `.tw-scope`-prefixed selectors and
+ * never could be, so they must never land after that line. */
+.tw-scope .no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.tw-scope .no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.tw-scope .timer-glow-work {
+  box-shadow: 0 0 45px rgb(239 68 68 / 28%);
+  border-color: rgb(239 68 68 / 45%);
+}
+
+.tw-scope .timer-glow-rest {
+  box-shadow: 0 0 45px rgb(16 185 129 / 28%);
+  border-color: rgb(16 185 129 / 45%);
+}
+
+.tw-scope .timer-glow-prep {
+  box-shadow: 0 0 40px rgb(245 158 11 / 22%);
+  border-color: rgb(245 158 11 / 35%);
+}
+
+.tw-scope .timer-ring {
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}
+
+@keyframes timer-pip-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.3);
+    opacity: 0.8;
+  }
+}
+
+.tw-scope .pip-active {
+  animation: timer-pip-pulse 0.5s ease-in-out infinite;
+}
+
 /* Preflight, scoped to `.tw-scope`.
  *
  * Layer order above puts `utilities` last, so a utility beats these regardless of the

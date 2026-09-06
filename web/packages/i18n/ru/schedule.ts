@@ -88,6 +88,18 @@ export const schedule: Bundle = {
   'session.durationMinutes': '{{minutes}} мин',
   'session.headcount': '{{count}} учеников',
   'session.attendanceMissing': 'Посещаемость ещё не отмечена',
+
+  // -- the restyled card's state (2026-09-06, staff redesign C2) ---------------------
+  'session.state.pendingClose': 'Ожидает закрытия посещаемости',
+  'session.state.activeNow': 'Идёт сейчас',
+  'session.state.nextUp': 'Следующее занятие',
+  // -- who has answered (§4.9) — thrown away until now; every roster row already carries it --
+  'session.confirmedCount': '{{confirmed}} из {{total}} подтвердили',
+  'session.notAnsweredCount': '{{count}} семей ещё не ответили',
+  'session.notAnsweredCount.one': 'Одна семья ещё не ответила',
+  'session.chaseButton': '{{count}} семей не ответили — связаться',
+  'session.chaseButton.one': 'Одна семья не ответила — связаться',
+  'session.chaseMessage': 'Напоминание: {{group}} проходит сегодня в {{time}}. Будем рады подтверждению в приложении.',
   'session.status.scheduled': 'Запланировано',
   'session.status.cancelled': 'Отменено',
   'session.status.completed': 'Завершено',

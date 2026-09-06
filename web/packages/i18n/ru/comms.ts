@@ -136,6 +136,14 @@ export const comms: Bundle = {
   'atRisk.noPhone': 'Нет номера телефона',
   'atRisk.empty': 'Нет учеников в зоне риска',
 
+  // -- §4.9's contact hand-off (2026-09-06, staff redesign C2) -----------------------
+  'contact.messageLabel': 'Текст сообщения',
+  'contact.readyHint': 'Сообщение готово. Ничего не отправляется автоматически — отправка на вас.',
+  'contact.missingPhoneCount': 'У {{count}} семей нет номера телефона в карточке',
+  'contact.missingPhoneCount.one': 'У одной семьи нет номера телефона в карточке',
+  'contact.noNumbers': 'Для этих семей нет доступных номеров телефона. Можно поделиться в WhatsApp',
+  'contact.loading': 'Загрузка контактов…',
+
   'calendar.coachSubtitle': 'Занятия, которые вы ведёте, появятся в вашем календаре',
   'inbox.joinClub': 'Вступить в клуб',
   // -- עדכונים, the redesigned parent updates tab (2026-09-05) -------------------

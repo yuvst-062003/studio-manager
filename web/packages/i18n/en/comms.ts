@@ -131,6 +131,14 @@ export const comms: Bundle = {
   'atRisk.noPhone': 'No phone number on file',
   'atRisk.empty': 'No students at risk',
 
+  // -- §4.9's contact hand-off (2026-09-06, staff redesign C2) -----------------------
+  'contact.messageLabel': 'Message text',
+  'contact.readyHint': 'The message is ready. Nothing is sent automatically — sending it is up to you.',
+  'contact.missingPhoneCount': '{{count}} families have no phone number on file',
+  'contact.missingPhoneCount.one': 'One family has no phone number on file',
+  'contact.noNumbers': 'No phone numbers are available for these families. You can still share to WhatsApp',
+  'contact.loading': 'Loading contact details…',
+
   'calendar.coachSubtitle': 'The sessions you teach appear in your calendar',
   'inbox.joinClub': 'Join the club',
   // -- עדכונים, the redesigned parent updates tab (2026-09-05) -------------------

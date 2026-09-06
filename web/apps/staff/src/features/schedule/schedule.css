@@ -1,0 +1,26 @@
+/* 9a/1d's timeline dot. Tokens only — never a hex (the same rule attendance.css states):
+ * the four dot colours are drawn from tokens already on the page (`--danger`, `--pending`,
+ * `--emphasis`, `--border-strong`), not invented ones, because D2's semantic band is
+ * non-overridable and `--paid`'s green is reserved for "a family owes nothing" — never
+ * "this class is happening right now". See timeline.ts's own header for the four-state
+ * rule this dot draws.
+ *
+ * The pulse is scoped to `.schedule-dot--active` alone. `primitives.css`'s own
+ * `prefers-reduced-motion: reduce` block already resets every animation's duration
+ * app-wide, so nothing further is needed here for that. */
+.schedule-dot--active .schedule-dot__core {
+  animation: schedule-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes schedule-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.55;
+    transform: scale(1.35);
+  }
+}

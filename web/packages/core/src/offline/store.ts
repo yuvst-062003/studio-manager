@@ -52,11 +52,14 @@ export function memoryStore(): OfflineStore {
 }
 
 const DB_NAME = 'studio.offline'
-const DB_VERSION = 1
-const TABLES: TableName[] = ['pending_ops', 'sessions', 'rosters', 'meta', 'conflicts']
+// Bumped for `timer_presets` (2026-09-06): `onupgradeneeded` only fires when the version
+// number rises, so a coach who already has this database from before the timer tab shipped
+// would otherwise open version 1 forever and never get the new object store.
+const DB_VERSION = 2
+const TABLES: TableName[] = ['pending_ops', 'sessions', 'rosters', 'meta', 'conflicts', 'timer_presets']
 
 /**
- * The real one. Five object stores, one per `TableName`, keyed out-of-line.
+ * The real one. Six object stores, one per `TableName`, keyed out-of-line.
  *
  * **The tables are separate object stores and not one keyed by prefix**, because §10.6's
  * exemption has to be enforceable by construction: `clear('sessions')` must be incapable

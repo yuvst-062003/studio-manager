@@ -86,6 +86,18 @@ export const schedule: Bundle = {
   'session.durationMinutes': '{{minutes}} min',
   'session.headcount': '{{count}} students',
   'session.attendanceMissing': 'Attendance not taken yet',
+
+  // -- the restyled card's state (2026-09-06, staff redesign C2) ---------------------
+  'session.state.pendingClose': 'Waiting to close attendance',
+  'session.state.activeNow': 'Happening now',
+  'session.state.nextUp': 'The next session',
+  // -- who has answered (§4.9) — thrown away until now; every roster row already carries it --
+  'session.confirmedCount': '{{confirmed}} of {{total}} confirmed',
+  'session.notAnsweredCount': '{{count}} families have not answered',
+  'session.notAnsweredCount.one': 'One family has not answered',
+  'session.chaseButton': '{{count}} families have not answered — contact them',
+  'session.chaseButton.one': 'One family has not answered — contact them',
+  'session.chaseMessage': 'Reminder: {{group}} is on today at {{time}}. We would love a confirmation in the app.',
   'session.status.scheduled': 'Scheduled',
   'session.status.cancelled': 'Cancelled',
   'session.status.completed': 'Completed',

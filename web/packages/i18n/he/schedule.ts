@@ -110,6 +110,26 @@ export const schedule: Bundle = {
   'session.durationMinutes': '{{minutes}} דק׳',
   'session.headcount': '{{count}} חניכים',
   'session.attendanceMissing': 'נוכחות טרם נרשמה',
+
+  // -- the restyled card's state (2026-09-06, staff redesign C2) ---------------------
+  // Three facts, not the prototype's four arbitrary colours: a session already over with
+  // its register still open, one happening right now, and everything still ahead — the
+  // NEXT of which gets its own colour so a coach can find it at a glance, and every one
+  // after it stays neutral. Read the state off the dot's colour AND this text — never
+  // colour alone (SC 1.4.1), the same rule the rollover rail states above.
+  'session.state.pendingClose': 'ממתין לסגירת נוכחות',
+  'session.state.activeNow': 'מתקיים כעת',
+  'session.state.nextUp': 'השיעור הבא',
+  // -- who has answered (§4.9) — thrown away until now; every roster row already carries it --
+  'session.confirmedCount': '{{confirmed}} מתוך {{total}} אישרו הגעה',
+  'session.notAnsweredCount': '{{count}} משפחות טרם ענו',
+  'session.notAnsweredCount.one': 'משפחה אחת טרם ענתה',
+  'session.chaseButton': '{{count}} משפחות שלא ענו — יצירת קשר',
+  'session.chaseButton.one': 'משפחה אחת שלא ענתה — יצירת קשר',
+  // `{{group}}` and `{{time}}` are the session's own real data — never a hardcoded club
+  // name (decision 18: this is the same reminder mechanism the session card and the task
+  // card both use, and the club's name belongs to the studio record, not this string).
+  'session.chaseMessage': 'תזכורת: השיעור של {{group}} מתקיים היום בשעה {{time}}. נשמח אם תאשרו הגעה באפליקציה.',
   'session.status.scheduled': 'מתוכנן',
   'session.status.cancelled': 'בוטל',
   'session.status.completed': 'הסתיים',

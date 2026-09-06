@@ -165,6 +165,20 @@ export const comms: Bundle = {
   'atRisk.noPhone': 'אין מספר טלפון בכרטיס',
   'atRisk.empty': 'אין תלמידים בסיכון',
 
+  // -- §4.9's contact hand-off (2026-09-06, staff redesign C2) -----------------------
+  // The shared component behind the schedule card's "chase them", the student card's
+  // call/WhatsApp row and the task card's reminder — one copy, three call sites. It never
+  // claims delivery: opening WhatsApp is not proof a message was sent, and the coach may
+  // never press send there. `delivery.copyNumbers` / `delivery.numbersCopied` /
+  // `delivery.shareToWhatsapp` above are reused rather than duplicated — the action is
+  // identical, only the audience differs.
+  'contact.messageLabel': 'נוסח ההודעה',
+  'contact.readyHint': 'ההודעה מוכנה. שום דבר לא נשלח אוטומטית — השליחה בידיים שלכם.',
+  'contact.missingPhoneCount': '{{count}} משפחות ללא מספר טלפון בכרטיס',
+  'contact.missingPhoneCount.one': 'משפחה אחת ללא מספר טלפון בכרטיס',
+  'contact.noNumbers': 'אין מספרי טלפון זמינים למשפחות האלה. אפשר עדיין לשתף בוואטסאפ',
+  'contact.loading': 'טוען פרטי קשר…',
+
   // §5.12's two feeds carry different things — a parent's children's lessons, a coach's own
   // sessions — so the panel says which one you are looking at.
   'calendar.coachSubtitle': 'השיעורים שאתם מעבירים יופיעו ביומן שלכם',

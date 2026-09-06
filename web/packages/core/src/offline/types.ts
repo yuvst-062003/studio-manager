@@ -105,6 +105,14 @@ export type RosterRow = {
   source: 'coach' | 'parent' | 'bulk' | 'system' | null
   has_absence_report: boolean
   absence_reason: string | null
+  /** The parent said the child WILL be there — separate from `has_absence_report`, because
+   *  "said yes", "said no" and "has not answered" are three states a coach's screen needs
+   *  to tell apart. Already on the wire (`app/services/attendance/bootstrap.py` includes it
+   *  in every `RosterEntry`, staff and cached alike); optional here for the same reason
+   *  `plan_name` is — every producer of this shape from before the field existed still
+   *  type-checks unchanged, and a fixture that omits it renders as "not confirmed" rather
+   *  than throwing. */
+  has_confirmation?: boolean
   /** Optional so every producer of this shape from before this field existed still type-
    *  checks unchanged. `undefined` and `null` both render as "no badge". */
   plan_name?: string | null
@@ -135,8 +143,18 @@ export type BootstrapPayload = {
  * The tables. `pending_ops` and `conflicts` are named separately from everything else
  * because §10.6 treats them differently: "`pending_ops` **exempt from eviction under all
  * circumstances**. Unsynced work is the one thing that must never be reclaimed."
+ *
+ * `timer_presets` (2026-09-06, the staff-app redesign's timer tab): a coach's own timer
+ * templates, saved on their device with no backend behind them (decision 2 — private to
+ * the phone). It joins `pending_ops` and `conflicts` in NOT appearing in `cache.ts`'s
+ * `EVICTABLE` list, for the same reason `pending_ops` does not — a coach's saved workouts
+ * are not a two-day cache of server data and must not be swept by §10.6's window or by
+ * `discardCache()`'s "past 7 days, untrustworthy" rule. Unlike `pending_ops` there is no
+ * source-level test pinning that (the exemption there guards against reading `evict()`'s
+ * *rows* as "everything referencing an evicted session", a mistake this table cannot be
+ * confused for), but the same rule applies and `cache.ts` must never name it.
  */
-export type TableName = 'pending_ops' | 'sessions' | 'rosters' | 'meta' | 'conflicts'
+export type TableName = 'pending_ops' | 'sessions' | 'rosters' | 'meta' | 'conflicts' | 'timer_presets'
 
 /**
  * The storage port. Deliberately tiny — five methods, no indexes, no queries.
