@@ -79,7 +79,11 @@ export default tseslint.config(
     // Build-time node scripts. Browser globals too: Playwright page.evaluate()
     // callbacks are browser code that lexically lives inside a node script.
     // D10 does not apply — these emit assets, they do not author styles.
-    files: ['scripts/**/*.mjs'],
+    // `tools/` as well as `scripts/`: the mark and splash helpers were extracted OUT of
+    // scripts/generate-icons.mjs to be shared with the Vite build, and the same Buffer and
+    // process globals came with them. Splitting the glob would have left the extracted
+    // half failing `no-undef` for having moved directory.
+    files: ['scripts/**/*.mjs', 'tools/**/*.mjs'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
     // The quote and semicolon rules above are scoped to **/*.{ts,tsx}, so without this
     // the node scripts sit outside them -- and a build script is exactly as reachable by

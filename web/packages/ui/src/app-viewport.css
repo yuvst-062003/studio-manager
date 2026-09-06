@@ -32,6 +32,45 @@ html {
    * SignaturePad's canvas keeps its `touch-action: none` and stays drawable.
    */
   touch-action: pan-x pan-y;
+
+  /* The rubber-band. Drag past the bottom of a screen and the whole app — header, tab bar
+   * and all — lifts off, showing the page behind it, then snaps back. A native list bounces
+   * INSIDE itself while the frame stays nailed down; nothing here was nailed down.
+   *
+   * `none` rather than `contain`: `contain` only stops the bounce from chaining out of a
+   * nested scroller, which was never the problem — the document itself was the thing
+   * moving. This also removes Chrome's pull-to-refresh, which is the same tell wearing a
+   * different hat: a spinner appearing over an app because someone scrolled up too far. */
+  overscroll-behavior: none;
+}
+
+/* You cannot select what you press.
+ *
+ * Long-press a tab label, a heading inside the bar, or any button, and iOS answers with
+ * text-selection handles and a Copy / Look Up / Share bubble — the browser treating the
+ * app's furniture as an article. No native app does that.
+ *
+ * Scoped to what a finger operates, NOT to the whole page: announcements, health
+ * declaration text and the technique library are things a parent has a real reason to
+ * select and copy, and `user-select: none` on `body` would take that away to fix a
+ * long-press on a tab.
+ *
+ * `-webkit-touch-callout` is the second half and a separate property — it suppresses the
+ * link preview sheet, which `user-select` does not touch. It has no unprefixed form. */
+a,
+button,
+label,
+summary,
+nav,
+[role='button'],
+[role='tab'] {
+  /* stylelint-disable-next-line property-no-vendor-prefix -- Safari only dropped the
+     prefix in 16.4 (March 2023), and the iPhones still running 15 are exactly the ones
+     whose owners are least likely to have replaced them. The rule exists to stop prefixes
+     that buy nothing; this one buys the older half of the install base. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 /* iOS zooms the page in whenever a focused field's font-size is under 16px, and does not

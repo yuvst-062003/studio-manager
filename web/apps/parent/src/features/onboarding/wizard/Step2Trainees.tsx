@@ -96,7 +96,7 @@ export function Step2Trainees({
   }
 
   return (
-    <div className="tw-scope flex flex-col w-full pb-28" data-testid="join-family-step">
+    <div className="tw-scope flex flex-col w-full pb-[calc(7rem+env(safe-area-inset-bottom,0px))]" data-testid="join-family-step">
       <div className="flex flex-col gap-1.5 mt-2 mb-4">
         <div className="flex items-center justify-between flex-wrap gap-1">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#e3e7fa] text-[#0d2c6c] text-[12px] font-semibold">
@@ -324,7 +324,7 @@ export function Step2Trainees({
         ) : null}
       </div>
 
-      <div className="fixed bottom-0 inset-x-0 z-30 bg-[#faf8ff]/95 backdrop-blur-md border-t border-[#dee2f4] shadow-[0_-4px_16px_rgba(15,23,42,0.06)] py-3 px-4">
+      <div className="fixed bottom-0 inset-x-0 z-30 bg-[#faf8ff]/95 backdrop-blur-md border-t border-[#dee2f4] shadow-[0_-4px_16px_rgba(15,23,42,0.06)] pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] px-4">
         <div className="max-w-[480px] mx-auto flex items-center gap-3">
           <button
             type="button"

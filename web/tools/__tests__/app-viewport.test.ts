@@ -100,3 +100,53 @@ describe('the gesture lock', () => {
     expect(main.indexOf('lockViewportZoom()')).toBeLessThan(main.indexOf('createRoot('))
   })
 })
+
+// ---------------------------------------------------------------------------------
+// The home indicator, and the long-press. Source assertions, because jsdom resolves
+// `env(safe-area-inset-bottom)` to nothing and has no notion of a notch at all.
+// ---------------------------------------------------------------------------------
+describe('nothing is drawn under the home indicator', () => {
+  /** Every element in the parent app pinned to the bottom edge, and its clearance. */
+  const BOTTOM_PINNED = [
+    'apps/parent/src/features/shell/ParentTabBar.tsx',
+    'apps/parent/src/features/shell/ParentShell.tsx',
+    'apps/parent/src/features/onboarding/wizard/Step2Trainees.tsx',
+    'apps/parent/src/features/onboarding/wizard/Step3Payment.tsx',
+  ]
+
+  it.each(BOTTOM_PINNED)('%s reserves the inset', (file) => {
+    // The regression this pins actually happened: `AppShell` carried
+    // `calc(64px + env(safe-area-inset-bottom, 0px))`, the Tailwind port of the shell did
+    // not, and the tab bar drew its five labels inside the home indicator's strip on every
+    // iPhone since the X. Nothing about that shows up on a desktop or in jsdom.
+    expect(read(file)).toContain('env(safe-area-inset-bottom,0px)')
+  })
+
+  it.each(PHONE_APPS)('%s asks for the space in the first place', (app) => {
+    // `env()` is 0 without this, so every calc above silently becomes the old padding.
+    expect(read(`apps/${app}/index.html`)).toContain('viewport-fit=cover')
+  })
+
+  it('uses dvh, so a Safari toolbar does not sit on top of the last screenful', () => {
+    // `100vh` is measured as though Safari's bottom bar were not there.
+    for (const file of BOTTOM_PINNED) expect(read(file)).not.toContain('min-h-screen')
+  })
+})
+
+describe('the app does not behave like a document', () => {
+  const sheet = () => read('packages/ui/src/app-viewport.css')
+
+  it('nails the frame down instead of letting the page rubber-band', () => {
+    expect(sheet()).toMatch(/overscroll-behavior:\s*none/)
+  })
+
+  it('makes what a finger operates unselectable, and only that', () => {
+    // Long-press on a tab label answered with selection handles and a Copy/Share bubble.
+    // Scoped to controls: announcements and the health declaration stay selectable, which
+    // a blanket rule on `body` would have taken away.
+    const css = sheet()
+    expect(css).toMatch(/-webkit-touch-callout:\s*none/)
+    expect(css).toMatch(/user-select:\s*none/)
+    expect(css).not.toMatch(/^\s*body[\s,{]/m)
+  })
+})

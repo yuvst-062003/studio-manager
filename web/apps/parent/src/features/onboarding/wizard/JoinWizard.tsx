@@ -257,7 +257,7 @@ export function JoinWizard({
 
   if (studio.status === 'loading') {
     return (
-      <div className="tw-scope min-h-screen bg-[#faf8ff] flex items-center justify-center p-6">
+      <div className="tw-scope min-h-[100dvh] bg-[#faf8ff] flex items-center justify-center p-6">
         <p className="text-[14px] text-[#444650]">{copy.loading}</p>
       </div>
     )
@@ -265,7 +265,7 @@ export function JoinWizard({
 
   if (studio.status === 'failed') {
     return (
-      <div className="tw-scope min-h-screen bg-[#faf8ff] flex items-center justify-center p-6">
+      <div className="tw-scope min-h-[100dvh] bg-[#faf8ff] flex items-center justify-center p-6">
         <WizardLoadFailed message={copy.loadFailed} onRetry={retry} retryLabel={copy.retry} />
       </div>
     )
@@ -286,7 +286,7 @@ export function JoinWizard({
   }
 
   return (
-    <div className="tw-scope min-h-screen bg-[#faf8ff] text-[#161b28] flex flex-col">
+    <div className="tw-scope min-h-[100dvh] bg-[#faf8ff] text-[#161b28] flex flex-col">
       <WizardHeader
         locale={locale}
         currentStep={step}

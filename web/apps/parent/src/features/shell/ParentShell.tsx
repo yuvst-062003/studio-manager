@@ -44,10 +44,10 @@ export function ParentShell({
   return (
     <>
       {devBar}
-      <div className="tw-scope bg-slate-100 dark:bg-black min-h-screen flex justify-center selection:bg-blue-200 transition-colors duration-200">
+      <div className="tw-scope bg-slate-100 dark:bg-black min-h-[100dvh] flex justify-center selection:bg-blue-200 transition-colors duration-200">
         <div
           id="app-wrapper"
-          className="w-full max-w-md bg-[#faf8ff] dark:bg-slate-950 min-h-screen flex flex-col relative shadow-xl border-x border-slate-200/80 dark:border-slate-800/80 transition-colors duration-200"
+          className="w-full max-w-md bg-[#faf8ff] dark:bg-slate-950 min-h-[100dvh] flex flex-col relative shadow-xl border-x border-slate-200/80 dark:border-slate-800/80 transition-colors duration-200"
         >
           {/* THE BAR'S CLEARANCE LIVES HERE, ONCE.
            *
@@ -57,8 +57,10 @@ export function ParentShell({
            * would double the gap, and four copies of a magic number is four places for it
            * to drift from the bar's actual height.
            *
-           * `pb-28` is the prototype's own value, not a recomputed one. */}
-          <main className={tabBar ? 'flex-1 flex flex-col pb-28' : 'flex-1 flex flex-col'}>
+           * `pb-28` is the prototype's own value, not a recomputed one. The
+           * `env(safe-area-inset-bottom)` term added to it is not — the bar grew by the
+           * home indicator's height, so its clearance had to. See ParentTabBar's header. */}
+          <main className={tabBar ? 'flex-1 flex flex-col pb-[calc(7rem+env(safe-area-inset-bottom,0px))]' : 'flex-1 flex flex-col'}>
             {children}
           </main>
           {tabBar ? (

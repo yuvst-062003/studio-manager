@@ -24,6 +24,7 @@ import type { InstallPromptEvent } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { ParentShell } from './features/shell/ParentShell'
+import { useScrollMemory } from './features/shell/useScrollMemory'
 import type { ParentTab } from './features/shell/ParentTabBar'
 import { AccessGate } from './features/identity/AccessGate'
 import type { InvitedStudent } from './features/identity/AccessGate'
@@ -539,6 +540,9 @@ function AuthedApp() {
     }
   }, [session.status, declarationsSigned, familyJoined])
   const hash = useHash()
+  // Each screen keeps its own scroll offset, and a screen with none opens at the top. A
+  // hash link moves neither by itself — see useScrollMemory's header.
+  useScrollMemory(hash)
   const today = useToday()
   // §5.4(c)'s add-a-sibling is one hash away from home. Hash and not a path: it is an
   // in-app screen, unlike the landing page, which has to be shareable.

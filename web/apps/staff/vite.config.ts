@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { manifest } from './manifest.config'
 import { workspaceAliases } from '../../tools/workspace-aliases'
+import { splashLinksPlugin } from '../../tools/splash-screens.mjs'
 
 export default defineConfig({
   // The same map vitest.config.ts applies. A test-only alias would give a lane green tests
@@ -11,6 +12,8 @@ export default defineConfig({
   resolve: { alias: workspaceAliases() },
   plugins: [
     react(),
+    // Injects the apple-touch-startup-image tags from tools/splash-screens.mjs.
+    splashLinksPlugin(),
     VitePWA({
       registerType: 'prompt',
       manifest,
@@ -18,6 +21,11 @@ export default defineConfig({
         // woff2 is the load-bearing entry: §6.1 primes offline on the assumption
         // that Rubik is already cached before a coach walks into a basement.
         globPatterns: ['**/*.{js,css,html,woff2,png,svg,webmanifest}'],
+        // The iOS launch screens are ~800KB of PNG that the app itself never requests —
+        // only iOS reads them, from its own cache, before the page exists. Precaching them
+        // would spend most of the offline budget §6.1 reserves for the font on images no
+        // offline session can use.
+        globIgnores: ['**/splash/*.png'],
         navigateFallback: 'index.html',
         cleanupOutdatedCaches: true,
       },

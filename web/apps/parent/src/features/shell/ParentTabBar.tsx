@@ -125,10 +125,28 @@ export function ParentTabBar({
   updatesBadgeCount?: number
 }) {
   return (
+    // THE HOME INDICATOR'S CLEARANCE.
+    //
+    // `pb-[calc(0.625rem+env(safe-area-inset-bottom,0px))]` and not `py-2.5`: on every
+    // iPhone since the X the bottom 34px of the screen belong to the home indicator, and a
+    // bar pinned to `bottom-0` draws its labels underneath it. `AppShell` — the shell this
+    // replaced, still used by the staff app — carried
+    // `calc(64px + env(safe-area-inset-bottom, 0px))` for exactly this, and the port to
+    // Tailwind dropped it (2026-09-06).
+    //
+    // The inset is 0 on everything else, so this is not a phone-only branch — it is the
+    // same expression everywhere, resolving to the old padding on a device with no
+    // indicator. `index.html` already asks for the space with `viewport-fit=cover`; without
+    // that, `env()` is always 0 and this reads as a no-op.
+    //
+    // `ParentShell` adds the same term to the clearance it holds above this bar, and the
+    // wizard's two fixed footers carry it too. Written out at each site rather than shared:
+    // Tailwind generates utilities by scanning source files for literal class strings, so a
+    // constructed class name produces no CSS at all.
     <nav
       aria-label={t(locale, 'common.tabs.parentBarLabel')}
       data-testid="tab-bar"
-      className="tw-scope fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-100 dark:border-slate-800 py-2.5 px-6 z-40 shadow-[0_-4px_16px_rgba(0,0,0,0.04)] dark:shadow-[0_-4px_16px_rgba(0,0,0,0.4)] transition-colors"
+      className="tw-scope fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-100 dark:border-slate-800 pt-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom,0px))] px-6 z-40 shadow-[0_-4px_16px_rgba(0,0,0,0.04)] dark:shadow-[0_-4px_16px_rgba(0,0,0,0.4)] transition-colors"
     >
       <div className="flex items-center justify-between">
         {ORDER.map((tab) => {

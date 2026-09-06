@@ -188,7 +188,7 @@ export function Step4Done({
   }
 
   return (
-    <div className="tw-scope relative w-full min-h-screen bg-[#02102f] text-white px-4 pt-6 pb-20">
+    <div className="tw-scope relative w-full min-h-[100dvh] bg-[#02102f] text-white px-4 pt-6 pb-20">
       <style>{'@keyframes wizard-fall{to{transform:translateY(16rem) rotate(320deg);opacity:0}}'}</style>
       <Confetti />
 

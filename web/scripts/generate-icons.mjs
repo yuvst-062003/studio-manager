@@ -31,9 +31,9 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
+import { BRAND, MARK, disc } from '../tools/brand-mark.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-const MARK = resolve(ROOT, 'web/packages/ui/src/brand/mark.png')
 const APPS = ['staff', 'parent', 'dashboard']
 
 /** Chromium installability needs 192 and 512; the rest are polish. */
@@ -43,34 +43,14 @@ const APPLE = [120, 152, 167, 180]
 /** Maskable icons need safe-area padding or Android crops the mark. */
 const MASKABLE = [192, 512]
 
-/** Sampled from the disc in mark.png. The corners are filled with it so no mask shape
- *  can reveal the white margin around the artwork. */
-const BRAND = '#24516f'
-/** The disc's radius as a fraction of the canvas. Measured, not guessed: the disc spans
- *  x=4..509 of 512, so its radius is 253 — and the mask is set a few pixels INSIDE that.
- *  The outermost pixels are the artwork's own antialiased rim, a lighter teal, and
- *  leaving them in draws a visible seam where the disc meets the fill. */
-const DISC = 249 / 512
-
 /**
- * The mark with its white margin removed and the result laid on full-bleed teal.
- *
- * `dest-in` keeps only the pixels under the mask, which turns the disc into the alpha
- * channel; compositing that over a teal square then fills what the margin used to be.
+ * The mark's disc laid on full-bleed teal, so no mask shape can reveal the white margin
+ * around the artwork. The disc and the measurement behind it live in tools/brand-mark.mjs,
+ * shared with the launch-screen generator.
  */
 async function fullBleed(size) {
-  const radius = Math.round(size * DISC)
-  const mask = Buffer.from(
-    `<svg width="${size}" height="${size}">` +
-      `<circle cx="${size / 2}" cy="${size / 2}" r="${radius}" fill="#fff"/></svg>`,
-  )
-  const disc = await sharp(MARK)
-    .resize(size, size)
-    .composite([{ input: mask, blend: 'dest-in' }])
-    .png()
-    .toBuffer()
   return sharp({ create: { width: size, height: size, channels: 4, background: BRAND } })
-    .composite([{ input: disc }])
+    .composite([{ input: await disc(size) }])
     .png()
     .toBuffer()
 }

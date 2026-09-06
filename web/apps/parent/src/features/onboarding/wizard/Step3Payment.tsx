@@ -218,7 +218,7 @@ export function Step3Payment({
   }
 
   return (
-    <div className="tw-scope flex flex-col w-full pb-36">
+    <div className="tw-scope flex flex-col w-full pb-[calc(9rem+env(safe-area-inset-bottom,0px))]">
       {submitError ? (
         <p
           className="mb-3 p-3 rounded-xl bg-red-50 border border-red-300 text-[13px] text-red-800 font-medium"
@@ -630,7 +630,7 @@ export function Step3Payment({
         </section>
       )}
 
-      <footer className="fixed bottom-0 inset-x-0 z-30 bg-[#faf8ff]/95 backdrop-blur-md shadow-[0_-4px_20px_rgba(15,23,42,0.08)] py-3 px-4 border-t border-[#dee2f4]">
+      <footer className="fixed bottom-0 inset-x-0 z-30 bg-[#faf8ff]/95 backdrop-blur-md shadow-[0_-4px_20px_rgba(15,23,42,0.08)] pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] px-4 border-t border-[#dee2f4]">
         <div className="max-w-[480px] mx-auto flex flex-col gap-2">
           <div className="flex items-center gap-2">
             {phase === 'form' ? (
