@@ -6,6 +6,11 @@ export type StudentDetail = components['schemas']['StudentDetailOut']
 export type EnrollmentOut = components['schemas']['EnrollmentOut']
 export type WeekdayOptions = components['schemas']['EnrollmentWeekdayOptionsOut']
 export type GroupOut = components['schemas']['GroupOut']
+/** The account tab's own record — the same `/me/profile` route the parent app's profile
+ *  tab already edits. No role dependency (the route's own docstring says why), so a coach
+ *  corrects their own name, email and phone through it exactly as a guardian does. */
+export type MyProfile = components['schemas']['MyProfileOut']
+export type MyProfileUpdate = components['schemas']['MyProfileUpdate']
 
 export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
 
@@ -33,6 +38,18 @@ export function makeStaffPeopleClient(fetcher: Fetcher) {
     /** 9e's identity block — the groups the CALLER coaches, from `group_staff`. */
     myGroups: (): Promise<{ items: GroupOut[] }> =>
       fetcher('/api/v1/groups?mine=true').then(json<{ items: GroupOut[] }>),
+
+    /** The account tab's profile card — this coach's own name, email and phone. */
+    myProfile: (): Promise<MyProfile> => fetcher('/api/v1/me/profile').then(json<MyProfile>),
+
+    /** The edit sheet's save. Role and belt grade are not in `MyProfileUpdate` at all —
+     *  there is no shape in which this call could touch either. */
+    updateMyProfile: (body: MyProfileUpdate): Promise<MyProfile> =>
+      fetcher('/api/v1/me/profile', {
+        method: 'PATCH',
+        headers: JSON_HEADERS,
+        body: JSON.stringify(body),
+      }).then(json<MyProfile>),
 
     student: (id: string): Promise<StudentDetail> =>
       fetcher(`/api/v1/students/${id}`).then(json<StudentDetail>),

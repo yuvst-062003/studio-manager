@@ -1,5 +1,8 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+// §8 — Tailwind for the redesigned staff screens only. src/tailwind.css imports theme and
+// utilities but NOT preflight; see that file for why.
+import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { manifest } from './manifest.config'
 import { workspaceAliases } from '../../tools/workspace-aliases'
@@ -12,6 +15,7 @@ export default defineConfig({
   resolve: { alias: workspaceAliases() },
   plugins: [
     react(),
+    tailwindcss(),
     // Injects the apple-touch-startup-image tags from tools/splash-screens.mjs.
     splashLinksPlugin(),
     VitePWA({

@@ -13,7 +13,6 @@
 // that same test id once the tour is finished, so a test pinned to it would pass on a
 // screen this lane did not draw. `open-date-picker` exists only in `ScheduleSection`.
 import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
 import App from '../../App'
@@ -97,20 +96,19 @@ describe('the staff app mounts lane SCHEDULE', () => {
     await waitFor(() => expect(screen.getByTestId('jump-to-today')).toBeInTheDocument())
   })
 
-  it('offers the schedule in the nav drawer, so the hash is not the only way in', async () => {
-    // A screen reachable only by typing a URL is not reachable on a phone. The drawer
-    // renders nothing while closed, so this opens it the way a coach does.
+  it('offers the schedule as a tab, so the hash is not the only way in', async () => {
+    // A screen reachable only by typing a URL is not reachable on a phone. The nav
+    // drawer this used to open is gone with the five-tab redesign (S3) — its own entries
+    // moved to the account tab, and schedule moved to the tab bar, which renders on
+    // every staff screen without needing to be opened first.
     globalThis.location.hash = ''
     vi.stubGlobal('fetch', signedInAs(['lead_coach']))
 
     render(<App />)
 
-    await userEvent.click(await screen.findByRole('button', { name: t('he', 'common.nav.menu') }))
-    // Two ways in exist since the design pass — the drawer entry and the tab bar —
-    // and both must point at the same place. The assertion keeps covering both.
-    const links = await screen.findAllByRole('link', { name: t('he', 'common.nav.schedule') })
-    for (const link of links) expect(link).toHaveAttribute('href', '#/schedule')
-    expect(links.length).toBeGreaterThan(0)
+    const link = await screen.findByTestId('tab-schedule')
+    expect(link).toHaveAttribute('href', '#/schedule')
+    expect(link).toHaveTextContent(t('he', 'common.tabs.staffSchedule'))
   })
 
   it('leaves §6.1 first-run routing alone on every other hash', async () => {

@@ -105,6 +105,15 @@ export const common: Bundle = {
   'tabs.parentUpdates': 'עדכונים',
   'tabs.parentTechniques': 'טכניקות',
   'tabs.parentProfile': 'פרופיל',
+  // -- the staff app's five tabs (the redesign of 2026-09-06) -------------------
+  // Same reasoning as the parent tabs above: `nav.*` is the staff drawer this redesign
+  // replaces, so the new tab bar gets its own app-prefixed keys rather than reusing it.
+  'tabs.staffBarLabel': 'ניווט ראשי',
+  'tabs.staffSchedule': 'לוח זמנים',
+  'tabs.staffStudents': 'תלמידים',
+  'tabs.staffTimer': 'טיימר',
+  'tabs.staffTasks': 'משימות',
+  'tabs.staffAccount': 'חשבון',
   // §6.1's first run. The refusal wording is §6.1's own, verbatim.
   'language.title': 'שפה',
   // -- the parent app's sign-in face (owner's Stitch design, 2026-09-01) ---------
@@ -637,4 +646,16 @@ export const common: Bundle = {
   'ops.signal.unknown': 'אין נתונים עדיין',
   'ops.email.on': 'התראות במייל פעילות',
   'ops.email.off': 'התראות במייל אינן מוגדרות — אין ערוץ שיודיע לכם',
+
+  // -- the staff app's account tab (the redesign of 2026-09-06) ------------------
+  // The new home for everything that lived in the drawer. Only the title and the four
+  // group headings live here — almost every row underneath reuses a key that already
+  // exists elsewhere (`nav.announcements`, `billing.cash.manager.title`,
+  // `people.join.card.title`, `reports.privacy.requests.operatorTitle`, `nav.signOut`,
+  // …), so this namespace does not duplicate them.
+  'account.title': 'חשבון והגדרות',
+  'account.group.club': 'ניהול המועדון',
+  'account.group.notifications': 'התראות ותקשורת',
+  'account.group.system': 'מערכת והעדפות',
+  'account.group.legal': 'מדיניות ותנאים',
 }

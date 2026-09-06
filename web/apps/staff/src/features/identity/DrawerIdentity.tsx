@@ -1,4 +1,5 @@
-// Staff artboard 9e — the drawer's two teaching blocks.
+// Staff artboard 9e's permission-boundaries teaching, and the role-label helper the
+// account tab's own profile card (`AccountScreen.tsx`) shares with it.
 //
 // **A locked capability is shown, not hidden.** 9e draws `מסמכים של חניכים`,
 // `תשלומים וגבייה` and `מעבר חניך בין כיתות` greyed out with `לא זמין בהרשאה שלך` and a
@@ -9,11 +10,16 @@
 //
 // The list adapts to what is actually locked for THIS viewer: a lead coach can move a
 // student (9c), so that row is not listed as locked for them.
-import { useEffect, useState } from 'react'
+//
+// The identity block ITSELF (name, role, classes coached) moved into `AccountScreen.tsx`'s
+// own profile card with the 2026-09-06 redesign — it needed to sit beside an avatar, phone
+// and email that this file never had. `roleLabelsOf` is what is left of it here: the exact
+// same role-filtering `DrawerIdentity` used, kept as one function so the card's `text-lg
+// font-black` name line and `permission-locked-row`'s footnote never compute "which roles
+// count" two different ways.
 import type { CSSProperties } from 'react'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import type { StaffPeopleClient } from '../people/peopleClient'
 
 const blockStyle: CSSProperties = {
   display: 'flex',
@@ -36,49 +42,11 @@ const lockedRowStyle: CSSProperties = {
   gap: 'var(--space-2)',
 }
 
-/** 9e's identity block: `שירה לוי · מאמנת · מתחילים · נוער` plus `הכיתות שלי N`. */
-export function DrawerIdentity({
-  locale,
-  client,
-  displayName,
-  roles,
-}: {
-  locale: Locale
-  client: StaffPeopleClient
-  displayName: string | null
-  roles: string[]
-}) {
-  const [groupNames, setGroupNames] = useState<string[]>([])
-
-  useEffect(() => {
-    let live = true
-    client
-      .myGroups()
-      .then((body) => live && setGroupNames(body.items.map((group) => group.name)))
-      .catch(() => live && setGroupNames([]))
-    return () => {
-      live = false
-    }
-  }, [client])
-
-  const roleLabels = roles
+/** The roles 9e/the profile card actually name — never `has_health_access` or the like. */
+export function roleLabelsOf(roles: string[], locale: Locale): string[] {
+  return roles
     .filter((role) => ['owner', 'manager', 'lead_coach', 'assistant_coach'].includes(role))
     .map((role) => t(locale, `common.staff.role.${role}`))
-
-  return (
-    <div style={blockStyle} data-testid="drawer-identity">
-      <p style={{ margin: 0 }}>
-        <bdi>{displayName}</bdi>
-        {roleLabels.length > 0 ? <span style={mutedStyle}> · {roleLabels.join(' · ')}</span> : null}
-      </p>
-      {groupNames.length > 0 ? (
-        <p style={mutedStyle} data-testid="drawer-my-classes">
-          {t(locale, 'common.identity.myClasses')} {groupNames.length} ·{' '}
-          <bdi>{groupNames.join(' · ')}</bdi>
-        </p>
-      ) : null}
-    </div>
-  )
 }
 
 /** 9e's permission boundaries, greyed and named — never silently missing screens. */

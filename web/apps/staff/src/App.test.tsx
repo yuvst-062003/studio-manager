@@ -209,3 +209,33 @@ describe('the manager sign-in, as the staff shell mounts it', () => {
     expect(screen.queryByTestId('privacy-operator')).toBeNull()
   })
 })
+
+// נגישות: on the public surfaces, off the signed-in ones — the same call the parent app
+// made (owner review, 2026-09-06; see `web/apps/parent/src/App.tsx`'s comment beside its
+// own `AccessibilityMenu` mount). The floating button came to rest ON TOP of the first tab
+// at phone widths, clipping לוח זמנים's label to "נים" and leaving that tab unpressable.
+// Moving the control into the account tab (`AccountScreen.tsx`, covered directly in
+// `AccountScreen.test.tsx` — see that file's own header for why it is not proved here
+// through `App`) solves it without adding clearance padding to the bar itself.
+describe('where the accessibility button lives', () => {
+  it('floats on the sign-in screen, where a visitor has no account screen to go to', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) =>
+        String(input).includes('/auth/refresh')
+          ? new Response('', { status: 401 })
+          : new Response(JSON.stringify({ items: [] }), { status: 200 }),
+      ),
+    )
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('sign-in')).toBeInTheDocument())
+    expect(screen.getByTestId('a11y-open')).toBeInTheDocument()
+  })
+
+  it('does not float over the signed-in app, where it covered the first tab', async () => {
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('tab-bar')).toBeInTheDocument())
+    // Not "no accessibility menu anywhere" — the account tab carries it as a row.
+    expect(screen.queryByTestId('a11y-open')).toBeNull()
+  })
+})

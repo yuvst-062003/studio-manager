@@ -102,6 +102,15 @@ export const common: Bundle = {
   'tabs.parentUpdates': 'Обновления',
   'tabs.parentTechniques': 'Приёмы',
   'tabs.parentProfile': 'Профиль',
+  // -- the staff app's five tabs (the redesign of 2026-09-06) -------------------
+  // Same reasoning as the parent tabs above: `nav.*` is the staff drawer this redesign
+  // replaces, so the new tab bar gets its own app-prefixed keys rather than reusing it.
+  'tabs.staffBarLabel': 'главная навигация',
+  'tabs.staffSchedule': 'Расписание',
+  'tabs.staffStudents': 'Ученики',
+  'tabs.staffTimer': 'Таймер',
+  'tabs.staffTasks': 'Задачи',
+  'tabs.staffAccount': 'Аккаунт',
   // §6.1's first run.
   'language.title': 'язык',
   // -- the parent app's sign-in face (owner's Stitch design, 2026-09-01) ---------
@@ -570,4 +579,16 @@ export const common: Bundle = {
   'ops.signal.unknown': 'Данных пока нет',
   'ops.email.on': 'Оповещения по почте включены',
   'ops.email.off': 'Оповещения по почте не настроены — вас никто не предупредит',
+
+  // -- the staff app's account tab (the redesign of 2026-09-06) ------------------
+  // The new home for everything that lived in the drawer. Only the title and the four
+  // group headings live here — almost every row underneath reuses a key that already
+  // exists elsewhere (`nav.announcements`, `billing.cash.manager.title`,
+  // `people.join.card.title`, `reports.privacy.requests.operatorTitle`, `nav.signOut`,
+  // …), so this namespace does not duplicate them.
+  'account.title': 'Аккаунт и настройки',
+  'account.group.club': 'Управление клубом',
+  'account.group.notifications': 'Уведомления и связь',
+  'account.group.system': 'Система и предпочтения',
+  'account.group.legal': 'Политики и условия',
 }

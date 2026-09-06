@@ -12,17 +12,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { apiFetch, useDisplayMode, useSession, switchStudio } from '@studio/core'
 import {
   AccessibilityMenu,
-  AccountDrawerFooter,
-  AppShell,
   EmptyState,
-  Icon,
   InstallBanner,
   InstallWalkthrough,
   ManagerSignIn,
   PRIVACY_HASH,
   SetupIncompleteBanner,
   SetupWizard,
-  TabBar,
   TERMS_HASH,
   ThemeProvider,
   UpdateToast,
@@ -70,20 +66,16 @@ import { TrialSection } from './features/people/TrialSection'
 import { StudentCardRoute } from './features/people/StudentCardRoute'
 import { useQueueFlusher } from './features/attendance/useQueueFlusher'
 import { registerHealthSections } from './features/health'
-import {
-  AtRiskAlert,
-  CoachCalendarFeed,
-  NotificationPreferences,
-  makeStaffCommsClient,
-  registerCommsSections,
-} from './features/comms'
+import { AtRiskAlert, makeStaffCommsClient, registerCommsSections } from './features/comms'
 // §16's operator view of §11.3 and §11.4. Nothing in either app rendered a `privacy.*`
 // string before this wave, so a complete he/en/ru copy set sat behind no screen and four
 // working endpoints sat behind no caller.
 import { PrivacyOperatorScreen, makeStaffPrivacyClient } from './features/privacy'
 import { StaffAlerts } from './StaffAlerts'
-import { DrawerIdentity, PermissionBoundaries } from './features/identity/DrawerIdentity'
 import { NetworkStatus } from './NetworkStatus'
+import { StaffShell } from './features/shell/StaffShell'
+import type { StaffTab } from './features/shell/StaffTabBar'
+import { AccountScreen } from './features/account/AccountScreen'
 import './features/attendance/attendance.css'
 
 // §5.1 — 'the staff app and dashboard route them into a resumable wizard'. Both mount the
@@ -110,26 +102,23 @@ registerAttendanceSections()
 registerHealthSections()
 registerCommsSections(AtRiskAlert)
 
-const NAV = [
-  { key: 'today', labelKey: 'common.nav.today', href: '/' },
-  // Both W2 lanes moved their entry from a path to a hash, independently and for the
-  // same reason: there is no server route behind the path form, so `/schedule` and
-  // `/students` were links to a 404.
-  { key: 'schedule', labelKey: 'common.nav.schedule', href: '#/schedule' },
-  { key: 'students', labelKey: 'common.nav.students', href: '#/students' },
-  // A hash, not a path: there is no server route behind `/attendance`, so the path form was
-  // a link to a 404 — the same correction both W2 lanes made independently.
-  { key: 'attendance', labelKey: 'common.nav.attendance', href: '#/attendance' },
-  // 9i. A hash for the same reason the two above are: there is no server route behind
-  // `/events`, so the path form would be a link to a 404.
-  { key: 'events', labelKey: 'events.title', href: '#/events' },
-  { key: 'announcements', labelKey: 'common.nav.announcements', href: '/announcements' },
-  // NO settings entry. `/settings` matched no route in either app, so the link fell
-  // through the service worker's navigateFallback to index.html and put the user back
-  // on home in silence. Artboard 9e — the inventory calls it "אותה מגירה", the same drawer as the parent app's 2e draws these controls in the DRAWER, not on a
-  // page, and that is where they now are — see `AccountDrawerFooter`, passed as
-  // `drawerFooter` below, under the studio switcher `AppShell` already renders.
-]
+// NO `NAV` ARRAY, AND NO DRAWER FOR IT TO SIT IN.
+//
+// **This replaces `AppShell` with `StaffShell` (§3 of
+// docs/superpowers/specs/2026-09-06-staff-app-redesign.md — "the redesign deletes the two
+// things AppShell exists to draw: THE DRAWER... THE HEADER").** Five tabs, no side menu.
+// Every destination NAV and the drawer used to carry now has a home in the account
+// screen — `features/account/AccountScreen.tsx` — or is reached from inside it: identity,
+// permission boundaries, notification preferences, the coach calendar feed, cash,
+// the join link, the privacy queue, the setup wizard, install, the two legal documents,
+// language/theme/sign-out, and the studio switcher. None of it is lost; see that file's
+// own header for where each one landed.
+//
+// **`announcements` is the one entry that does NOT get a new home, on purpose (bug 2.2).**
+// The old NAV pointed it at the PATH `/announcements`, which no server route answers — it
+// fell through the service worker's `navigateFallback` to index.html and silently put the
+// coach back on home. There is no announcements screen anywhere in this app and building
+// one is not part of this pass. Do not "restore" this entry; it never had a destination.
 
 /**
  * Lane SCHEDULE's screens route on `location.hash`, matching the dashboard: real `<a href>`
@@ -231,14 +220,21 @@ export default function App() {
   // "there are none", which is a different and worse claim than "not yours".
   const onPrivacy = hash === '#/privacy'
   // The sign-in footer's two documents (§6.1 step 5's text, read before there is an
-  // account). Routed with the ANONYMOUS branch below rather than here in the shell: a
-  // legal link that needs a session is a legal link nobody at the sign-in can follow.
-  // Distinct from `#/privacy` above, which is §16's operator queue and is manager-gated.
+  // account). Read once, here, and used by BOTH the anonymous branch below (where they
+  // must work before there is a session at all) and the signed-in one (the account tab's
+  // legal group links to the same two hashes — a staff member never had a way to reread
+  // these while signed in before this redesign).
   const onTerms = hash === TERMS_HASH
   const onPrivacyPolicy = hash === PRIVACY_HASH
   // 2026-08-28 — the way BACK into the wizard after a dismissal. Resolve routes an owner
   // in only on first run; the incomplete-setup banner needs a door that exists after it.
   const onSetup = hash === '#/setup'
+  // The account tab's own screen, and the two stubs beside it (timer, tasks) — reserved
+  // routes StaffTabBar already links to. Real screens land at later checkpoints; a tab
+  // that goes nowhere today is the exact bug (2.2) this pass exists to not repeat.
+  const onAccount = hash === '#/account'
+  const onTimer = hash === '#/timer'
+  const onTasks = hash === '#/tasks'
   // §5.7's register, opened from a session. The id is in the hash so the back button works
   // and a link survives a reload — the same shape both W2 lanes settled on, and the reason
   // NAV's `/attendance` entry became a hash below. A second segment picks the in-session
@@ -260,6 +256,24 @@ export default function App() {
   const rosterEventId = eventParts.length === 2 && eventParts[1] === 'roster' ? eventParts[0]! : null
   const examEventId = eventParts.length === 1 && eventParts[0] ? eventParts[0] : null
 
+  // Which of the five tabs the current hash belongs to. `null` is a real answer, not a
+  // fallback — see `StaffShell`'s own header: a student card, the privacy operator queue
+  // and a session roster all sit BESIDE the tabs rather than inside one, same as every
+  // other screen reached only as a sub-page (cash, the join link, setup, the two legal
+  // documents). The bar still shows, so a coach can always leave, but marking a tab
+  // current on a screen that tab does not lead to is a lie told to a screen reader.
+  const activeTab: StaffTab | null = onAccount
+    ? 'account'
+    : onTimer
+      ? 'timer'
+      : onTasks
+        ? 'tasks'
+        : onStudents
+          ? 'students'
+          : hash === '' || hash.startsWith('#/schedule')
+            ? 'schedule'
+            : null
+
   useEffect(() => {
     // Chromium fires this when it considers the app installable; iOS never does, which
     // is why §6.5's iOS path is taught rather than prompted.
@@ -273,7 +287,19 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <AccessibilityMenu locale={locale} />
+      {/* נגישות, SIGNED OUT ONLY — the same call the parent app made (owner review,
+          2026-09-06, see its App.tsx around the AccessibilityMenu mount). The floating
+          button sits right on a public page but wrong behind a fixed bottom bar: at phone
+          widths it came to rest ON TOP of the first tab, clipping לוח זמנים's label to
+          "נים" and making that tab unpressable. `.studio-a11y__fab` publishes an
+          `--a11y-fab-clearance` for exactly this and the redesigned Tailwind bar does not
+          read it — padding the bar is not the fix here, because unlike the parent app's
+          landing page, a signed-in coach HAS a destination for the control: the account
+          tab draws it as a row via `renderTrigger` (see AccountScreen.tsx). Do not
+          "restore" the unconditional render — the sign-in screen and any anonymous state
+          keep the FAB, because that is where IS 5568 bites hardest: a stranger with low
+          vision has no account screen to go to yet. */}
+      {session.status !== 'signed-in' ? <AccessibilityMenu locale={locale} /> : null}
       {/* New-build toast — floats over whatever is open, in every session state. */}
       <UpdateToast locale={locale} />
       {session.status === 'anonymous' ? (
@@ -298,110 +324,21 @@ export default function App() {
       ) : null}
 
       {session.status === 'signed-in' ? (
-        // §6.1 step 3's refusal renders OUTSIDE `AppShell` — see `AccessGate`'s header.
+        // §6.1 step 3's refusal renders OUTSIDE the shell — see `AccessGate`'s header.
         // Every hash-routed branch below already re-checks `session.access.staff` for
         // itself, so this closes the one gap that was left: the shell's own chrome
-        // (title, drawer, the unguarded install banner) rendering around the refusal.
+        // (the tab bar, the unguarded install banner) rendering around the refusal.
         <AccessGate session={session} locale={locale}>
-        <AppShell
-          title={session.activeStudioName ?? ''}
-          items={
-            viewerIsManager
-              ? [
-                  ...NAV,
-                  { key: 'cash', labelKey: 'billing.cash.manager.title', href: '#/cash' },
-                  { key: 'joinLink', labelKey: 'people.join.card.title', href: '#/join-link' },
-                ]
-              : NAV
-          }
+        <StaffShell
+          activeTab={activeTab}
           locale={locale}
-          drawerFooter={
-            // 9e — "אותה מגירה": M8's notification preferences and the coach's §5.12
-            // calendar feed live in the drawer they were designed for (S2), above the
-            // language/theme footer everyone shares.
-            <>
-              {session.access.staff ? (
-                <DrawerIdentity
-                  client={peopleClient}
-                  displayName={session.displayName}
-                  locale={locale}
-                  roles={membership?.roles ?? []}
-                />
-              ) : null}
-              <NotificationPreferences client={commsClient} locale={locale} />
-              <CoachCalendarFeed client={commsClient} locale={locale} />
-              {/* 9e — the locked capabilities, shown. A manager sees none: nothing on
-                  this list is locked for them. */}
-              {session.access.staff && !viewerIsManager ? (
-                <PermissionBoundaries
-                  locale={locale}
-                  canMoveStudents={membership?.roles.includes('lead_coach') ?? false}
-                />
-              ) : null}
-              {/* §16's privacy queue, in 9e's drawer — the same place the parent app puts
-                  its own privacy link. A link and not a NAV entry: NAV is the coach's four
-                  working surfaces, and this is an operator control. Manager-only, matching
-                  the route's own gate: a link a coach follows to a refusal is a link that
-                  teaches the app is broken. */}
-              {viewerIsManager ? (
-                <p style={{ margin: 0 }}>
-                  <a href="#/privacy">{t(locale, 'reports.privacy.requests.operatorTitle')}</a>
-                </p>
-              ) : null}
-              <AccountDrawerFooter
-                locale={locale}
-                onChooseLocale={setLocale}
-                onSignOut={() => void session.signOut()}
-                accountName={session.displayName}
-              />
-            </>
-          }
-          studios={session.studios.map((s) => ({
-            studioId: s.studio_id,
-            studioName: s.studio_name,
-            studioIsDemo: s.studio_is_demo,
-          }))}
-          activeStudioId={session.activeStudioId}
-          onSwitchStudio={(studioId) => void switchStudio(studioId)}
-          tabBar={
-            // 9a/1c/1d draw the four-tab bar on every staff screen; עוד opens the same
-            // drawer 9e describes ("אותה מגירה"), through the shell's own control.
-            session.access.staff
-              ? ({ openDrawer }) => (
-                  <TabBar
-                    label={t(locale, 'common.nav.today')}
-                    items={[
-                      {
-                        key: 'schedule',
-                        label: t(locale, 'common.nav.schedule'),
-                        href: '#/schedule',
-                        icon: <Icon name="calendar" size={20} />,
-                        active: hash === '' || hash.startsWith('#/schedule'),
-                      },
-                      {
-                        key: 'students',
-                        label: t(locale, 'common.nav.students'),
-                        href: '#/students',
-                        icon: <Icon name="search" size={20} />,
-                        active: onStudents,
-                      },
-                      {
-                        key: 'events',
-                        label: t(locale, 'events.title'),
-                        href: '#/events',
-                        icon: <Icon name="events" size={20} />,
-                        active: onEvents || examEventId !== null,
-                      },
-                      {
-                        key: 'more',
-                        label: t(locale, 'common.nav.more'),
-                        icon: <Icon name="menu" size={20} />,
-                        onSelect: openDrawer,
-                      },
-                    ]}
-                  />
-                )
-              : undefined
+          // Wired properly at a later checkpoint — this is not a placeholder count, it is
+          // the honest one: §1's decision is "no task table", so there is nothing to count
+          // yet, and a badge showing an invented number is worse than no badge.
+          tasksBadgeCount={0}
+          networkStatus={session.access.staff ? <NetworkStatus locale={locale} /> : null}
+          staffAlerts={
+            session.access.staff ? <StaffAlerts client={commsClient} locale={locale} /> : null
           }
           devBar={
             // §19.4 — the identity is real now. `devTools` comes from /auth/me, which
@@ -420,14 +357,6 @@ export default function App() {
             />
           }
         >
-          {/* The alert container, above whatever screen is open: a sync conflict or an
-              at-risk child must be visible from Today and from the roster, not behind a
-              navigation the coach has no reason to make. Every fill renders null when it
-              has nothing to say. */}
-          {/* S5 — the offline machinery made visible: network mode and queue depth, in the
-              shell, so a coach in a basement sees it from Today and from the roster alike.
-              Also the app's one `useNetworkMonitor` mount, which starts the probe loop. */}
-          {session.access.staff ? <NetworkStatus locale={locale} /> : null}
           {/* The unfinished-setup nudge (2026-08-28). Manager-gated — S4's lesson: a
               manager-only read mounted in front of a coach is a 403 on every screen.
               Hidden on the wizard itself; keyed on the hash so leaving it re-asks. */}
@@ -441,7 +370,6 @@ export default function App() {
               }}
             />
           ) : null}
-          {session.access.staff ? <StaffAlerts client={commsClient} locale={locale} /> : null}
           {/* §6.1's first-run routing still owns the DEFAULT screen: `Resolve` decides
               between the setup wizard, the tour and the refusal. Both W2 lanes hang a
               screen off a hash in front of it, and neither claims the fallback — an
@@ -451,7 +379,40 @@ export default function App() {
               whoever is holding the phone, so the check cannot live in the link. Lane
               PEOPLE's branch inherits the same protection from being below it: a person
               without staff access takes the `Resolve` arm and gets §6.1's refusal. */}
-          {onInstall ? (
+          {onTerms ? (
+            // No `access.staff` guard, matching `onInstall` below: these are public
+            // documents, readable by anyone this shell has already let in.
+            <LegalScreen locale={locale} doc="terms" />
+          ) : onPrivacyPolicy ? (
+            <LegalScreen locale={locale} doc="policy" />
+          ) : session.access.staff && onAccount ? (
+            <AccountScreen
+              activeStudioId={session.activeStudioId}
+              commsClient={commsClient}
+              displayName={session.displayName}
+              locale={locale}
+              onChooseLocale={setLocale}
+              onSignOut={() => void session.signOut()}
+              onSwitchStudio={(studioId) => void switchStudio(studioId)}
+              peopleClient={peopleClient}
+              roles={membership?.roles ?? []}
+              studios={session.studios.map((s) => ({
+                studioId: s.studio_id,
+                studioName: s.studio_name,
+                studioIsDemo: s.studio_is_demo,
+              }))}
+              viewerIsManager={viewerIsManager}
+            />
+          ) : session.access.staff && onTimer ? (
+            <section aria-label={t(locale, 'timer.title')} data-testid="timer-placeholder">
+              <h1>{t(locale, 'timer.title')}</h1>
+            </section>
+          ) : session.access.staff && onTasks ? (
+            <section aria-label={t(locale, 'tasks.title')} data-testid="tasks-placeholder">
+              <h1>{t(locale, 'tasks.title')}</h1>
+              <p>{t(locale, 'tasks.empty')}</p>
+            </section>
+          ) : onInstall ? (
             // Needs no access guard: installing the app is every signed-in person's
             // business, and the screen shows nothing from any studio.
             <section aria-label={t(locale, 'common.install.title')}>
@@ -591,7 +552,7 @@ export default function App() {
               />
             </>
           )}
-        </AppShell>
+        </StaffShell>
         </AccessGate>
       ) : null}
     </ThemeProvider>

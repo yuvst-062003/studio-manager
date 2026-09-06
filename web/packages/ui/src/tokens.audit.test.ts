@@ -72,13 +72,26 @@ const OUTWARD_DARK_SELECTOR = '[data-theme="dark"] [data-surface="outward"]'
 const OUTWARD = readTokenBlock(OUTWARD_SELECTOR)
 const OUTWARD_DARK = readTokenBlock(OUTWARD_DARK_SELECTOR)
 
-/** What a token actually resolves to on each of the four surface-and-theme combinations. */
+/**
+ * The staff app's own cool blue-grey surface — the third palette, alongside `inward`
+ * (the bare `:root`/dark blocks, which the dashboard keeps) and `outward`. Read the
+ * same way, for the same reason: a block the audit does not read is a fork that rots
+ * silently.
+ */
+const STAFF_SELECTOR = '[data-surface="staff"]'
+const STAFF_DARK_SELECTOR = '[data-theme="dark"] [data-surface="staff"]'
+const STAFF = readTokenBlock(STAFF_SELECTOR)
+const STAFF_DARK = readTokenBlock(STAFF_DARK_SELECTOR)
+
+/** What a token actually resolves to on each of the six surface-and-theme combinations. */
 const EFFECTIVE = {
   light: LIGHT,
   dark: { ...LIGHT, ...DARK },
   'outward light': { ...LIGHT, ...OUTWARD },
   // Both layers, in cascade order: the plain dark override first, then the outward one.
   'outward dark': { ...LIGHT, ...DARK, ...OUTWARD, ...OUTWARD_DARK },
+  'staff light': { ...LIGHT, ...STAFF },
+  'staff dark': { ...LIGHT, ...DARK, ...STAFF, ...STAFF_DARK },
 } as const
 
 describe('the roles table and tokens.css are in exact bijection', () => {
@@ -87,7 +100,7 @@ describe('the roles table and tokens.css are in exact bijection', () => {
     expect(Object.keys(DARK).length).toBeGreaterThan(10)
   })
 
-  it('declares no custom property outside the four audited blocks', () => {
+  it('declares no custom property outside the six audited blocks', () => {
     // The backstop for the parser itself. A token declared inside `html { }`, inside a
     // media query, or in a second `:root { }` would otherwise never reach TOKEN_ROLES
     // and would be audited by nothing at all.
@@ -99,6 +112,8 @@ describe('the roles table and tokens.css are in exact bijection', () => {
       ...Object.keys(DARK),
       ...Object.keys(OUTWARD),
       ...Object.keys(OUTWARD_DARK),
+      ...Object.keys(STAFF),
+      ...Object.keys(STAFF_DARK),
     ])
     expect([...declared].filter((t) => !audited.has(t))).toEqual([])
   })
@@ -140,58 +155,72 @@ describe('the roles table and tokens.css are in exact bijection', () => {
   })
 })
 
-describe('the outward surface is a theme, not a fork', () => {
-  it('finds a non-trivial number of tokens in each outward block', () => {
-    expect(Object.keys(OUTWARD).length).toBeGreaterThan(8)
-    expect(Object.keys(OUTWARD_DARK).length).toBeGreaterThan(8)
+it('GROUND_COLOR.inward matches the stylesheet', () => {
+  // The half of the "cannot drift" promise that belongs to no overlay surface — checked
+  // once here rather than once per surface below.
+  expect(GROUND_COLOR.inward.light).toBe(LIGHT['--ground'])
+  expect(GROUND_COLOR.inward.dark).toBe(DARK['--ground'])
+})
+
+/**
+ * Every surface that re-values the palette on top of `:root` — `outward` (the landing
+ * and the parent app) and `staff` (the staff app's cool blue-grey). `inward` is not one
+ * of these: it IS `:root`/dark, not an overlay on top of it, which is why the dashboard
+ * needs no entry here at all.
+ */
+const OVERLAY_SURFACES = [
+  { label: 'outward', groundKey: 'outward', light: OUTWARD, dark: OUTWARD_DARK },
+  { label: 'staff', groundKey: 'staff', light: STAFF, dark: STAFF_DARK },
+] as const
+
+describe.each(OVERLAY_SURFACES)('the $label surface is a theme, not a fork', ({ groundKey, light, dark }) => {
+  it('finds a non-trivial number of tokens in each block', () => {
+    expect(Object.keys(light).length).toBeGreaterThan(8)
+    expect(Object.keys(dark).length).toBeGreaterThan(8)
   })
 
   it('overrides only tokens that already exist in :root', () => {
     // An override layer, not a second palette. A token defined only here would be
     // undefined on every inward screen and inherit from nowhere.
-    const invented = [...Object.keys(OUTWARD), ...Object.keys(OUTWARD_DARK)].filter(
-      (t) => !(t in LIGHT),
-    )
-    expect(invented, 'the outward block may re-value a token, never introduce one').toEqual([])
+    const invented = [...Object.keys(light), ...Object.keys(dark)].filter((t) => !(t in LIGHT))
+    expect(invented, 'a surface block may re-value a token, never introduce one').toEqual([])
   })
 
   it('gives every token it overrides a role', () => {
-    const unclassified = [...Object.keys(OUTWARD), ...Object.keys(OUTWARD_DARK)].filter(
+    const unclassified = [...Object.keys(light), ...Object.keys(dark)].filter(
       (t) => !(t in TOKEN_ROLES),
     )
     expect(unclassified).toEqual([])
   })
 
   it('re-values every colour it takes in light for dark as well', () => {
-    // The failure this catches is precise: a navy screen keeping a warm light value on a
-    // dark ground, because the outward block re-coloured only half the pair.
-    const missing = Object.keys(OUTWARD).filter(
-      (t) => TOKEN_ROLES[t]?.obligation.kind !== 'none' && !(t in OUTWARD_DARK),
+    // The failure this catches is precise: a screen keeping a light value on a dark
+    // ground, because the surface block re-coloured only half the pair.
+    const missing = Object.keys(light).filter(
+      (t) => TOKEN_ROLES[t]?.obligation.kind !== 'none' && !(t in dark),
     )
-    expect(missing, 'these carry colour on the outward surface and need a dark value').toEqual([])
+    expect(missing, 'these carry colour on this surface and need a dark value').toEqual([])
   })
 
   it('never touches the semantic band — D2, and the reason the debt banner survives a brand', () => {
-    // Decision 2 of the redesign spec: the brand's palette is carried in, the semantic
-    // band stays untouchable. The landing's crimson is a BRAND colour; red in this app
-    // means a family owes money, and a club branding itself red still gets a working
-    // debt banner only because these nine are out of reach.
-    const semantic = [...Object.keys(OUTWARD), ...Object.keys(OUTWARD_DARK)].filter(
+    // Decision 2 of the redesign spec: a surface's own palette is carried in, the
+    // semantic band stays untouchable. Red in this app means a family owes money, and a
+    // club branding itself red — or a staff app going blue — still gets a working debt
+    // banner only because these nine are out of reach.
+    const semantic = [...Object.keys(light), ...Object.keys(dark)].filter(
       (t) => TOKEN_ROLES[t]?.tier === 'semantic',
     )
-    expect(semantic, 'the outward surface may not re-value a semantic token').toEqual([])
+    expect(semantic, 'a surface block may not re-value a semantic token').toEqual([])
   })
 
   it('is the source of GROUND_COLOR, so a manifest cannot drift from the stylesheet', () => {
-    // `theme.ts` promises these four ARE `--ground`. Nothing enforced it, and the promise
-    // was already false for the parent app the moment the outward block landed: its
-    // manifest and its status bar named the inward grey while the page painted navy-warm.
-    // Asserted against the parsed CSS rather than restated, so the stylesheet stays the
-    // one place a ground colour is decided.
-    expect(GROUND_COLOR.inward.light).toBe(LIGHT['--ground'])
-    expect(GROUND_COLOR.inward.dark).toBe(DARK['--ground'])
-    expect(GROUND_COLOR.outward.light).toBe(OUTWARD['--ground'])
-    expect(GROUND_COLOR.outward.dark).toBe(OUTWARD_DARK['--ground'])
+    // `theme.ts` promises this IS `--ground`. Nothing enforced it, and the promise was
+    // already false for the parent app the moment the outward block landed: its
+    // manifest and its status bar named the inward grey while the page painted
+    // navy-warm. Asserted against the parsed CSS rather than restated, so the
+    // stylesheet stays the one place a ground colour is decided.
+    expect(GROUND_COLOR[groundKey].light).toBe(light['--ground'])
+    expect(GROUND_COLOR[groundKey].dark).toBe(dark['--ground'])
   })
 
   it('derives its ramp from --brand-primary rather than adding brand tokens', () => {
@@ -201,7 +230,7 @@ describe('the outward surface is a theme, not a fork', () => {
       .filter(([, r]) => r.tier === 'brand')
       .map(([t]) => t)
     expect(brand.sort()).toEqual(['--brand-on-primary', '--brand-primary'])
-    expect(OUTWARD).toHaveProperty('--brand-primary')
+    expect(light).toHaveProperty('--brand-primary')
   })
 })
 
@@ -268,13 +297,15 @@ describe('D2 — the three tiers, and nothing else', () => {
 
 // Each block is an override LAYER, so an effective palette is the light block with the
 // later ones laid over it. Auditing DARK alone would silently skip every token dark does
-// not override — and auditing the outward blocks alone would skip far more, since the
-// outward surface re-values a palette and inherits the whole type and spacing scale.
+// not override — and auditing an overlay surface's blocks alone would skip far more,
+// since each one re-values a palette and inherits the whole type and spacing scale.
 const MODES = [
   { name: 'light', tokens: EFFECTIVE.light },
   { name: 'dark', tokens: EFFECTIVE.dark },
   { name: 'outward light', tokens: EFFECTIVE['outward light'] },
   { name: 'outward dark', tokens: EFFECTIVE['outward dark'] },
+  { name: 'staff light', tokens: EFFECTIVE['staff light'] },
+  { name: 'staff dark', tokens: EFFECTIVE['staff dark'] },
 ] as const
 
 const valueOf = (tokens: Record<string, string>, token: string): string => {

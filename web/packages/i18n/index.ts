@@ -11,6 +11,8 @@ import { events as heEvents } from './he/events'
 import { comms as heComms } from './he/comms'
 import { reports as heReports } from './he/reports'
 import { techniques as heTechniques } from './he/techniques'
+import { timer as heTimer } from './he/timer'
+import { tasks as heTasks } from './he/tasks'
 
 import { common as enCommon } from './en/common'
 import { schedule as enSchedule } from './en/schedule'
@@ -22,6 +24,8 @@ import { events as enEvents } from './en/events'
 import { comms as enComms } from './en/comms'
 import { reports as enReports } from './en/reports'
 import { techniques as enTechniques } from './en/techniques'
+import { timer as enTimer } from './en/timer'
+import { tasks as enTasks } from './en/tasks'
 
 import { common as ruCommon } from './ru/common'
 import { schedule as ruSchedule } from './ru/schedule'
@@ -33,6 +37,8 @@ import { events as ruEvents } from './ru/events'
 import { comms as ruComms } from './ru/comms'
 import { reports as ruReports } from './ru/reports'
 import { techniques as ruTechniques } from './ru/techniques'
+import { timer as ruTimer } from './ru/timer'
+import { tasks as ruTasks } from './ru/tasks'
 
 export const bundles: Record<Locale, Record<Namespace, Bundle>> = {
   he: {
@@ -46,6 +52,8 @@ export const bundles: Record<Locale, Record<Namespace, Bundle>> = {
     comms: heComms,
     reports: heReports,
     techniques: heTechniques,
+    timer: heTimer,
+    tasks: heTasks,
   },
   en: {
     common: enCommon,
@@ -58,6 +66,8 @@ export const bundles: Record<Locale, Record<Namespace, Bundle>> = {
     comms: enComms,
     reports: enReports,
     techniques: enTechniques,
+    timer: enTimer,
+    tasks: enTasks,
   },
   ru: {
     common: ruCommon,
@@ -70,6 +80,8 @@ export const bundles: Record<Locale, Record<Namespace, Bundle>> = {
     comms: ruComms,
     reports: ruReports,
     techniques: ruTechniques,
+    timer: ruTimer,
+    tasks: ruTasks,
   },
 }
 

@@ -1,5 +1,12 @@
 <!doctype html>
-<html lang="he" dir="rtl" data-theme="light">
+<!-- `data-surface="staff"` puts this app in its own cool blue-grey palette rather than
+     the warm neutral the manager dashboard keeps. The two used to share one palette
+     (D14); the values are the [data-surface="staff"] block in packages/ui/src/tokens.css.
+
+     On <html> and not on <body>, same reasoning as the parent app's outward marker:
+     tokens.css sets `html { background: var(--ground) }`, so a marker on the body
+     leaves the page behind it painted the dashboard's warm grey. -->
+<html lang="he" dir="rtl" data-theme="light" data-surface="staff">
   <head>
     <meta charset="UTF-8" />
     <!-- `maximum-scale=1, user-scalable=no` — a native app does not scale under two
@@ -11,7 +18,10 @@
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#f7f5f1" />
+    <!-- The STAFF ground. ThemeProvider rewrites this on mount for dark mode; this
+         value is what paints the status bar in the moments before it does, so a stale
+         one is a visible flash of the wrong palette on every cold start. -->
+    <meta name="theme-color" content="#f6f9fd" />
 
     <!-- iOS ignores the manifest for the home-screen icon and reads these
          instead. Without them the icon is a screenshot of the page (§6.5). -->

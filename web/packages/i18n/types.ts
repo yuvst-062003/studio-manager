@@ -10,6 +10,11 @@ export const NAMESPACES = [
   'common', 'schedule', 'people', 'health',
   'attendance', 'billing', 'events', 'comms', 'reports',
   'techniques',
+  // The staff app's five-tab redesign (2026-09-06). Small on purpose: the timer and
+  // tasks screens land later and add their own keys, but this is the one commit that
+  // edits this registry, so both namespaces are created now rather than when their
+  // first screen needs them.
+  'timer', 'tasks',
 ] as const
 export type Namespace = (typeof NAMESPACES)[number]
 

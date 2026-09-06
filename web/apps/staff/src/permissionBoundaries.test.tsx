@@ -144,22 +144,24 @@ describe('the setup nudge and its door (2026-08-28)', () => {
   it('shows a coach no banner at all', async () => {
     vi.stubGlobal('fetch', staffFetch(['lead_coach']))
     render(<App />)
-    await screen.findByRole('button', { name: t('he', 'common.nav.more') })
+    // The drawer's own "עוד" button is gone (S3 redesign) — the tab bar rendering at all
+    // is the new "the shell finished mounting" signal.
+    await screen.findByTestId('tab-bar')
     expect(screen.queryByTestId('setup-incomplete')).toBeNull()
   })
 })
 
-describe('S10 — 9e: the drawer teaches the role', () => {
-  async function openDrawer() {
-    await userEvent.click(
-      await screen.findByRole('button', { name: t('he', 'common.nav.more') }),
-    )
-  }
-
+describe('S10 — 9e (now the account tab): teaches the role', () => {
+  // The drawer עוד opened a side panel; the redesign folds that panel into the account
+  // TAB (S3 — "every drawer entry has a new home"). Reaching it is a hash now — the same
+  // pattern the `#/cash`/`#/join-link` tests above already use — not a button click, so
+  // the selector changed (set the hash before rendering, rather than clicking a "עוד"
+  // button that no longer exists); the assertion's meaning did not: identity and the
+  // permission boundaries still render on the one screen a coach can reach them from.
   it('lists all three locked capabilities for an assistant coach, with the footnote', async () => {
+    globalThis.location.hash = '#/account'
     vi.stubGlobal('fetch', staffFetch(['assistant_coach']))
     render(<App />)
-    await openDrawer()
     await waitFor(() =>
       expect(screen.getAllByTestId('permission-locked-row')).toHaveLength(3),
     )
@@ -167,9 +169,9 @@ describe('S10 — 9e: the drawer teaches the role', () => {
   })
 
   it('does not list מעבר כיתה as locked for a lead coach, because 9c gives it to them', async () => {
+    globalThis.location.hash = '#/account'
     vi.stubGlobal('fetch', staffFetch(['lead_coach']))
     render(<App />)
-    await openDrawer()
     await waitFor(() =>
       expect(screen.getAllByTestId('permission-locked-row')).toHaveLength(2),
     )
@@ -179,14 +181,15 @@ describe('S10 — 9e: the drawer teaches the role', () => {
   })
 
   it('shows a manager no locked list at all', async () => {
+    globalThis.location.hash = '#/account'
     vi.stubGlobal('fetch', staffFetch(['manager']))
     render(<App />)
-    await openDrawer()
     await screen.findByTestId('drawer-identity')
     expect(screen.queryByTestId('permission-boundaries')).toBeNull()
   })
 
   it('carries the identity block: name, role, and the classes coached', async () => {
+    globalThis.location.hash = '#/account'
     const fetchSpy = staffFetch(['lead_coach'])
     vi.stubGlobal(
       'fetch',
@@ -207,7 +210,6 @@ describe('S10 — 9e: the drawer teaches the role', () => {
       }),
     )
     render(<App />)
-    await openDrawer()
     const identity = await screen.findByTestId('drawer-identity')
     expect(identity).toHaveTextContent(t('he', 'common.staff.role.lead_coach'))
     const classes = await screen.findByTestId('drawer-my-classes')

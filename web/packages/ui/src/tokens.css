@@ -254,6 +254,97 @@
   --radius-md: 2px;
 }
 
+/* ═══ THE STAFF SURFACE ═══════════════════════════════════════════════════════════
+ * The staff app's redesign gave it a cool blue-grey register of its own. Staff and the
+ * manager dashboard used to share the plain inward palette (D14); they no longer can,
+ * so this is the third surface. `staff` wears the cool palette below; the dashboard
+ * carries no surface attribute and stays on the bare `:root` values, untouched by this
+ * block exactly as it is untouched by `outward`.
+ *
+ * Same rule as `outward`: a re-VALUING of tokens that already exist above — brand tier
+ * and structural palette only, never the semantic band. tokens.audit.test.ts enforces
+ * both and now audits this block the same way it audits `outward`.
+ *
+ * Values are ported from the redesign's own prototype screens (its light dashboard and
+ * its dark timer view) as a VISUAL REFERENCE, the same way artboard 4h was for the warm
+ * palette (D10) — no CSS copy-pasted from an export. Several of the prototype's own
+ * greys and blues do not clear AA on these grounds; those are corrected below rather
+ * than shipped failing, the same discipline D8/D12 record for the warm palette. Ratios
+ * are not written here for the same reason they are not written anywhere else in this
+ * file — a number in a comment rots the first time someone tweaks a hex. */
+
+[data-surface="staff"] {
+  --brand-primary: #2563eb;
+  --brand-on-primary: #fff;
+
+  /* The surface ladder: page → card → raised. Unlike `outward`'s, this one does not
+   * top out at white in light mode — the prototype's card tone still has room above
+   * it, so `--surface-raised` gets a real third step instead of repeating `--surface`.
+   * The prototype's other nearby tone is duller than the ground rather than lighter,
+   * so it becomes `--disabled-surface` instead of a rung on the elevation ladder. */
+  --ground: #f6f9fd;
+  --surface: #f8fafc;
+  --surface-raised: #fff;
+  --disabled-surface: #f3f6fb;
+  --fg: #0f172a;
+  --on-fg: #f6f9fd;
+  --emphasis: #2563eb;
+  --on-emphasis: #fff;
+  --text-secondary: #334155;
+
+  /* NOT the prototype's own value. Its slate-500 clears 4.5:1 on this ground by a
+   * margin thin enough that the next hex tweak here, made without re-running the
+   * audit, is a coin flip either way. Darkened for real headroom above the floor. */
+  --text-muted: #5e6e84;
+  --border: #e2e8f0;
+
+  /* The prototype's border pair is light-on-light — fine for `--border`, which carries
+   * no contrast obligation, but `--border-strong` is a control boundary (SC 1.4.11,
+   * D12) and neither of the prototype's two stops reaches 3:1 on this ground. Corrected
+   * to a darker slate that does. */
+  --border-strong: #7c8ca2;
+  --accent: #1e3a8a;
+  --on-accent: #fff;
+  --belt-ring: #0f172a;
+  --scrim: rgb(15 23 42 / 45%);
+}
+
+[data-theme="dark"][data-surface="staff"],
+[data-theme="dark"] [data-surface="staff"] {
+  /* Ground, card and raised-tile are the prototype's own dark (timer) screen,
+   * transcribed directly — its ladder already goes lighter with elevation, the same
+   * direction dark mode requires everywhere else in this file. */
+  --brand-primary: #60a5fa;
+  --brand-on-primary: #090d16;
+  --ground: #090d16;
+  --surface: #111827;
+  --surface-raised: #182232;
+  --disabled-surface: #16202f;
+  --fg: #f1f5f9;
+  --on-fg: #090d16;
+  --emphasis: #60a5fa;
+  --on-emphasis: #090d16;
+
+  /* NOT in the prototype, which names only two text weights for its dark screen. A
+   * third was needed the same way `outward`'s `--text-muted` was derived from a source
+   * that also had only two — this sits between them, nowhere near the floor. */
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --border: #1e293b;
+
+  /* The prototype's own dark border pair falls well short of 3:1 against this ground.
+   * Corrected to a lighter slate that clears it. */
+  --border-strong: #64748b;
+
+  /* The light mode's deep navy inverts to a light foreground blue, the same move
+   * `outward`'s dark accent makes — filling with the deep value here would be close to
+   * invisible on a near-black ground. */
+  --accent: #93c5fd;
+  --on-accent: #090d16;
+  --belt-ring: #f1f5f9;
+  --scrim: rgb(0 0 0 / 62%);
+}
+
 *,
 *::before,
 *::after {

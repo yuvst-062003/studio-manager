@@ -14,7 +14,7 @@ describe('locale direction (SPEC §9)', () => {
 })
 
 describe('Seam 3 — namespaces exist for every vertical in every locale', () => {
-  it('lists all ten namespaces', () => {
+  it('lists all twelve namespaces', () => {
     expect([...NAMESPACES]).toEqual([
       'common', 'schedule', 'people', 'health',
       'attendance', 'billing', 'events', 'comms', 'reports',
@@ -23,6 +23,10 @@ describe('Seam 3 — namespaces exist for every vertical in every locale', () =>
       // its own rather than a corner of `common` for the same reason as the other nine —
       // one file per feature is what stops two lanes editing one bundle.
       'techniques',
+      // The staff app's five-tab redesign (2026-09-06): `timer` and `tasks` are their own
+      // screens, so each gets its own namespace rather than a corner of `common`, same
+      // reasoning as `techniques` above.
+      'timer', 'tasks',
     ])
   })
 

@@ -408,6 +408,8 @@ one face or three is the owner's call — see the open questions below.
 | C10 — `3f` loses the health-block toggle | yes | **yes — canvas edited 2026-08-26 (W6)** |
 | D13 empty cell may start a session | yes | **yes — `WeekBoard.tsx`, 2026-08-29. The canvas is NOT edited: `3a` still draws an inert cell, and the affordance is invisible until hover.** |
 | D14 outward wears the brand | yes | **yes — the `[data-surface="outward"]` block in `tokens.css`, the parent app's `index.html`, and `landing.css` re-pointed at it. Asserted by `tokens.audit.test.ts`, which audits all four surface-and-theme palettes and fails if the block re-values a semantic token.** |
+| D15 staff takes a cool palette | yes | **yes — the `[data-surface="staff"]` block and its dark pair in `tokens.css`, `GROUND_COLOR.staff` in `theme.ts`, and the staff app's `index.html` (including its `theme-color` meta). `tokens.audit.test.ts` now audits six palettes.** |
+| D16 the a11y button floats only signed out | yes | **yes — staff `App.tsx` and `AccountScreen.tsx`, 2026-09-06; parent `App.tsx` and `sheets.tsx` the same day. Tests in both apps fail if the float becomes unconditional or the row disappears.** |
 
 **All three D9 rows were re-verified against the artboard markup on 2026-08-26**, because
 `milestone-plan.md`'s C9 still claimed the opposite and that claim was blocking W6. They were
@@ -416,3 +418,75 @@ applied. The divergence was between two documents, not between a document and th
 **The table is no longer the only record.** `tests/contracts/test_canvas_matches_spec.py`
 asserts each of these against the artboard HTML and runs in every lane, so an undone edit
 fails when the canvas changes rather than when someone next reads this file.
+
+---
+
+## D15 — the staff app leaves the shared working palette and takes a cool one
+
+**Decided:** 2026-09-06 · owner decision, in session
+
+**This amends [D14](#d14--outward-surfaces-wear-the-brand-inward-tools-wear-the-working-palette).**
+D14 put the staff app and the manager dashboard together on the neutral working palette, on the
+reasoning that a tool used for hours a day should recede. The staff app's redesign is drawn in a
+cool blue-grey, and the owner chose to keep it. Recorded as an amendment rather than an edit,
+because D14 gave reasons and a later reader deserves to see that they were overruled rather than
+forgotten.
+
+**What D14 still governs.** The dashboard. It carries no surface attribute and is unmoved. The
+two tools now look different from each other; that is the consequence of this decision and it is
+deliberate.
+
+**A third surface, and why it was not avoidable.** `outward` and the default `inward` were
+enough while staff and dashboard shared a palette. They no longer do, so `[data-surface="staff"]`
+joins them, carried on the staff app's `<html>` exactly as the parent app carries `outward`.
+
+The part that is easy to miss: `GROUND_COLOR` in `theme.ts` records `--ground` per surface per
+theme, and **the installed PWA's splash screen and status bar read it**. A surface without an
+entry there opens on the old warm colour and turns blue once React mounts. `tokens.audit.test.ts`
+asserts those values against the stylesheet's own declarations and now audits six palettes rather
+than four.
+
+**D2 is untouched.** The semantic band — `debt · paid · pending · cancelled · danger · focus` —
+is not re-valued by the new block, and the audit test still fails if any surface tries. Red still
+means a family owes money.
+
+**Three values from the design did not survive contrast.** The prototype supplies no dark palette
+at all — its only dark screen is the timer — so the dark palette is derived from that screen's own
+near-black navy, and every pair was measured rather than eyeballed:
+
+| Token | Design's value | Measured | Shipped | Now |
+|---|---|--:|---|--:|
+| `--border-strong`, light | slate-200 | **1.17:1** | `#7c8ca2` | 3.24:1 |
+| `--border-strong`, dark | slate-700 | **1.88:1** | `#64748b` | 4.08:1 |
+| `--text-muted`, light | slate-500 | 4.51:1 | `#5e6e84` | 4.92:1 |
+
+The first two failed the 3:1 a non-text border must reach — a border at 1.17:1 is not a faint
+border, it is an invisible one. The third passed 4.5:1 and was corrected anyway, to clear
+[D8](#d8--6f6b62-is-the-floor-for-any-text-token)'s 4.88 floor rather than the legal minimum.
+Same posture as D12: the design supplies the intent, the audit supplies the values.
+
+## D16 — the accessibility button is floated only where there is no account screen
+
+**Decided:** 2026-09-06 · applied to the staff app the same day the parent app decided it
+
+The floating נגישות button sits at the viewport's bottom corner. Both redesigned apps put a
+fixed tab bar in exactly that corner, and in both the button came to rest **on top of the first
+tab**, which could then not be pressed at all. Measured in the staff app at 420px: the
+`לוח זמנים` label was clipped to `נים`.
+
+**The rule.** Signed out — sign-in, the join wall, the landing — the button floats. Signed in,
+the identical panel is a row in the account screen (staff) or profile (parent), beside privacy,
+because both are rights rather than preferences.
+
+**Why not clearance padding**, which is how the landing page's sticky bar solved the same
+collision: that bar has no account screen to move the control into. These apps do. Reserving a
+corner of a five-tab bar would spend a tab's width on every screen to avoid a collision that
+moving the control removes entirely.
+
+**IS 5568 is the reason the signed-out half is not simply dropped.** A stranger with low vision
+arriving at a sign-in page has no profile to navigate to, and that is precisely where the standard
+bites hardest.
+
+The opener is drawn per surface; the panel, the adjustments and the legally required statement
+stay inside `AccessibilityMenu`, so a row and a floating button cannot drift apart. Tests in both
+apps fail if the floating button becomes unconditional again, or if the row disappears.

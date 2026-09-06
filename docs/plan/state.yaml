@@ -2,7 +2,7 @@
 # comments across a round-trip, so every explanation belongs in a `why:` or
 # `source:` field rather than in a comment that would silently disappear.
 version: 1
-updated: 2026-08-31
+updated: 2026-09-06
 waves:
   - id: W0
     milestone: M0
@@ -860,6 +860,79 @@ waves:
           the alternative. Recorded in the spec's Provenance table as such.
         status: shipped
         on: 2026-09-01
+  - id: W9S
+    milestone: design
+    title: The staff app's redesign — five tabs, ported from the AI Studio prototype
+    mode: sequential
+    lanes: []
+    exit_gate: every screen in the prototype either built against the real API or written down as deliberately not built with its reason; no screen that worked before is unreachable; the touched suites, typecheck and lint green and re-run by the manager rather than reported
+    status: active
+    opened: 2026-09-06
+    source: docs/superpowers/specs/2026-09-06-staff-app-redesign.md
+    pieces:
+      - id: C1
+        title: The shell — five-tab bar, Tailwind isolation, the staff surface and its two palettes, the account tab
+        why: >-
+          The account tab had to land with the shell rather than after it, because it is
+          where the deleted drawer's contents go and there is no intermediate state in
+          which they are reachable otherwise. Every destination is named in the spec's
+          §3 table and the new routes.reachable.test.ts asserts each one is linked from
+          somewhere that is not the route table itself.
+
+          Three defects surfaced that predate this work and are fixed here. The
+          announcements NAV entry pointed at a path nothing routed and fell through the
+          service worker to home — that entry is removed rather than given a screen,
+          because the screen has never existed. The at-risk alert and the dead
+          coach-substituted switch are recorded in the spec and land at C7 and C5.
+
+          A fourth was introduced by the redesign and caught by looking rather than by a
+          test: the floating accessibility button came to rest on the first tab, clipping
+          לוח זמנים to נים and making it unpressable. The parent app hit the identical
+          defect the same day; its resolution is applied here rather than a second one
+          invented, and is recorded as D16.
+
+          The palette is not the prototype's values as drawn. Three failed contrast and
+          were corrected — borders at 1.17:1 light and 1.88:1 dark against a 3:1
+          requirement — and the dark palette had to be authored at all, since the
+          prototype's only dark surface is its timer screen. Recorded as D15.
+        status: shipped
+        on: 2026-09-06
+      - id: C2
+        title: The schedule tab — events merged into the session list, who has confirmed, and the contact actions
+        status: pending
+      - id: C3
+        title: The attendance screen restyled, session and event
+        status: pending
+      - id: C4
+        title: The students tab and the student detail sheet
+        status: pending
+      - id: C5
+        title: The schema contract — one revision carrying unavailability, the briefing column, and the removal of the coach-substituted switch
+        status: pending
+      - id: C6
+        title: Session briefings — written for the session, read on the mat
+        status: pending
+      - id: C7
+        title: The at-risk worker reaches coaches and managers, as its own documentation says it does
+        status: pending
+      - id: C8
+        title: The tasks tab — derived, personal, with a tick box for the one type the app cannot observe
+        status: pending
+      - id: C9
+        title: The timer tab — local presets, a wake lock, no backend
+        status: pending
+      - id: C10
+        title: Coach unavailability — endpoints and the coach's own screen
+        status: pending
+      - id: C11
+        title: The calendar — future sessions and events, with change-coach, cancel and move
+        status: pending
+      - id: C12
+        title: The dashboard's alert and resolution popup — approve, refuse, replace, cancel, move
+        status: pending
+      - id: C13
+        title: Event attendance offline — the sync protocol's third write kind, last and alone
+        status: pending
   - id: W9E
     milestone: design
     title: The dashboard's five worst screens — a redesign

@@ -4,18 +4,21 @@ export type ResolvedTheme = 'light' | 'dark'
 export const THEME_STORAGE_KEY = 'studio.theme'
 
 /** Which palette a surface wears. See `docs/design/decisions.md`. */
-export type Surface = 'inward' | 'outward'
+export type Surface = 'inward' | 'outward' | 'staff'
 
 /**
  * The `--ground` value per theme, so a manifest and a meta tag cannot drift from
  * the CSS. Task 8's manifests read this rather than repeating the literal.
  *
- * **Per surface as well as per theme.** Outward-facing surfaces wear the club's brand and
- * their ground is a different colour, so one record could only ever have been right for
- * two of the three apps — and the half it got wrong is the half nobody looks at in a
- * browser tab: the status bar of an installed PWA and the splash screen behind it.
+ * **Per surface as well as per theme.** A surface that re-values `--ground` needs its
+ * own entry here, or one record could only ever have been right for the surfaces it
+ * didn't cover — and the half it got wrong is the half nobody looks at in a browser
+ * tab: the status bar of an installed PWA and the splash screen behind it. `staff`
+ * exists because the staff app stopped sharing the dashboard's warm neutral palette and
+ * needed a cool blue-grey one of its own; without an entry here the installed staff app
+ * would open on the old warm splash and only turn blue once React mounts.
  *
- * `tokens.audit.test.ts` asserts these four against the stylesheet's own `--ground`
+ * `tokens.audit.test.ts` asserts these six against the stylesheet's own `--ground`
  * declarations, which is what makes the "cannot drift" in the first paragraph true rather
  * than aspirational.
  */
@@ -28,6 +31,10 @@ export const GROUND_COLOR: Record<Surface, Record<ResolvedTheme, string>> = {
     light: '#fcf9f8',
     dark: '#141519',
   },
+  staff: {
+    light: '#f6f9fd',
+    dark: '#090d16',
+  },
 }
 
 /** The inward palette, kept under its original name for the two apps that wear it. */
@@ -39,7 +46,10 @@ export const THEME_COLOR: Record<ResolvedTheme, string> = GROUND_COLOR.inward
  * with the stylesheet winning silently, because it is the one you can see.
  */
 export function surfaceOf(element: { dataset: DOMStringMap } | null | undefined): Surface {
-  return element?.dataset.surface === 'outward' ? 'outward' : 'inward'
+  const surface = element?.dataset.surface
+  if (surface === 'outward') return 'outward'
+  if (surface === 'staff') return 'staff'
+  return 'inward'
 }
 
 /**

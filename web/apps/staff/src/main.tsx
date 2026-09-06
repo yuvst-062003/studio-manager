@@ -2,6 +2,10 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { lockViewportZoom, requestPersistentStorage } from '@studio/core'
 import App from './App'
+// §8 — utilities app-wide, preflight scoped to `.tw-scope`. See tailwind.css.
+import './tailwind.css'
+// AFTER tailwind.css and deliberately so: its rules are unlayered and outrank every
+// Tailwind layer, but only a reader checking the order can tell that was on purpose.
 import '@studio/ui/app-viewport.css'
 import { registerServiceWorker } from './registerSW'
 
