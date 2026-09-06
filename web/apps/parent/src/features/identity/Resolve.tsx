@@ -26,7 +26,7 @@ import type { Locale } from '@studio/i18n'
 // stays on disk until the redesign is accepted end to end, then goes.
 import { HomeScreen } from '../home/redesign/HomeScreen'
 import { childrenNeedingDeclaration, familyNameOf } from '../home/redesign/derive'
-import type { Intents, Lesson } from '../home/redesign/derive'
+import type { FamilyEvent, Intents, Lesson } from '../home/redesign/derive'
 import { needsFullDeclaration } from '../health/HealthGate'
 import { makeIntentClient } from '../home/intentClient'
 import { cancelReasonLabel } from '../schedule/client'
@@ -107,6 +107,9 @@ export function Resolve({
   // server rather than held locally, so reopening the app shows what the club knows and
   // not what this device last hoped — the whole point of the answer being real.
   const [intents, setIntents] = useState<Intents>({})
+  // `[]` and not `null`: a family with no events is the ordinary case and draws a home
+  // with no events on it, so there is no third state for this read to be in.
+  const [events, setEvents] = useState<readonly FamilyEvent[]>([])
   // Bumped after an answer lands, which re-runs the read below. One source of truth.
   const [intentEpoch, setIntentEpoch] = useState(0)
   // §6.3's reduced home is drawn around a lesson, and `TrialHome` was mounted below with
@@ -188,6 +191,53 @@ export function Resolve({
         const next: Record<string, 'coming' | 'not_coming'> = {}
         for (const row of body.items) next[`${row.session_id}:${row.student_id}`] = row.intent
         setIntents(next)
+      })
+      .catch(() => {})
+    // §4 — "events appear beside every other session". Read here rather than only behind
+    // `#/events`, because a family's week is one week and a grading a parent finds only in
+    // a second list is a grading they miss. `/me/events` already returns one row per CHILD
+    // per event, which is the shape the home's session list is in.
+    //
+    // A failure leaves the list empty rather than raising: an unreachable events read must
+    // not take the lessons down with it, and a home with no events on it is what a family
+    // with no events sees anyway.
+    void apiFetch('/api/v1/me/events')
+      .then((response) =>
+        response.ok
+          ? (response.json() as Promise<{
+              items: {
+                event: {
+                  id: string
+                  title: string
+                  starts_at: string
+                  ends_at: string | null
+                  location_text: string | null
+                  status: string
+                }
+                registration: {
+                  student_id: string
+                  student_display_name: string
+                  rsvp: 'yes' | 'no' | 'pending'
+                }
+              }[]
+            }>)
+          : { items: [] },
+      )
+      .then((body) => {
+        if (!live) return
+        setEvents(
+          body.items.map((row) => ({
+            id: row.event.id,
+            title: row.event.title,
+            startsAt: row.event.starts_at,
+            endsAt: row.event.ends_at,
+            locationText: row.event.location_text,
+            cancelled: row.event.status === 'cancelled',
+            studentId: row.registration.student_id,
+            studentName: row.registration.student_display_name,
+            rsvp: row.registration.rsvp,
+          })),
+        )
       })
       .catch(() => {})
     // 2a's other half — what actually happened — is NOT read here any more.
@@ -288,6 +338,7 @@ export function Resolve({
             : null
       }
       lessons={upcoming}
+      events={events}
       lessonsFailed={lessonsFailed}
       intents={intents}
       urgent={{

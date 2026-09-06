@@ -30,14 +30,16 @@ import { ReminderSheet, readReminders, writeReminder } from './ReminderSheet'
 import type { LeadTime } from './ReminderSheet'
 import {
   buildWeekStrip,
+  expandEvents,
   durationMinutesOf,
   expandSessions,
+  mergeSchedule,
   headlineFor,
   monthOf,
   shiftMonth,
   weekdayOf,
 } from './derive'
-import type { Intents, Lesson } from './derive'
+import type { FamilyEvent, Intents, Lesson } from './derive'
 import type { HomeChild, HomeSession, HomeUrgent } from './types'
 
 /** The writes בית makes. One narrow interface so the screen can be tested without a fetch. */
@@ -52,6 +54,7 @@ export function HomeScreen({
   childList,
   lessons,
   lessonsFailed,
+  events,
   intents,
   urgent,
   debtLabel,
@@ -70,6 +73,16 @@ export function HomeScreen({
   childList: readonly HomeChild[] | null
   lessons: readonly Lesson[] | null
   lessonsFailed: boolean
+  /**
+   * §5.12's events for this family, one row per child per event, from `GET /me/events`.
+   *
+   * `[]` and not `null` when the read fails: an empty events list draws a home with no
+   * events on it, which is the ordinary case, whereas a failed SESSIONS read has its own
+   * banner because a week with no lessons in it is not ordinary and must not be silent.
+   * §4 asks for events "beside every other session", and beside is the whole ask — an
+   * event the parent finds only in a second list is an event they miss.
+   */
+  events: readonly FamilyEvent[]
   intents: Intents
   urgent: HomeUrgent
   debtLabel: string | null
@@ -102,8 +115,11 @@ export function HomeScreen({
     () =>
       childList === null || lessons === null
         ? []
-        : expandSessions(lessons, childList, intents, cancelReasonLabel),
-    [lessons, childList, intents, cancelReasonLabel],
+        : mergeSchedule(
+            expandSessions(lessons, childList, intents, cancelReasonLabel),
+            expandEvents(events, childList, t(locale, 'schedule.home.statusCancelled')),
+          ),
+    [lessons, events, childList, intents, cancelReasonLabel, locale],
   )
 
   const strip = useMemo(() => buildWeekStrip(todayKey, allSessions), [todayKey, allSessions])
@@ -135,6 +151,10 @@ export function HomeScreen({
         allSessions
           .filter(
             (session) =>
+              // LESSONS ONLY. An event is declined by RSVP, in a different table; a batch
+              // that swept one in would POST an event id to `/absence-reports` and the
+              // sheet would report a failure the parent could do nothing about.
+              session.kind === 'lesson' &&
               studioDayKey(session.startsAt) === dayKey &&
               (selectedChildId === null || session.studentId === selectedChildId) &&
               !session.reportedAbsent &&

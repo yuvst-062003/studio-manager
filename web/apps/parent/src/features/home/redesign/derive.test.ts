@@ -10,14 +10,16 @@ import {
   durationMinutesOf,
   expandSessions,
   familyNameOf,
+  expandEvents,
   headlineFor,
+  mergeSchedule,
   monthGrid,
   monthOf,
   shiftDay,
   shiftMonth,
   weekdayOf,
 } from './derive'
-import type { Lesson } from './derive'
+import type { FamilyEvent, Lesson } from './derive'
 import type { HomeChild } from './types'
 
 const child = (id: string, firstName: string, groups: string[], belt = '#10b981'): HomeChild => ({
@@ -232,5 +234,88 @@ describe('monthGrid — the calendar modal cannot hardcode one month', () => {
     expect(shiftMonth({ year: 2026, month: 12 }, 1)).toEqual({ year: 2027, month: 1 })
     expect(shiftMonth({ year: 2026, month: 1 }, -1)).toEqual({ year: 2025, month: 12 })
     expect(monthOf('2026-08-25')).toEqual({ year: 2026, month: 8 })
+  })
+})
+
+// -- §4: events beside the lessons ---------------------------------------------
+describe('expandEvents', () => {
+  const kids = [child('c1', 'נועה', ['מתחילים']), child('c2', 'דנה', ['מתקדמים'])]
+
+  const event = (over: Partial<FamilyEvent> = {}): FamilyEvent => ({
+    id: 'e1',
+    title: 'אליפות המחוז',
+    startsAt: '2026-08-25T15:00:00Z',
+    endsAt: '2026-08-25T18:00:00Z',
+    locationText: 'היכל הספורט, נתניה',
+    studentId: 'c1',
+    studentName: 'נועה כהן',
+    rsvp: 'pending',
+    ...over,
+  })
+
+  it('puts the event TITLE where a lesson puts its group name', () => {
+    // An event has no group, and the title is the line a parent reads to know what the row
+    // is. `coachName` stays null: an event has organisers, not a lead coach, and inventing
+    // one would put a name on a card no table can back.
+    const [row] = expandEvents([event()], kids, 'בוטל')
+    expect(row!.kind).toBe('event')
+    expect(row!.groupName).toBe('אליפות המחוז')
+    expect(row!.locationName).toBe('היכל הספורט, נתניה')
+    expect(row!.coachName).toBeNull()
+  })
+
+  it('does NOT fan out over the family, the way a group lesson does', () => {
+    // The server has already resolved who is entered — one registration per entered child.
+    // Fanning out would invite a parent to RSVP for a child the club never entered.
+    expect(expandEvents([event()], kids, 'בוטל')).toHaveLength(1)
+  })
+
+  it('turns "pending" into no answer at all', () => {
+    // `pending` is the ABSENCE of an answer. Rendered as a value it would read as though
+    // the parent had chosen it.
+    expect(expandEvents([event()], kids, 'בוטל')[0]!.rsvp).toBeNull()
+    expect(expandEvents([event({ rsvp: 'yes' })], kids, 'בוטל')[0]!.rsvp).toBe('yes')
+  })
+
+  it('is never "reported absent", whatever the family answered', () => {
+    // Declining an event is an RSVP, in a different table. A `no` that showed up as an
+    // absence would land in the club's report for a lesson that never existed.
+    expect(expandEvents([event({ rsvp: 'no' })], kids, 'בוטל')[0]!.reportedAbsent).toBe(false)
+  })
+
+  it('carries the child’s belt colour, so the card looks like the ones around it', () => {
+    expect(expandEvents([event()], kids, 'בוטל')[0]!.beltColorHex).toBe(kids[0]!.beltColorHex)
+  })
+
+  it('says cancelled when the club calls the event off', () => {
+    expect(expandEvents([event({ cancelled: true })], kids, 'בוטל')[0]!.cancelledReason).toBe('בוטל')
+  })
+})
+
+describe('mergeSchedule', () => {
+  it('interleaves events and lessons by time, not by kind', () => {
+    // §4 asks for events "beside every other session". Two lists, or one list with the
+    // events bolted on the end, is an event a parent scrolls past.
+    const lessons = expandSessions(
+      [lesson({ id: 's1', startsAt: '2026-08-25T16:00:00Z' })],
+      [child('c1', 'נועה', ['קבוצה 2'])],
+      {},
+      noReason,
+    )
+    const events = expandEvents(
+      [
+        {
+          id: 'e1',
+          title: 'אליפות',
+          startsAt: '2026-08-25T14:00:00Z',
+          studentId: 'c1',
+          studentName: 'נועה כהן',
+          rsvp: 'pending',
+        },
+      ],
+      [child('c1', 'נועה', ['קבוצה 2'])],
+      'בוטל',
+    )
+    expect(mergeSchedule(lessons, events).map((row) => row.id)).toEqual(['e1', 's1'])
   })
 })

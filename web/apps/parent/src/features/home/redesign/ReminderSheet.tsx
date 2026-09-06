@@ -82,7 +82,11 @@ export function buildIcs(
   const summary = `${clubName}: ${session.studentName} — ${session.groupName}`
   const details = [
     `${t(locale, 'schedule.reminder.icsChild')} ${session.studentName}`,
-    `${t(locale, 'schedule.reminder.icsGroup')} ${session.groupName}`,
+    // An event has no group; `groupName` carries its TITLE on those rows, so the label has
+    // to follow or the file reads "קבוצה: אליפות המחוז" in the parent's calendar.
+    session.kind === 'event'
+      ? `${t(locale, 'schedule.reminder.icsEvent')} ${session.groupName}`
+      : `${t(locale, 'schedule.reminder.icsGroup')} ${session.groupName}`,
     session.coachName ? `${t(locale, 'schedule.reminder.icsCoach')} ${session.coachName}` : null,
     session.locationName
       ? `${t(locale, 'schedule.reminder.icsWhere')} ${session.locationName}`

@@ -21,6 +21,27 @@ export type Lesson = {
   cancelReason?: string | null
 }
 
+/**
+ * One row of `GET /me/events`, narrowed to what בית reads.
+ *
+ * ALREADY ONE ROW PER CHILD. `/me/events` returns `{event, registration}` pairs — a family
+ * with two children entered in one competition gets two rows — which is exactly the shape
+ * the home's session list is in, and the reason no join is needed here.
+ */
+export type FamilyEvent = {
+  id: string
+  title: string
+  startsAt: string
+  endsAt?: string | null
+  /** `location_text`, §5.12's free-text place: an event happens at someone else's dojo. */
+  locationText?: string | null
+  cancelled?: boolean
+  studentId: string
+  studentName: string
+  /** `pending` is the API's word for "not answered". It becomes `null` on the row. */
+  rsvp: 'yes' | 'no' | 'pending'
+}
+
 /** What the family has already told the club, keyed `<sessionId>:<studentId>`. The same
  *  shape `Resolve` already builds from `GET /me/attendance-intents`. */
 export type Intents = Readonly<Record<string, 'coming' | 'not_coming'>>
@@ -71,6 +92,7 @@ export function expandSessions(
     for (const child of children) {
       if (!child.groupNames.includes(lesson.groupName)) continue
       rows.push({
+        kind: 'lesson',
         id: lesson.id,
         studentId: child.id,
         // The FULL name, not the first — the prototype's cards and its absence sheet both
@@ -89,8 +111,63 @@ export function expandSessions(
       })
     }
   }
-  // Earliest first. Two children in one group tie on `startsAt`, so the name breaks it and
-  // the order stops depending on which child the roster happened to list first.
+  return sortByWhenThenWho(rows)
+}
+
+/**
+ * §5.12's events, as rows of the same list.
+ *
+ * The event's TITLE goes where a lesson's group name goes, because that is the line a
+ * parent reads to know what the row is — "אליפות המחוז" is the name of the thing, and
+ * events have no group. `coachName` is null and stays null: an event has organisers, not a
+ * lead coach, and inventing one would put a name on a card that no table can back.
+ *
+ * A child on the family's roster but not entered in the event contributes NO row — the
+ * server has already resolved that by returning one registration per entered child. This
+ * is the one place the home does not fan out over children, and doing so would invite a
+ * parent to RSVP for a child the club never entered.
+ */
+export function expandEvents(
+  events: readonly FamilyEvent[],
+  children: readonly HomeChild[],
+  cancelledLabel: string,
+): HomeSession[] {
+  const beltOf = new Map(children.map((child) => [child.id, child.beltColorHex]))
+  return sortByWhenThenWho(
+    events.map((event) => ({
+      kind: 'event' as const,
+      id: event.id,
+      studentId: event.studentId,
+      studentName: event.studentName,
+      groupName: event.title,
+      startsAt: event.startsAt,
+      endsAt: event.endsAt ?? null,
+      // §5.12's `location_text` — an event is at someone else's dojo, so it is free text
+      // rather than a row in the studio's own `location` table.
+      locationName: event.locationText ?? null,
+      coachName: null,
+      beltColorHex: beltOf.get(event.studentId) ?? null,
+      // An event is never "reported absent": declining one is an RSVP, and the two are
+      // different rows in different tables. Conflating them would let a `no` show up in
+      // the club's absence report for a lesson that never existed.
+      reportedAbsent: false,
+      cancelledReason: event.cancelled === true ? cancelledLabel : null,
+      rsvp: event.rsvp === 'pending' ? null : event.rsvp,
+    })),
+  )
+}
+
+/** Lessons and events, in one list, in time order. */
+export function mergeSchedule(
+  lessons: readonly HomeSession[],
+  events: readonly HomeSession[],
+): HomeSession[] {
+  return sortByWhenThenWho([...lessons, ...events])
+}
+
+// Earliest first. Two children in one group tie on `startsAt`, so the name breaks it and
+// the order stops depending on which child the roster happened to list first.
+function sortByWhenThenWho(rows: HomeSession[]): HomeSession[] {
   return rows.sort(
     (a, b) => a.startsAt.localeCompare(b.startsAt) || a.studentName.localeCompare(b.studentName),
   )

@@ -115,6 +115,7 @@ the inbox's RSVP action.
 | 6 | strings into `@studio/i18n`, mirrored into `en/` and `ru/` | ✅ done |
 | — | the dark sweep | ✅ done, and see below |
 | — | deleting the screens the redesign replaced | ✅ done (b8621c3) |
+| — | §5.12's events, beside the lessons on בית | ✅ done |
 
 ### The dark sweep, and what it deliberately left light
 
@@ -146,9 +147,14 @@ made from), and darkening them is a design change the owner has not been shown.
   Home's header button and the floating button both go to `#/absence`, which is a working
   screen that already does multi-child, multi-session picking. Nothing is broken; the
   prototype's version is simply not built.
-- **Events folded into Home.** §4 says events appear beside every other session. `GET
-  /sessions` returns lessons, not events, so this needs the events read joined into the same
-  list. `#/events` is still linked from the inbox's RSVP action, so nothing is stranded.
+- ~~**Events folded into Home.**~~ Done 2026-09-06. `GET /me/events` already returns one
+  row per CHILD per event — the shape בית's list is in — so no server change was needed and
+  no join either. `expandEvents` builds the rows, `mergeSchedule` interleaves them by time,
+  and the card branches: an event leads with an RSVP link to `#/events`, never the absence
+  button, because declining an event is a different answer in a different table. Events are
+  excluded from the whole-day absence batch for the same reason (proved red-green). The day
+  count changed from 'שיעורים' to 'פעילויות' — a competition counted as a lesson is a
+  sentence that is false on any day a family has one.
 - **`#/calendar`** is now linked from Profile's quick links as the CALENDAR FEED — §5.12's
   subscription, which is what the route still exists for now that בית draws the month itself
   in a modal. `AccountControls`'s two transitional links are gone: Profile carries

@@ -648,10 +648,12 @@ export const schedule: Bundle = {
   'home.monthButton': 'חודש',
   'home.monthButtonTitle': 'פתיחת לוח חודשי מלא',
   'home.today': 'היום',
-  // -- the day headline's count --
-  'home.noSessionsPlanned': 'אין אימונים מתוכננים',
-  'home.oneSessionPlanned': 'שיעור אחד מתוכנן',
-  'home.manySessionsPlanned': '{{count}} שיעורים מתוכננים',
+  // -- the day headline's count. 'פעילויות' and not the prototype's 'שיעורים': §5.12's
+  //    events sit in this list too (§4), and a competition counted as a lesson is a
+  //    sentence that is simply false on any day a family has one --
+  'home.noSessionsPlanned': 'אין פעילויות מתוכננות',
+  'home.oneSessionPlanned': 'פעילות אחת מתוכננת',
+  'home.manySessionsPlanned': '{{count}} פעילויות מתוכננות',
   // -- the session card --
   'home.absentQuestion': 'נעדר/ת?',
   'home.absentReported': 'דווח ✓',
@@ -664,7 +666,7 @@ export const schedule: Bundle = {
   'home.reminderUnset': 'תזכורת ליומן',
   'home.reminderTitle': 'הגדר תזכורת אישית ביומן המכשיר',
   // -- the empty day --
-  'home.emptyTitle': 'אין אימונים מתוכננים ליום זה',
+  'home.emptyTitle': 'אין פעילויות מתוכננות ליום זה',
   'home.emptyBody': 'ניתן לצפות בימים אחרים או בלוח החודשי המלא',
   'home.emptyCta': 'פתיחת לוח חודשי',
   // -- the monthly calendar modal, which is where the deleted drawer's calendar went --
@@ -683,6 +685,14 @@ export const schedule: Bundle = {
   'home.loading': 'טוען את לוח האימונים…',
   'home.loadFailed': 'לא הצלחנו לטעון את לוח האימונים',
   'home.retry': 'נסו שוב',
+  // -- §5.12's events, folded into בית's session list (§4) ----------------------
+  // The card is not a lesson's: an event asks for an RSVP, which is a different answer to
+  // a different question. `eventPending` is what a child with no answer yet shows.
+  'home.eventBadge': 'אירוע',
+  'home.eventRsvpYes': 'אישרתם ✓',
+  'home.eventRsvpNo': 'לא מגיעים',
+  'home.eventPending': 'לאישור',
+  'home.eventOpen': 'לפרטים ולאישור',
   // -- the per-session calendar reminder (the parent home redesign, 2026-09-05) ---
   //
   // The prototype carries all three languages inline in `REMINDER_OPTIONS`
@@ -705,6 +715,7 @@ export const schedule: Bundle = {
   // -- field labels inside the .ics description --
   'reminder.icsChild': 'חניך/ה:',
   'reminder.icsGroup': 'קבוצה:',
+  'reminder.icsEvent': 'אירוע:',
   'reminder.icsCoach': 'מאמן/ת:',
   'reminder.icsWhere': 'מיקום:',
 }

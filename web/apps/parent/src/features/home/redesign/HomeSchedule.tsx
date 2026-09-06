@@ -4,10 +4,23 @@
 // porting rules this file follows — Tailwind classes kept as written, physical directional
 // utilities turned logical, every string from `content.ts`, no date math.
 //
-// The prototype knows two card states (scheduled, reported_absent). This screen adds a
-// third: CANCELLED, when the club calls the lesson off (`session.cancelledReason` is a
-// resolved sentence, not a flag) — a cancelled lesson is never drawn as an absence.
-import { Bell, Calendar, CalendarDays, CalendarX, CheckCircle2, Clock, MapPin, Plus } from 'lucide-react'
+// The prototype knows two card states (scheduled, reported_absent). This screen adds two:
+// CANCELLED, when the club calls the lesson off (`session.cancelledReason` is a resolved
+// sentence, not a flag) — a cancelled lesson is never drawn as an absence — and EVENT,
+// §5.12's competitions and gradings folded in beside the lessons as §4 asks. An event card
+// leads with an RSVP link rather than the absence button: it is a different answer to a
+// different question, and the prototype has no events at all to draw one from.
+import {
+  Bell,
+  Calendar,
+  CalendarDays,
+  CalendarX,
+  CheckCircle2,
+  Clock,
+  MapPin,
+  Plus,
+  Trophy,
+} from 'lucide-react'
 import { fill, weekdayInitials } from '@studio/core'
 import { t } from '@studio/i18n'
 import { resolveLoadFailedText } from '../../shell/loadFailed'
@@ -176,6 +189,7 @@ export function HomeSchedule({
             </div>
           ) : sessions.length > 0 ? (
             sessions.map((session) => {
+              const isEvent = session.kind === 'event'
               const isCancelled = session.cancelledReason !== null
               const isAbsent = !isCancelled && session.reportedAbsent
               const location =
@@ -193,7 +207,35 @@ export function HomeSchedule({
                   data-testid={`home-session-${session.id}-${session.studentId}`}
                   className="session-card bg-white dark:bg-slate-900 rounded-3xl p-3.5 shadow-xs border border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3 relative overflow-hidden transition-all duration-300"
                 >
-                  {/* Absence Action Button */}
+                  {/* THE LEADING ACTION, which is not the same question on both kinds.
+                      A lesson asks "נעדר/ת?" and writes an absence report; an event asks
+                      for an RSVP, stored in a different table and answered on §5.12's own
+                      screen where the fee and the consent text are. Sending an event id to
+                      `POST /absence-reports` would 404, so this is a branch and not a
+                      relabelled button. */}
+                  {isEvent ? (
+                    <a
+                      href="#/events"
+                      data-testid={`home-event-rsvp-${session.id}-${session.studentId}`}
+                      aria-label={`${t(locale, 'schedule.home.eventOpen')} ${session.studentName}`}
+                      className={`flex flex-col items-center justify-center p-2 rounded-2xl w-16 shrink-0 border transition-all cursor-pointer ${
+                        session.rsvp === 'yes'
+                          ? 'bg-emerald-50/70 border-emerald-200 text-emerald-700'
+                          : session.rsvp === 'no'
+                            ? 'bg-slate-50 dark:bg-slate-800/70 border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400'
+                            : 'bg-blue-50 dark:bg-blue-400/15 border-blue-100 dark:border-blue-400/25 text-[#0056c5] dark:text-blue-300'
+                      }`}
+                    >
+                      <Trophy className="w-4 h-4" aria-hidden="true" />
+                      <span className="text-[10px] font-bold mt-0.5 text-center leading-tight">
+                        {session.rsvp === 'yes'
+                          ? t(locale, 'schedule.home.eventRsvpYes')
+                          : session.rsvp === 'no'
+                            ? t(locale, 'schedule.home.eventRsvpNo')
+                            : t(locale, 'schedule.home.eventPending')}
+                      </span>
+                    </a>
+                  ) : (
                   <button
                     type="button"
                     disabled={isAbsent || isCancelled}
@@ -225,6 +267,7 @@ export function HomeSchedule({
                       </>
                     )}
                   </button>
+                  )}
 
                   {/* Middle Info Details */}
                   <div className="flex-1 text-start">
@@ -245,12 +288,20 @@ export function HomeSchedule({
                         className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
                           isCancelled
                             ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
-                            : isAbsent
+                            : isEvent
+                              ? 'bg-blue-50 dark:bg-blue-400/15 text-[#0056c5] dark:text-blue-300 font-semibold'
+                              : isAbsent
                               ? 'bg-amber-100 text-amber-900 font-semibold'
                               : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
                         }`}
                       >
-                        {isCancelled ? t(locale, 'schedule.home.statusCancelled') : isAbsent ? t(locale, 'schedule.home.statusReported') : t(locale, 'schedule.home.statusScheduled')}
+                        {isCancelled
+                          ? t(locale, 'schedule.home.statusCancelled')
+                          : isEvent
+                            ? t(locale, 'schedule.home.eventBadge')
+                            : isAbsent
+                              ? t(locale, 'schedule.home.statusReported')
+                              : t(locale, 'schedule.home.statusScheduled')}
                       </span>
                     </div>
                     <p className="font-semibold text-sm text-slate-800 dark:text-slate-50 mt-0.5">{session.groupName}</p>
