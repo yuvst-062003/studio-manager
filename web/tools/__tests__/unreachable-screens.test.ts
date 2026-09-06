@@ -47,6 +47,15 @@ describe.each(APPS)('reachability in apps/%s', (app) => {
               // Module paths are not references — `from './HandOverSheet'` on a
               // type-only re-export must not make the component count as used.
               .replaceAll(/from\s+'[^']+'/g, 'from ""')
+              // Comments are not references either — a component named only in prose
+              // (four files once mentioned `StaffStudentCard` in a comment explaining
+              // where it WOULD mount, and that alone satisfied this check while nothing
+              // actually rendered it) must not count as "referenced". Block comments
+              // first, since one can span several lines a line-comment strip alone would
+              // miss; module paths are already blanked above, so a `//` inside
+              // `'https://…'` is gone before this treats a bare `//` as a comment opener.
+              .replaceAll(/\/\*[\s\S]*?\*\//g, '')
+              .replaceAll(/\/\/.*$/gm, '')
               .replaceAll(new RegExp(`^export \\{[^}]*\\b${name}\\b[^}]*\\}.*$`, 'gm'), '')
               .replaceAll(new RegExp(`export (function|const|class) ${name}\\b`, 'g'), '')
             return new RegExp(`\\b${name}\\b`).test(stripped)
