@@ -131,7 +131,10 @@ export function StaffTabBar({
       // the timer.
       className={`tw-scope fixed inset-x-0 bottom-0 mx-auto max-w-md z-40 border-t shadow-2xl transition-colors duration-300 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] px-2 ${
         isTimerActive
-          ? 'bg-[#090d16]/95 border-slate-800 text-slate-400'
+          ? // Follows the THEME now (owner, 2026-09-07), like the timer screen it matches.
+            // It used to be unconditionally dark, so a coach on the light theme got a black
+            // bar under a screen that is no longer black.
+            'bg-white/95 border-slate-200 text-slate-500 dark:bg-[#090d16]/95 dark:border-slate-800 dark:text-slate-400'
           : 'bg-white border-slate-200 text-slate-500'
       }`}
     >
