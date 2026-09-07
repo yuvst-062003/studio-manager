@@ -8,7 +8,16 @@
 // and §5.11 permits no email or SMS fallback, so that parent is reachable only by
 // telephone."
 import { useEffect, useMemo, useState } from 'react'
-import { apiFetch, apiUrl, getAccessToken, refresh, useDisplayMode, useSession, switchStudio } from '@studio/core'
+import {
+  apiFetch,
+  apiUrl,
+  getAccessToken,
+  refresh,
+  useDisplayMode,
+  useScrollMemory,
+  useSession,
+  switchStudio,
+} from '@studio/core'
 import {
   AccessibilityMenu,
   InstallBanner,
@@ -24,7 +33,6 @@ import type { InstallPromptEvent } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { ParentShell } from './features/shell/ParentShell'
-import { useScrollMemory } from './features/shell/useScrollMemory'
 import type { ParentTab } from './features/shell/ParentTabBar'
 import { AccessGate } from './features/identity/AccessGate'
 import type { InvitedStudent } from './features/identity/AccessGate'

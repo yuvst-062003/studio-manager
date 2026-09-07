@@ -15,6 +15,13 @@
 // **Nothing is persisted.** The map lives as long as the shell. A position restored from a
 // previous session would point into a list that has since changed, which is worse than the
 // top of the page.
+//
+// **In @studio/core, beside `lockViewportZoom`, and for the same reason** (moved here
+// 2026-09-07): both phone apps route on `location.hash` and both had the identical hole,
+// and the staff app's is the worse of the two — a coach scrolls a register of thirty
+// children, taps טיימר to start a round, and comes back to the top of a list they were
+// halfway through marking. The dashboard does not import it: it is the manager's desktop
+// tool and the browser already restores its scroll on a real page navigation.
 import { useEffect, useLayoutEffect, useRef } from 'react'
 
 /**

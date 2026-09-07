@@ -9,7 +9,7 @@
 // installed — which is why the nudge names what installing buys, but it is a pitch now,
 // not a gate.
 import { useEffect, useMemo, useState } from 'react'
-import { apiFetch, useDisplayMode, useSession, switchStudio } from '@studio/core'
+import { apiFetch, useDisplayMode, useScrollMemory, useSession, switchStudio } from '@studio/core'
 import {
   AccessibilityMenu,
   EmptyState,
@@ -189,6 +189,12 @@ export default function App() {
     session.status === 'signed-in',
   )
   const hash = useHash()
+  // A hash link moves the page by neither scrolling nor restoring, so without this a coach
+  // who scrolls halfway down a thirty-child register, taps טיימר to run a round and comes
+  // back lands in the middle of the timer screen on the way out and at the same offset in a
+  // list they were part-way through marking on the way back. One offset per screen; see the
+  // hook's own header in @studio/core.
+  useScrollMemory(hash)
   const today = useToday()
 
   // S4.3 — the bare hash redirects EXPLICITLY rather than falling through in silence:
