@@ -8,7 +8,7 @@
 // web app is exempt from Safari's 7-day script-storage cap, so `pending_ops` is safest
 // installed — which is why the nudge names what installing buys, but it is a pitch now,
 // not a gate.
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiFetch, useDisplayMode, useScrollMemory, useSession, switchStudio } from '@studio/core'
 import {
   AccessibilityMenu,
@@ -77,6 +77,11 @@ import {
   makeStaffConsentClient,
   makeStaffPrivacyClient,
 } from './features/privacy'
+import {
+  EmergencyContactStep,
+  shouldAskForEmergencyContact,
+} from './features/account/EmergencyContactStep'
+import type { EmergencyContactInput } from './features/account/EmergencyContactStep'
 import { StaffAlerts } from './StaffAlerts'
 import { NetworkStatus } from './NetworkStatus'
 import { StaffShell } from './features/shell/StaffShell'
@@ -230,8 +235,42 @@ export default function App() {
   // trio `PATCH /sessions` already admits and `StaffEventsScreen`'s own `canPublish` below
   // computes inline for the identical reason. An assistant coach reads `RosterScreen`'s
   // plan card with no editor rather than being refused a screen that would show them one.
+  // Revision 0025 — asked of ASSISTANT COACHES with nothing on file, and nobody else. The
+  // profile read is the source of truth for "nothing on file": a device-local flag would let
+  // one tap hide a safety field forever on a phone the club never sees, so the only thing
+  // kept locally is `postponed`, which dies with this launch.
+  const [emergencyOnFile, setEmergencyOnFile] = useState<string | null | undefined>(undefined)
+  const [emergencyPostponed, setEmergencyPostponed] = useState(false)
   const viewerCanWritePlan =
     viewerIsManager || (membership?.roles.includes('lead_coach') ?? false)
+
+  const isAssistant = membership?.roles.includes('assistant_coach') ?? false
+  useEffect(() => {
+    if (session.status !== 'signed-in' || !isAssistant) return
+    let live = true
+    void apiFetch('/api/v1/me/profile')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body: { emergency_contact_name?: string | null } | null) => {
+        // `null` on a failed read means "nothing to ask about" rather than "ask": a step
+        // that appeared because the network hiccuped would be an interruption with no
+        // reason behind it, and the ask returns on the next launch anyway.
+        if (live) setEmergencyOnFile(body?.emergency_contact_name ?? null)
+      })
+      .catch(() => live && setEmergencyOnFile('unknown'))
+    return () => {
+      live = false
+    }
+  }, [session.status, isAssistant])
+
+  const saveEmergencyContact = useCallback(async (input: EmergencyContactInput) => {
+    const response = await apiFetch('/api/v1/me/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    })
+    if (!response.ok) throw new Error(String(response.status))
+    setEmergencyOnFile(input.emergency_contact_name)
+  }, [])
   // §4.4 (checkpoint 8) — "no task table, rebuilt every time the tab opens". Called here,
   // once, rather than inside the tasks screen alone, because the tab bar's own badge is
   // visible on every screen and needs the same count `TasksScreen` renders; see
@@ -393,6 +432,19 @@ export default function App() {
             role at all would be asked to accept terms for a studio that has already refused
             them. */}
         <StaffConsentGate client={consentClient} locale={locale}>
+        {/* Revision 0025's ask. A STEP, not a second gate — it stands after the consent
+            gate, which is the hard one, and the app behind it is fully usable via "later".
+            `emergencyOnFile === undefined` is "still asking", and rendering the step then
+            would flash it at an assistant who filled it in months ago. */}
+        {emergencyOnFile !== undefined &&
+        !emergencyPostponed &&
+        shouldAskForEmergencyContact(membership?.roles ?? [], emergencyOnFile) ? (
+          <EmergencyContactStep
+            locale={locale}
+            onSave={saveEmergencyContact}
+            onSkip={() => setEmergencyPostponed(true)}
+          />
+        ) : (
         <StaffShell
           activeTab={activeTab}
           locale={locale}
@@ -670,6 +722,7 @@ export default function App() {
             </>
           )}
         </StaffShell>
+        )}
         </StaffConsentGate>
         </AccessGate>
       ) : null}

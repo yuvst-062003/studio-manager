@@ -919,6 +919,14 @@ class MyProfileUpdate(BaseModel):
     last_name: str | None = Field(default=None, min_length=1, max_length=80)
     phone: str | None = Field(default=None, max_length=32)
     email: str | None = Field(default=None, pattern=EMAIL_PATTERN, max_length=320)
+    #: 0025 -- who to call if this person is hurt. Asked for by the staff app's first-run
+    #: step, of ASSISTANT COACHES only (that revision's docstring says why that role);
+    #: writable by anyone, because refusing a lead coach who wants to record one would be a
+    #: refusal with nothing behind it. An explicit `null` clears one, like every other field
+    #: here.
+    emergency_contact_name: str | None = Field(default=None, max_length=160)
+    emergency_contact_phone: str | None = Field(default=None, max_length=32)
+    emergency_contact_relation: str | None = Field(default=None, max_length=40)
 
 
 class MyProfileOut(BaseModel):
@@ -928,6 +936,12 @@ class MyProfileOut(BaseModel):
     display_name: str
     email: str | None
     phone: str | None
+    #: The caller's OWN emergency contact, so the first-run step knows whether to ask and
+    #: the account screen can show what is on file. Nobody else's is reachable here -- a
+    #: manager reads a colleague's through `GET /staff`, which is `ManagerOrOwner`.
+    emergency_contact_name: str | None = None
+    emergency_contact_phone: str | None = None
+    emergency_contact_relation: str | None = None
 
 
 def _my_profile_out(person: Person) -> MyProfileOut:
@@ -938,6 +952,9 @@ def _my_profile_out(person: Person) -> MyProfileOut:
         display_name=format_person_name(person.first_name, person.last_name),
         email=person.email,
         phone=person.phone,
+        emergency_contact_name=person.emergency_contact_name,
+        emergency_contact_phone=person.emergency_contact_phone,
+        emergency_contact_relation=person.emergency_contact_relation,
     )
 
 

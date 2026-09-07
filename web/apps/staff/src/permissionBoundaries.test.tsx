@@ -51,6 +51,17 @@ function staffFetch(roles: string[]) {
         { status: 200 },
       )
     }
+    if (url.includes('/me/profile')) {
+      // Revision 0025's first-run step asks an ASSISTANT COACH for an emergency contact and
+      // holds the shell until they answer or postpone — and half of this file signs in as
+      // one. Answering it here says out loud what these tests assume: they are about the
+      // permission boundaries INSIDE the app, not about first-run, and a step standing in
+      // front of the shell would make every one of them fail for a reason none of them is
+      // testing. `App.test.tsx` owns the first-run behaviour itself.
+      return new Response(JSON.stringify({ emergency_contact_name: 'רונית גולן' }), {
+        status: 200,
+      })
+    }
     return new Response(JSON.stringify({ items: [] }), { status: 200 })
   })
 }

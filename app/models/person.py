@@ -84,6 +84,21 @@ class Person(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     national_id_encrypted: Mapped[bytes | None] = mapped_column(
         EncryptedBytes("person.national_id_encrypted")
     )
+    #: Who to call if this person is hurt. Collected from ASSISTANT COACHES only -- see
+    #: revision 0025 for why that role and not the others: an assistant is typically a
+    #: teenager helping on the mat whose parent's number the club does not otherwise hold,
+    #: while a manager or lead coach is an adult member of staff whose details it already
+    #: has. Asked for by the staff app's own first-run step, skippable, and never inferred.
+    #:
+    #: **Read by a manager, never by a coach.** The only surface is `GET /staff`, which is
+    #: already `ManagerOrOwner` -- these are a third party's name and number, and a coach
+    #: browsing their colleagues' next-of-kin is not a thing this product does.
+    emergency_contact_name: Mapped[str | None] = mapped_column(String(160))
+    emergency_contact_phone: Mapped[str | None] = mapped_column(String(32))
+    #: 'אמא', 'בן/בת זוג' — free text rather than an enum, because the useful answer here is
+    #: whatever the person would actually say when handing over a number, and a list would
+    #: be a list somebody is missing from.
+    emergency_contact_relation: Mapped[str | None] = mapped_column(String(40))
     address: Mapped[str | None] = mapped_column(String(200))
     city: Mapped[str | None] = mapped_column(String(80))
     #: `מספר טלפון בבית`. `phone` is the mobile; the paper form asks for both, and a

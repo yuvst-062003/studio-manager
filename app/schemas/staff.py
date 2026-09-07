@@ -20,6 +20,18 @@ class StaffMemberOut(BaseModel):
     first_name: str | None = None
     last_name: str | None = None
     email: str | None = None
+    #: 0025 -- the person to call if this one is hurt on a mat. Collected from ASSISTANT
+    #: COACHES only (that revision's docstring says why that role and not the others) and
+    #: null for everyone who has not filled it in, which on the day it shipped is everyone.
+    #:
+    #: **On THIS response and no other.** `GET /staff` is `ManagerOrOwner`; a coach-scoped
+    #: route must never learn to carry these, because they are a third party's name and
+    #: number and a coach browsing their colleagues' next-of-kin is not a thing this product
+    #: does. It is also why the fields live here rather than on a roster row or a session's
+    #: staff list, both of which a coach can read.
+    emergency_contact_name: str | None = None
+    emergency_contact_phone: str | None = None
+    emergency_contact_relation: str | None = None
     roles: list[str]
     groups: list[StaffGroupOut]
     weekly_hours: float | None = Field(

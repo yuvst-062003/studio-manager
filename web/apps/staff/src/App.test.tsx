@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
 import App from './App'
@@ -281,5 +282,69 @@ describe('§6.1 step 5 — the consent gate is actually MOUNTED', () => {
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('tab-bar')).toBeInTheDocument())
     expect(screen.queryByTestId('staff-consent-gate')).not.toBeInTheDocument()
+  })
+})
+
+describe('revision 0025 — the emergency-contact step is MOUNTED, and only for assistants', () => {
+  /** Same reasoning as the consent block above: a step nobody mounts asks nobody anything.
+   *  `EmergencyContactStep.test.tsx` renders the component, which proves the component. */
+  const asRole = (role: string) => ({
+    ...SIGNED_IN_BODY,
+    studios: [{ ...SIGNED_IN_BODY.studios[0], roles: [role] }],
+  })
+
+  const stubFor = (role: string, profile: Record<string, unknown>) =>
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/auth/refresh')) {
+          return new Response(
+            JSON.stringify({ access_token: 'tok', expires_in: 900, ...asRole(role) }),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/auth/me')) {
+          return new Response(JSON.stringify({ ...asRole(role), dev_tools: false }), {
+            status: 200,
+          })
+        }
+        if (url.includes('/me/profile')) {
+          return new Response(JSON.stringify(profile), { status: 200 })
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+
+  it('asks an assistant coach who has nobody on file', async () => {
+    stubFor('assistant_coach', { emergency_contact_name: null })
+    render(<App />)
+    await waitFor(() =>
+      expect(screen.getByTestId('emergency-contact-step')).toBeInTheDocument(),
+    )
+  })
+
+  it('never asks a lead coach', async () => {
+    stubFor('lead_coach', { emergency_contact_name: null })
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('tab-bar')).toBeInTheDocument())
+    expect(screen.queryByTestId('emergency-contact-step')).not.toBeInTheDocument()
+  })
+
+  it('stops asking an assistant who already answered', async () => {
+    stubFor('assistant_coach', { emergency_contact_name: 'רונית גולן' })
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('tab-bar')).toBeInTheDocument())
+    expect(screen.queryByTestId('emergency-contact-step')).not.toBeInTheDocument()
+  })
+
+  it('lets the app through once postponed', async () => {
+    stubFor('assistant_coach', { emergency_contact_name: null })
+    render(<App />)
+    await screen.findByTestId('emergency-contact-step')
+
+    await userEvent.click(screen.getByTestId('emergency-skip'))
+
+    await waitFor(() => expect(screen.getByTestId('tab-bar')).toBeInTheDocument())
   })
 })

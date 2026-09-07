@@ -100,6 +100,15 @@ def _people(session: Session) -> list[dict[str, Any]]:
                 "first_name": person.first_name,
                 "last_name": person.last_name,
                 "email": person.email,
+                # 0025 -- who to call if this person is hurt. Manager-only by virtue of
+                # where it appears: `GET /staff` is `ManagerOrOwner`. Emitted for EVERY
+                # staff row rather than filtered to assistants, because the filter that
+                # matters is on who is ASKED (the staff app's first-run step, assistants
+                # only) -- and a lead coach who chose to record one should not have it
+                # silently dropped on the way out.
+                "emergency_contact_name": person.emergency_contact_name,
+                "emergency_contact_phone": person.emergency_contact_phone,
+                "emergency_contact_relation": person.emergency_contact_relation,
                 "roles": [],
                 "groups": [],
                 # W2's, and named as absent rather than guessed at.

@@ -9083,6 +9083,12 @@ export interface components {
             display_name: string;
             /** Email */
             email: string | null;
+            /** Emergency Contact Name */
+            emergency_contact_name?: string | null;
+            /** Emergency Contact Phone */
+            emergency_contact_phone?: string | null;
+            /** Emergency Contact Relation */
+            emergency_contact_relation?: string | null;
             /** First Name */
             first_name: string;
             /** Last Name */
@@ -9109,6 +9115,12 @@ export interface components {
         MyProfileUpdate: {
             /** Email */
             email?: string | null;
+            /** Emergency Contact Name */
+            emergency_contact_name?: string | null;
+            /** Emergency Contact Phone */
+            emergency_contact_phone?: string | null;
+            /** Emergency Contact Relation */
+            emergency_contact_relation?: string | null;
             /** First Name */
             first_name?: string | null;
             /** Last Name */
@@ -11634,6 +11646,12 @@ export interface components {
         StaffMemberOut: {
             /** Email */
             email?: string | null;
+            /** Emergency Contact Name */
+            emergency_contact_name?: string | null;
+            /** Emergency Contact Phone */
+            emergency_contact_phone?: string | null;
+            /** Emergency Contact Relation */
+            emergency_contact_relation?: string | null;
             /** First Name */
             first_name?: string | null;
             /** Groups */

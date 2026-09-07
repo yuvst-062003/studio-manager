@@ -904,4 +904,14 @@ export const people: Bundle = {
   'stats.chartLabel': 'Average attendance compared across groups',
   'stats.noData': 'No attendance data to show yet',
   'stats.footer': 'Figures reflect the students currently shown and attendance recorded so far — not a monthly trend.',
+  // Counterpart of he/people.ts's emergency block.
+  'emergency.title': 'Who should we call if something happens?',
+  'emergency.body': 'As an assistant coach we ask for one emergency contact. Only club managers can see it, and only if something happens during training.',
+  'emergency.name': 'Contact name',
+  'emergency.phone': 'Phone',
+  'emergency.relation': 'Relationship (optional)',
+  'emergency.save': 'Save',
+  'emergency.saving': 'Saving…',
+  'emergency.later': 'I will fill this in later',
+  'emergency.saveFailed': 'Saving failed. Try again.',
 }

@@ -28,7 +28,26 @@ from app.services.people.errors import NotFoundError
 #: What the profile tab may write. Everything else on `person` -- the national id, the
 #: aliyah year, the address, the birthdate -- is registration's, collected once under a
 #: signature, and is deliberately not editable from a settings screen.
-EDITABLE = ("first_name", "last_name", "phone", "email")
+#:
+#: **The three emergency-contact fields joined this list in 0025**, and they are the one
+#: group here that was never collected at registration. They belong on a settings screen
+#: precisely because they change -- a phone number, a person who moved away -- and because
+#: the person who knows the answer is the one holding the session.
+#:
+#: Writable by ANY caller, not only an assistant coach. Who is ASKED is a product decision
+#: the staff app's first-run step makes (0025's docstring says why assistants); who is
+#: ALLOWED is this list, and refusing a lead coach who wants to record one would be a
+#: refusal with nothing behind it. The scoping that matters is on the READ, which is
+#: manager-only.
+EDITABLE = (
+    "first_name",
+    "last_name",
+    "phone",
+    "email",
+    "emergency_contact_name",
+    "emergency_contact_phone",
+    "emergency_contact_relation",
+)
 
 
 class ProfileService:

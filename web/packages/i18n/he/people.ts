@@ -1028,4 +1028,18 @@ export const people: Bundle = {
   'stats.chartLabel': 'השוואת ממוצע נוכחות בין קבוצות',
   'stats.noData': 'עדיין אין נתוני נוכחות להצגה',
   'stats.footer': 'הנתונים משקפים את החניכים המוצגים כרגע ואת הנוכחות שנרשמה עד כה — לא מגמה חודשית.',
+  // -- איש קשר לשעת חירום (revision 0025). Asked of ASSISTANT COACHES only: an
+  // assistant is typically a teenager helping on the mat whose parent's number the club
+  // does not otherwise hold, while a manager or lead coach is an adult member of staff
+  // whose details it already has. The body line says who can see it, because a person
+  // handing over a third party's phone number is owed that before they type it.
+  'emergency.title': 'למי להתקשר אם משהו יקרה?',
+  'emergency.body': 'כמאמן/ת עוזר/ת אנחנו מבקשים איש קשר אחד לשעת חירום. הפרטים גלויים למנהלי המועדון בלבד, ורק אם משהו קורה באימון.',
+  'emergency.name': 'שם איש הקשר',
+  'emergency.phone': 'טלפון',
+  'emergency.relation': 'מה הקשר (לא חובה)',
+  'emergency.save': 'שמירה',
+  'emergency.saving': 'שומר…',
+  'emergency.later': 'אמלא בהמשך',
+  'emergency.saveFailed': 'השמירה נכשלה. נסו שוב.',
 }
