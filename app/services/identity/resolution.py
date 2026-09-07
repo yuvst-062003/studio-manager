@@ -252,6 +252,13 @@ def studios_for_identity(session: Session, identity_id: uuid.UUID) -> list[Studi
                 # §18.3's suspend action. A suspended studio someone can still switch
                 # into is a suspension that suspended nothing.
                 continue
+            # DISTINCT: §3.1 keys an assignment by `(person, role, scope_type, scope_id)`,
+            # so a coach who works four groups holds four live rows of the SAME role.
+            # `roles` says what this person is in this studio -- scope multiplicity is the
+            # assignments' business, not this projection's. Without it the staff profile
+            # card printed 'מאמן עוזר' once per group, eleven times for a real coach.
+            # `act_as._describe` fixed the identical bug as ship-audit D4; this query,
+            # which feeds every real session rather than the persona switcher, was missed.
             roles = tuple(
                 session.execute(
                     select(RoleAssignment.role)
@@ -259,6 +266,7 @@ def studios_for_identity(session: Session, identity_id: uuid.UUID) -> list[Studi
                         RoleAssignment.person_id == person.id,
                         RoleAssignment.revoked_at.is_(None),
                     )
+                    .distinct()
                     .order_by(RoleAssignment.role)
                 )
                 .scalars()

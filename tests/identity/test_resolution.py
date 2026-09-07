@@ -338,6 +338,45 @@ def test_a_studio_switcher_is_only_earned_by_belonging_to_two(app_session, studi
     assert memberships[0].is_guardian is False
 
 
+def test_a_role_held_on_many_groups_is_named_once(app_session, studio):
+    """3.1 -- role_assignment is '(person, role, scope_type, scope_id)', so a coach who
+    works four groups holds FOUR live rows of the same role. `roles` is a projection of
+    what the person IS in this studio, not a count of their assignments.
+
+    Without DISTINCT the staff app's profile card printed 'מאמן עוזר' once per group --
+    eleven times for a real coach. `act_as._describe` fixed exactly this as ship-audit D4
+    ('the switcher listed lead_coach nineteen times') and this query, which feeds every
+    real session rather than the persona switcher, was left behind.
+    """
+    identity = _identity(app_session)
+    person = _person(app_session, studio, identity)
+    for scope_id in (uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), uuid.uuid4()):
+        app_session.add(
+            RoleAssignment(
+                studio_id=studio.id,
+                person_id=person.id,
+                role="assistant_coach",
+                scope_type="group",
+                scope_id=scope_id,
+                granted_at=T0,
+            )
+        )
+    app_session.add(
+        RoleAssignment(
+            studio_id=studio.id,
+            person_id=person.id,
+            role="manager",
+            scope_type="studio",
+            granted_at=T0,
+        )
+    )
+    app_session.commit()
+
+    memberships = studios_for_identity(app_session, identity.id)
+
+    assert memberships[0].roles == ("assistant_coach", "manager")
+
+
 def test_a_suspended_studio_is_not_offered(app_session, studio):
     """18.3's suspend action. A suspended studio a person can still switch into is a
     suspension that suspended nothing."""

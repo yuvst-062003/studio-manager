@@ -44,7 +44,13 @@ const lockedRowStyle: CSSProperties = {
 
 /** The roles 9e/the profile card actually name — never `has_health_access` or the like. */
 export function roleLabelsOf(roles: string[], locale: Locale): string[] {
-  return roles
+  // **Deduplicated, and not only because the server now does it too.** §3.1 keys a role
+  // assignment by scope, so a coach working eleven groups holds eleven `assistant_coach`
+  // rows; `studios_for_identity` lacked DISTINCT and the profile card printed 'מאמן עוזר'
+  // eleven times. The server is fixed -- but §10.2 means a coach can be running from a
+  // session cached before that deploy, and a label list is a projection of what someone
+  // IS either way. Deduping here costs one Set and makes the screen right regardless.
+  return [...new Set(roles)]
     .filter((role) => ['owner', 'manager', 'lead_coach', 'assistant_coach'].includes(role))
     .map((role) => t(locale, `common.staff.role.${role}`))
 }
