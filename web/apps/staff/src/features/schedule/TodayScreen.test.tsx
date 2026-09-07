@@ -821,3 +821,94 @@ describe('TodayScreen — the session happening now gets its own card (C3)', () 
     expect(screen.queryByTestId('session-roster-unavailable')).toBeNull()
   })
 })
+
+// Owner fixes (2026-09-07): the pendingClose card's primary action names the act it
+// performs (closing a session by taking its register) rather than reading "open
+// attendance" on a session already over, and the card gains a discreet link to the
+// session's write-up once the class has actually happened. Neither fix touches the
+// schedule client, adds a status column, or invents a "close" write — closing stays
+// derived, exactly as it was before this pass; see `SessionCard`'s own note above
+// `open-roster` in `TodayScreen.tsx`.
+describe('TodayScreen — the pendingClose card names the act it performs (owner fix)', () => {
+  const ENDED_UNCLOSED: SessionRow = {
+    ...base,
+    id: 's-ended-unclosed',
+    starts_at: '2026-11-03T09:00:00Z',
+    ends_at: '2026-11-03T10:00:00Z',
+    attendance_taken: false,
+    status: 'scheduled',
+  }
+
+  it('reads "close the session" and still links to the same register', async () => {
+    render(screenFor({ client: stub([ENDED_UNCLOSED]) }))
+    const action = await screen.findByTestId('open-roster')
+    expect(action).toHaveTextContent(t('he', 'schedule.today.closeSession'))
+    expect(action).toHaveAccessibleName(t('he', 'schedule.today.closeSession'))
+    expect(action).toHaveAttribute('href', '#/attendance/s-ended-unclosed')
+  })
+
+  it('leaves every other state reading "open attendance"', async () => {
+    // `TODAY_SESSION` starts after `screenFor`'s default `today` (12:00Z) — nextUp, not
+    // pendingClose.
+    render(screenFor({ client: stub([TODAY_SESSION]) }))
+    const action = await screen.findByTestId('open-roster')
+    expect(action).toHaveTextContent(t('he', 'schedule.today.openRoster'))
+    expect(screen.queryByText(t('he', 'schedule.today.closeSession'))).toBeNull()
+  })
+})
+
+describe('TodayScreen — the write-up is reachable from the card (owner fix)', () => {
+  const ENDED_CLOSED: SessionRow = {
+    ...base,
+    id: 's-ended-closed',
+    starts_at: '2026-11-03T09:00:00Z',
+    ends_at: '2026-11-03T10:00:00Z',
+    attendance_taken: true,
+    status: 'scheduled',
+  }
+
+  it('appears on an ended, already-closed session and points at its summary', async () => {
+    render(screenFor({ client: stub([ENDED_CLOSED]) }))
+    const link = await screen.findByTestId('session-summary-link')
+    expect(link).toHaveAttribute('href', '#/attendance/s-ended-closed/summary')
+  })
+
+  it('appears on an ended, still-open (pendingClose) session too', async () => {
+    render(
+      screenFor({
+        client: stub([{ ...ENDED_CLOSED, id: 's-ended-open', attendance_taken: false }]),
+      }),
+    )
+    const link = await screen.findByTestId('session-summary-link')
+    expect(link).toHaveAttribute('href', '#/attendance/s-ended-open/summary')
+  })
+
+  it('does not appear on an upcoming session', async () => {
+    render(screenFor({ client: stub([TODAY_SESSION]) }))
+    await screen.findByTestId('open-roster')
+    expect(screen.queryByTestId('session-summary-link')).toBeNull()
+  })
+
+  it('does not appear on a session happening right now', async () => {
+    const ACTIVE_NOW: SessionRow = {
+      ...base,
+      id: 's-active-now',
+      starts_at: '2026-11-03T11:00:00Z',
+      ends_at: '2026-11-03T13:00:00Z',
+      status: 'scheduled',
+    }
+    render(screenFor({ client: stub([ACTIVE_NOW]) }))
+    await screen.findByTestId('open-roster')
+    expect(screen.queryByTestId('session-summary-link')).toBeNull()
+  })
+
+  it('does not appear on a cancelled session, even one long past its slot — it never happened', async () => {
+    render(
+      screenFor({
+        client: stub([{ ...ENDED_CLOSED, status: 'cancelled', cancel_reason: 'system:closure' }]),
+      }),
+    )
+    await screen.findByTestId('session-row')
+    expect(screen.queryByTestId('session-summary-link')).toBeNull()
+  })
+})

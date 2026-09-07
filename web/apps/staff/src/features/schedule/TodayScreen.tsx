@@ -1092,6 +1092,15 @@ export function SessionCard({
     Math.round((Date.parse(session.ends_at) - Date.parse(today)) / 60_000),
   )
 
+  // Owner fixes (2026-09-07): the card's primary action names the act it actually performs
+  // rather than always reading "open attendance" — `timelineStates`' own `ended` category
+  // (see its header) is recomputed here off the same two instants, because `pendingClose`
+  // is not the only ended state (`later` also covers "ended and closed") and a cancelled
+  // session never happened at all, however long ago its slot was. Neither fix touches the
+  // schedule client, adds a status, or invents a "close" write — see this card's own note
+  // above `open-roster` for why closing is, and stays, derived rather than a button's doing.
+  const sessionHasEnded = session.status !== 'cancelled' && Date.parse(today) >= Date.parse(session.ends_at)
+
   // §4.9's chase action, decision 18: the same mechanism as everywhere else in the app —
   // copy the numbers, open WhatsApp with the message ready. No integration. Computed once,
   // C4, so both the ordinary two-up grid and the cancelled-session row (which has no
@@ -1314,9 +1323,17 @@ export function SessionCard({
           // attendance takes the whole row alone when there is not — a button offering to
           // chase nobody is noise.
           <div className={counts.notAnswered > 0 ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-1'}>
+            {/* Owner fix (2026-09-07): `pendingClose` is a session already over with its
+                register still owed — the prototype's own card names the act that closes it
+                (`סגור אימון`), not "open attendance" again. Same link, same destination
+                (closing a session IS taking its register, per this card's own note above),
+                only the label and the accessible name it carries change; every other state
+                keeps `schedule.today.openRoster` exactly as it read before this pass. */}
             <a href={`#/attendance/${session.id}`} data-testid="open-roster" className={ATTENDANCE_BUTTON_CLASS}>
               <ClipboardList className="w-4 h-4" aria-hidden="true" />
-              <span>{t(locale, 'schedule.today.openRoster')}</span>
+              <span>
+                {t(locale, state === 'pendingClose' ? 'schedule.today.closeSession' : 'schedule.today.openRoster')}
+              </span>
             </a>
             {chaseButton}
           </div>
@@ -1338,6 +1355,26 @@ export function SessionCard({
             {chaseButton}
           </div>
         )}
+
+        {/* Owner fix (2026-09-07): the write-up (`#/attendance/<id>/summary`) used to be
+            reachable only from a footer button below the whole roster — nothing on the card
+            itself pointed at it. A discreet tertiary link, never a third filled button
+            beside the two-up grid above, and only once the class has actually happened:
+            `sessionHasEnded` is false for `nextUp`/`activeNow` and for any cancelled
+            session (a class that never happened has no write-up to reach), true for
+            `pendingClose` and for the "ended and closed" sessions `timelineStates` files
+            under the neutral `later` bucket. Any staff may write one (`POST
+            /sessions/{id}/notes` is `AnyStaff`) — this is deliberately not `canWritePlan`
+            gated, unlike the briefing marker above. */}
+        {sessionHasEnded ? (
+          <a
+            href={`#/attendance/${session.id}/summary`}
+            data-testid="session-summary-link"
+            className="self-center text-[11px] font-bold text-slate-400 transition-colors hover:text-slate-600"
+          >
+            {t(locale, 'attendance.summary.title')}
+          </a>
+        ) : null}
       </div>
     </article>
   )

@@ -10,6 +10,7 @@ export const schedule: Bundle = {
   'today.sessionCount.one': '1 занятие',
   'today.backToToday': 'Вернуться к сегодня',
   'today.openRoster': 'Открыть перекличку',
+  'today.closeSession': 'Закрыть занятие',
   'today.empty': 'Сегодня занятий нет',
   'today.emptyHint': 'Дни занятий задаются в недельном расписании группы',
   'today.noTrainingYear': 'Ни один учебный год не охватывает эту дату',

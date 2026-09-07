@@ -22,6 +22,12 @@ export const schedule: Bundle = {
   'today.sessionCount.one': 'שיעור אחד',
   'today.backToToday': 'חזרה להיום',
   'today.openRoster': 'פתיחת נוכחות',
+  // Owner fix (2026-09-07) — the same link as `today.openRoster`, to the same
+  // `#/attendance/<id>`, only on a `pendingClose` card: closing a session IS taking its
+  // register, so the action's wording should say that rather than "open attendance" on a
+  // session that has already ended. Never repurposes `today.openRoster`, which every other
+  // state still uses as written.
+  'today.closeSession': 'סגור אימון',
   'today.empty': 'אין שיעורים היום',
   'today.emptyHint': 'ימי פעילות נקבעים בלו״ז השבועי של הקבוצה',
   // Register §4.2 — a date outside every declared training year used to render exactly

@@ -7,6 +7,7 @@ export const schedule: Bundle = {
   'today.sessionCount.one': '1 session',
   'today.backToToday': 'Back to today',
   'today.openRoster': 'Open the register',
+  'today.closeSession': 'Close the session',
   'today.empty': 'No classes today',
   'today.emptyHint': 'Activity days are set in the group’s weekly schedule',
   'today.noTrainingYear': 'No training year covers this date',
