@@ -391,3 +391,41 @@ def test_a_hebrew_sentence_still_keeps_its_full_stop_on_the_left():
 def test_hebrew_inside_a_russian_sentence_is_still_reversed():
     """Base LTR does not mean 'no bidi'. An RTL run inside an LTR paragraph still reverses."""
     assert shape_rtl("Клуб מועדון today") == "Клуб ןודעומ today"
+
+
+# ==========================================================================================
+# Bracket pairs — UBA N0
+# ==========================================================================================
+# A bracketed RTL phrase inside an LTR sentence split its own brackets across two runs. The
+# opening one sat inside the Hebrew run and was mirrored; the closing one resolved to the LTR
+# paragraph and was not — so the club's own name rendered `"ר״ע) גנידליב ןיירב)"`, brackets
+# facing the same way. Unreachable while the surrounding Cyrillic was a row of boxes.
+#
+# N0 resolves a bracket PAIR together, from the strong direction found between them, so both
+# ends land in the same run and mirror as a pair.
+
+
+def test_a_bracketed_hebrew_phrase_inside_an_ltr_sentence_keeps_its_brackets_paired():
+    """The club's payee line: a Hebrew company name with `(ע״ר)` after it, inside Russian."""
+    shaped = shape_rtl('в пользу "בריין בילדינג (ע״ר)"')
+    assert "(ר״ע)" in shaped, shaped
+    assert ")ר״ע)" not in shaped, shaped
+
+
+def test_a_bracket_pair_inside_a_hebrew_line_is_unchanged():
+    """The case that already worked, so N0 must not disturb it."""
+    shaped = shape_rtl("(אסתמה)")
+    assert shaped.startswith("(")
+    assert shaped.endswith(")")
+
+
+def test_a_bracket_pair_around_latin_inside_a_hebrew_line_stays_upright():
+    """Brackets enclosing an LTR run in an RTL paragraph belong to the LTR run and must not
+    mirror — `(PDF)` is not `)PDF(`."""
+    assert "(PDF)" in shape_rtl("קובץ (PDF) מצורף")
+
+
+def test_an_unmatched_bracket_does_not_break_the_line():
+    """A parent typing a stray `(` into a free-text medical note must not lose the note."""
+    assert shape_rtl("הערה (חשוב").strip() != ""
+    assert shape_rtl("примечание (важно") != ""

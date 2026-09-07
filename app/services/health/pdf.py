@@ -127,6 +127,62 @@ def _is_ltr_char(char: str) -> bool:
     return char.isalnum() and not is_rtl_char(char)
 
 
+#: BD16's canonical bracket pairs. `_MIRRORED` also carries `<`/`>`, which mirror but are *not*
+#: bracket pairs in Unicode's sense — they are mathematical operators, and pairing them would
+#: rewrite `a < b` and `b > a` as a pair.
+_BRACKET_PAIRS = {"(": ")", "[": "]", "{": "}"}
+
+
+def _resolve_bracket_pairs(text: str, classes: list[str], base: str) -> None:
+    """Unicode N0, in place: a bracket **pair** takes one direction, decided together.
+
+    Without this, a bracketed RTL phrase inside an LTR sentence splits its own brackets across two
+    runs — the opening one inside the Hebrew, the closing one resolving to the paragraph — so only
+    one of them mirrors and the club's payee line rendered `"ר״ע) גנידליב ןיירב)"`, both brackets
+    facing the same way.
+
+    The rules, as N0 states them: a strong type matching the paragraph direction inside the pair
+    wins (b); otherwise a strong type opposite it wins **only if** the text before the pair also
+    turns that way (c.1), and falls back to the paragraph direction if not (c.2); a pair with no
+    strong type inside is left to N1/N2 (d).
+
+    Rule c.1 is the whole reason this exists and the reason it is nearly inert: it fires only when
+    a bracket pair follows text of the same non-paragraph direction — `בריין בילדינג (ע״ר)` inside
+    Russian. `קובץ (PDF) מצורף` takes c.2 and comes out exactly as it did before.
+    """
+    opposite = "L" if base == "R" else "R"
+    closers = set(_BRACKET_PAIRS.values())
+    stack: list[tuple[str, int]] = []
+    pairs: list[tuple[int, int]] = []
+
+    for index, char in enumerate(text):
+        if classes[index] != "N":
+            continue  # a bracket already resolved as strong is not a bracket for N0's purposes
+        if char in _BRACKET_PAIRS:
+            stack.append((char, index))
+        elif char in closers:
+            for depth in range(len(stack) - 1, -1, -1):
+                opening, opened_at = stack[depth]
+                if _BRACKET_PAIRS[opening] == char:
+                    pairs.append((opened_at, index))
+                    del stack[depth:]
+                    break
+
+    for opened_at, closed_at in pairs:
+        inside = classes[opened_at + 1 : closed_at]
+        if base in inside:
+            direction = base
+        elif opposite in inside:
+            preceding = next(
+                (c for c in reversed(classes[:opened_at]) if c in ("L", "R")),
+                base,
+            )
+            direction = opposite if preceding == opposite else base
+        else:
+            continue
+        classes[opened_at] = classes[closed_at] = direction
+
+
 def base_direction(text: str) -> str:
     """`'R'` or `'L'`, from the first strongly-directional character — Unicode's P2/P3.
 
@@ -182,6 +238,9 @@ def shape_rtl(text: str) -> str:
 
     # 1 -- classify. 'R', 'L', 'N'.
     classes = ["R" if is_rtl_char(c) else "L" if _is_ltr_char(c) else "N" for c in text]
+
+    # 1b -- N0: bracket pairs resolve together, before the neutrals around them do.
+    _resolve_bracket_pairs(text, classes, base)
 
     # 2 -- resolve neutrals.
     resolved = list(classes)
