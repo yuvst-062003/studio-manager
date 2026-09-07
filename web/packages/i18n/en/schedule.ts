@@ -549,12 +549,9 @@ export const schedule: Bundle = {
   'home.reportAbsence': 'Report an absence',
   'home.notificationsTitle': 'Alerts and messages from your coach',
   'home.notificationsLabel': 'Coach alerts',
-  'home.urgentTitle': 'Your registration needs attention',
-  'home.urgentCta': 'Sort it out',
+  // Named for the banner it was written for; `HomeSchedule` reuses it as a plain
+  // bullet between a location and a coach, which is why it outlived the banner.
   'home.urgentSeparator': ' • ',
-  'home.urgentDebt': 'Tuition owed {{amount}}',
-  'home.urgentHealthOne': "{{name}}'s health declaration is missing",
-  'home.urgentHealthMany': '{{count}} health declarations are missing',
   'home.allChildren': 'All children',
   'home.weekStripLabel': 'Choose a day',
   'home.monthButton': 'Month',

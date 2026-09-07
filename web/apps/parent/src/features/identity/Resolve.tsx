@@ -18,16 +18,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { StudioSwitcher } from '@studio/ui'
 import type { Session } from '@studio/core'
-import { apiFetch, formatAgorot, studioDayKey } from '@studio/core'
+import { apiFetch, studioDayKey } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 // Checkpoint 2 of the parent-app redesign. `ParentHome` (artboard 1a, the 2026-09-01
 // Option B rearrangement) is replaced wholesale by the port of the owner's prototype; it
 // stays on disk until the redesign is accepted end to end, then goes.
 import { HomeScreen } from '../home/redesign/HomeScreen'
-import { childrenNeedingDeclaration, familyNameOf } from '../home/redesign/derive'
+import { familyNameOf } from '../home/redesign/derive'
 import type { FamilyEvent, Intents, Lesson } from '../home/redesign/derive'
-import { needsFullDeclaration } from '../health/HealthGate'
 import { makeIntentClient } from '../home/intentClient'
 import { cancelReasonLabel } from '../schedule/client'
 import { everyChildIsOnATrial, makePeopleClient, nextTrialLesson, useMyStudents } from '../people'
@@ -98,9 +97,6 @@ export function Resolve({
   // The schedule read failing is its own state: בית offers a retry rather than drawing an
   // empty week, which reads as "no training this week" and is a different claim entirely.
   const [lessonsFailed, setLessonsFailed] = useState(false)
-  // 1a's debt alert — the same `/me/balance` read `12f` renders in full. Zero on failure:
-  // a home that cannot ask about money shows no alert rather than a broken one.
-  const [debtAgorot, setDebtAgorot] = useState(0)
   // What the family has already told the club about their COMING lessons. Read from the
   // server rather than held locally, so reopening the app shows what the club knows and
   // not what this device last hoped — the whole point of the answer being real.
@@ -133,12 +129,9 @@ export function Resolve({
   useEffect(() => {
     if (!session.access.parent) return
     let live = true
-    void apiFetch('/api/v1/me/balance')
-      .then((response) => (response.ok ? (response.json() as Promise<{ balance_agorot: number }>) : { balance_agorot: 0 }))
-      .then((body) => {
-        if (live) setDebtAgorot(Math.max(0, body.balance_agorot))
-      })
-      .catch(() => {})
+    // No `/me/balance` read here any more: it existed only to feed the urgent banner,
+    // removed 2026-09-07. The payments screen makes the same read for itself, and a
+    // request whose only reader is gone is a request nobody will remember to delete.
     const now = new Date()
     // 2a's strip reads back as well as forward: a week each way, one fetch.
     const weekBack = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
@@ -339,25 +332,6 @@ export function Resolve({
       events={events}
       lessonsFailed={lessonsFailed}
       intents={intents}
-      urgent={{
-        debtAgorot: debtAgorot > 0 ? debtAgorot : null,
-        // The SAME predicate §6.1's gate uses. Two spellings of "does this child still owe
-        // something" is how a banner comes to disagree with the gate that blocks the app.
-        childrenNeedingDeclaration:
-          mine.status === 'ready'
-            ? childrenNeedingDeclaration(
-                mine.students.map((student) => ({
-                  firstName: student.first_name,
-                  // `GatedStudent` needs a display name the roster row does not carry.
-                  // Composed here rather than by loosening the predicate: it is the gate's
-                  // own type, and the gate is the thing this banner must agree with.
-                  student: { ...student, display_name: `${student.first_name} ${student.last_name}` },
-                })),
-                ({ student }) => needsFullDeclaration(student),
-              )
-            : [],
-      }}
-      debtLabel={debtAgorot > 0 ? formatAgorot(debtAgorot) : null}
       todayKey={studioDayKey(new Date())}
       writer={{
         reportAbsence: (sessionId, studentId, reason) =>

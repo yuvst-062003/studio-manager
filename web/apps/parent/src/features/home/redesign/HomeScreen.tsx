@@ -42,7 +42,7 @@ import {
   weekdayOf,
 } from './derive'
 import type { FamilyEvent, Intents, Lesson } from './derive'
-import type { HomeChild, HomeSession, HomeUrgent } from './types'
+import type { HomeChild, HomeSession } from './types'
 
 /** The writes בית makes. One narrow interface so the screen can be tested without a fetch. */
 export type HomeWriter = {
@@ -68,8 +68,6 @@ export function HomeScreen({
   lessonsFailed,
   events,
   intents,
-  urgent,
-  debtLabel,
   todayKey,
   writer,
   cancelReasonLabel,
@@ -95,8 +93,6 @@ export function HomeScreen({
    */
   events: readonly FamilyEvent[]
   intents: Intents
-  urgent: HomeUrgent
-  debtLabel: string | null
   /** `YYYY-MM-DD` in the studio's zone. Passed in rather than read from the clock here, so
    *  a test can put the screen on a Tuesday without stubbing `Date`. */
   todayKey: string
@@ -353,13 +349,6 @@ export function HomeScreen({
         childList={childList ?? []}
         selectedChildId={selectedChildId}
         onSelectChild={setSelectedChildId}
-        urgent={urgent}
-        debtLabel={debtLabel}
-        onUrgentAction={() => {
-          // The banner's two halves have two destinations and the debt is the one with a
-          // deadline, so it wins when both are outstanding.
-          globalThis.location.hash = urgent.debtAgorot !== null ? '#/payments' : '#/'
-        }}
         onReportAbsence={() => {
           globalThis.location.hash = '#/absence'
         }}

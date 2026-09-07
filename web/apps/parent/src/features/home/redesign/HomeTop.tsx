@@ -3,7 +3,7 @@ import { Bell, Plus } from 'lucide-react'
 import { fill } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import type { HomeChild, HomeUrgent } from './types'
+import type { HomeChild } from './types'
 
 export function HomeTop({
   clubName,
@@ -12,9 +12,6 @@ export function HomeTop({
   childList,
   selectedChildId,
   onSelectChild,
-  urgent,
-  debtLabel,
-  onUrgentAction,
   onReportAbsence,
   onOpenNotifications,
 }: {
@@ -29,33 +26,11 @@ export function HomeTop({
   /** null means "all children" — the prototype's 'all' sentinel. */
   selectedChildId: string | null
   onSelectChild: (id: string | null) => void
-  urgent: HomeUrgent
-  /** urgent.debtAgorot already formatted as money by the caller, e.g. "₪320". null when
-   *  there is no debt. Never divide agorot in this file. */
-  debtLabel: string | null
-  onUrgentAction: () => void
   onReportAbsence: () => void
   onOpenNotifications: () => void
 }) {
   const greeting = familyName ? fill(t(locale, 'schedule.home.greetingFamily'), { name: familyName }) : t(locale, 'schedule.home.greeting')
 
-  const debtPart = debtLabel !== null ? fill(t(locale, 'schedule.home.urgentDebt'), { amount: debtLabel }) : null
-  const healthCount = urgent.childrenNeedingDeclaration.length
-  const healthPart =
-    healthCount === 1
-      ? fill(t(locale, 'schedule.home.urgentHealthOne'), { name: urgent.childrenNeedingDeclaration[0] ?? '' })
-      : healthCount >= 2
-        ? fill(t(locale, 'schedule.home.urgentHealthMany'), { count: healthCount })
-        : null
-  const urgentDetail = [debtPart, healthPart]
-    .filter((part): part is string => part !== null)
-    .join(t(locale, 'schedule.home.urgentSeparator'))
-
-  // Decided by what the banner can actually SAY, not by what the caller knows. Keying this
-  // off `urgent.debtAgorot` — which is what it first did — let a family with a debt and no
-  // formatted label render a red banner whose detail line was empty: an alarm with no
-  // reason in it, which is worse than no alarm.
-  const isUrgent = urgentDetail !== ''
 
 
   return (
@@ -103,35 +78,11 @@ export function HomeTop({
         </div>
       </div>
 
-      {/* Urgent Action Banner */}
-      {isUrgent && (
-        <div
-          data-testid="home-urgent-banner"
-          data-purpose="urgent-alert"
-          className="bg-[#ffdad6] text-slate-900 rounded-3xl p-4 shadow-xs flex items-center justify-between gap-3 border border-red-200/70 transition-all duration-200"
-        >
-          {/* Action CTA Button */}
-          <button
-            type="button"
-            data-testid="home-urgent-cta"
-            onClick={onUrgentAction}
-            className="bg-[#ba1a1a] text-white text-xs font-semibold px-3.5 py-2 rounded-xl shadow-xs hover:bg-red-800 active:scale-95 transition-transform shrink-0 cursor-pointer"
-          >
-            {t(locale, 'schedule.home.urgentCta')}
-          </button>
-
-          {/* Alert Content */}
-          <div className="text-start flex-1">
-            <div className="flex items-center justify-end gap-1.5 font-bold text-[#ba1a1a] text-sm">
-              <span>{t(locale, 'schedule.home.urgentTitle')}</span>
-              <span className="inline-flex items-center justify-center w-5 h-5 bg-[#ba1a1a] text-white rounded-full text-xs font-bold">
-                !
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-tight mt-1 font-normal">{urgentDetail}</p>
-          </div>
-        </div>
-      )}
+      {/* No urgent banner (owner, 2026-09-07). It said "דרוש טיפול דחוף בהרשמה" over an
+          outstanding balance or a missing declaration — neither of which is urgent in the
+          sense a red alarm claims, and both of which already reach the family through
+          עדכונים, which is a tab with its own badge. A permanent red block on the screen a
+          parent opens to see when their child trains is an alarm that stops being read. */}
 
       {/* Trainee Filter Chips Strip */}
       <div

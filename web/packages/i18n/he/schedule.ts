@@ -635,16 +635,9 @@ export const schedule: Bundle = {
   'home.reportAbsence': 'דיווח היעדרות',
   'home.notificationsTitle': 'התראות והודעות מהמאמן',
   'home.notificationsLabel': 'התראות מהמאמן',
-  // -- the urgent banner. Both halves are conditional and the separator appears only
-  //    between two present halves --
-  'home.urgentTitle': 'דרוש טיפול דחוף בהרשמה',
-  'home.urgentCta': 'טיפול מהיר',
+  // Named for the banner it was written for; `HomeSchedule` reuses it as a plain
+  // bullet between a location and a coach, which is why it outlived the banner.
   'home.urgentSeparator': ' • ',
-  // `{{amount}}` arrives already formatted — agorot are never divided at a call site.
-  'home.urgentDebt': 'חוב שכר לימוד {{amount}}',
-  'home.urgentHealthOne': 'הצהרת בריאות ל{{name}} חסרה',
-  // Two or more, because "הצהרת בריאות לנועה, לדנה וליוסי חסרה" does not decline.
-  'home.urgentHealthMany': 'חסרות {{count}} הצהרות בריאות',
   'home.allChildren': 'כל הילדים',
   // -- the week strip. `weekStripLabel` names the landmark for a screen reader; the port
   //    first fell back to the day headline, which reads as a date rather than a control --
