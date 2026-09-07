@@ -24,26 +24,40 @@ const INLINE_HEBREW = 'export const A = () => <div>שלום עולם</div>'
 const VIA_T = `import { t } from '@studio/i18n'
 export const A = () => <div>{t('he', 'common.dev.title')}</div>`
 
+/**
+ * 20s, not vitest's 5s default.
+ *
+ * Each case here CONSTRUCTS A FULL ESLint INSTANCE — the flat config, every plugin, the
+ * whole resolver — and that is seconds of real work before a single assertion runs. Five
+ * seconds is enough on an idle machine and is not enough when eighty test files are running
+ * in parallel, so this failed intermittently and always at a different one of its cases.
+ *
+ * Raising it is the fix rather than a paper-over: the budget was simply wrong for the work.
+ * A guard that fails at random is worse than no guard, because it teaches everyone reading
+ * CI to shrug at a red run — which is exactly what happened here (2026-09-07).
+ */
+const LINT_TIMEOUT_MS = 20_000
+
 describe('G4 covers the dev bar', () => {
   it('rejects an inlined string in the dev-bar directory', async () => {
     const out = await lint(INLINE_HEBREW, 'packages/ui/src/dev-bar/Fixture.tsx')
     expect(out).toMatch(/no user-facing string is inlined/)
-  })
+  }, LINT_TIMEOUT_MS)
 
   it('accepts the same component when the string comes from t()', async () => {
     const out = await lint(VIA_T, 'packages/ui/src/dev-bar/Fixture.tsx')
     expect(out).not.toMatch(/no user-facing string is inlined/)
-  })
+  }, LINT_TIMEOUT_MS)
 
   it('still leaves the primitives alone — they take their text as props', async () => {
     const out = await lint(INLINE_HEBREW, 'packages/ui/src/primitives/Fixture.tsx')
     expect(out).not.toMatch(/no user-facing string is inlined/)
-  })
+  }, LINT_TIMEOUT_MS)
 
   it('still covers the apps', async () => {
     const out = await lint(INLINE_HEBREW, 'apps/staff/src/Fixture.tsx')
     expect(out).toMatch(/no user-facing string is inlined/)
-  })
+  }, LINT_TIMEOUT_MS)
 
   // Round 1 fix: a dev-bar `.test.tsx` fixture string is test scaffolding, never
   // shipped and never translated, so G4 has nothing to protect there. Pinned here so
@@ -53,5 +67,5 @@ describe('G4 covers the dev bar', () => {
   it('does not flag a .test.tsx fixture in the dev-bar directory', async () => {
     const out = await lint(INLINE_HEBREW, 'packages/ui/src/dev-bar/DevBar.test.tsx')
     expect(out).not.toMatch(/no user-facing string is inlined/)
-  })
+  }, LINT_TIMEOUT_MS)
 })

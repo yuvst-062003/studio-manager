@@ -8,23 +8,37 @@ const lintText = async (code: string) => {
   return results.flatMap((r) => r.messages.map((m) => m.message)).join('\n')
 }
 
+/**
+ * 20s, not vitest's 5s default.
+ *
+ * Each case here CONSTRUCTS A FULL ESLint INSTANCE — the flat config, every plugin, the
+ * whole resolver — and that is seconds of real work before a single assertion runs. Five
+ * seconds is enough on an idle machine and is not enough when eighty test files are running
+ * in parallel, so this failed intermittently and always at a different one of its cases.
+ *
+ * Raising it is the fix rather than a paper-over: the budget was simply wrong for the work.
+ * A guard that fails at random is worse than no guard, because it teaches everyone reading
+ * CI to shrug at a red run — which is exactly what happened here (2026-09-07).
+ */
+const LINT_TIMEOUT_MS = 20_000
+
 describe('D10 — physical CSS properties are banned before the first component', () => {
   it('rejects marginLeft in a style object', async () => {
     const out = await lintText('export const A = () => <div style={{ marginLeft: 8 }} />')
     expect(out).toMatch(/marginInlineStart/)
-  })
+  }, LINT_TIMEOUT_MS)
 
   it('rejects a bare left offset', async () => {
     const out = await lintText('export const A = () => <div style={{ left: 0 }} />')
     expect(out).toMatch(/insetInlineStart/)
-  })
+  }, LINT_TIMEOUT_MS)
 
   it('accepts the logical equivalent', async () => {
     const out = await lintText(
       'export const A = () => <div style={{ marginInlineStart: 8 }} />',
     )
     expect(out).not.toMatch(/marginInlineStart is banned/)
-  })
+  }, LINT_TIMEOUT_MS)
 })
 
 const CONFIG = new URL('../../stylelint.config.js', import.meta.url).pathname
@@ -100,5 +114,5 @@ describe('D10 in stylesheets — stylelint is the only thing that reads these', 
       configFile: CONFIG,
     })
     expect(errored).toBe(false)
-  })
+  }, LINT_TIMEOUT_MS)
 })

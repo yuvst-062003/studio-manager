@@ -113,8 +113,14 @@ describe('artboards 1c and 9f — the roster screen', () => {
       ]),
       notExpectedIds: ['d'],
     })
+    // `findByTestId` resolves as soon as the CONTAINER exists, and the container renders
+    // immediately with zeroes while the roster is still in flight. So this used to assert
+    // the first frame and pass only because the promise usually settled within the same
+    // batch — on a loaded machine it read `0` and failed. Wait for the settled VALUE.
     const counts = await screen.findByTestId('roster-counts')
-    expect(counts.querySelector('[data-count="present"]')?.textContent).toContain('1')
+    await waitFor(() =>
+      expect(counts.querySelector('[data-count="present"]')?.textContent).toContain('1'),
+    )
     expect(counts.querySelector('[data-count="absent"]')?.textContent).toContain('1')
     expect(counts.querySelector('[data-count="unmarked"]')?.textContent).toContain('1')
   })
