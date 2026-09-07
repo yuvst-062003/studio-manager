@@ -45,7 +45,12 @@ import { AbsenceScreen, makeAbsenceClient } from './features/absence'
 import { registerAttendanceSections } from './features/attendance'
 import { makeParentScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
-import { PublicLanding, landingSlugFor, makeLandingClient } from './features/landing'
+import {
+  PublicLanding,
+  landingHostsFrom,
+  landingSlugFor,
+  makeLandingClient,
+} from './features/landing'
 import { matchJoinPath } from './features/onboarding/joinPath'
 // The redesigned wizard (spec 2026-09-05). It replaced `JoinFlow`'s four screens for all
 // three doors that route through here (B, C, D) -- door A's own trial booking
@@ -159,13 +164,21 @@ function useHash(): string {
  */
 export default function App() {
   const path = globalThis.location?.pathname ?? '/'
-  // #25 -- `/t/{slug}` stays canonical; the ROOT additionally serves the configured club,
-  // so `gladiatorclub.co.il` is the shop window rather than a sign-in box. The literal
-  // `import.meta.env.X` form is deliberate and is the reason this read is not hoisted into
-  // `route.ts`: both Vite's build and vitest's transform replace exactly that expression,
-  // and an aliased read survives untransformed as `undefined`. Unset is the same behaviour
-  // this app has always had, which is what keeps `app.` and staging untouched.
-  const landingSlug = landingSlugFor(path, import.meta.env.VITE_LANDING_SLUG)
+  // #25 -- `/t/{slug}` stays canonical; the root of a LANDING HOST additionally serves the
+  // configured club, so `gladiatorclub.co.il` is the shop window rather than a sign-in box
+  // while `app.` keeps opening the app. ONE Railway service answers for both from a single
+  // build, which is why the host decides and not the path alone -- see `landingSlugFor`.
+  //
+  // The literal `import.meta.env.X` form is deliberate, and is why these two reads are not
+  // hoisted into `route.ts`: both Vite's build and vitest's transform replace exactly that
+  // expression, and an aliased read survives untransformed as `undefined`. Unset is the
+  // behaviour this app has always had, which is what keeps staging untouched.
+  const landingSlug = landingSlugFor(
+    path,
+    import.meta.env.VITE_LANDING_SLUG,
+    landingHostsFrom(import.meta.env.VITE_LANDING_HOSTS),
+    globalThis.location?.hostname ?? '',
+  )
   const joinToken = matchJoinPath(path)
   if (landingSlug) return <LandingShell slug={landingSlug} />
   if (joinToken) return <JoinShell token={joinToken} />

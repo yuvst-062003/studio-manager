@@ -35,32 +35,49 @@ describe('matchLandingPath', () => {
 describe('landingSlugFor — the club at the apex (#25)', () => {
   // §5.4a ① puts the landing at `/t/{slug}` and that stays the canonical URL. #25 asks for
   // the club's shop window at `gladiatorclub.co.il` rather than under `app.`, and the root
-  // of the parent app currently renders the sign-in wall — so DNS alone would point the
-  // apex at a login box.
+  // of the parent app renders the sign-in wall — so DNS alone would point the apex at a
+  // login box.
   //
-  // The variable is what makes this safe: an environment that does not set it behaves
-  // exactly as before, so `app.` and staging are untouched by the domain move.
-  it('serves the configured club at the root', () => {
-    expect(landingSlugFor('/', 'gladiator')).toBe('gladiator')
+  // **Keyed on the HOST, not on the path alone.** One Railway service answers for both
+  // `app.` and the apex from a single build, so a rule that claimed every root would have
+  // turned `app.gladiatorclub.co.il/` into a marketing page for parents who are already
+  // members. The sign-in state cannot decide it either: `App()` resolves the public routes
+  // before any session hook runs, deliberately, and the in-memory token is empty on a cold
+  // load even for a returning parent — so that test would show the landing to a member
+  // every time they opened the app fresh.
+  const APEX = ['gladiatorclub.co.il', 'www.gladiatorclub.co.il']
+
+  it('serves the configured club at the root of a landing host', () => {
+    expect(landingSlugFor('/', 'gladiator', APEX, 'gladiatorclub.co.il')).toBe('gladiator')
+    expect(landingSlugFor('/', 'gladiator', APEX, 'www.gladiatorclub.co.il')).toBe('gladiator')
   })
 
-  it('serves nothing at the root when no club is configured', () => {
-    // Every environment but production. `''` is what an unset `import.meta.env` read
-    // collapses to, and it must not become a slug — `/t/` would 404 against the API and
-    // render a refusal on the one page a stranger sees first.
-    expect(landingSlugFor('/', '')).toBeNull()
-    expect(landingSlugFor('/', undefined)).toBeNull()
+  it('leaves the app host alone, which is the whole point', () => {
+    // A signed-in parent opening `app.gladiatorclub.co.il` must reach their app, not the
+    // club's advertisement.
+    expect(landingSlugFor('/', 'gladiator', APEX, 'app.gladiatorclub.co.il')).toBeNull()
   })
 
-  it('still prefers an explicit /t/{slug} over the configured one', () => {
-    // The canonical URL keeps working and keeps naming its own club. A flyer QR printed
-    // for one club must not resolve to whichever club the build was configured with.
-    expect(landingSlugFor('/t/other-club', 'gladiator')).toBe('other-club')
+  it('serves nothing when no club or no host is configured', () => {
+    // Every environment but production. `''` is what an unset build variable collapses to,
+    // and it must never become a slug — `/t/` 404s against the API and would render a
+    // refusal on the one page a stranger sees first.
+    expect(landingSlugFor('/', '', APEX, 'gladiatorclub.co.il')).toBeNull()
+    expect(landingSlugFor('/', undefined, APEX, 'gladiatorclub.co.il')).toBeNull()
+    expect(landingSlugFor('/', 'gladiator', [], 'gladiatorclub.co.il')).toBeNull()
+  })
+
+  it('still prefers an explicit /t/{slug}, on any host', () => {
+    // The canonical URL keeps working and keeps naming its own club. A flyer QR printed for
+    // one club must not resolve to whichever club the build was configured with.
+    expect(landingSlugFor('/t/other-club', 'gladiator', APEX, 'app.gladiatorclub.co.il')).toBe(
+      'other-club',
+    )
   })
 
   it('leaves every other path alone', () => {
-    // `/join/{token}` and the signed-in app both live under paths this must not claim.
-    expect(landingSlugFor('/join/abc', 'gladiator')).toBeNull()
-    expect(landingSlugFor('/anything', 'gladiator')).toBeNull()
+    expect(landingSlugFor('/join/abc', 'gladiator', APEX, 'gladiatorclub.co.il')).toBeNull()
+    expect(landingSlugFor('/anything', 'gladiator', APEX, 'gladiatorclub.co.il')).toBeNull()
   })
 })
+

@@ -28,22 +28,49 @@ export function matchLandingPath(pathname: string): { slug: string } | null {
  * not enough on its own: `/` renders the sign-in wall, so the apex would have shown a
  * login box to every stranger who typed the club's name.
  *
- * **`/t/{slug}` stays canonical and stays first.** A flyer QR printed for one club must
- * resolve to that club, never to whichever club the build happened to be configured with.
- * This only answers for the ROOT, and only when a club is named.
+ * **Keyed on the HOST, and that is not incidental.** One Railway service answers for both
+ * `app.` and the apex from a single build, so a rule that claimed every root would turn
+ * `app.gladiatorclub.co.il/` into a marketing page for parents who are already members.
+ * The sign-in state cannot decide it either: `App()` resolves the public routes *before*
+ * any session hook runs — deliberately, so an anonymous landing visit does not open with a
+ * 401 — and the in-memory token is empty on a cold load even for a returning parent, so
+ * that test would show the club's advertisement to a member every time they opened the app
+ * fresh.
  *
- * **Configured at build time, so nothing changes where it is not set.** `app.` and staging
- * pass an empty value and keep the behaviour they have today — the apex is a production
- * deployment concern, and an environment that has not opted in must not silently acquire a
- * public marketing page at its root.
+ * **`/t/{slug}` stays canonical and stays first**, on every host. A flyer QR printed for
+ * one club must resolve to that club, never to whichever club the build was configured
+ * with.
+ *
+ * **Both halves are build-time configuration, so nothing changes where they are unset.**
+ * Staging and development pass empty values and keep the behaviour they have today; the
+ * apex is a production deployment concern, and an environment that has not opted in must
+ * not silently acquire a public marketing page at its root.
  */
-export function landingSlugFor(pathname: string, configuredSlug: string | undefined): string | null {
+export function landingSlugFor(
+  pathname: string,
+  configuredSlug: string | undefined,
+  landingHosts: readonly string[],
+  hostname: string,
+): string | null {
   const explicit = matchLandingPath(pathname)
   if (explicit) return explicit.slug
   if (pathname !== '/' && pathname !== '') return null
-  //: An unset `import.meta.env` read collapses to `''`, and an empty slug must never become
-  //: a request: `/t/` 404s against the API and renders a refusal on the one page a stranger
-  //: sees first.
+  //: An unset build variable collapses to `''`, and an empty slug must never become a
+  //: request: `/t/` 404s against the API and would render a refusal on the one page a
+  //: stranger sees first.
   const slug = configuredSlug?.trim()
-  return slug ? slug : null
+  if (!slug) return null
+  //: Case-insensitive, because a hostname is. A port is never part of `location.hostname`,
+  //: so there is nothing to strip.
+  const host = hostname.toLowerCase()
+  return landingHosts.some((candidate) => candidate.trim().toLowerCase() === host) ? slug : null
+}
+
+/** The hosts whose ROOT is the club's landing page, from build-time configuration.
+ *  Comma-separated so one variable carries the apex and `www.` together. */
+export function landingHostsFrom(configured: string | undefined): string[] {
+  return (configured ?? '')
+    .split(',')
+    .map((host) => host.trim())
+    .filter(Boolean)
 }
