@@ -41,7 +41,17 @@ export const GROUND_TOKENS = [
   '--debt-tint',
   '--danger-tint',
   '--cancelled-tint',
+  '--paid-tint',
+  '--pending-tint',
+  '--emphasis-tint',
   '--disabled-surface',
+  // The status colours themselves: a FILLED chip makes its own ground, which is what
+  // --on-status is measured against. Naming them here only permits the reference —
+  // ON_GROUNDS stays ['--ground', '--surface'], so nothing else is audited against them.
+  '--paid',
+  '--pending',
+  '--danger',
+  '--debt',
 ] as const
 export type GroundToken = (typeof GROUND_TOKENS)[number]
 
@@ -100,13 +110,13 @@ export const TOKEN_ROLES: Record<string, TokenRole> = {
   '--paid': {
     tier: 'semantic',
     group: 'status',
-    obligation: { kind: 'text', on: ON_GROUNDS },
+    obligation: { kind: 'text', on: [...ON_GROUNDS, '--paid-tint'] },
     note: 'Artboard 4h’s שולם chip is outline-only, so the text sits on the plain card.',
   },
   '--pending': {
     tier: 'semantic',
     group: 'status',
-    obligation: { kind: 'text', on: ON_GROUNDS },
+    obligation: { kind: 'text', on: [...ON_GROUNDS, '--pending-tint'] },
     note: 'Also the לא סומן dashed chip and the two unresolved attendance marks.',
   },
   '--cancelled': {
@@ -126,6 +136,26 @@ export const TOKEN_ROLES: Record<string, TokenRole> = {
     group: 'status',
     obligation: { kind: 'text', on: [...ON_GROUNDS, '--danger-tint'] },
     note: 'Destructive actions, field errors, the alert banner.',
+  },
+  '--paid-tint': {
+    tier: 'semantic',
+    group: 'status',
+    obligation: { kind: 'ground' },
+    note: 'The שולם chip’s fill. A ground, so --paid is audited against it.',
+  },
+  '--pending-tint': {
+    tier: 'semantic',
+    group: 'status',
+    obligation: { kind: 'ground' },
+    note: 'The לא סומן / awaiting fill. A ground, so --pending is audited against it.',
+  },
+  '--on-status': {
+    tier: 'structural',
+    group: 'palette',
+    // One label colour for every status FILL. Its obligation names all four grounds it
+    // is rendered on, so a status colour that moves drags this with it.
+    obligation: { kind: 'text', on: ['--paid', '--pending', '--danger', '--debt'] },
+    note: 'The label on a filled status chip — white in light, near-black in dark.',
   },
   '--danger-tint': {
     tier: 'semantic',
@@ -164,6 +194,12 @@ export const TOKEN_ROLES: Record<string, TokenRole> = {
     group: 'palette',
     obligation: { kind: 'text', on: ['--fg'] },
     note: 'Text on an ink fill: primary button, toast, active segment.',
+  },
+  '--emphasis-tint': {
+    tier: 'structural',
+    group: 'palette',
+    obligation: { kind: 'ground' },
+    note: 'The wash behind an emphasised chip. Structural, so a surface may re-value it.',
   },
   '--emphasis': {
     tier: 'structural',

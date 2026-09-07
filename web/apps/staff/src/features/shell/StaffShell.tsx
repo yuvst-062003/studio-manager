@@ -61,10 +61,10 @@ export function StaffShell({
   return (
     <>
       {devBar}
-      <div className="tw-scope w-full min-h-[100dvh] bg-[#f3f6fb] flex justify-center text-slate-800 transition-colors duration-200">
+      <div className="tw-scope w-full min-h-[100dvh] bg-[var(--disabled-surface)] flex justify-center text-[var(--fg)] transition-colors duration-200">
         <div
           id="app-wrapper"
-          className="w-full max-w-md min-h-[100dvh] bg-[#f6f9fd] flex flex-col relative shadow-xl border-x border-slate-200/80 transition-colors duration-200"
+          className="w-full max-w-md min-h-[100dvh] bg-[var(--ground)] flex flex-col relative shadow-xl border-x border-[var(--border)] transition-colors duration-200"
         >
           {/* THE BAR'S CLEARANCE LIVES HERE, ONCE — same reasoning as `ParentShell`.
            *

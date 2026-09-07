@@ -748,7 +748,11 @@ describe('TodayScreen — the session happening now gets its own card (C3)', () 
     const card = row.querySelector('article')
     expect(card).not.toBeNull()
     expect(card!.className).toContain('border-2')
-    expect(card!.className).toContain('border-blue-500')
+    // `--emphasis`, not a literal blue: the staff app was tokenised on 2026-09-07 so it
+    // follows [data-theme]. The frame still has to be the emphasis colour rather than the
+    // ordinary hairline, which is what this test is actually about — it just no longer
+    // names one theme's hex for it.
+    expect(card!.className).toContain('border-[var(--emphasis)]')
   })
 
   it('shows present-of-total, a percentage, and the real minutes remaining — all from confirmationCounts and ends_at - today', async () => {

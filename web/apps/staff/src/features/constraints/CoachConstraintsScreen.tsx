@@ -82,10 +82,10 @@ const REASON_EMOJI: Record<CoachConstraintReason, string> = {
 }
 
 const STATUS_BADGE: Record<CoachConstraintRow['status'], string> = {
-  pending: 'bg-amber-100 text-amber-800',
-  approved: 'bg-emerald-100 text-emerald-800',
-  refused: 'bg-rose-100 text-rose-800',
-  withdrawn: 'bg-slate-200 text-slate-600',
+  pending: 'bg-[var(--pending-tint)] text-[var(--pending)]',
+  approved: 'bg-[var(--paid-tint)] text-[var(--paid)]',
+  refused: 'bg-[var(--danger-tint)] text-[var(--danger)]',
+  withdrawn: 'bg-[var(--border)] text-[var(--text-secondary)]',
 }
 
 /** A history row is withdrawable exactly when the service will accept it (`refuse rather
@@ -259,7 +259,7 @@ export function CoachConstraintsScreen({
       {toast ? (
         <div
           role="status"
-          className="fixed top-14 start-1/2 -translate-x-1/2 z-50 bg-slate-900 border border-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2"
+          className="fixed top-14 start-1/2 -translate-x-1/2 z-50 bg-slate-900 border border-[var(--paid)] text-white text-xs font-bold px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2"
         >
           <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" aria-hidden="true" />
           <span>{toast}</span>
@@ -269,43 +269,43 @@ export function CoachConstraintsScreen({
       <header className="flex items-center justify-between">
         <a
           href="#/account"
-          className="flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-95 transition-all text-xs font-bold shadow-xs"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-[var(--surface-raised)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--surface)] active:scale-95 transition-all text-xs font-bold shadow-xs"
         >
-          <ChevronRight className="w-4 h-4 text-slate-500" aria-hidden="true" />
+          <ChevronRight className="w-4 h-4 text-[var(--text-muted)]" aria-hidden="true" />
           <span>{t(locale, 'schedule.constraint.back')}</span>
         </a>
-        <div className="w-9 h-9 rounded-2xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center shadow-xs">
+        <div className="w-9 h-9 rounded-2xl bg-[var(--danger-tint)] text-[var(--danger)] border border-[var(--danger)] flex items-center justify-center shadow-xs">
           <Shield className="w-4 h-4" aria-hidden="true" />
         </div>
       </header>
 
       <div>
-        <h1 className="text-xl font-black text-slate-900 tracking-tight">
+        <h1 className="text-xl font-black text-[var(--fg)] tracking-tight">
           {t(locale, 'schedule.constraint.title')}
         </h1>
-        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+        <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
           {t(locale, 'schedule.constraint.subtitle')}
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {/* -- step 1: date and time ---------------------------------------------- */}
-        <section className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-xs flex flex-col gap-3">
+        <section className="bg-[var(--surface-raised)] rounded-3xl p-4 border border-[var(--border)] shadow-xs flex flex-col gap-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[11px] font-bold flex items-center justify-center">
+            <span className="text-xs font-black text-[var(--fg)] flex items-center gap-1.5">
+              <span className="w-5 h-5 rounded-full bg-[var(--emphasis-tint)] text-[var(--emphasis)] text-[11px] font-bold flex items-center justify-center">
                 1
               </span>
               <span>{t(locale, 'schedule.constraint.step1.title')}</span>
             </span>
-            <div className="bg-slate-100 p-0.5 rounded-xl flex items-center text-xs font-bold">
+            <div className="bg-[var(--disabled-surface)] p-0.5 rounded-xl flex items-center text-xs font-bold">
               {(['single', 'range'] as const).map((mode) => (
                 <label
                   key={mode}
                   className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
                     selectionType === mode
-                      ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-slate-500 hover:text-slate-800'
+                      ? 'bg-[var(--surface-raised)] text-[var(--fg)] shadow-xs'
+                      : 'text-[var(--text-muted)] hover:text-[var(--fg)]'
                   }`}
                 >
                   <input
@@ -323,7 +323,7 @@ export function CoachConstraintsScreen({
 
           {selectionType === 'single' ? (
             <label className="flex flex-col gap-1">
-              <span className="text-[11px] font-bold text-slate-500">
+              <span className="text-[11px] font-bold text-[var(--text-muted)]">
                 {t(locale, 'schedule.constraint.step1.date')}
               </span>
               <input
@@ -331,13 +331,13 @@ export function CoachConstraintsScreen({
                 required
                 value={singleDate}
                 onChange={(event) => setSingleDate(event.target.value)}
-                className="h-11 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900"
+                className="h-11 px-3.5 bg-[var(--surface)] border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--fg)]"
               />
             </label>
           ) : (
             <div className="grid grid-cols-2 gap-2">
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-bold text-slate-500">
+                <span className="text-[11px] font-bold text-[var(--text-muted)]">
                   {t(locale, 'schedule.constraint.step1.rangeStart')}
                 </span>
                 <input
@@ -345,11 +345,11 @@ export function CoachConstraintsScreen({
                   required
                   value={rangeStart}
                   onChange={(event) => setRangeStart(event.target.value)}
-                  className="h-11 px-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900"
+                  className="h-11 px-2.5 bg-[var(--surface)] border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--fg)]"
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-bold text-slate-500">
+                <span className="text-[11px] font-bold text-[var(--text-muted)]">
                   {t(locale, 'schedule.constraint.step1.rangeEnd')}
                 </span>
                 <input
@@ -357,29 +357,29 @@ export function CoachConstraintsScreen({
                   required
                   value={rangeEnd}
                   onChange={(event) => setRangeEnd(event.target.value)}
-                  className="h-11 px-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900"
+                  className="h-11 px-2.5 bg-[var(--surface)] border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--fg)]"
                   aria-invalid={rangeInvalid || undefined}
                   aria-describedby={rangeInvalid ? 'constraint-range-error' : undefined}
                 />
               </label>
               {rangeInvalid ? (
-                <p id="constraint-range-error" role="alert" className="col-span-2 text-[11px] font-bold text-rose-600">
+                <p id="constraint-range-error" role="alert" className="col-span-2 text-[11px] font-bold text-[var(--danger)]">
                   {t(locale, 'schedule.constraint.validation.rangeOrder')}
                 </p>
               ) : null}
             </div>
           )}
 
-          <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
+          <div className="pt-2 border-t border-[var(--border)] flex flex-col gap-2">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <span className="text-xs font-bold text-slate-700">
+              <span className="text-xs font-bold text-[var(--text-secondary)]">
                 {t(locale, 'schedule.constraint.step1.scopeLegend')}
               </span>
               <div className="flex items-center gap-2">
                 {([true, false] as const).map((allDayOption) => (
                   <label
                     key={String(allDayOption)}
-                    className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-medium text-slate-600"
+                    className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-medium text-[var(--text-secondary)]"
                   >
                     <input
                       type="radio"
@@ -402,9 +402,9 @@ export function CoachConstraintsScreen({
             </div>
 
             {!isAllDay ? (
-              <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-2xl border border-slate-200/80">
+              <div className="grid grid-cols-2 gap-2 bg-[var(--surface)] p-2.5 rounded-2xl border border-[var(--border)]">
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] text-slate-500 font-bold">
+                  <span className="text-[10px] text-[var(--text-muted)] font-bold">
                     {t(locale, 'schedule.constraint.step1.from')}
                   </span>
                   <input
@@ -412,11 +412,11 @@ export function CoachConstraintsScreen({
                     required
                     value={startTime}
                     onChange={(event) => setStartTime(event.target.value)}
-                    className="h-9 px-2 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold"
+                    className="h-9 px-2 bg-[var(--surface-raised)] border border-[var(--border)] rounded-lg text-xs font-mono font-bold"
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] text-slate-500 font-bold">
+                  <span className="text-[10px] text-[var(--text-muted)] font-bold">
                     {t(locale, 'schedule.constraint.step1.to')}
                   </span>
                   <input
@@ -424,13 +424,13 @@ export function CoachConstraintsScreen({
                     required
                     value={endTime}
                     onChange={(event) => setEndTime(event.target.value)}
-                    className="h-9 px-2 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold"
+                    className="h-9 px-2 bg-[var(--surface-raised)] border border-[var(--border)] rounded-lg text-xs font-mono font-bold"
                     aria-invalid={timeInvalid || undefined}
                     aria-describedby={timeInvalid ? 'constraint-time-error' : undefined}
                   />
                 </label>
                 {timeInvalid ? (
-                  <p id="constraint-time-error" role="alert" className="col-span-2 text-[11px] font-bold text-rose-600">
+                  <p id="constraint-time-error" role="alert" className="col-span-2 text-[11px] font-bold text-[var(--danger)]">
                     {t(locale, 'schedule.constraint.validation.timeOrder')}
                   </p>
                 ) : null}
@@ -440,9 +440,9 @@ export function CoachConstraintsScreen({
         </section>
 
         {/* -- step 2: reason ------------------------------------------------------ */}
-        <section className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-xs flex flex-col gap-3">
-          <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-            <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[11px] font-bold flex items-center justify-center">
+        <section className="bg-[var(--surface-raised)] rounded-3xl p-4 border border-[var(--border)] shadow-xs flex flex-col gap-3">
+          <span className="text-xs font-black text-[var(--fg)] flex items-center gap-1.5">
+            <span className="w-5 h-5 rounded-full bg-[var(--emphasis-tint)] text-[var(--emphasis)] text-[11px] font-bold flex items-center justify-center">
               2
             </span>
             <span>{t(locale, 'schedule.constraint.step2.title')}</span>
@@ -456,8 +456,8 @@ export function CoachConstraintsScreen({
                   key={code}
                   className={`p-2.5 rounded-2xl text-start border transition-all flex items-center gap-2 cursor-pointer ${
                     isSelected
-                      ? 'bg-blue-50 border-blue-400 text-blue-900 font-bold ring-2 ring-blue-500/20'
-                      : 'bg-slate-50/70 border-slate-200 text-slate-700 hover:bg-slate-100 text-xs'
+                      ? 'bg-[var(--emphasis-tint)] border-[var(--emphasis)] text-[var(--emphasis)] font-bold ring-2 ring-blue-500/20'
+                      : 'bg-[var(--disabled-surface)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--disabled-surface)] text-xs'
                   }`}
                 >
                   <input
@@ -481,9 +481,9 @@ export function CoachConstraintsScreen({
           {/* Renders — and is required — ONLY for `other`. See this file's own header,
               point 1: the prototype's `|| true` made this always show. */}
           {noteRequired ? (
-            <div className="pt-2 border-t border-slate-100">
+            <div className="pt-2 border-t border-[var(--border)]">
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-bold text-slate-600">
+                <span className="text-[11px] font-bold text-[var(--text-secondary)]">
                   {t(locale, 'schedule.constraint.step2.noteLabel')}
                 </span>
                 <textarea
@@ -494,11 +494,11 @@ export function CoachConstraintsScreen({
                   required
                   aria-invalid={noteInvalid || undefined}
                   aria-describedby={noteInvalid ? 'constraint-note-error' : undefined}
-                  className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800"
+                  className="p-2.5 bg-[var(--surface)] border border-[var(--border)] rounded-xl text-xs text-[var(--fg)]"
                 />
               </label>
               {noteInvalid ? (
-                <p id="constraint-note-error" role="alert" className="mt-1 text-[11px] font-bold text-rose-600">
+                <p id="constraint-note-error" role="alert" className="mt-1 text-[11px] font-bold text-[var(--danger)]">
                   {t(locale, 'schedule.constraint.validation.noteRequired')}
                 </p>
               ) : null}
@@ -507,31 +507,31 @@ export function CoachConstraintsScreen({
         </section>
 
         {/* -- step 3: a suggested substitute, in the coach's own words ------------ */}
-        <section className="bg-white rounded-3xl p-4 border border-slate-200/90 shadow-xs flex flex-col gap-3">
-          <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-            <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[11px] font-bold flex items-center justify-center">
+        <section className="bg-[var(--surface-raised)] rounded-3xl p-4 border border-[var(--border)] shadow-xs flex flex-col gap-3">
+          <span className="text-xs font-black text-[var(--fg)] flex items-center gap-1.5">
+            <span className="w-5 h-5 rounded-full bg-[var(--emphasis-tint)] text-[var(--emphasis)] text-[11px] font-bold flex items-center justify-center">
               3
             </span>
             <span>{t(locale, 'schedule.constraint.step3.title')}</span>
           </span>
           <label className="flex flex-col gap-1">
             <span className="sr-only">{t(locale, 'schedule.constraint.step3.title')}</span>
-            <div className="flex items-center gap-2 p-2.5 bg-slate-50/70 border border-slate-200 rounded-2xl">
-              <UserCheck className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
+            <div className="flex items-center gap-2 p-2.5 bg-[var(--disabled-surface)] border border-[var(--border)] rounded-2xl">
+              <UserCheck className="w-4 h-4 text-[var(--text-muted)] shrink-0" aria-hidden="true" />
               <input
                 type="text"
                 value={substitute}
                 onChange={(event) => setSubstitute(event.target.value)}
                 placeholder={t(locale, 'schedule.constraint.step3.placeholder')}
-                className="flex-1 bg-transparent text-xs text-slate-800 outline-hidden"
+                className="flex-1 bg-transparent text-xs text-[var(--fg)] outline-hidden"
               />
             </div>
           </label>
-          <p className="text-[11px] text-slate-400">{t(locale, 'schedule.constraint.step3.hint')}</p>
+          <p className="text-[11px] text-[var(--text-muted)]">{t(locale, 'schedule.constraint.step3.hint')}</p>
         </section>
 
         {submitFailed ? (
-          <p role="alert" className="text-xs font-bold text-rose-600 text-center">
+          <p role="alert" className="text-xs font-bold text-[var(--danger)] text-center">
             {t(locale, 'schedule.constraint.submitFailed')}
           </p>
         ) : null}
@@ -550,7 +550,7 @@ export function CoachConstraintsScreen({
 
       <section aria-labelledby="constraint-history-title" className="flex flex-col gap-2 mt-2">
         <div className="flex items-center justify-between px-1">
-          <h2 id="constraint-history-title" className="text-xs font-black text-slate-900 tracking-wider">
+          <h2 id="constraint-history-title" className="text-xs font-black text-[var(--fg)] tracking-wider">
             {t(locale, 'schedule.constraint.history.title')}
           </h2>
         </div>
@@ -574,15 +574,15 @@ export function CoachConstraintsScreen({
               <li
                 key={row.id}
                 data-testid="constraint-history-row"
-                className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-xs flex items-start justify-between gap-3 text-xs"
+                className="bg-[var(--surface-raised)] rounded-2xl p-3.5 border border-[var(--border)] shadow-xs flex items-start justify-between gap-3 text-xs"
               >
                 <div className="flex items-start gap-2.5 min-w-0">
-                  <span className="text-xl p-1.5 rounded-xl bg-slate-100 shrink-0" aria-hidden="true">
+                  <span className="text-xl p-1.5 rounded-xl bg-[var(--disabled-surface)] shrink-0" aria-hidden="true">
                     {REASON_EMOJI[row.reason]}
                   </span>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-black text-slate-900">
+                      <span className="font-black text-[var(--fg)]">
                         {t(locale, `schedule.constraint.reason.${row.reason}`)}
                       </span>
                       <span
@@ -592,12 +592,12 @@ export function CoachConstraintsScreen({
                         {t(locale, `schedule.constraint.status.${row.status}`)}
                       </span>
                     </div>
-                    <span className="text-[11px] font-mono text-slate-500 block mt-0.5">
+                    <span className="text-[11px] font-mono text-[var(--text-muted)] block mt-0.5">
                       <Calendar className="w-3 h-3 inline-block me-1" aria-hidden="true" />
                       {whenLabel(row, locale)}
                     </span>
                     {row.note ? (
-                      <p className="text-[11px] text-slate-600 mt-1 bg-slate-50 p-1.5 rounded-lg whitespace-pre-line">
+                      <p className="text-[11px] text-[var(--text-secondary)] mt-1 bg-[var(--surface)] p-1.5 rounded-lg whitespace-pre-line">
                         {row.note}
                       </p>
                     ) : null}
@@ -610,7 +610,7 @@ export function CoachConstraintsScreen({
                     onClick={() => withdraw(row.id)}
                     disabled={withdrawingId === row.id}
                     aria-label={t(locale, 'schedule.constraint.history.withdraw')}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0 disabled:opacity-50"
+                    className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-tint)] transition-colors shrink-0 disabled:opacity-50"
                   >
                     <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                   </button>

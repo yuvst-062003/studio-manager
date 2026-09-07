@@ -29,6 +29,21 @@
   --cancelled-tint: #f3f2ef;
   --danger: #b3261e;
   --danger-tint: #faf1ee;
+
+  /* Three tints and one "on" colour the band was missing. `--debt-tint`,
+   * `--danger-tint` and `--cancelled-tint` already existed; `--paid` and `--pending`
+   * had no fill of their own, and nothing named the label colour that sits ON a status
+   * fill. The staff app's ported screens use all four (bg-emerald-50, bg-amber-50,
+   * bg-blue-50, and white text on a filled chip), and inventing them in that app's
+   * surface block would have been a second palette rather than an override.
+   *
+   * `--on-status` is ONE token for all four fills, not four. In light mode every status
+   * colour is dark, so white sits on all of them; in dark mode every one is light, so
+   * near-black does. Four tokens would be four things to keep in step for no freedom. */
+  --paid-tint: #eef5f0;
+  --pending-tint: #f8f3e8;
+  --emphasis-tint: #f2f1ed;
+  --on-status: #fff;
   --focus-ring: #2f6fa8;
 
   /* ═══ TIER 3 · STRUCTURAL · palette ═══════════════════════════════════════════ */
@@ -133,6 +148,14 @@
   --cancelled-tint: #292825;
   --danger: #ff8a7d;
   --danger-tint: #2c2420;
+
+  /* The four new tokens, inverted the way the rest of this block is: each tint becomes
+   * a dark wash of its own hue and --on-status flips to near-black, because every
+   * status colour above is light here. Tightest pair is --paid on --paid-tint, 4.69:1. */
+  --paid-tint: #18241d;
+  --pending-tint: #2b2519;
+  --emphasis-tint: #2a2724;
+  --on-status: #141311;
   --focus-ring: #6aa9e0;
 
   /* Palette. #a8a49a and #8f8b82 are legal HERE and only here — D8 makes them
@@ -307,6 +330,11 @@
   --on-accent: #fff;
   --belt-ring: #0f172a;
   --scrim: rgb(15 23 42 / 45%);
+
+  /* The wash behind an emphasised chip — the ported screens' `bg-blue-50`. Structural,
+   * so re-valuing it here is allowed; the semantic band above it deliberately is NOT
+   * re-valued (D2), which is why a debt chip stays the studio's red on this blue app. */
+  --emphasis-tint: #eff6ff;
 }
 
 [data-theme="dark"][data-surface="staff"],
@@ -343,6 +371,11 @@
   --on-accent: #090d16;
   --belt-ring: #f1f5f9;
   --scrim: rgb(0 0 0 / 62%);
+
+  /* Inverted like every other dark pair here: a dark wash of the emphasis hue, so an
+   * emphasised chip still reads as raised without becoming a bright rectangle on a
+   * near-black page. --fg clears 14.31:1 on it and --emphasis 6.16:1. */
+  --emphasis-tint: #17233b;
 }
 
 *,

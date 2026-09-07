@@ -90,7 +90,7 @@ export function EmergencyContactStep({
     type: string,
   ) => (
     <label className="block">
-      <span className="block text-xs font-bold text-slate-700">
+      <span className="block text-xs font-bold text-[var(--text-secondary)]">
         {t(locale, `people.emergency.${key}`)}
       </span>
       <input
@@ -102,7 +102,7 @@ export function EmergencyContactStep({
         // still a string the server treats as free text (numbers here are written a dozen
         // ways and none of them is wrong).
         inputMode={key === 'phone' ? 'tel' : undefined}
-        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+        className="mt-1 w-full rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2 text-sm"
       />
     </label>
   )
@@ -113,15 +113,15 @@ export function EmergencyContactStep({
       data-testid="emergency-contact-step"
     >
       <header>
-        <h1 className="text-2xl font-black text-slate-900">
+        <h1 className="text-2xl font-black text-[var(--fg)]">
           {t(locale, 'people.emergency.title')}
         </h1>
-        <p className="mt-1 text-sm leading-relaxed text-slate-500">
+        <p className="mt-1 text-sm leading-relaxed text-[var(--text-muted)]">
           {t(locale, 'people.emergency.body')}
         </p>
       </header>
 
-      <section className="flex flex-col gap-3 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+      <section className="flex flex-col gap-3 rounded-3xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-sm">
         {field('name', name, setName, 'text')}
         {field('phone', phone, setPhone, 'tel')}
         {field('relation', relation, setRelation, 'text')}
@@ -131,7 +131,7 @@ export function EmergencyContactStep({
         <p
           role="alert"
           data-testid="emergency-failed"
-          className="rounded-2xl bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700"
+          className="rounded-2xl bg-[var(--danger-tint)] px-3 py-2 text-xs font-bold text-[var(--danger)]"
         >
           {t(locale, 'people.emergency.saveFailed')}
         </p>
@@ -142,7 +142,7 @@ export function EmergencyContactStep({
         data-testid="emergency-save"
         disabled={!complete || saving}
         onClick={() => void save()}
-        className="w-full rounded-2xl bg-blue-600 py-3 text-sm font-black text-white disabled:bg-slate-200 disabled:text-slate-400"
+        className="w-full rounded-2xl bg-[var(--emphasis)] py-3 text-sm font-black text-[var(--on-emphasis)] disabled:bg-[var(--border)] disabled:text-[var(--text-muted)]"
       >
         {t(locale, saving ? 'people.emergency.saving' : 'people.emergency.save')}
       </button>
@@ -151,7 +151,7 @@ export function EmergencyContactStep({
         type="button"
         data-testid="emergency-skip"
         onClick={onSkip}
-        className="w-full py-2 text-xs font-bold text-slate-500"
+        className="w-full py-2 text-xs font-bold text-[var(--text-muted)]"
       >
         {t(locale, 'people.emergency.later')}
       </button>

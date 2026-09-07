@@ -257,7 +257,9 @@ describe('D2 — the three tiers, and nothing else', () => {
         '--debt-tint',
         '--focus-ring',
         '--paid',
+        '--paid-tint',
         '--pending',
+        '--pending-tint',
       ].sort(),
     )
   })

@@ -110,7 +110,7 @@ export function StaffConsentGate({
           type="button"
           data-testid="staff-consent-doc-back"
           onClick={() => setOpenDoc(null)}
-          className="self-start rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700"
+          className="self-start rounded-xl bg-[var(--disabled-surface)] px-3 py-1.5 text-xs font-bold text-[var(--text-secondary)]"
         >
           {t(locale, 'reports.privacy.gate.closeFull')}
         </button>
@@ -132,16 +132,16 @@ export function StaffConsentGate({
   return (
     <div className="tw-scope flex flex-col gap-4 px-4 pt-6 pb-8" data-testid="staff-consent-gate">
       <header>
-        <h1 className="text-2xl font-black text-slate-900">
+        <h1 className="text-2xl font-black text-[var(--fg)]">
           {t(locale, 'reports.privacy.gate.title')}
         </h1>
-        <p className="mt-1 text-sm leading-relaxed text-slate-500">
+        <p className="mt-1 text-sm leading-relaxed text-[var(--text-muted)]">
           {t(locale, 'reports.privacy.gate.body')}
         </p>
         {/* The one line that is the staff app's own. A coach is not being asked the same
             question a parent is: a parent consents to the club holding THEIR family's data,
             and a coach undertakes to handle other people's children's. */}
-        <p className="mt-2 text-sm font-bold leading-relaxed text-slate-700">
+        <p className="mt-2 text-sm font-bold leading-relaxed text-[var(--text-secondary)]">
           {t(locale, 'reports.privacy.gate.staffBody')}
         </p>
         {state.policy_is_draft ? (
@@ -157,7 +157,7 @@ export function StaffConsentGate({
           ['privacy', 'reports.privacy.gate.acceptPrivacy', 'reports.privacy.gate.privacySummary'],
         ] as const
       ).map(([key, titleKey, summaryKey]) => (
-        <section key={key} className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+        <section key={key} className="rounded-3xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-sm">
           <label className="flex items-start gap-3">
             <input
               type="checkbox"
@@ -169,17 +169,17 @@ export function StaffConsentGate({
               }}
               className="mt-0.5 h-5 w-5 shrink-0 accent-blue-600"
             />
-            <span className="text-sm font-black text-slate-900">{t(locale, titleKey)}</span>
+            <span className="text-sm font-black text-[var(--fg)]">{t(locale, titleKey)}</span>
           </label>
-          <p className="mt-2 text-xs leading-relaxed text-slate-500">{t(locale, summaryKey)}</p>
-          <p className="mt-1 text-[11px] text-slate-400">
+          <p className="mt-2 text-xs leading-relaxed text-[var(--text-muted)]">{t(locale, summaryKey)}</p>
+          <p className="mt-1 text-[11px] text-[var(--text-muted)]">
             {t(locale, 'reports.privacy.doc.version')} {state.policy_version_label}
           </p>
           <button
             type="button"
             data-testid={`staff-consent-read-${key}`}
             onClick={() => setOpenDoc(DOC_OF[key])}
-            className="mt-2 text-xs font-bold text-blue-700"
+            className="mt-2 text-xs font-bold text-[var(--emphasis)]"
           >
             {t(locale, 'reports.privacy.gate.readFull')}
           </button>
@@ -191,7 +191,7 @@ export function StaffConsentGate({
         <p
           role="alert"
           data-testid="staff-consent-failed"
-          className="rounded-2xl bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700"
+          className="rounded-2xl bg-[var(--danger-tint)] px-3 py-2 text-xs font-bold text-[var(--danger)]"
         >
           {t(locale, 'reports.privacy.gate.failed')}
         </p>
@@ -202,7 +202,7 @@ export function StaffConsentGate({
         data-testid="staff-consent-submit"
         disabled={!both || saving}
         onClick={() => void submit()}
-        className="w-full rounded-2xl bg-blue-600 py-3 text-sm font-black text-white disabled:bg-slate-200 disabled:text-slate-400"
+        className="w-full rounded-2xl bg-[var(--emphasis)] py-3 text-sm font-black text-[var(--on-emphasis)] disabled:bg-[var(--border)] disabled:text-[var(--text-muted)]"
       >
         {t(locale, saving ? 'reports.privacy.gate.working' : 'reports.privacy.gate.submit')}
       </button>

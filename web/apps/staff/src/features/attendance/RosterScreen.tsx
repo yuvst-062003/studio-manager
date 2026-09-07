@@ -243,7 +243,7 @@ export function RosterScreen({
           <strong>{t(locale, 'attendance.sync.staleWarning')}</strong>
           <span>{t(locale, 'attendance.sync.staleBody')}</span>
         </Alert>
-        <p className="text-xs font-semibold text-slate-500" data-testid="roster-stale-count">
+        <p className="text-xs font-semibold text-[var(--text-muted)]" data-testid="roster-stale-count">
           {plural(locale, 'attendance.sync.pendingCount', pending)}
         </p>
       </section>
@@ -258,15 +258,15 @@ export function RosterScreen({
       className="flex flex-col gap-4 px-4 pt-4"
       data-testid="roster-screen"
     >
-      <header className="flex flex-col gap-3 rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs">
+      <header className="flex flex-col gap-3 rounded-3xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-xs">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-base font-black text-slate-900" id="roster-title">
+            <h1 className="text-base font-black text-[var(--fg)]" id="roster-title">
               {t(locale, 'attendance.roster.title')}
             </h1>
             {header ? (
               <p
-                className="mt-0.5 text-xs font-semibold text-slate-400"
+                className="mt-0.5 text-xs font-semibold text-[var(--text-muted)]"
                 data-testid="roster-session"
               >
                 {/* S6 — `יום א׳ · 17:00 · אולם א׳`. The weekday and the hall are for the coach
@@ -293,7 +293,7 @@ export function RosterScreen({
               (§5.7 — a not-expected child who has not come has not missed anything), so
               this number and `roster-counts`' own present tile never disagree. */}
           <div className="shrink-0 text-end" data-testid="roster-live-count">
-            <p className="text-sm font-black text-slate-900">
+            <p className="text-sm font-black text-[var(--fg)]">
               {withMonoNumerals(
                 t(locale, 'attendance.roster.presentOfTotal')
                   .replace('{{present}}', String(counts.present))
@@ -309,19 +309,19 @@ export function RosterScreen({
         <ul className="grid grid-cols-3 gap-2" data-testid="roster-counts">
           <li className="rounded-2xl border p-2.5 text-center" data-count="present">
             <span className="count-number block font-mono text-lg">{counts.present}</span>
-            <span className="count-label mt-0.5 block text-[11px] font-semibold text-slate-500">
+            <span className="count-label mt-0.5 block text-[11px] font-semibold text-[var(--text-muted)]">
               {t(locale, 'attendance.roster.present')}
             </span>
           </li>
           <li className="rounded-2xl border p-2.5 text-center" data-count="absent">
             <span className="count-number block font-mono text-lg">{counts.absent}</span>
-            <span className="count-label mt-0.5 block text-[11px] font-semibold text-slate-500">
+            <span className="count-label mt-0.5 block text-[11px] font-semibold text-[var(--text-muted)]">
               {t(locale, 'attendance.roster.absent')}
             </span>
           </li>
           <li className="rounded-2xl border p-2.5 text-center" data-count="unmarked">
             <span className="count-number block font-mono text-lg">{counts.unmarked}</span>
-            <span className="count-label mt-0.5 block text-[11px] font-semibold text-slate-500">
+            <span className="count-label mt-0.5 block text-[11px] font-semibold text-[var(--text-muted)]">
               {t(locale, 'attendance.roster.unmarked')}
             </span>
           </li>
@@ -365,17 +365,17 @@ export function RosterScreen({
 
       {/* The prototype's quick-action strip. Only its "mark all" half is drawn — see this
           file's own header note on why "reset" has nothing behind it. */}
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200/60 bg-slate-50 px-4 py-2.5">
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5">
         {/* `9f` finding 1 — "if the action skips pre-reported marks, **the button's own copy
             should say so**." Unconditional, and not only when a parent has reported: a coach
             decides whether to tap this before knowing whether anybody reported, and a
             reassurance that appears only sometimes is one nobody learns to rely on. The
             dashboard's `1e` copy says the same thing beside the same button. */}
-        <p className="text-xs font-medium text-slate-500" data-testid="roster-bulk-hint">
+        <p className="text-xs font-medium text-[var(--text-muted)]" data-testid="roster-bulk-hint">
           {t(locale, 'attendance.roster.markAllPresentHint')}
         </p>
         <button
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-emerald-700 shadow-2xs transition-all active:scale-95 hover:bg-emerald-50"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-3.5 py-2 text-xs font-bold text-[var(--paid)] shadow-2xs transition-all active:scale-95 hover:bg-[var(--paid-tint)]"
           onClick={() => {
             void bulkPresent()
           }}
@@ -387,7 +387,7 @@ export function RosterScreen({
       </div>
 
       {roster.length === 0 ? (
-        <p className="text-sm text-slate-500" data-testid="roster-empty">
+        <p className="text-sm text-[var(--text-muted)]" data-testid="roster-empty">
           {t(locale, 'attendance.roster.empty')}
         </p>
       ) : null}
@@ -410,7 +410,7 @@ export function RosterScreen({
           collapsed by default, reachable by keyboard, and needs no state of its own. */}
       {split.notExpected.length > 0 ? (
         <details
-          className="rounded-2xl border border-slate-200/60 bg-slate-50/60 px-3"
+          className="rounded-2xl border border-[var(--border)] bg-[var(--disabled-surface)] px-3"
           data-testid="roster-not-expected"
         >
           <summary className="text-sm font-semibold">
@@ -432,7 +432,7 @@ export function RosterScreen({
       ) : null}
 
       <footer className="flex flex-col gap-3 pb-2">
-        <p className="text-center text-xs font-medium text-slate-400" data-testid="roster-edit-anytime">
+        <p className="text-center text-xs font-medium text-[var(--text-muted)]" data-testid="roster-edit-anytime">
           {t(locale, 'attendance.roster.editAnytime')}
         </p>
         {/* S2 — the register's exits. `9g` is the step after taking a register; `11a`
@@ -443,24 +443,24 @@ export function RosterScreen({
           data-testid="roster-actions"
         >
           <a
-            className="flex flex-col items-center gap-1 rounded-2xl border border-slate-200/80 bg-white px-2 py-2.5 text-center text-[11px] font-bold text-slate-600 shadow-2xs transition-all active:scale-95 hover:bg-slate-50"
+            className="flex flex-col items-center gap-1 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-2 py-2.5 text-center text-[11px] font-bold text-[var(--text-secondary)] shadow-2xs transition-all active:scale-95 hover:bg-[var(--surface)]"
             href={`#/attendance/${sessionId}/summary`}
           >
-            <ClipboardList aria-hidden="true" className="h-4 w-4 text-blue-600" />
+            <ClipboardList aria-hidden="true" className="h-4 w-4 text-[var(--emphasis)]" />
             {t(locale, 'attendance.summary.title')}
           </a>
           <a
-            className="flex flex-col items-center gap-1 rounded-2xl border border-slate-200/80 bg-white px-2 py-2.5 text-center text-[11px] font-bold text-slate-600 shadow-2xs transition-all active:scale-95 hover:bg-slate-50"
+            className="flex flex-col items-center gap-1 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-2 py-2.5 text-center text-[11px] font-bold text-[var(--text-secondary)] shadow-2xs transition-all active:scale-95 hover:bg-[var(--surface)]"
             href={`#/attendance/${sessionId}/handover`}
           >
-            <Package aria-hidden="true" className="h-4 w-4 text-blue-600" />
+            <Package aria-hidden="true" className="h-4 w-4 text-[var(--emphasis)]" />
             {t(locale, 'billing.product.handOut')}
           </a>
           <a
-            className="flex flex-col items-center gap-1 rounded-2xl border border-slate-200/80 bg-white px-2 py-2.5 text-center text-[11px] font-bold text-slate-600 shadow-2xs transition-all active:scale-95 hover:bg-slate-50"
+            className="flex flex-col items-center gap-1 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-2 py-2.5 text-center text-[11px] font-bold text-[var(--text-secondary)] shadow-2xs transition-all active:scale-95 hover:bg-[var(--surface)]"
             href={`#/attendance/${sessionId}/trial`}
           >
-            <UserPlus aria-hidden="true" className="h-4 w-4 text-blue-600" />
+            <UserPlus aria-hidden="true" className="h-4 w-4 text-[var(--emphasis)]" />
             {t(locale, 'people.trial.addDuringClass')}
           </a>
         </nav>

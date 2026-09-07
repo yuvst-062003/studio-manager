@@ -48,7 +48,7 @@
 // still drew the same shape — the session actually happening now looked like any other,
 // carrying no more information than one that had not started. Three fixes, all from the
 // prototype's own four hand-drawn cards, none of them a token swap:
-//   - `activeNow`'s card gets the prototype's own frame — `border-2 border-blue-500
+//   - `activeNow`'s card gets the prototype's own frame — `border-2 border-[var(--emphasis)]
 //     shadow-lg shadow-blue-500/10` — in place of the ordinary hairline every other state
 //     draws, via `CARD_FRAME` below (replacing the old colour-only `CARD_BORDER`).
 //   - `activeNow` gets a second thing no other state carries: a live progress block, off
@@ -197,16 +197,16 @@ const DOT_COLOR: Record<DotState, string> = {
  * dot's alone, and `--paid`'s green is money-scoped and never borrowed here.
  *
  * `activeNow` is not a fourth hairline the way the other three are — the prototype draws
- * the session happening right now with its own two-pixel frame (`border-2 border-blue-500
+ * the session happening right now with its own two-pixel frame (`border-2 border-[var(--emphasis)]
  * shadow-lg shadow-blue-500/10`), distinct from every other card's `border shadow-xs`. Its
  * dot and chip stay emerald (nothing above changes); only the card's own outline goes blue,
  * which is what makes it the one card on the screen a coach cannot mistake for any other.
  */
 const CARD_FRAME: Record<DotState, string> = {
-  pendingClose: 'border border-rose-200 shadow-xs',
-  activeNow: 'border-2 border-blue-500 shadow-lg shadow-blue-500/10',
-  nextUp: 'border border-blue-200 shadow-xs',
-  later: 'border border-slate-200/80 shadow-xs',
+  pendingClose: 'border border-[var(--danger)] shadow-xs',
+  activeNow: 'border-2 border-[var(--emphasis)] shadow-lg shadow-blue-500/10',
+  nextUp: 'border border-[var(--emphasis)] shadow-xs',
+  later: 'border border-[var(--border)] shadow-xs',
 }
 
 /**
@@ -219,9 +219,9 @@ const CARD_FRAME: Record<DotState, string> = {
  * the way the prototype has it, regardless of which `DotState` the card is in.
  */
 const ATTENDANCE_BUTTON_CLASS =
-  'py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-bold text-xs shadow-md shadow-blue-600/30 flex items-center justify-center gap-1.5 transition-all'
+  'py-3 rounded-2xl bg-[var(--emphasis)] hover:brightness-110 active:scale-[0.98] text-[var(--on-emphasis)] font-bold text-xs shadow-md shadow-blue-600/30 flex items-center justify-center gap-1.5 transition-all'
 const CHASE_BUTTON_CLASS =
-  'py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-bold text-xs shadow-md shadow-emerald-600/25 flex items-center justify-center gap-1.5 transition-all'
+  'py-3 rounded-2xl bg-[var(--paid)] hover:bg-[var(--paid)] active:scale-[0.98] text-[var(--on-status)] font-bold text-xs shadow-md shadow-emerald-600/25 flex items-center justify-center gap-1.5 transition-all'
 
 const timelineRowStyle: CSSProperties = {
   display: 'flex',
@@ -692,7 +692,7 @@ export function TodayScreen({
             href="#/calendar"
             data-testid="open-month-calendar"
             aria-label={t(locale, 'schedule.staffCalendar.openButton')}
-            className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-xs border border-indigo-100 active:scale-95 transition-all shrink-0"
+            className="w-10 h-10 rounded-2xl bg-[var(--emphasis-tint)] text-[var(--emphasis)] flex items-center justify-center shadow-xs border border-[var(--emphasis)] active:scale-95 transition-all shrink-0"
           >
             <CalendarDays className="w-5 h-5" aria-hidden="true" />
           </a>
@@ -701,14 +701,14 @@ export function TodayScreen({
             data-testid="back-to-today"
             disabled={day === todayKey}
             onClick={() => setDay(todayKey)}
-            className="px-3.5 py-1 rounded-xl text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 active:scale-95 transition-all disabled:opacity-60 disabled:active:scale-100"
+            className="px-3.5 py-1 rounded-xl text-xs font-bold bg-[var(--emphasis-tint)] text-[var(--emphasis)] border border-[var(--emphasis)] active:scale-95 transition-all disabled:opacity-60 disabled:active:scale-100"
           >
             {t(locale, 'schedule.today.title')}
           </button>
         </div>
 
         <div className="text-end">
-          <h1 id="today-title" className="text-base font-black text-slate-900 tracking-tight">
+          <h1 id="today-title" className="text-base font-black text-[var(--fg)] tracking-tight">
             {/* S7 — `היום`, or the day being looked at: `יום שלישי · 3 בנובמבר`. */}
             {day === todayKey
               ? t(locale, 'schedule.today.title')
@@ -720,7 +720,7 @@ export function TodayScreen({
           {/* S7 — `5 שיעורים · אלון מזרחי`. The coach half renders only when the filter has
               chosen one, which for a coach opening their own day is the default. Sessions
               only — an event is a different kind of thing to count in the same breath. */}
-          <p data-testid="today-summary" className="text-xs font-semibold text-slate-400 mt-0.5">
+          <p data-testid="today-summary" className="text-xs font-semibold text-[var(--text-muted)] mt-0.5">
             ({withMonoNumerals(plural(locale, 'schedule.today.sessionCount', onThisDay.length))}
             {coachName ? (
               <>
@@ -753,19 +753,19 @@ export function TodayScreen({
               onClick={() => chooseDay(key)}
               className={`flex-1 min-w-[44px] py-2.5 rounded-2xl flex flex-col items-center gap-0.5 transition-all active:scale-95 ${
                 selected
-                  ? 'bg-[#1e3a8a] text-white shadow-md ring-2 ring-blue-600/30'
-                  : 'bg-white text-slate-600 border border-slate-200/80'
+                  ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-md ring-2 ring-blue-600/30'
+                  : 'bg-[var(--surface-raised)] text-[var(--text-secondary)] border border-[var(--border)]'
               }`}
             >
               <span
-                className={`text-[11px] font-semibold ${selected ? 'text-blue-200' : 'text-slate-400'}`}
+                className={`text-[11px] font-semibold ${selected ? 'text-blue-200' : 'text-[var(--text-muted)]'}`}
               >
                 {t(locale, `schedule.weekday.${new Date(`${key}T12:00:00Z`).getUTCDay()}`)}
               </span>
               <span className="text-sm font-black font-mono">{key.slice(8)}</span>
               {isToday ? (
                 <span
-                  className={`w-1.5 h-1.5 rounded-full ${selected ? 'bg-white' : 'bg-blue-600'}`}
+                  className={`w-1.5 h-1.5 rounded-full ${selected ? 'bg-[var(--surface-raised)]' : 'bg-[var(--emphasis)]'}`}
                   aria-hidden="true"
                 />
               ) : null}
@@ -797,7 +797,7 @@ export function TodayScreen({
         <p
           role="status"
           data-testid="schedule-from-cache"
-          className="rounded-2xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800"
+          className="rounded-2xl bg-[var(--pending-tint)] px-3 py-2 text-xs font-bold text-[var(--pending)]"
         >
           {t(locale, 'schedule.today.fromCache')}
         </p>
@@ -918,7 +918,7 @@ function SessionStateChip({
     return (
       <span
         data-testid="session-state"
-        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600"
+        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[var(--disabled-surface)] text-[var(--text-secondary)]"
       >
         <Ban className="w-3 h-3" aria-hidden="true" />
         <span>{t(locale, 'schedule.session.status.cancelled')}</span>
@@ -929,7 +929,7 @@ function SessionStateChip({
     return (
       <span
         data-testid="session-state"
-        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200"
+        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[var(--danger-tint)] text-[var(--danger)] border border-[var(--danger)]"
       >
         <AlertCircle className="w-3 h-3" aria-hidden="true" />
         <span>{t(locale, 'schedule.session.state.pendingClose')}</span>
@@ -940,9 +940,9 @@ function SessionStateChip({
     return (
       <span
         data-testid="session-state"
-        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"
+        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[var(--paid-tint)] text-[var(--paid)] border border-[var(--paid)]"
       >
-        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true" />
+        <span className="w-2 h-2 rounded-full bg-[var(--paid)] animate-pulse" aria-hidden="true" />
         <span>{t(locale, 'schedule.session.state.activeNow')}</span>
       </span>
     )
@@ -951,7 +951,7 @@ function SessionStateChip({
     return (
       <span
         data-testid="session-state"
-        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-100"
+        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[var(--emphasis-tint)] text-[var(--emphasis)] border border-[var(--emphasis)]"
       >
         <Clock className="w-3 h-3" aria-hidden="true" />
         <span>{t(locale, 'schedule.session.state.nextUp')}</span>
@@ -974,10 +974,10 @@ function SessionProgress({ locale, roster }: { locale: Locale; roster: RosterRow
   if (roster === undefined) {
     return (
       <div
-        className="bg-slate-50/80 rounded-2xl p-3 border border-slate-200/80 mb-3"
+        className="bg-[var(--disabled-surface)] rounded-2xl p-3 border border-[var(--border)] mb-3"
         data-testid="session-progress"
       >
-        <span className="text-xs font-semibold text-slate-400">
+        <span className="text-xs font-semibold text-[var(--text-muted)]">
           {t(locale, 'schedule.session.rosterUnavailable')}
         </span>
       </div>
@@ -987,35 +987,35 @@ function SessionProgress({ locale, roster }: { locale: Locale; roster: RosterRow
   const percent = counts.total > 0 ? Math.round((counts.confirmed / counts.total) * 100) : 0
   return (
     <div
-      className="bg-slate-50/80 rounded-2xl p-3 border border-slate-200/80 mb-3"
+      className="bg-[var(--disabled-surface)] rounded-2xl p-3 border border-[var(--border)] mb-3"
       data-testid="session-progress"
     >
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-bold text-slate-700" data-testid="session-progress-count">
+        <span className="text-xs font-bold text-[var(--text-secondary)]" data-testid="session-progress-count">
           {withMonoNumerals(
             t(locale, 'schedule.session.confirmedCount')
               .replace('{{confirmed}}', String(counts.confirmed))
               .replace('{{total}}', String(counts.total)),
           )}
         </span>
-        <span className="text-xs font-black text-blue-700 font-mono" data-testid="session-progress-percent">
+        <span className="text-xs font-black text-[var(--emphasis)] font-mono" data-testid="session-progress-percent">
           {t(locale, 'schedule.session.confirmedPercent').replace('{{percent}}', String(percent))}
         </span>
       </div>
-      <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden mb-2">
+      <div className="w-full bg-[var(--border)] rounded-full h-2 overflow-hidden mb-2">
         <div
-          className="bg-blue-600 h-2 rounded-full transition-all duration-500"
+          className="bg-[var(--emphasis)] h-2 rounded-full transition-all duration-500"
           style={{ inlineSize: `${percent}%` }}
         />
       </div>
       <div className="flex items-center justify-between text-[11px] font-bold">
-        <span className="text-emerald-700 flex items-center gap-1">
-          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" aria-hidden="true" />
+        <span className="text-[var(--paid)] flex items-center gap-1">
+          <CheckCircle2 className="w-3.5 h-3.5 text-[var(--paid)]" aria-hidden="true" />
           <span className="font-mono">{counts.confirmed}</span>
           <span>{t(locale, 'schedule.session.progressConfirmedLabel')}</span>
         </span>
-        <span className="text-rose-600 flex items-center gap-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" aria-hidden="true" />
+        <span className="text-[var(--danger)] flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-[var(--danger)]" aria-hidden="true" />
           <span className="font-mono">{counts.notAnswered}</span>
           <span>{t(locale, 'schedule.session.progressNotAnsweredLabel')}</span>
         </span>
@@ -1071,7 +1071,7 @@ function SessionBriefingControl({
           hasBriefing ? 'schedule.session.openBriefing' : 'attendance.briefing.add',
         )}
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1 font-bold text-blue-700"
+        className="inline-flex items-center gap-1 font-bold text-[var(--emphasis)]"
       >
         <ClipboardList className="w-3 h-3" aria-hidden="true" />
         {t(locale, hasBriefing ? 'schedule.session.hasBriefing' : 'attendance.briefing.add')}
@@ -1085,14 +1085,14 @@ function SessionBriefingControl({
             aria-label={t(locale, 'attendance.briefing.title')}
             tabIndex={-1}
             data-testid="session-briefing-sheet"
-            className="relative w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl"
+            className="relative w-full max-w-sm rounded-3xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-2xl"
           >
             <button
               type="button"
               onClick={close}
               aria-label={t(locale, 'common.a11y.close')}
               data-testid="session-briefing-close"
-              className="absolute end-3 top-3 flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-400 hover:text-slate-700"
+              className="absolute end-3 top-3 flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--disabled-surface)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
             >
               <X className="w-4 h-4" aria-hidden="true" />
             </button>
@@ -1217,7 +1217,7 @@ export function SessionCard({
     ) : null
 
   return (
-    <article className={`bg-white rounded-3xl p-4 ${CARD_FRAME[state]}`}>
+    <article className={`bg-[var(--surface-raised)] rounded-3xl p-4 ${CARD_FRAME[state]}`}>
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-1.5 min-w-0">
           <SessionStateChip status={session.status} state={state} locale={locale} />
@@ -1230,7 +1230,7 @@ export function SessionCard({
               data-testid="session-edit-open"
               aria-label={t(locale, 'schedule.session.actions')}
               onClick={onEdit}
-              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-all hover:bg-slate-200 active:scale-95"
+              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--disabled-surface)] text-[var(--text-muted)] transition-all hover:bg-[var(--border)] active:scale-95"
             >
               <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
@@ -1238,7 +1238,7 @@ export function SessionCard({
         </div>
         {/* 1d — `45 דק׳`, derived: two instants are already on the wire. */}
         <div className="flex flex-col items-end gap-0.5">
-          <span className="text-xs font-bold font-mono text-slate-400">
+          <span className="text-xs font-bold font-mono text-[var(--text-muted)]">
             {formatTimeInStudioZone(session.starts_at, locale)}
             {'–'}
             {formatTimeInStudioZone(session.ends_at, locale)}
@@ -1267,29 +1267,29 @@ export function SessionCard({
         </div>
       </div>
 
-      <strong className="block text-base font-black text-slate-900 mb-1">{session.group_name}</strong>
+      <strong className="block text-base font-black text-[var(--fg)] mb-1">{session.group_name}</strong>
 
       <div className="flex flex-col gap-1 mb-3">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-muted)]">
           {session.location_name ? (
             <span className="flex items-center gap-1">
-              <MapPin className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+              <MapPin className="w-3.5 h-3.5 text-[var(--text-muted)]" aria-hidden="true" />
               <span>{session.location_name}</span>
             </span>
           ) : null}
           {session.location_name ? <span aria-hidden="true">•</span> : null}
           <span className="flex items-center gap-1">
-            <User className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+            <User className="w-3.5 h-3.5 text-[var(--text-muted)]" aria-hidden="true" />
             <span>{coachLine}</span>
           </span>
         </div>
         {hasHints ? (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-400">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[var(--text-muted)]">
             {/* 1d — "נוכחות נרשמה": the register-state marker, the difference between
                 "done" and "still owed" at a glance down the day. A Tailwind badge of our
                 own rather than `StatusChip status="paid"` — that token is money-scoped. */}
             {session.attendance_taken ? (
-              <span className="inline-flex items-center gap-1 font-bold text-emerald-700">
+              <span className="inline-flex items-center gap-1 font-bold text-[var(--paid)]">
                 <CheckCircle2 className="w-3 h-3" aria-hidden="true" />
                 {t(locale, 'schedule.session.attendanceTaken')}
               </span>
@@ -1327,7 +1327,7 @@ export function SessionCard({
           isn't — never a blank corner. C4 moved this cluster onto its own row, right-
           aligned as before, now that the actions beneath it are a full-width grid rather
           than a row it used to share. */}
-      <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
+      <div className="flex flex-col gap-2 pt-2 border-t border-[var(--border)]">
         <div className="flex items-center justify-end gap-2">
           {counts.total > 0 ? (
             <>
@@ -1335,7 +1335,7 @@ export function SessionCard({
                 {counts.notAnswered > 0 ? (
                   <span
                     data-testid="session-not-answered"
-                    className="block font-extrabold text-rose-700 text-xs"
+                    className="block font-extrabold text-[var(--danger)] text-xs"
                   >
                     {withMonoNumerals(plural(locale, 'schedule.session.notAnsweredCount', counts.notAnswered))}
                   </span>
@@ -1344,8 +1344,8 @@ export function SessionCard({
                   data-testid="session-confirmed"
                   className={
                     counts.notAnswered > 0
-                      ? 'block text-[11px] text-slate-400'
-                      : 'block font-extrabold text-emerald-700 text-xs'
+                      ? 'block text-[11px] text-[var(--text-muted)]'
+                      : 'block font-extrabold text-[var(--paid)] text-xs'
                   }
                 >
                   {withMonoNumerals(
@@ -1357,7 +1357,7 @@ export function SessionCard({
               </div>
               <div
                 className={`w-7 h-7 rounded-xl flex items-center justify-center ${
-                  counts.notAnswered > 0 ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-600'
+                  counts.notAnswered > 0 ? 'bg-[var(--danger-tint)] text-[var(--danger)]' : 'bg-[var(--paid-tint)] text-[var(--paid)]'
                 }`}
               >
                 {counts.notAnswered > 0 ? (
@@ -1372,13 +1372,13 @@ export function SessionCard({
             // group's live enrollment) answers a different question than "who confirmed",
             // and showing it here would read as the same fact when it is not — the roster
             // simply is not cached, and this says exactly that.
-            <span data-testid="session-roster-unavailable" className="text-xs font-semibold text-slate-400">
+            <span data-testid="session-roster-unavailable" className="text-xs font-semibold text-[var(--text-muted)]">
               {t(locale, 'schedule.session.rosterUnavailable')}
             </span>
           ) : (
             <>
               {/* 1d — `אולם א׳ · 14 חניכים`. */}
-              <span data-testid="session-headcount" className="text-xs font-bold text-slate-700">
+              <span data-testid="session-headcount" className="text-xs font-bold text-[var(--text-secondary)]">
                 {withMonoNumerals(
                   `${session.location_name ? `${session.location_name} · ` : ''}${t(
                     locale,
@@ -1386,7 +1386,7 @@ export function SessionCard({
                   ).replace('{{count}}', String(session.headcount))}`,
                 )}
               </span>
-              <div className="w-7 h-7 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center">
+              <div className="w-7 h-7 rounded-xl bg-[var(--disabled-surface)] text-[var(--text-muted)] flex items-center justify-center">
                 <Users className="w-4 h-4" aria-hidden="true" />
               </div>
             </>
@@ -1422,7 +1422,7 @@ export function SessionCard({
           // when a cancelled session somehow still has families unanswered, unchanged from
           // before this pass.
           <div className="flex flex-col gap-2">
-            <span className="text-xs font-semibold text-slate-500">
+            <span className="text-xs font-semibold text-[var(--text-muted)]">
               {t(locale, 'schedule.session.cancelled')}
               {session.cancel_reason ? (
                 <>
@@ -1449,7 +1449,7 @@ export function SessionCard({
           <a
             href={`#/attendance/${session.id}/summary`}
             data-testid="session-summary-link"
-            className="self-center text-[11px] font-bold text-slate-400 transition-colors hover:text-slate-600"
+            className="self-center text-[11px] font-bold text-[var(--text-muted)] transition-colors hover:text-[var(--text-secondary)]"
           >
             {t(locale, 'attendance.summary.title')}
           </a>
@@ -1472,45 +1472,45 @@ export function SessionCard({
 export function EventCard({ event, state, locale }: { event: EventOut; state: DotState; locale: Locale }) {
   const total = event.rsvp_yes_count + event.rsvp_no_count + event.rsvp_pending_count
   return (
-    <article className={`bg-white rounded-3xl p-4 ${CARD_FRAME[state]}`}>
+    <article className={`bg-[var(--surface-raised)] rounded-3xl p-4 ${CARD_FRAME[state]}`}>
       <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[var(--pending-tint)] text-[var(--pending)] border border-[var(--pending)]">
           <Trophy className="w-3 h-3" aria-hidden="true" />
           <span>{t(locale, `events.type.${event.type}`)}</span>
         </span>
-        <span className="text-xs font-bold font-mono text-slate-400" data-testid="event-when">
+        <span className="text-xs font-bold font-mono text-[var(--text-muted)]" data-testid="event-when">
           {formatTimeInStudioZone(event.starts_at, locale)}
         </span>
       </div>
 
-      <strong className="block text-base font-black text-slate-900 mb-1">{event.title}</strong>
+      <strong className="block text-base font-black text-[var(--fg)] mb-1">{event.title}</strong>
 
       {event.location_text ? (
-        <div className="flex items-center gap-1 text-xs text-slate-500 mb-3">
-          <MapPin className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+        <div className="flex items-center gap-1 text-xs text-[var(--text-muted)] mb-3">
+          <MapPin className="w-3.5 h-3.5 text-[var(--text-muted)]" aria-hidden="true" />
           <bdi>{event.location_text}</bdi>
         </div>
       ) : null}
 
-      <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+      <div className="flex items-center justify-between gap-2 pt-2 border-t border-[var(--border)]">
         <a
           href={`#/events/${event.id}/roster`}
           data-testid="open-event-roster"
-          className="px-4 py-2 rounded-xl border border-amber-300 text-amber-700 font-bold text-xs hover:bg-amber-50 active:scale-95 transition-all inline-flex items-center gap-1"
+          className="px-4 py-2 rounded-xl border border-[var(--pending)] text-[var(--pending)] font-bold text-xs hover:bg-[var(--pending-tint)] active:scale-95 transition-all inline-flex items-center gap-1"
         >
           <span>{t(locale, 'events.roster.title')}</span>
           <ChevronLeft className="w-4 h-4" aria-hidden="true" />
         </a>
 
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs font-bold text-slate-700">
+          <span className="text-xs font-bold text-[var(--text-secondary)]">
             {withMonoNumerals(
               total > 0
                 ? `${t(locale, 'events.counts.confirmed')} ${event.rsvp_yes_count}/${total}`
                 : t(locale, 'events.roster.empty'),
             )}
           </span>
-          <div className="w-7 h-7 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
+          <div className="w-7 h-7 rounded-xl bg-[var(--pending-tint)] text-[var(--pending)] flex items-center justify-center">
             <Users className="w-4 h-4" aria-hidden="true" />
           </div>
         </div>

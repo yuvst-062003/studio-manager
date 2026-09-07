@@ -201,11 +201,11 @@ export function StudentsSearch({
     <section aria-labelledby="students-search-title" data-testid="students-search" className="flex flex-col gap-4 px-4 pt-4 pb-8">
       <header className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
-          <h1 id="students-search-title" className="text-2xl font-black text-slate-900 tracking-tight m-0 truncate">
+          <h1 id="students-search-title" className="text-2xl font-black text-[var(--fg)] tracking-tight m-0 truncate">
             {t(locale, 'people.list.title')}
           </h1>
           {students !== null ? (
-            <span className="shrink-0 bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-1 rounded-full">
+            <span className="shrink-0 bg-[var(--emphasis-tint)] text-[var(--emphasis)] text-xs font-bold px-2.5 py-1 rounded-full">
               {t(locale, 'people.list.registeredCount').replace('{{count}}', String(students.length))}
             </span>
           ) : null}
@@ -215,10 +215,10 @@ export function StudentsSearch({
           data-testid="sort-toggle"
           aria-pressed={sortByAttendance}
           onClick={() => setSortByAttendance((value) => !value)}
-          className="shrink-0 flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 transition-colors py-1.5 px-2.5 rounded-lg hover:bg-slate-100 active:scale-95"
+          className="shrink-0 flex items-center gap-1.5 text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--fg)] transition-colors py-1.5 px-2.5 rounded-lg hover:bg-[var(--disabled-surface)] active:scale-95"
         >
           <span>{t(locale, sortByAttendance ? 'people.list.sortAttendance' : 'people.list.sortAlpha')}</span>
-          <ArrowUpDown aria-hidden="true" className="w-3.5 h-3.5 text-slate-500" />
+          <ArrowUpDown aria-hidden="true" className="w-3.5 h-3.5 text-[var(--text-muted)]" />
         </button>
       </header>
 
@@ -249,7 +249,7 @@ export function StudentsSearch({
             className={`shrink-0 min-h-11 px-4 py-1.5 rounded-full text-xs font-bold transition-transform active:scale-95 ${
               groupTab === ''
                 ? 'bg-black text-white shadow-sm'
-                : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                : 'bg-[var(--surface-raised)] text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--surface)]'
             }`}
           >
             {t(locale, viewerIsCoach ? 'people.tabs.myClasses' : 'people.tabs.allClasses').replace(
@@ -267,7 +267,7 @@ export function StudentsSearch({
               className={`shrink-0 min-h-11 px-4 py-1.5 rounded-full text-xs font-bold transition-transform active:scale-95 ${
                 groupTab === group.id
                   ? 'bg-black text-white shadow-sm'
-                  : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                  : 'bg-[var(--surface-raised)] text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--surface)]'
               }`}
             >
               {group.name}
@@ -311,7 +311,7 @@ export function StudentsSearch({
         />
       ) : sortByAttendance ? (
         <section aria-label={t(locale, 'people.list.sortAttendance')} className="flex flex-col gap-2.5">
-          <h2 className="text-xs font-black text-slate-900 tracking-wider px-1 m-0">
+          <h2 className="text-xs font-black text-[var(--fg)] tracking-wider px-1 m-0">
             {t(locale, 'people.list.sortAttendance')}
           </h2>
           <ul className="list-none m-0 p-0 flex flex-col gap-2.5">{flatList.map(renderRow)}</ul>
@@ -319,7 +319,7 @@ export function StudentsSearch({
       ) : sections ? (
         sections.map(([groupName, rows]) => (
           <section key={groupName} aria-label={groupName} className="flex flex-col gap-2.5">
-            <h2 className="text-xs font-black text-slate-900 tracking-wider px-1 m-0" data-testid="class-header">
+            <h2 className="text-xs font-black text-[var(--fg)] tracking-wider px-1 m-0" data-testid="class-header">
               <bdi>{groupName}</bdi> · {rows.length}
             </h2>
             <ul className="list-none m-0 p-0 flex flex-col gap-2.5">{rows.map(renderRow)}</ul>
@@ -354,14 +354,14 @@ function StudentCard({
       type="button"
       onClick={onOpen ? () => onOpen(student.id) : undefined}
       disabled={!onOpen}
-      className="w-full bg-white rounded-2xl p-4 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.06)] border border-slate-100 flex items-center justify-between gap-3 hover:border-slate-300 transition-all active:scale-[0.99] text-start disabled:active:scale-100"
+      className="w-full bg-[var(--surface-raised)] rounded-2xl p-4 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.06)] border border-[var(--border)] flex items-center justify-between gap-3 hover:border-[var(--border-strong)] transition-all active:scale-[0.99] text-start disabled:active:scale-100"
     >
       <ChevronLeft aria-hidden="true" className="w-5 h-5 stroke-[2.5] text-slate-300 shrink-0" />
 
       <span className="flex flex-col items-end gap-1.5 min-w-0">
         <span className="flex items-center gap-2 min-w-0">
           {student.current_belt_color_hex ? (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-slate-200 bg-slate-50 shrink-0">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-[var(--border)] bg-[var(--surface)] shrink-0">
               <span
                 aria-hidden="true"
                 className="w-2 h-2 rounded-full"
@@ -373,14 +373,14 @@ function StudentCard({
               <span>{student.current_belt_name}</span>
             </span>
           ) : null}
-          <span className="text-base font-extrabold text-slate-900 truncate">
+          <span className="text-base font-extrabold text-[var(--fg)] truncate">
             <bdi>{name}</bdi>
           </span>
         </span>
 
         <span
           className={`flex items-center gap-2 text-xs min-w-0 ${
-            (student.attendance_percent ?? 0) >= 80 ? 'text-emerald-700' : 'text-slate-500'
+            (student.attendance_percent ?? 0) >= 80 ? 'text-[var(--paid)]' : 'text-[var(--text-muted)]'
           }`}
         >
           {student.status !== 'active' ? (

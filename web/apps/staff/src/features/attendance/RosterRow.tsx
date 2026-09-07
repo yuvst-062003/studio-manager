@@ -110,10 +110,10 @@ const MARK_LABEL: Record<RosterRowData['status'], string> = {
  * still do.
  */
 const ROW_TONE: Record<RosterRowData['status'], string> = {
-  present: 'bg-emerald-50/60 border-emerald-200',
-  absent_unexcused: 'bg-rose-50/60 border-rose-200',
-  absent_excused: 'bg-amber-50/60 border-amber-200',
-  unmarked: 'bg-white border-slate-200/80',
+  present: 'bg-[var(--paid-tint)] border-[var(--paid)]',
+  absent_unexcused: 'bg-[var(--danger-tint)] border-[var(--danger)]',
+  absent_excused: 'bg-[var(--pending-tint)] border-[var(--pending)]',
+  unmarked: 'bg-[var(--surface-raised)] border-[var(--border)]',
 }
 
 /** §5.7's own words: "requires a long-press to override". Register follow-up — this used
@@ -208,7 +208,7 @@ export function RosterRow({
         <span className="roster-row__text">
           {/* <bdi>, as StudentRow already does: this row is Hebrew on 1c, and M3 fills it
               with Latin names too. Mixed-direction text reorders without isolation (§9). */}
-          <bdi className="roster-row__name block text-sm font-bold text-slate-900">
+          <bdi className="roster-row__name block text-sm font-bold text-[var(--fg)]">
             {row.display_name}
           </bdi>
           {/* The redesign's row anatomy puts the belt right under the name. `BeltBar`'s
@@ -218,7 +218,7 @@ export function RosterRow({
           {row.belt_color_hex && row.belt_name ? (
             <span className="roster-row__belt inline-flex items-center gap-1.5">
               <BeltBar colorHex={row.belt_color_hex} label={row.belt_name} />
-              <span className="roster-row__belt-label text-xs font-medium text-slate-400">
+              <span className="roster-row__belt-label text-xs font-medium text-[var(--text-muted)]">
                 {row.belt_name}
               </span>
             </span>
@@ -255,7 +255,7 @@ export function RosterRow({
           screen reader, the exact class `1c`'s a11y finding flags for icon-only controls. */}
       <a
         aria-label={`${t(locale, 'people.card.open')} · ${row.display_name}`}
-        className="roster-row__open-card rounded-2xl transition-colors hover:bg-slate-100 active:scale-95"
+        className="roster-row__open-card rounded-2xl transition-colors hover:bg-[var(--disabled-surface)] active:scale-95"
         data-testid={`roster-open-card-${row.student_id}`}
         href={`#/students/${row.student_id}`}
       >

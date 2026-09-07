@@ -85,9 +85,9 @@ function nextAttended(current: boolean | null): boolean {
 }
 
 const MARK_TONE: Record<MarkState, string> = {
-  present: 'border-emerald-300 bg-emerald-50 text-emerald-700',
-  absent: 'border-rose-300 bg-rose-50 text-rose-700',
-  unmarked: 'border-slate-200 bg-slate-50 text-slate-400',
+  present: 'border-[var(--paid)] bg-[var(--paid-tint)] text-[var(--paid)]',
+  absent: 'border-[var(--danger)] bg-[var(--danger-tint)] text-[var(--danger)]',
+  unmarked: 'border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]',
 }
 
 function rsvpTone(rsvp: EventRegistrationOut['rsvp']): 'paid' | 'cancelled' | 'pending' {
@@ -220,7 +220,7 @@ export function EventRosterScreen({
           <strong>{t(locale, 'attendance.sync.staleWarning')}</strong>
           <span>{t(locale, 'attendance.sync.staleBody')}</span>
         </Alert>
-        <p className="text-xs font-semibold text-slate-500">
+        <p className="text-xs font-semibold text-[var(--text-muted)]">
           {plural(locale, 'attendance.sync.pendingCount', pending)}
         </p>
       </section>
@@ -233,8 +233,8 @@ export function EventRosterScreen({
       className="flex flex-col gap-4 px-4 pt-4"
       data-testid="event-roster"
     >
-      <header className="flex items-start justify-between gap-3 rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs">
-        <h1 className="text-base font-black text-slate-900" id="event-roster-title">
+      <header className="flex items-start justify-between gap-3 rounded-3xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-xs">
+        <h1 className="text-base font-black text-[var(--fg)]" id="event-roster-title">
           {t(locale, 'events.roster.title')}
         </h1>
         {/* The session register's live counter (`RosterScreen`'s `roster-live-count`), over
@@ -242,7 +242,7 @@ export function EventRosterScreen({
             weekly schedule for "expected" to mean anything against. */}
         {rows !== null ? (
           <p
-            className="shrink-0 text-end text-sm font-black text-slate-900"
+            className="shrink-0 text-end text-sm font-black text-[var(--fg)]"
             data-testid="event-roster-live-count"
           >
             {t(locale, 'attendance.roster.presentOfTotal')
@@ -261,11 +261,11 @@ export function EventRosterScreen({
             const label = `${t(locale, MARK_LABEL[state])} · ${row.display_name}`
             return (
               <li
-                className="flex min-h-11 flex-wrap items-center gap-2 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-xs"
+                className="flex min-h-11 flex-wrap items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] p-3 shadow-xs"
                 data-testid="event-roster-row"
                 key={row.student_id}
               >
-                <bdi className="me-auto text-sm font-bold text-slate-900">{row.display_name}</bdi>
+                <bdi className="me-auto text-sm font-bold text-[var(--fg)]">{row.display_name}</bdi>
                 {/* RSVP and consent are `null` on a cached row (the offline read has neither
                     field) — rendering "pending" or "not signed" for a fact this device
                     cannot actually check would be the false claim §4.9's rules forbid

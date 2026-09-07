@@ -103,36 +103,36 @@ const noteStyle: CSSProperties = { color: 'var(--text-secondary)' }
  *  rows get their own colour so five kinds still read apart at a glance — see this file's
  *  own header for why amber/blue rather than a sixth invented tone. */
 const KIND_BADGE_TINT: Record<TaskKind, string> = {
-  close_session: 'bg-rose-50 text-rose-600 border border-rose-100',
-  missing_health_form: 'bg-rose-50 text-rose-700 border border-rose-100',
-  call_parent: 'bg-rose-50 text-rose-700 border border-rose-100',
+  close_session: 'bg-[var(--danger-tint)] text-[var(--danger)] border border-[var(--danger)]',
+  missing_health_form: 'bg-[var(--danger-tint)] text-[var(--danger)] border border-[var(--danger)]',
+  call_parent: 'bg-[var(--danger-tint)] text-[var(--danger)] border border-[var(--danger)]',
   // Emerald, its own tone. A גי to bring is the one row here that is not a problem — the
   // family paid, the item is in the office, and the coach only has to remember it. Giving
   // it rose would put "somebody may be about to train uninsured" and "pick up a bag on the
   // way out" in the same colour, which is how a colour stops meaning anything.
-  bring_item: 'bg-emerald-50 text-emerald-700 border border-emerald-100',
-  cash_pending: 'bg-amber-50 text-amber-700 border border-amber-100',
-  health_review: 'bg-blue-50 text-blue-700 border border-blue-100',
+  bring_item: 'bg-[var(--paid-tint)] text-[var(--paid)] border border-[var(--paid)]',
+  cash_pending: 'bg-[var(--pending-tint)] text-[var(--pending)] border border-[var(--pending)]',
+  health_review: 'bg-[var(--emphasis-tint)] text-[var(--emphasis)] border border-[var(--emphasis)]',
 }
 
 const KIND_SCOPE_TINT: Record<TaskKind, string> = {
-  close_session: 'text-slate-500',
-  missing_health_form: 'text-rose-700',
-  call_parent: 'text-slate-500',
-  bring_item: 'text-emerald-700',
-  cash_pending: 'text-amber-700',
-  health_review: 'text-blue-700',
+  close_session: 'text-[var(--text-muted)]',
+  missing_health_form: 'text-[var(--danger)]',
+  call_parent: 'text-[var(--text-muted)]',
+  bring_item: 'text-[var(--paid)]',
+  cash_pending: 'text-[var(--pending)]',
+  health_review: 'text-[var(--emphasis)]',
 }
 
 /** The tinted "open X" link button — this port's replacement for the prototype's black
  *  `Check`-icon primary button, see this file's own header for why. */
 const KIND_LINK_TINT: Record<TaskKind, string> = {
-  close_session: 'border-rose-300 text-rose-700 bg-rose-50 hover:bg-rose-100',
-  missing_health_form: 'border-rose-300 text-rose-700 bg-rose-50 hover:bg-rose-100',
-  call_parent: 'border-rose-300 text-rose-700 bg-rose-50 hover:bg-rose-100',
-  bring_item: 'border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100',
-  cash_pending: 'border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100',
-  health_review: 'border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100',
+  close_session: 'border-[var(--danger)] text-[var(--danger)] bg-[var(--danger-tint)] hover:bg-[var(--danger-tint)]',
+  missing_health_form: 'border-[var(--danger)] text-[var(--danger)] bg-[var(--danger-tint)] hover:bg-[var(--danger-tint)]',
+  call_parent: 'border-[var(--danger)] text-[var(--danger)] bg-[var(--danger-tint)] hover:bg-[var(--danger-tint)]',
+  bring_item: 'border-[var(--paid)] text-[var(--paid)] bg-[var(--paid-tint)] hover:bg-[var(--paid-tint)]',
+  cash_pending: 'border-[var(--pending)] text-[var(--pending)] bg-[var(--pending-tint)] hover:bg-[var(--pending-tint)]',
+  health_review: 'border-[var(--emphasis)] text-[var(--emphasis)] bg-[var(--emphasis-tint)] hover:bg-[var(--emphasis-tint)]',
 }
 
 /** The alert box's leading icon, one per kind — `AlertTriangle`/`Phone`/`FileText` are the
@@ -142,17 +142,17 @@ function AlertIcon({ kind }: { kind: TaskKind }) {
   const cls = 'w-4 h-4 shrink-0 mt-0.5'
   switch (kind) {
     case 'close_session':
-      return <AlertTriangle className={`${cls} text-rose-500`} aria-hidden="true" />
+      return <AlertTriangle className={`${cls} text-[var(--danger)]`} aria-hidden="true" />
     case 'call_parent':
-      return <Phone className={`${cls} text-rose-500`} aria-hidden="true" />
+      return <Phone className={`${cls} text-[var(--danger)]`} aria-hidden="true" />
     case 'missing_health_form':
-      return <FileText className={`${cls} text-slate-500`} aria-hidden="true" />
+      return <FileText className={`${cls} text-[var(--text-muted)]`} aria-hidden="true" />
     case 'bring_item':
-      return <ShoppingBag className={`${cls} text-emerald-600`} aria-hidden="true" />
+      return <ShoppingBag className={`${cls} text-[var(--paid)]`} aria-hidden="true" />
     case 'cash_pending':
-      return <Wallet className={`${cls} text-amber-600`} aria-hidden="true" />
+      return <Wallet className={`${cls} text-[var(--pending)]`} aria-hidden="true" />
     case 'health_review':
-      return <FileText className={`${cls} text-blue-600`} aria-hidden="true" />
+      return <FileText className={`${cls} text-[var(--emphasis)]`} aria-hidden="true" />
   }
 }
 
@@ -160,7 +160,7 @@ function TaskCardView({ task, locale }: { task: TaskCard; locale: Locale }) {
   const hasAvatar = task.avatarInitials != null
 
   return (
-    <article className="bg-white rounded-3xl p-4 shadow-sm border border-slate-100 relative overflow-hidden">
+    <article className="bg-[var(--surface-raised)] rounded-3xl p-4 shadow-sm border border-[var(--border)] relative overflow-hidden">
       <div className="flex items-center justify-between gap-2 mb-2">
         <span
           className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${KIND_BADGE_TINT[task.taskKind]}`}
@@ -179,17 +179,17 @@ function TaskCardView({ task, locale }: { task: TaskCard; locale: Locale }) {
       {hasAvatar ? (
         <div className="flex items-start justify-between gap-2 mb-3">
           <div className="min-w-0">
-            <p className="text-base font-black text-slate-900 m-0">
+            <p className="text-base font-black text-[var(--fg)] m-0">
               <bdi>{task.title}</bdi>
             </p>
             {task.subtitle ? (
-              <p className="text-xs text-slate-500 mt-0.5 m-0">
+              <p className="text-xs text-[var(--text-muted)] mt-0.5 m-0">
                 <bdi>{task.subtitle}</bdi>
               </p>
             ) : null}
           </div>
           <div
-            className="w-10 h-10 rounded-2xl bg-blue-100 text-blue-700 font-black text-xs flex items-center justify-center shrink-0"
+            className="w-10 h-10 rounded-2xl bg-[var(--emphasis-tint)] text-[var(--emphasis)] font-black text-xs flex items-center justify-center shrink-0"
             aria-hidden="true"
           >
             {task.avatarInitials}
@@ -197,11 +197,11 @@ function TaskCardView({ task, locale }: { task: TaskCard; locale: Locale }) {
         </div>
       ) : (
         <div className="mb-3">
-          <p className="text-lg font-black text-slate-900 mb-0.5 m-0">
+          <p className="text-lg font-black text-[var(--fg)] mb-0.5 m-0">
             <bdi>{task.title}</bdi>
           </p>
           {task.subtitle ? (
-            <p className="text-xs font-medium text-slate-500 m-0">
+            <p className="text-xs font-medium text-[var(--text-muted)] m-0">
               <bdi>{task.subtitle}</bdi>
             </p>
           ) : null}
@@ -217,9 +217,9 @@ function TaskCardView({ task, locale }: { task: TaskCard; locale: Locale }) {
         </div>
       )}
 
-      <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3 mb-3 flex items-start gap-2.5">
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-3 mb-3 flex items-start gap-2.5">
         <AlertIcon kind={task.taskKind} />
-        <p className="text-xs text-slate-700 leading-relaxed font-medium m-0">{task.alertText}</p>
+        <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-medium m-0">{task.alertText}</p>
       </div>
 
       <div className="flex items-center gap-2 pt-1 flex-wrap">
@@ -257,14 +257,14 @@ function TaskCardView({ task, locale }: { task: TaskCard; locale: Locale }) {
               href={`tel:${task.contactPhone}`}
               data-testid={`task-call-${task.id}`}
               aria-label={t(locale, 'comms.atRisk.contactParent')}
-              className="w-10 h-10 rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 flex items-center justify-center active:scale-90 transition-all shrink-0"
+              className="w-10 h-10 rounded-xl bg-[var(--danger-tint)] text-[var(--danger)] hover:bg-[var(--danger-tint)] border border-[var(--danger)] flex items-center justify-center active:scale-90 transition-all shrink-0"
             >
               <Phone className="w-4 h-4" aria-hidden="true" />
             </a>
           ) : (
             <p
               data-testid={`task-no-phone-${task.id}`}
-              className="text-[11px] text-slate-500 font-medium m-0"
+              className="text-[11px] text-[var(--text-muted)] font-medium m-0"
             >
               {t(locale, 'comms.atRisk.noPhone')}
             </p>
@@ -276,7 +276,7 @@ function TaskCardView({ task, locale }: { task: TaskCard; locale: Locale }) {
             onClick={task.tick.onTick}
             data-testid={`task-tick-${task.id}`}
             aria-label={task.tick.label}
-            className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 flex items-center justify-center active:scale-90 transition-all shrink-0"
+            className="w-10 h-10 rounded-xl bg-[var(--emphasis-tint)] text-[var(--emphasis)] hover:bg-[var(--emphasis-tint)] border border-[var(--emphasis)] flex items-center justify-center active:scale-90 transition-all shrink-0"
           >
             <Check className="w-4 h-4 stroke-[2.5]" aria-hidden="true" />
           </button>
@@ -316,13 +316,13 @@ function BirthdayRowView({
       // two-line row), and a center-aligned row would then float the avatar and the
       // trailing controls oddly against a taller left column.
       className={`p-3 rounded-2xl border flex items-start justify-between gap-2 transition-all ${
-        greeted ? 'bg-white/60 border-slate-200/80 opacity-75' : 'bg-white border-amber-200 shadow-xs'
+        greeted ? 'bg-white/60 border-[var(--border)] opacity-75' : 'bg-[var(--surface-raised)] border-[var(--pending)] shadow-xs'
       }`}
     >
       <div className="flex items-start gap-2.5 min-w-0">
         <div
           className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${
-            row.isToday ? 'bg-amber-100 text-amber-900 ring-2 ring-amber-400' : 'bg-slate-100 text-slate-700'
+            row.isToday ? 'bg-[var(--pending-tint)] text-[var(--pending)] ring-2 ring-amber-400' : 'bg-[var(--disabled-surface)] text-[var(--text-secondary)]'
           }`}
           aria-hidden="true"
         >
@@ -330,14 +330,14 @@ function BirthdayRowView({
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-xs font-black text-slate-900">
+            <span className="text-xs font-black text-[var(--fg)]">
               <bdi>{row.name}</bdi>
             </span>
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200 whitespace-nowrap">
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-[var(--pending-tint)] text-[var(--pending)] border border-[var(--pending)] whitespace-nowrap">
               {t(locale, 'tasks.birthday.turningAge').replace('{{age}}', String(row.turningAge))}
             </span>
             {row.isToday ? (
-              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-rose-500 text-white">
+              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-[var(--danger)] text-[var(--on-status)]">
                 {row.dayLabel}
               </span>
             ) : null}
@@ -346,7 +346,7 @@ function BirthdayRowView({
               comment. At the narrow end (≈420px) the combined "in N days · group name"
               line is often longer than one line has room for, and a truncated word reads
               worse than a two-line subtitle. */}
-          <span className="text-[11px] text-slate-500 block mt-0.5 font-medium leading-snug">
+          <span className="text-[11px] text-[var(--text-muted)] block mt-0.5 font-medium leading-snug">
             {row.isToday ? null : `${row.dayLabel} · `}
             <bdi>{row.groupLabel}</bdi>
           </span>
@@ -371,8 +371,8 @@ function BirthdayRowView({
           title={greeted ? t(locale, 'tasks.birthday.greetedHint') : undefined}
           className={`w-8 h-8 rounded-xl border flex items-center justify-center transition-all ${
             greeted
-              ? 'bg-emerald-500 text-white border-emerald-500'
-              : 'bg-slate-50 text-slate-400 border-slate-200 hover:text-slate-600'
+              ? 'bg-[var(--paid)] text-[var(--on-status)] border-[var(--paid)]'
+              : 'bg-[var(--surface)] text-[var(--text-muted)] border-[var(--border)] hover:text-[var(--text-secondary)]'
           }`}
         >
           <Check className="w-3.5 h-3.5" aria-hidden="true" />
@@ -400,7 +400,7 @@ function BirthdayRowView({
               data-testid={`birthday-greet-${row.studentId}`}
               aria-label={t(locale, greeted ? 'tasks.birthday.greetAgain' : 'tasks.birthday.greetAction')}
               title={t(locale, greeted ? 'tasks.birthday.greetAgain' : 'tasks.birthday.greetAction')}
-              className="w-8 h-8 rounded-xl border flex items-center justify-center transition-all bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 shrink-0"
+              className="w-8 h-8 rounded-xl border flex items-center justify-center transition-all bg-[var(--pending-tint)] text-[var(--pending)] border-[var(--pending)] hover:bg-[var(--pending-tint)] shrink-0"
             >
               <MessageCircle className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
@@ -432,25 +432,25 @@ function BirthdaySection({
     <section
       aria-labelledby="birthday-section-title"
       data-testid="birthday-section"
-      className="bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-yellow-500/10 rounded-3xl p-4 border border-amber-300/80 shadow-xs relative overflow-hidden"
+      className="bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-yellow-500/10 rounded-3xl p-4 border border-[var(--pending)] shadow-xs relative overflow-hidden"
     >
       <div className="flex items-center gap-2 mb-2.5">
         <div
-          className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-xs shrink-0"
+          className="w-8 h-8 rounded-xl bg-[var(--pending)] text-[var(--on-status)] flex items-center justify-center shadow-xs shrink-0"
           aria-hidden="true"
         >
           <Gift className="w-4 h-4" />
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <h2 id="birthday-section-title" className="text-sm font-black text-slate-900 m-0">
+            <h2 id="birthday-section-title" className="text-sm font-black text-[var(--fg)] m-0">
               {t(locale, 'tasks.birthday.sectionTitle')}
             </h2>
-            <span className="text-[10px] font-black bg-amber-500 text-white px-1.5 py-0.5 rounded-full">
+            <span className="text-[10px] font-black bg-[var(--pending)] text-[var(--on-status)] px-1.5 py-0.5 rounded-full">
               {plural(locale, 'tasks.birthday.countBadge', rows.length)}
             </span>
           </div>
-          <span className="text-[11px] text-slate-500 font-medium block">
+          <span className="text-[11px] text-[var(--text-muted)] font-medium block">
             {t(locale, 'tasks.birthday.sectionHint')}
           </span>
         </div>
@@ -500,10 +500,10 @@ function FilterChip({
   const tone = isAll
     ? selected
       ? 'bg-black text-white shadow-sm'
-      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+      : 'bg-[var(--surface-raised)] text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--surface)]'
     : selected
-      ? 'bg-blue-600 text-white shadow-sm'
-      : 'bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100'
+      ? 'bg-[var(--emphasis)] text-[var(--on-emphasis)] shadow-sm'
+      : 'bg-[var(--emphasis-tint)] text-[var(--emphasis)] border border-[var(--emphasis)] hover:bg-[var(--emphasis-tint)]'
   return (
     <button
       type="button"
@@ -515,7 +515,7 @@ function FilterChip({
       {/* The "urgent" chip's own dot, unchanged from the prototype — words carry the
           meaning (SC 1.4.1); the dot is decorative reinforcement, not the only signal. */}
       {filterKey === 'urgent' ? (
-        <span className="w-1.5 h-1.5 rounded-full bg-rose-500" aria-hidden="true" />
+        <span className="w-1.5 h-1.5 rounded-full bg-[var(--danger)]" aria-hidden="true" />
       ) : null}
       {/* The count is its own leaf, in `font-mono` — every OTHER numeral this screen
           renders is embedded inside a full, already-localized sentence (`plural()`'s
@@ -583,10 +583,10 @@ export function TasksScreen({
     <section aria-labelledby="tasks-title" data-testid="staff-tasks" className="flex flex-col gap-4 px-4 pt-4 pb-8">
       <header>
         <div className="flex items-center gap-2">
-          <span className="bg-rose-500 text-white text-xs font-bold px-2.5 py-0.5 rounded-full shadow-xs font-mono">
+          <span className="bg-[var(--danger)] text-[var(--on-status)] text-xs font-bold px-2.5 py-0.5 rounded-full shadow-xs font-mono">
             {openCount}
           </span>
-          <h1 id="tasks-title" className="text-2xl font-black text-slate-900 tracking-tight m-0">
+          <h1 id="tasks-title" className="text-2xl font-black text-[var(--fg)] tracking-tight m-0">
             {t(locale, 'tasks.title')}
           </h1>
         </div>

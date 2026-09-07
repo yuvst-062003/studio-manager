@@ -118,7 +118,7 @@ export function HandOverSheet({
 
   return (
     <div className="flex flex-col gap-4 px-4 pt-4 pb-8" data-testid="hand-over">
-      <h2 className="text-xl font-black text-slate-900">
+      <h2 className="text-xl font-black text-[var(--fg)]">
         {t(locale, 'billing.product.handOut')}
       </h2>
 
@@ -129,12 +129,12 @@ export function HandOverSheet({
       {waiting.length > 0 ? (
         <section
           data-testid="awaiting-handout"
-          className="rounded-3xl border border-emerald-100 bg-emerald-50/60 p-4"
+          className="rounded-3xl border border-[var(--paid)] bg-[var(--paid-tint)] p-4"
         >
-          <h3 className="text-xs font-black text-emerald-800">
+          <h3 className="text-xs font-black text-[var(--paid)]">
             {t(locale, 'billing.product.awaitingTitle')}
           </h3>
-          <p className="mt-1 text-xs leading-relaxed text-emerald-900/70">
+          <p className="mt-1 text-xs leading-relaxed text-[var(--paid)]">
             {t(locale, 'billing.product.awaitingHint')}
           </p>
           <ul className="mt-3 flex flex-col gap-2" style={RESET_LIST}>
@@ -142,19 +142,19 @@ export function HandOverSheet({
               <li
                 key={`${row.charge_id}:${row.student_id}`}
                 data-testid="awaiting-row"
-                className="flex items-center gap-3 rounded-2xl border border-emerald-100 bg-white p-3"
+                className="flex items-center gap-3 rounded-2xl border border-[var(--paid)] bg-[var(--surface-raised)] p-3"
               >
                 <div className="min-w-0 flex-1">
                   <p
                     data-testid="awaiting-student"
-                    className="truncate text-sm font-black text-slate-900"
+                    className="truncate text-sm font-black text-[var(--fg)]"
                   >
                     <bdi>{nameOf(row.student_id)}</bdi>
                   </p>
                   {/* `line_note` carries the size — "גי · 140" — which is the whole reason a
                       coach needs this row: the family was promised a hand-over לאחר וידוא
                       מידה. It carries no price; the shop never put one in it. */}
-                  <p data-testid="awaiting-item" className="truncate text-xs text-slate-500">
+                  <p data-testid="awaiting-item" className="truncate text-xs text-[var(--text-muted)]">
                     <bdi>{row.line_note ?? row.product_name}</bdi>
                   </p>
                 </div>
@@ -163,7 +163,7 @@ export function HandOverSheet({
                   data-testid="awaiting-confirm"
                   disabled={inFlight}
                   onClick={() => void settle(row)}
-                  className="shrink-0 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+                  className="shrink-0 rounded-xl bg-[var(--paid)] px-4 py-2 text-xs font-bold text-[var(--on-status)] disabled:opacity-50"
                 >
                   {t(locale, 'billing.product.awaitingHandOver')}
                 </button>
@@ -179,7 +179,7 @@ export function HandOverSheet({
           role="status"
           data-testid={ours ? 'awaiting-done' : 'awaiting-taken'}
           className={`rounded-2xl px-3 py-2 text-xs font-bold ${
-            ours ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
+            ours ? 'bg-[var(--paid-tint)] text-[var(--paid)]' : 'bg-[var(--disabled-surface)] text-[var(--text-secondary)]'
           }`}
         >
           {t(locale, ours ? 'billing.product.awaitingDone' : 'billing.product.awaitingTakenByOther')}
@@ -188,12 +188,12 @@ export function HandOverSheet({
 
       {/* Named, now that it is no longer the only path. A coach who scrolled past a waiting
           order needs the difference between the two to be on the screen. */}
-      <h3 data-testid="new-charge-title" className="text-sm font-black text-slate-900">
+      <h3 data-testid="new-charge-title" className="text-sm font-black text-[var(--fg)]">
         {t(locale, 'billing.product.newChargeTitle')}
       </h3>
 
-      <section className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
-        <h4 className="text-xs font-bold text-slate-500">
+      <section className="rounded-3xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-sm">
+        <h4 className="text-xs font-bold text-[var(--text-muted)]">
           {t(locale, 'billing.product.forWhom')}
         </h4>
         {/* Chips rather than the bare radios this screen shipped with: eighteen `<input
@@ -213,8 +213,8 @@ export function HandOverSheet({
                 onClick={() => setStudentId(student.id)}
                 className={`rounded-xl px-3 py-1.5 text-xs font-bold ${
                   chosen
-                    ? 'bg-blue-600 text-white'
-                    : 'border border-slate-200 bg-slate-50 text-slate-600'
+                    ? 'bg-[var(--emphasis)] text-[var(--on-emphasis)]'
+                    : 'border border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)]'
                 }`}
               >
                 <bdi>{student.displayName}</bdi>
@@ -235,8 +235,8 @@ export function HandOverSheet({
                 onClick={() => setProductId(option.id)}
                 className={`rounded-xl px-3 py-2 text-xs font-bold ${
                   chosen
-                    ? 'bg-blue-600 text-white'
-                    : 'border border-blue-200 bg-blue-50 text-blue-700'
+                    ? 'bg-[var(--emphasis)] text-[var(--on-emphasis)]'
+                    : 'border border-[var(--emphasis)] bg-[var(--emphasis-tint)] text-[var(--emphasis)]'
                 }`}
               >
                 {/* The NAME, and nothing else. `HandoutOptionOut` has no money field, which
@@ -252,7 +252,7 @@ export function HandOverSheet({
           data-testid="hand-over-confirm"
           disabled={inFlight || !productId || !studentId}
           onClick={() => void confirm()}
-          className="mt-4 w-full rounded-2xl bg-blue-600 py-3 text-sm font-black text-white disabled:bg-slate-200 disabled:text-slate-400"
+          className="mt-4 w-full rounded-2xl bg-[var(--emphasis)] py-3 text-sm font-black text-[var(--on-emphasis)] disabled:bg-[var(--border)] disabled:text-[var(--text-muted)]"
         >
           {t(locale, 'billing.product.handOut')}
         </button>
@@ -260,12 +260,12 @@ export function HandOverSheet({
 
       {/* §5.10 on the screen: a coach handing out the last גי would otherwise expect the app
           to know it was the last one. */}
-      <p data-testid="no-stock-hint" className="text-xs text-slate-400">
+      <p data-testid="no-stock-hint" className="text-xs text-[var(--text-muted)]">
         {t(locale, 'billing.product.noStockHint')}
       </p>
 
       {/* §3.2 written on the screen — the true half of `11a`'s own disclaimer. */}
-      <p data-testid="price-policy" className="text-xs text-slate-400">
+      <p data-testid="price-policy" className="text-xs text-[var(--text-muted)]">
         {t(locale, 'billing.product.handOutPolicy')}
       </p>
 
@@ -274,7 +274,7 @@ export function HandOverSheet({
         <p
           role="status"
           data-testid="handed-out"
-          className="rounded-2xl bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700"
+          className="rounded-2xl bg-[var(--emphasis-tint)] px-3 py-2 text-xs font-bold text-[var(--emphasis)]"
         >
           {t(locale, 'billing.product.handedOut')}
         </p>

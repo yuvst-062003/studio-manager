@@ -48,14 +48,14 @@ export function SessionPlanCard({
   if (editing) {
     return (
       <section
-        className="flex flex-col gap-2 rounded-3xl border border-blue-200 bg-blue-50/70 p-4"
+        className="flex flex-col gap-2 rounded-3xl border border-[var(--emphasis)] bg-[var(--emphasis-tint)] p-4"
         data-testid="session-plan-editor"
       >
-        <label className="text-xs font-bold text-blue-900" htmlFor="session-plan-body">
+        <label className="text-xs font-bold text-[var(--emphasis)]" htmlFor="session-plan-body">
           {t(locale, 'attendance.briefing.title')}
         </label>
         <textarea
-          className="min-h-24 rounded-2xl border border-blue-200 bg-white p-3 text-sm text-slate-900"
+          className="min-h-24 rounded-2xl border border-[var(--emphasis)] bg-[var(--surface-raised)] p-3 text-sm text-[var(--fg)]"
           data-testid="session-plan-input"
           id="session-plan-body"
           onChange={(event) => setDraft(event.target.value)}
@@ -63,13 +63,13 @@ export function SessionPlanCard({
           value={draft}
         />
         {failed ? (
-          <p className="text-xs font-semibold text-rose-600" role="alert">
+          <p className="text-xs font-semibold text-[var(--danger)]" role="alert">
             {t(locale, 'attendance.briefing.saveFailed')}
           </p>
         ) : null}
         <div className="flex items-center justify-end gap-2">
           <button
-            className="rounded-xl px-3 py-1.5 text-xs font-bold text-slate-500 transition-all active:scale-95"
+            className="rounded-xl px-3 py-1.5 text-xs font-bold text-[var(--text-muted)] transition-all active:scale-95"
             onClick={() => {
               setEditing(false)
               setFailed(false)
@@ -80,7 +80,7 @@ export function SessionPlanCard({
             {t(locale, 'attendance.briefing.cancel')}
           </button>
           <button
-            className="rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white transition-all active:scale-95 disabled:opacity-60"
+            className="rounded-xl bg-[var(--emphasis)] px-3.5 py-1.5 text-xs font-bold text-[var(--on-emphasis)] transition-all active:scale-95 disabled:opacity-60"
             data-testid="session-plan-save"
             disabled={saving || draft.trim().length === 0}
             onClick={() => {
@@ -103,11 +103,11 @@ export function SessionPlanCard({
 
   return (
     <section
-      className="flex flex-col gap-1.5 rounded-3xl border border-blue-200 bg-blue-50/70 p-4"
+      className="flex flex-col gap-1.5 rounded-3xl border border-[var(--emphasis)] bg-[var(--emphasis-tint)] p-4"
       data-testid="session-plan"
     >
       <div className="flex items-center justify-between gap-2">
-        <h2 className="flex items-center gap-1.5 text-xs font-bold text-blue-900">
+        <h2 className="flex items-center gap-1.5 text-xs font-bold text-[var(--emphasis)]">
           <ClipboardList aria-hidden="true" className="h-3.5 w-3.5" />
           {t(locale, 'attendance.briefing.title')}
         </h2>
@@ -116,7 +116,7 @@ export function SessionPlanCard({
             reach a screen the server would refuse the save from anyway. */}
         {canWrite ? (
           <button
-            className="text-xs font-bold text-blue-700"
+            className="text-xs font-bold text-[var(--emphasis)]"
             data-testid="session-plan-edit"
             onClick={() => {
               // Set here, on the transition into editing, rather than synced by an effect
@@ -132,9 +132,9 @@ export function SessionPlanCard({
         ) : null}
       </div>
       {plan ? (
-        <p className="whitespace-pre-wrap text-sm text-slate-700">{plan}</p>
+        <p className="whitespace-pre-wrap text-sm text-[var(--text-secondary)]">{plan}</p>
       ) : (
-        <p className="text-xs text-slate-400">{t(locale, 'attendance.briefing.empty')}</p>
+        <p className="text-xs text-[var(--text-muted)]">{t(locale, 'attendance.briefing.empty')}</p>
       )}
     </section>
   )

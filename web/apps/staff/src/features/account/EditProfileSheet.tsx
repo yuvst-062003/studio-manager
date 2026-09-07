@@ -53,14 +53,14 @@ export function EditProfileSheet({
         aria-labelledby="account-edit-title"
         tabIndex={-1}
         data-testid="account-edit-sheet"
-        className="bg-white rounded-3xl p-5 w-full max-w-sm shadow-2xl relative space-y-4 border border-slate-200"
+        className="bg-[var(--surface-raised)] rounded-3xl p-5 w-full max-w-sm shadow-2xl relative space-y-4 border border-[var(--border)]"
       >
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+            <div className="w-8 h-8 rounded-xl bg-[var(--emphasis-tint)] text-[var(--emphasis)] flex items-center justify-center font-bold">
               <Edit3 className="w-4 h-4" aria-hidden="true" />
             </div>
-            <h2 id="account-edit-title" className="text-sm font-black text-slate-900">
+            <h2 id="account-edit-title" className="text-sm font-black text-[var(--fg)]">
               {t(locale, 'people.profile.personalSheetTitle')}
             </h2>
           </div>
@@ -68,7 +68,7 @@ export function EditProfileSheet({
             type="button"
             onClick={onClose}
             aria-label={t(locale, 'people.profile.close')}
-            className="w-7 h-7 rounded-lg bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center"
+            className="w-7 h-7 rounded-lg bg-[var(--disabled-surface)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] flex items-center justify-center"
           >
             <X className="w-4 h-4" aria-hidden="true" />
           </button>
@@ -125,24 +125,24 @@ export function EditProfileSheet({
             <p
               role="alert"
               data-testid="account-edit-error"
-              className="text-xs font-semibold text-rose-700 bg-rose-50 rounded-2xl p-3"
+              className="text-xs font-semibold text-[var(--danger)] bg-[var(--danger-tint)] rounded-2xl p-3"
             >
               {t(locale, 'people.profile.personalSaveFailed')}
             </p>
           ) : null}
 
-          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[var(--border)]">
             <button
               type="button"
               onClick={onClose}
-              className="h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs active:scale-95 transition-all"
+              className="h-10 rounded-xl bg-[var(--disabled-surface)] hover:bg-[var(--border)] text-[var(--text-secondary)] font-bold text-xs active:scale-95 transition-all"
             >
               {t(locale, 'people.profile.personalCancel')}
             </button>
             <button
               type="submit"
               disabled={busy || draft.firstName.trim() === '' || draft.lastName.trim() === ''}
-              className="h-10 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold text-xs shadow-md shadow-blue-600/20 active:scale-95 transition-all flex items-center justify-center gap-1.5"
+              className="h-10 rounded-xl bg-[var(--emphasis)] hover:brightness-110 disabled:opacity-60 text-[var(--on-emphasis)] font-bold text-xs shadow-md shadow-blue-600/20 active:scale-95 transition-all flex items-center justify-center gap-1.5"
             >
               <Check className="w-4 h-4 stroke-[2.5]" aria-hidden="true" />
               <span>
@@ -173,7 +173,7 @@ function Field({
 }) {
   return (
     <div className="space-y-1">
-      <label htmlFor={id} className="block text-xs font-bold text-slate-700">
+      <label htmlFor={id} className="block text-xs font-bold text-[var(--text-secondary)]">
         {label}
       </label>
       <input
@@ -186,7 +186,7 @@ function Field({
         // address or a phone number as it is typed — the same fix `PersonalDetails.tsx`
         // applies for the identical reason.
         dir={type === 'email' || type === 'tel' ? 'ltr' : undefined}
-        className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="w-full h-10 px-3 bg-[var(--surface)] border border-[var(--border)] rounded-xl text-xs font-bold text-[var(--fg)] focus:outline-none focus:ring-2 focus:ring-[var(--emphasis)]"
       />
     </div>
   )

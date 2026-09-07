@@ -302,14 +302,14 @@ function StudentProfileBanner({
 
 function PersonalDetails({ student, locale }: { student: StudentDetail; locale: Locale }) {
   return (
-    <section className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm" data-testid="staff-card-personal-details">
-      <h2 className="text-xs font-black text-slate-900 tracking-wider m-0 mb-3">
+    <section className="bg-[var(--surface-raised)] rounded-2xl p-4 border border-[var(--border)] shadow-sm" data-testid="staff-card-personal-details">
+      <h2 className="text-xs font-black text-[var(--fg)] tracking-wider m-0 mb-3">
         {t(locale, 'people.staffCard.personalDetails')}
       </h2>
       <div className="grid grid-cols-2 gap-3 text-xs">
-        <div className="bg-slate-50 p-2.5 rounded-xl">
-          <span className="text-slate-400 block mb-0.5">{t(locale, 'people.student.birthdate')}</span>
-          <span className="font-bold text-slate-800" dir="ltr">
+        <div className="bg-[var(--surface)] p-2.5 rounded-xl">
+          <span className="text-[var(--text-muted)] block mb-0.5">{t(locale, 'people.student.birthdate')}</span>
+          <span className="font-bold text-[var(--fg)]" dir="ltr">
             {student.birthdate ?? '—'}
           </span>
         </div>
@@ -337,14 +337,14 @@ function ParentContacts({ student, locale }: { student: StudentDetail; locale: L
   return (
     <section
       aria-labelledby="staff-card-guardians-title"
-      className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm flex flex-col gap-3"
+      className="bg-[var(--surface-raised)] rounded-2xl p-4 border border-[var(--border)] shadow-sm flex flex-col gap-3"
     >
-      <h2 id="staff-card-guardians-title" className="text-xs font-black text-slate-900 tracking-wider m-0">
+      <h2 id="staff-card-guardians-title" className="text-xs font-black text-[var(--fg)] tracking-wider m-0">
         {t(locale, 'people.staffCard.guardiansTitle')}
       </h2>
 
       {guardians.length === 0 ? (
-        <p className="text-xs text-slate-500 m-0" data-testid="staff-card-no-guardians">
+        <p className="text-xs text-[var(--text-muted)] m-0" data-testid="staff-card-no-guardians">
           {t(locale, 'people.staffCard.noGuardians')}
         </p>
       ) : (
@@ -353,10 +353,10 @@ function ParentContacts({ student, locale }: { student: StudentDetail; locale: L
             <li
               key={guardian.person_id}
               data-testid="staff-card-guardian"
-              className="flex items-center justify-between gap-3 bg-slate-50 rounded-xl p-2.5"
+              className="flex items-center justify-between gap-3 bg-[var(--surface)] rounded-xl p-2.5"
             >
               <span className="min-w-0">
-                <span className="block text-xs font-extrabold text-slate-800 truncate">
+                <span className="block text-xs font-extrabold text-[var(--fg)] truncate">
                   <bdi>{guardian.display_name}</bdi>
                 </span>
                 {guardian.phone ? (
@@ -364,7 +364,7 @@ function ParentContacts({ student, locale }: { student: StudentDetail; locale: L
                     dir="ltr"
                     href={`tel:${guardian.phone}`}
                     data-testid="staff-card-call"
-                    className="text-[11px] text-slate-500"
+                    className="text-[11px] text-[var(--text-muted)]"
                   >
                     {guardian.phone}
                   </a>

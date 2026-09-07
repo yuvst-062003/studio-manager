@@ -154,7 +154,7 @@ type StaffOption = { person_id: string | null; first_name: string | null; last_n
 
 const chipClass = (active: boolean): string =>
   `px-3 py-1 rounded-full text-xs font-bold transition-all shrink-0 active:scale-95 ${
-    active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+    active ? 'bg-[var(--emphasis)] text-[var(--on-emphasis)]' : 'bg-[var(--disabled-surface)] text-[var(--text-secondary)] hover:bg-[var(--border)]'
   }`
 
 /**
@@ -243,7 +243,7 @@ function SessionEditSheet({
       <div
         aria-label={sheetLabel}
         aria-modal="true"
-        className="relative flex max-h-[85vh] w-full max-w-sm flex-col gap-4 overflow-y-auto rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl"
+        className="relative flex max-h-[85vh] w-full max-w-sm flex-col gap-4 overflow-y-auto rounded-3xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-2xl"
         data-testid="session-edit-sheet"
         onClick={(event) => event.stopPropagation()}
         ref={dialogRef}
@@ -252,7 +252,7 @@ function SessionEditSheet({
       >
         <button
           aria-label={t(locale, 'common.a11y.close')}
-          className="absolute end-3 top-3 flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-400 hover:text-slate-700"
+          className="absolute end-3 top-3 flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--disabled-surface)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
           data-testid="session-edit-close"
           onClick={onClose}
           type="button"
@@ -261,8 +261,8 @@ function SessionEditSheet({
         </button>
 
         <div>
-          <h2 className="text-base font-black text-slate-900">{t(locale, 'schedule.session.actions')}</h2>
-          <p className="text-xs text-slate-500">
+          <h2 className="text-base font-black text-[var(--fg)]">{t(locale, 'schedule.session.actions')}</h2>
+          <p className="text-xs text-[var(--text-muted)]">
             <bdi>{session.group_name}</bdi> · {formatDateInStudioZone(session.starts_at, locale)} ·{' '}
             {formatTimeInStudioZone(session.starts_at, locale)}–
             {formatTimeInStudioZone(session.ends_at, locale)}
@@ -271,7 +271,7 @@ function SessionEditSheet({
 
         {!canEdit ? (
           <p
-            className="rounded-2xl bg-slate-50 p-3 text-xs text-slate-500"
+            className="rounded-2xl bg-[var(--surface)] p-3 text-xs text-[var(--text-muted)]"
             data-testid="session-edit-readonly-note"
           >
             {t(locale, 'schedule.session.editRestricted')}
@@ -279,10 +279,10 @@ function SessionEditSheet({
         ) : null}
 
         <section className="flex flex-col gap-1.5">
-          <span className="text-xs font-bold text-slate-700">{t(locale, 'schedule.session.coach')}</span>
+          <span className="text-xs font-bold text-[var(--text-secondary)]">{t(locale, 'schedule.session.coach')}</span>
           {canEdit && staff.length > 0 ? (
             <select
-              className="h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-900"
+              className="h-11 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-xs font-bold text-[var(--fg)]"
               data-testid="edit-coach-select"
               onChange={(event) => {
                 if (event.target.value === '') return
@@ -302,25 +302,25 @@ function SessionEditSheet({
               ))}
             </select>
           ) : (
-            <p className="text-sm font-bold text-slate-900" data-testid="session-edit-coach-display">
+            <p className="text-sm font-bold text-[var(--fg)]" data-testid="session-edit-coach-display">
               <bdi>{currentCoach}</bdi>
             </p>
           )}
         </section>
 
         {session.status === 'cancelled' ? (
-          <p className="text-xs font-semibold text-slate-500">{t(locale, 'schedule.session.cancelled')}</p>
+          <p className="text-xs font-semibold text-[var(--text-muted)]">{t(locale, 'schedule.session.cancelled')}</p>
         ) : canEdit ? (
           <>
-            <section className="flex flex-col gap-2 border-t border-slate-100 pt-3">
-              <span className="text-xs font-bold text-slate-700">{t(locale, 'schedule.session.editTime')}</span>
+            <section className="flex flex-col gap-2 border-t border-[var(--border)] pt-3">
+              <span className="text-xs font-bold text-[var(--text-secondary)]">{t(locale, 'schedule.session.editTime')}</span>
               <div className="grid grid-cols-3 gap-2">
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] font-bold text-slate-500">
+                  <span className="text-[10px] font-bold text-[var(--text-muted)]">
                     {t(locale, 'schedule.session.adHocDate')}
                   </span>
                   <input
-                    className="h-10 rounded-lg border border-slate-200 px-2 text-xs font-mono font-bold"
+                    className="h-10 rounded-lg border border-[var(--border)] px-2 text-xs font-mono font-bold"
                     data-testid="edit-move-date"
                     onChange={(event) => setDay(event.target.value)}
                     type="date"
@@ -328,11 +328,11 @@ function SessionEditSheet({
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] font-bold text-slate-500">
+                  <span className="text-[10px] font-bold text-[var(--text-muted)]">
                     {t(locale, 'schedule.session.adHocStart')}
                   </span>
                   <input
-                    className="h-10 rounded-lg border border-slate-200 px-2 text-xs font-mono font-bold"
+                    className="h-10 rounded-lg border border-[var(--border)] px-2 text-xs font-mono font-bold"
                     data-testid="edit-move-start"
                     onChange={(event) => setStartTime(event.target.value)}
                     type="time"
@@ -340,11 +340,11 @@ function SessionEditSheet({
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10px] font-bold text-slate-500">
+                  <span className="text-[10px] font-bold text-[var(--text-muted)]">
                     {t(locale, 'schedule.session.adHocEnd')}
                   </span>
                   <input
-                    className="h-10 rounded-lg border border-slate-200 px-2 text-xs font-mono font-bold"
+                    className="h-10 rounded-lg border border-[var(--border)] px-2 text-xs font-mono font-bold"
                     data-testid="edit-move-end"
                     onChange={(event) => setEndTime(event.target.value)}
                     type="time"
@@ -353,7 +353,7 @@ function SessionEditSheet({
                 </label>
               </div>
               <button
-                className="h-10 rounded-xl bg-blue-600 text-xs font-bold text-white transition-all active:scale-95 disabled:opacity-60"
+                className="h-10 rounded-xl bg-[var(--emphasis)] text-xs font-bold text-[var(--on-emphasis)] transition-all active:scale-95 disabled:opacity-60"
                 data-testid="edit-move-submit"
                 disabled={busy}
                 onClick={() =>
@@ -370,14 +370,14 @@ function SessionEditSheet({
               </button>
             </section>
 
-            <section className="flex flex-col gap-2 border-t border-slate-100 pt-3">
-              <span className="text-xs font-bold text-rose-700">{t(locale, 'schedule.session.cancel')}</span>
+            <section className="flex flex-col gap-2 border-t border-[var(--border)] pt-3">
+              <span className="text-xs font-bold text-[var(--danger)]">{t(locale, 'schedule.session.cancel')}</span>
               <label className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold text-slate-500">
+                <span className="text-[10px] font-bold text-[var(--text-muted)]">
                   {t(locale, 'schedule.session.cancelReason')}
                 </span>
                 <input
-                  className="h-10 rounded-lg border border-slate-200 px-2.5 text-xs"
+                  className="h-10 rounded-lg border border-[var(--border)] px-2.5 text-xs"
                   data-testid="edit-cancel-reason"
                   onChange={(event) => setCancelReason(event.target.value)}
                   type="text"
@@ -385,7 +385,7 @@ function SessionEditSheet({
                 />
               </label>
               <button
-                className="h-10 rounded-xl bg-rose-600 text-xs font-bold text-white transition-all active:scale-95 disabled:opacity-50"
+                className="h-10 rounded-xl bg-[var(--danger)] text-xs font-bold text-[var(--on-status)] transition-all active:scale-95 disabled:opacity-50"
                 data-testid="edit-cancel-submit"
                 disabled={busy || cancelReason.trim() === ''}
                 onClick={() => act(client.cancelSession(session.id, cancelReason.trim()))}
@@ -398,7 +398,7 @@ function SessionEditSheet({
         ) : null}
 
         {failed ? (
-          <p className="text-xs font-bold text-rose-600" data-testid="session-edit-failed" role="alert">
+          <p className="text-xs font-bold text-[var(--danger)]" data-testid="session-edit-failed" role="alert">
             {t(locale, 'common.loadFailed.body')}
           </p>
         ) : null}
@@ -646,10 +646,10 @@ export function CalendarScreen({
     <div className="flex flex-col gap-4 px-4 pt-4 pb-8" data-testid="staff-calendar">
       <header className="flex items-center justify-between">
         <a
-          className="flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-xs transition-all hover:bg-slate-50 active:scale-95"
+          className="flex items-center gap-1.5 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-2 text-xs font-bold text-[var(--text-secondary)] shadow-xs transition-all hover:bg-[var(--surface)] active:scale-95"
           href="#/schedule"
         >
-          <ChevronRight aria-hidden="true" className="h-4 w-4 text-slate-500" />
+          <ChevronRight aria-hidden="true" className="h-4 w-4 text-[var(--text-muted)]" />
           <span>{t(locale, 'schedule.staffCalendar.back')}</span>
         </a>
         <div className="flex items-center gap-2">
@@ -658,33 +658,33 @@ export function CalendarScreen({
               never reads as another neutral nav action. `#/constraints` already has one link
               (the account tab's); `routes.reachable.test.ts` allows a route more than one. */}
           <a
-            className="flex items-center gap-1.5 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 shadow-xs transition-all hover:bg-rose-100 active:scale-95"
+            className="flex items-center gap-1.5 rounded-2xl border border-[var(--danger)] bg-[var(--danger-tint)] px-3 py-2 text-xs font-bold text-[var(--danger)] shadow-xs transition-all hover:bg-[var(--danger-tint)] active:scale-95"
             data-testid="calendar-file-constraint"
             href="#/constraints"
           >
-            <Shield aria-hidden="true" className="h-3.5 w-3.5 text-rose-600" />
+            <Shield aria-hidden="true" className="h-3.5 w-3.5 text-[var(--danger)]" />
             <span>{t(locale, 'schedule.staffCalendar.fileConstraint')}</span>
           </a>
-          <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 text-blue-600 shadow-xs">
+          <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-[var(--emphasis)] bg-[var(--emphasis-tint)] text-[var(--emphasis)] shadow-xs">
             <CalendarIcon aria-hidden="true" className="h-4 w-4" />
           </div>
         </div>
       </header>
 
       <div>
-        <h1 className="text-xl font-black tracking-tight text-slate-900">
+        <h1 className="text-xl font-black tracking-tight text-[var(--fg)]">
           {t(locale, 'schedule.staffCalendar.title')}
         </h1>
-        <p className="mt-1 text-xs text-slate-500">{t(locale, 'schedule.staffCalendar.subtitle')}</p>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">{t(locale, 'schedule.staffCalendar.subtitle')}</p>
       </div>
 
-      <section className="flex flex-col gap-3 rounded-3xl border border-slate-200/90 bg-white p-4 shadow-xs">
+      <section className="flex flex-col gap-3 rounded-3xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-xs">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-black text-slate-900">{formatMonthLabel(year, month, locale)}</span>
+          <span className="text-sm font-black text-[var(--fg)]">{formatMonthLabel(year, month, locale)}</span>
           <div className="flex items-center gap-1.5">
             <button
               aria-label={t(locale, 'schedule.week.view.previousMonth')}
-              className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-700 transition-all hover:bg-slate-200 active:scale-95"
+              className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--disabled-surface)] text-[var(--text-secondary)] transition-all hover:bg-[var(--border)] active:scale-95"
               data-testid="calendar-prev-month"
               onClick={() => step(-1)}
               type="button"
@@ -692,7 +692,7 @@ export function CalendarScreen({
               <ChevronRight aria-hidden="true" className="h-4 w-4" />
             </button>
             <button
-              className="rounded-xl bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 transition-all hover:bg-blue-100 active:scale-95"
+              className="rounded-xl bg-[var(--emphasis-tint)] px-3 py-1.5 text-xs font-bold text-[var(--emphasis)] transition-all hover:bg-[var(--emphasis-tint)] active:scale-95"
               data-testid="calendar-jump-today"
               onClick={jumpToToday}
               type="button"
@@ -701,7 +701,7 @@ export function CalendarScreen({
             </button>
             <button
               aria-label={t(locale, 'schedule.week.view.nextMonth')}
-              className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-700 transition-all hover:bg-slate-200 active:scale-95"
+              className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--disabled-surface)] text-[var(--text-secondary)] transition-all hover:bg-[var(--border)] active:scale-95"
               data-testid="calendar-next-month"
               onClick={() => step(1)}
               type="button"
@@ -743,7 +743,7 @@ export function CalendarScreen({
 
         <div className="grid grid-cols-7 gap-1 text-center" role="row">
           {[0, 1, 2, 3, 4, 5, 6].map((weekday) => (
-            <div className="py-1 text-[11px] font-bold text-slate-500" key={weekday} role="columnheader">
+            <div className="py-1 text-[11px] font-bold text-[var(--text-muted)]" key={weekday} role="columnheader">
               {t(locale, `schedule.weekday.${weekday}`)}
             </div>
           ))}
@@ -777,20 +777,20 @@ export function CalendarScreen({
             MEANINGFUL fill both failed that check and are decorative-only above). */}
         <div
           aria-label={t(locale, 'schedule.staffCalendar.legend.label')}
-          className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-slate-100 pt-3 text-[10px] text-slate-500"
+          className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-[var(--border)] pt-3 text-[10px] text-[var(--text-muted)]"
           data-testid="calendar-legend"
           role="group"
         >
           <div className="flex items-center gap-1.5">
-            <span aria-hidden="true" className="h-2 w-2 rounded-full bg-blue-500" />
+            <span aria-hidden="true" className="h-2 w-2 rounded-full bg-[var(--emphasis)]" />
             <span>{t(locale, 'schedule.staffCalendar.legend.count')}</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span aria-hidden="true" className="h-2 w-2 rounded-full bg-rose-500" />
+            <span aria-hidden="true" className="h-2 w-2 rounded-full bg-[var(--danger)]" />
             <span>{t(locale, 'schedule.staffCalendar.legend.constraint')}</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span aria-hidden="true" className="h-2 w-2 rounded-full bg-blue-50 ring-2 ring-blue-500" />
+            <span aria-hidden="true" className="h-2 w-2 rounded-full bg-[var(--emphasis-tint)] ring-2 ring-[var(--emphasis)]" />
             <span>{t(locale, 'schedule.today.title')}</span>
           </div>
         </div>
@@ -798,10 +798,10 @@ export function CalendarScreen({
 
       <section aria-labelledby="calendar-agenda-title" className="flex flex-col gap-2">
         <div className="flex items-center justify-between px-1">
-          <h2 className="text-sm font-black text-slate-900" id="calendar-agenda-title">
+          <h2 className="text-sm font-black text-[var(--fg)]" id="calendar-agenda-title">
             {formatDayHeadline(selectedDay, locale)}
           </h2>
-          <span className="text-xs font-semibold text-slate-500" data-testid="calendar-agenda-count">
+          <span className="text-xs font-semibold text-[var(--text-muted)]" data-testid="calendar-agenda-count">
             {dayItems.length > 0
               ? plural(locale, 'schedule.staffCalendar.dayItemCount', dayItems.length)
               : t(locale, 'schedule.staffCalendar.dayEmpty')}
@@ -907,10 +907,10 @@ function DayCell({
       aria-label={`${dateLabel} · ${countLabel}${constraintLabel}`}
       className={`relative flex h-12 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-bold transition-all active:scale-95 ${
         isSelected
-          ? 'bg-[#1e3a8a] text-white shadow-md'
+          ? 'bg-[var(--accent)] text-[var(--on-accent)] shadow-md'
           : isToday
-            ? 'bg-blue-50 text-blue-900 ring-2 ring-blue-500'
-            : 'bg-slate-50 text-slate-800 hover:bg-slate-100'
+            ? 'bg-[var(--emphasis-tint)] text-[var(--emphasis)] ring-2 ring-[var(--emphasis)]'
+            : 'bg-[var(--surface)] text-[var(--fg)] hover:bg-[var(--disabled-surface)]'
       }`}
       data-testid={`calendar-day-${dayKey}`}
       onClick={() => onSelect(dayKey)}
@@ -918,11 +918,11 @@ function DayCell({
     >
       <span className="font-mono">{Number(dayKey.slice(8))}</span>
       <span aria-hidden="true" className="flex items-center gap-1">
-        {constraintReason ? <span className="h-1.5 w-1.5 rounded-full bg-rose-500" /> : null}
+        {constraintReason ? <span className="h-1.5 w-1.5 rounded-full bg-[var(--danger)]" /> : null}
         {count > 0 ? (
           <span
             className={`rounded-sm px-1 text-[9px] font-black ${
-              isSelected ? 'bg-white/20 text-blue-100' : 'bg-blue-100 text-blue-700'
+              isSelected ? 'bg-white/20 text-blue-100' : 'bg-[var(--emphasis-tint)] text-[var(--emphasis)]'
             }`}
           >
             {count}

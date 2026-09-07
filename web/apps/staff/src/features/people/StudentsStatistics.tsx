@@ -143,7 +143,7 @@ function chipClass(active: boolean): string {
   return `shrink-0 min-h-11 px-3 py-1.5 rounded-full text-[11px] font-bold transition-transform active:scale-95 ${
     active
       ? 'bg-slate-900 text-white shadow-sm'
-      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+      : 'bg-[var(--surface-raised)] text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--surface)]'
   }`
 }
 
@@ -184,21 +184,21 @@ export function StudentsStatistics({
     <section
       aria-labelledby="students-stats-title"
       data-testid="students-statistics"
-      className="bg-white rounded-2xl p-4 border border-slate-200 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.06)] mb-4"
+      className="bg-[var(--surface-raised)] rounded-2xl p-4 border border-[var(--border)] shadow-[0_2px_10px_-3px_rgba(0,0,0,0.06)] mb-4"
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <div
             aria-hidden="true"
-            className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center shrink-0"
+            className="w-8 h-8 rounded-xl bg-[var(--emphasis-tint)] text-[var(--emphasis)] flex items-center justify-center shrink-0"
           >
             <BarChart3 className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <h2 id="students-stats-title" className="text-sm font-black text-slate-900 leading-tight m-0 truncate">
+            <h2 id="students-stats-title" className="text-sm font-black text-[var(--fg)] leading-tight m-0 truncate">
               {t(locale, 'people.stats.title')}
             </h2>
-            <p className="text-[11px] text-slate-500 font-medium m-0 truncate">
+            <p className="text-[11px] text-[var(--text-muted)] font-medium m-0 truncate">
               {t(locale, 'people.stats.subtitle')}
             </p>
           </div>
@@ -210,7 +210,7 @@ export function StudentsStatistics({
           aria-controls="students-stats-body"
           aria-label={t(locale, collapsed ? 'people.stats.expand' : 'people.stats.collapse')}
           onClick={toggle}
-          className="shrink-0 text-slate-500 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+          className="shrink-0 text-[var(--text-muted)] hover:text-[var(--text-secondary)] p-1 rounded-lg hover:bg-[var(--disabled-surface)] transition-colors"
         >
           {collapsed ? (
             <ChevronDown aria-hidden="true" className="w-4 h-4" />
@@ -225,26 +225,26 @@ export function StudentsStatistics({
           {/* KPI strip — the prototype's shape (a value cell and a badge cell) kept, its
               CONTENT replaced: there is no delta cell, because a delta needs a prior
               month and none exists here. */}
-          <div className="flex items-center justify-between gap-3 bg-slate-50 rounded-xl p-2.5 mb-2 border border-slate-100">
+          <div className="flex items-center justify-between gap-3 bg-[var(--surface)] rounded-xl p-2.5 mb-2 border border-[var(--border)]">
             <div className="min-w-0">
-              <span className="text-[11px] text-slate-500 block font-medium">
+              <span className="text-[11px] text-[var(--text-muted)] block font-medium">
                 {t(locale, 'people.stats.clubAverage')}
               </span>
               <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-xl font-black font-mono text-slate-900" data-testid="stats-club-average">
+                <span className="text-xl font-black font-mono text-[var(--fg)]" data-testid="stats-club-average">
                   {club.average === null ? '—' : `${club.average}%`}
                 </span>
-                <span className="text-[11px] font-bold text-slate-500 font-mono">
+                <span className="text-[11px] font-bold text-[var(--text-muted)] font-mono">
                   {t(locale, 'people.stats.clubAverageOf').replace('{{count}}', String(club.markedCount))}
                 </span>
               </div>
             </div>
-            <div className="text-end border-s border-slate-200 ps-3 shrink-0">
-              <span className="text-[11px] text-slate-500 block font-medium">
+            <div className="text-end border-s border-[var(--border)] ps-3 shrink-0">
+              <span className="text-[11px] text-[var(--text-muted)] block font-medium">
                 {t(locale, 'people.stats.needAttention')}
               </span>
               <span
-                className="text-base font-black font-mono text-rose-800 flex items-center gap-1 mt-0.5"
+                className="text-base font-black font-mono text-[var(--danger)] flex items-center gap-1 mt-0.5"
                 data-testid="stats-need-attention-count"
               >
                 <TriangleAlert aria-hidden="true" className="w-3.5 h-3.5 text-amber-500" />
@@ -253,7 +253,7 @@ export function StudentsStatistics({
             </div>
           </div>
 
-          <p className="text-[11px] text-slate-500 font-medium mb-3" data-testid="stats-need-attention-breakdown">
+          <p className="text-[11px] text-[var(--text-muted)] font-medium mb-3" data-testid="stats-need-attention-breakdown">
             {t(locale, 'people.stats.needAttentionBreakdown')
               .replace('{{below}}', String(attention.belowThreshold))
               .replace('{{threshold}}', String(ATTENTION_THRESHOLD))
@@ -289,7 +289,7 @@ export function StudentsStatistics({
           </div>
 
           {bars.length === 0 ? (
-            <p className="text-xs text-slate-500 text-center py-4" data-testid="stats-no-data">
+            <p className="text-xs text-[var(--text-muted)] text-center py-4" data-testid="stats-no-data">
               {t(locale, 'people.stats.noData')}
             </p>
           ) : (
@@ -304,23 +304,23 @@ export function StudentsStatistics({
                 const label = bar.groupId === null ? t(locale, 'people.stats.allGroups') : bar.label
                 return (
                   <li key={bar.key} className="flex items-center gap-2">
-                    <span className="w-24 shrink-0 text-[11px] font-bold text-slate-600 truncate">
+                    <span className="w-24 shrink-0 text-[11px] font-bold text-[var(--text-secondary)] truncate">
                       <bdi>{label}</bdi>
                     </span>
-                    <span className="relative flex-1 h-5 rounded-md bg-slate-100 overflow-hidden">
+                    <span className="relative flex-1 h-5 rounded-md bg-[var(--disabled-surface)] overflow-hidden">
                       {/* Decorative: the visible, readable value is the text cell below,
                           not this fill — see the file header's note on the text equivalent. */}
                       <span
                         aria-hidden="true"
                         className={`absolute inset-y-0 start-0 rounded-md ${
-                          isSelected ? 'bg-blue-700' : 'bg-blue-500'
+                          isSelected ? 'bg-[var(--emphasis)]' : 'bg-[var(--emphasis)]'
                         }`}
                         style={{ width: `${Math.max(bar.value, 3)}%` }}
                       />
                     </span>
                     <span
                       className={`w-12 shrink-0 text-end text-xs font-mono ${
-                        isSelected ? 'font-black text-blue-700' : 'font-bold text-slate-600'
+                        isSelected ? 'font-black text-[var(--emphasis)]' : 'font-bold text-[var(--text-secondary)]'
                       }`}
                       data-testid={`stats-bar-value-${bar.key}`}
                     >
@@ -332,7 +332,7 @@ export function StudentsStatistics({
             </ul>
           )}
 
-          <div className="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500" data-testid="stats-footer">
+          <div className="mt-2 pt-2 border-t border-[var(--border)] text-[11px] text-[var(--text-muted)]" data-testid="stats-footer">
             {t(locale, 'people.stats.footer')}
           </div>
         </div>

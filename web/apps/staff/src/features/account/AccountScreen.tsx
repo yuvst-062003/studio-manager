@@ -79,16 +79,16 @@ type AccountProfile = {
 /** Icon-tile background/ink pairs — the prototype's own hue-per-row choice, class for
  *  class (`bg-<hue>-50 text-<hue>-600`). */
 const TILE_HUE = {
-  blue: 'bg-blue-50 text-blue-600',
-  indigo: 'bg-indigo-50 text-indigo-600',
-  amber: 'bg-amber-50 text-amber-600',
-  rose: 'bg-rose-50 text-rose-600',
-  emerald: 'bg-emerald-50 text-emerald-600',
+  blue: 'bg-[var(--emphasis-tint)] text-[var(--emphasis)]',
+  indigo: 'bg-[var(--emphasis-tint)] text-[var(--emphasis)]',
+  amber: 'bg-[var(--pending-tint)] text-[var(--pending)]',
+  rose: 'bg-[var(--danger-tint)] text-[var(--danger)]',
+  emerald: 'bg-[var(--paid-tint)] text-[var(--paid)]',
 } as const
 
 function GroupHeading({ id, children }: { id: string; children: ReactNode }) {
   return (
-    <h2 id={id} className="text-xs font-black text-slate-900 tracking-wider px-1">
+    <h2 id={id} className="text-xs font-black text-[var(--fg)] tracking-wider px-1">
       {children}
     </h2>
   )
@@ -96,7 +96,7 @@ function GroupHeading({ id, children }: { id: string; children: ReactNode }) {
 
 function RowCard({ children }: { children: ReactNode }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs divide-y divide-slate-100 overflow-hidden text-xs">
+    <div className="bg-[var(--surface-raised)] rounded-2xl border border-[var(--border)] shadow-xs divide-y divide-[var(--border)] overflow-hidden text-xs">
       {children}
     </div>
   )
@@ -120,7 +120,7 @@ function Row({
   return (
     <a
       href={href}
-      className="p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50 active:bg-slate-100 transition-colors"
+      className="p-3.5 flex items-center justify-between gap-3 hover:bg-[var(--surface)] active:bg-[var(--disabled-surface)] transition-colors"
     >
       <span className="flex items-center gap-3 min-w-0">
         <span
@@ -129,13 +129,13 @@ function Row({
           <Icon className="w-4 h-4" aria-hidden="true" />
         </span>
         <span className="flex flex-col items-start text-start min-w-0">
-          <span className="font-bold text-slate-800 truncate">{title}</span>
-          {subtitle ? <span className="text-[11px] text-slate-500 truncate">{subtitle}</span> : null}
+          <span className="font-bold text-[var(--fg)] truncate">{title}</span>
+          {subtitle ? <span className="text-[11px] text-[var(--text-muted)] truncate">{subtitle}</span> : null}
         </span>
       </span>
       {/* ChevronLeft, not Right: in a right-to-left document "onward" points left — the
           parent app's `ProfileMenu` made the same call for the same reason. */}
-      <ChevronLeft className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
+      <ChevronLeft className="w-4 h-4 text-[var(--text-muted)] shrink-0" aria-hidden="true" />
     </a>
   )
 }
@@ -246,10 +246,10 @@ export function AccountScreen({
     <div data-testid="account-screen" className="flex flex-col gap-4 px-4 pt-4">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+          <h1 className="text-2xl font-black text-[var(--fg)] tracking-tight">
             {t(locale, 'common.account.title')}
           </h1>
-          {studioName ? <p className="text-[11px] text-slate-500 mt-0.5">{studioName}</p> : null}
+          {studioName ? <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{studioName}</p> : null}
         </div>
         <div
           aria-hidden="true"
@@ -342,7 +342,7 @@ export function AccountScreen({
       {/* 9e's boundary teaching, unchanged — see PermissionBoundaries' own header. A
           manager sees none: nothing on this list is locked for them. */}
       {!viewerIsManager ? (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-3.5 text-xs">
+        <div className="bg-[var(--surface-raised)] rounded-2xl border border-[var(--border)] shadow-xs p-3.5 text-xs">
           <PermissionBoundaries locale={locale} canMoveStudents={roles.includes('lead_coach')} />
         </div>
       ) : null}
@@ -381,14 +381,14 @@ export function AccountScreen({
         <GroupHeading id="account-group-notifications">
           {t(locale, 'common.account.group.notifications')}
         </GroupHeading>
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-3.5 text-xs">
+        <div className="bg-[var(--surface-raised)] rounded-2xl border border-[var(--border)] shadow-xs p-3.5 text-xs">
           <NotificationPreferences client={commsClient} locale={locale} />
         </div>
       </section>
 
       <section aria-labelledby="account-group-system" className="flex flex-col gap-2">
         <GroupHeading id="account-group-system">{t(locale, 'common.account.group.system')}</GroupHeading>
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-3.5 text-xs">
+        <div className="bg-[var(--surface-raised)] rounded-2xl border border-[var(--border)] shadow-xs p-3.5 text-xs">
           <CoachCalendarFeed client={commsClient} locale={locale} />
         </div>
         <RowCard>
@@ -454,15 +454,15 @@ export function AccountScreen({
                 aria-expanded={open}
                 data-testid="a11y-open"
                 onClick={toggle}
-                className="w-full p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50 active:bg-slate-100 transition-colors text-start"
+                className="w-full p-3.5 flex items-center justify-between gap-3 hover:bg-[var(--surface)] active:bg-[var(--disabled-surface)] transition-colors text-start"
               >
                 <span className="flex items-center gap-3 min-w-0">
-                  <span className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 font-bold">
+                  <span className="w-8 h-8 rounded-xl bg-[var(--paid-tint)] text-[var(--paid)] flex items-center justify-center shrink-0 font-bold">
                     <Accessibility className="w-4 h-4" aria-hidden="true" />
                   </span>
-                  <span className="font-bold text-slate-800">{t(locale, 'common.a11y.title')}</span>
+                  <span className="font-bold text-[var(--fg)]">{t(locale, 'common.a11y.title')}</span>
                 </span>
-                <ChevronLeft className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
+                <ChevronLeft className="w-4 h-4 text-[var(--text-muted)] shrink-0" aria-hidden="true" />
               </button>
             )}
           />
