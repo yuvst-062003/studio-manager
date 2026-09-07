@@ -1,7 +1,7 @@
 // Task 3a -- the three things a door differs by, injected rather than branched on inside
 // `JoinWizard`. See that module's own header and the type doc below for why these three
 // and nothing else.
-import { apiFetch } from '@studio/core'
+import { apiFetch, apiUrl } from '@studio/core'
 import type { HealthClient, TemplateSchema } from '../../health/healthClient'
 import type { PlanOption } from '../familyDraft'
 import { toWizardGroup, toWizardPlan } from './adapters'
@@ -116,7 +116,12 @@ export function tokenSource(token: string, healthClient: HealthClient): JoinWiza
       }
       return {
         studioName: info.studio_name,
-        logoUrl: info.logo_url ?? null,
+        //: `logo_url` is an API PATH, not a public URL. On split origins -- which every
+        //: deployed environment is -- the browser resolves a relative path against THIS
+        //: app's host and 404s, so the wizard header rendered a broken image.
+        //: `PublicLanding` learned this on 2026-08-30 and wraps its own logo in `apiUrl`;
+        //: the wizard's two sources never got the same fix (owner-reported 2026-09-07).
+        logoUrl: info.logo_url ? apiUrl(info.logo_url) : null,
         groups: (info.groups ?? []).map(toWizardGroup),
         clubTermsVersion: info.club_terms_version ?? null,
         slug: info.slug ?? null,
@@ -230,7 +235,9 @@ export function studioSource(healthClient: HealthClient): JoinWizardSource {
         // rebuilt from `slug` against the UNAUTHENTICATED `GET /public/studios/{slug}/logo`
         // door B already uses, and which the server itself builds the same way in
         // `app/routers/public.py`/`app/routers/onboarding.py`. Null stays null.
-        logoUrl: logoUrl ? `/api/v1/public/studios/${slug}/logo` : null,
+        //: Absolute for the same reason as `tokenSource`'s above: this is an API path,
+        //: and on a split origin a relative one resolves against the PWA's host.
+        logoUrl: logoUrl ? apiUrl(`/api/v1/public/studios/${slug}/logo`) : null,
         groups: groups.map(toWizardGroup),
         // Gap 2: `/me/studio` carries no `club_terms_version` at all -- this door has no
         // number to show, and inventing one (a frontend constant, or the WRITE's default)

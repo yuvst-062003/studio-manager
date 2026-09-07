@@ -12,6 +12,10 @@ vi.mock('@studio/core', async (importOriginal) => {
   return {
     ...actual,
     apiFetch: vi.fn(),
+    // A REAL origin, unlike the empty string a test build bakes in. `apiUrl` is a no-op
+    // when VITE_API_ORIGIN is '', so without this the logo assertions below would pass
+    // just as happily against the unfixed code that never called it at all.
+    apiUrl: (path: string) => `https://api.test${path}`,
   }
 })
 
@@ -114,6 +118,44 @@ describe('tokenSource -- door B, lifted unchanged from WizardJoinFlow', () => {
   // Gap 2 -- `OnboardingInfoOut.club_terms_version` is live off the server's own
   // `CLUB_TERMS_VERSION`, so step 1 can show the family which version they are agreeing
   // to. This is the one place that reads it off the wire.
+  it('loadStudio returns an ABSOLUTE logo URL, not the API path the wire carries', async () => {
+    // Owner-reported 2026-09-07: the wizard's header and its success screen both drew a
+    // broken image. `logo_url` is an API path, and on split origins — which every deployed
+    // environment is — a relative path resolves against the PWA's host and 404s.
+    // `PublicLanding` fixed exactly this on 2026-08-30; neither wizard source did.
+    const { apiFetch } = await import('@studio/core')
+    vi.mocked(apiFetch).mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            studio_name: 'מועדון בדיקה',
+            logo_url: '/api/v1/public/onboarding/tok-e2e/logo',
+            groups: [],
+          }),
+          { status: 200 },
+        ),
+    )
+
+    const studio = await tokenSource(TOKEN, healthClientStub()).loadStudio()
+
+    expect(studio.logoUrl).toBe('https://api.test/api/v1/public/onboarding/tok-e2e/logo')
+  })
+
+  it('loadStudio keeps a missing logo null rather than building a URL that 404s', async () => {
+    const { apiFetch } = await import('@studio/core')
+    vi.mocked(apiFetch).mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({ studio_name: 'מועדון בדיקה', logo_url: null, groups: [] }),
+          { status: 200 },
+        ),
+    )
+
+    const studio = await tokenSource(TOKEN, healthClientStub()).loadStudio()
+
+    expect(studio.logoUrl).toBeNull()
+  })
+
   it('loadStudio maps club_terms_version onto clubTermsVersion', async () => {
     const { apiFetch } = await import('@studio/core')
     const fetchMock = vi.fn(async (input: string | URL) => {
@@ -355,7 +397,7 @@ describe('studioSource -- doors C and D, no token anywhere', () => {
     const source = studioSource(healthClientStub())
     const studio = await source.loadStudio()
 
-    expect(studio.logoUrl).toBe('/api/v1/public/studios/demo-club/logo')
+    expect(studio.logoUrl).toBe('https://api.test/api/v1/public/studios/demo-club/logo')
     expect(studio.logoUrl).not.toBe('/api/v1/studio/logo')
   })
 

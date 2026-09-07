@@ -190,17 +190,6 @@ export function ShopScreen({
             </div>
           </main>
 
-          {/* Delivery Guarantee Note */}
-          <section className="px-5 mt-5">
-            <div className="bg-[#EEF2FE] border border-blue-100 rounded-2xl p-4 flex items-center gap-3">
-              <div className="text-[#2563EB] shrink-0">
-                <ShieldCheck className="w-6 h-6" aria-hidden="true" />
-              </div>
-              <p className="text-xs font-semibold text-[#1e3a8a] leading-relaxed text-start">
-                {t(locale, 'billing.shop.deliveryNote')}
-              </p>
-            </div>
-          </section>
         </>
       ) : (
         <main className="px-5 mt-4 flex-1">
