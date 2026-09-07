@@ -912,3 +912,105 @@ describe('TodayScreen — the write-up is reachable from the card (owner fix)', 
     expect(screen.queryByTestId('session-summary-link')).toBeNull()
   })
 })
+
+describe('TodayScreen — §6.1s offline promise, kept (2026-09-07)', () => {
+  /** `writeWindow` primed two days of sessions into IndexedDB from the day the offline
+   *  machinery shipped, and nothing ever read them back — `cachedSessions` had no caller
+   *  outside its own tests. So in a basement the app held the data AND showed "could not
+   *  load" over the top of it. These tests are that gap. */
+  let store: OfflineStore
+  const NOW = '2026-11-03T12:00:00Z'
+
+  const cachedSession = () => ({
+    id: TODAY_SESSION.id,
+    group_id: 'g1',
+    group_name: TODAY_SESSION.group_name,
+    starts_at: TODAY_SESSION.starts_at,
+    ends_at: TODAY_SESSION.ends_at,
+    location_name: null,
+    status: 'scheduled' as const,
+    attendance_taken: false,
+  })
+
+  const offlineClient = () => ({
+    ...stub(),
+    listSessions: vi.fn(async () => {
+      throw new Error('offline')
+    }),
+  })
+
+  beforeEach(() => {
+    store = memoryStore()
+    setOfflineStore(store)
+  })
+  afterEach(() => {
+    setOfflineStore(null)
+  })
+
+  it('renders the cached day when the network is gone', async () => {
+    await writeWindow(store, {
+      server_time: NOW,
+      from_time: NOW,
+      to_time: NOW,
+      sessions: [cachedSession()],
+      rosters: {},
+    })
+
+    render(screenFor({ client: offlineClient() }))
+
+    expect(await screen.findByText(TODAY_SESSION.group_name)).toBeInTheDocument()
+    // And says so, because a coach reading a stale list has to know it may be stale.
+    expect(screen.getByTestId('schedule-from-cache')).toBeInTheDocument()
+  })
+
+  it('still fails when the cache has nothing for this day', async () => {
+    // The cache holds two days. Rendering an empty day for a Thursday nobody cached would
+    // say "you have nothing on", which is the one lie this screen must never tell.
+    render(screenFor({ client: offlineClient() }))
+
+    await waitFor(() => expect(screen.getByTestId('load-failed')).toBeInTheDocument())
+    expect(screen.queryByTestId('schedule-from-cache')).not.toBeInTheDocument()
+  })
+
+  it('draws the card from the CACHE, not from a network shape it never received', async () => {
+    // The two shapes differ, and this is the difference made visible. The network fixture
+    // carries `location_name: 'אולם א׳'` and `headcount: 14`; `/sync/bootstrap` sends the
+    // location but no headcount and no staff, so the cached card shows the location it
+    // really has and cannot show the count it never got.
+    await writeWindow(store, {
+      server_time: NOW,
+      from_time: NOW,
+      to_time: NOW,
+      sessions: [{ ...cachedSession(), location_name: 'מזרן 2' }],
+      rosters: {},
+    })
+
+    render(screenFor({ client: offlineClient() }))
+    await screen.findByTestId('schedule-from-cache')
+
+    expect(screen.getByText('מזרן 2')).toBeInTheDocument()
+    // The network fixture's own location and headcount — neither reached this render.
+    expect(screen.queryByText('אולם א׳')).not.toBeInTheDocument()
+    expect(screen.queryByText('14')).not.toBeInTheDocument()
+  })
+
+  it('drops the notice again once the network comes back', async () => {
+    await writeWindow(store, {
+      server_time: NOW,
+      from_time: NOW,
+      to_time: NOW,
+      sessions: [cachedSession()],
+      rosters: {},
+    })
+
+    const { rerender } = render(screenFor({ client: offlineClient() }))
+    await screen.findByTestId('schedule-from-cache')
+
+    rerender(screenFor({ client: stub([TODAY_SESSION]) }))
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('schedule-from-cache')).not.toBeInTheDocument(),
+    )
+  })
+})
+

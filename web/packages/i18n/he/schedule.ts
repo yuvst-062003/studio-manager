@@ -28,6 +28,10 @@ export const schedule: Bundle = {
   // session that has already ended. Never repurposes `today.openRoster`, which every other
   // state still uses as written.
   'today.closeSession': 'סגור אימון',
+  // §6.1's offline promise, finally kept (2026-09-07). Two days of sessions were primed
+  // into IndexedDB and never read back, so the app carried the data for a basement and
+  // then showed "could not load" over the top of it in one.
+  'today.fromCache': 'אין חיבור — זו הרשימה השמורה במכשיר. ייתכן שהיא לא מעודכנת.',
   'today.empty': 'אין שיעורים היום',
   'today.emptyHint': 'ימי פעילות נקבעים בלו״ז השבועי של הקבוצה',
   // Register §4.2 — a date outside every declared training year used to render exactly

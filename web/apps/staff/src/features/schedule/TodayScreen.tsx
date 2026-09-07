@@ -130,6 +130,7 @@ import {
 } from 'lucide-react'
 import { EmptyState, LoadFailed, useModalDialog } from '@studio/ui'
 import {
+  cachedSessions,
   formatDateInStudioZone,
   formatTimeInStudioZone,
   offlineStore,
@@ -402,6 +403,9 @@ export function TodayScreen({
   const [sessions, setSessions] = useState<SessionRow[]>([])
   const [events, setEvents] = useState<EventOut[]>([])
   const [failed, setFailed] = useState(false)
+  /** Rendered from IndexedDB rather than the network. Said out loud, because a coach
+   *  looking at a stale list has to know it may be stale. */
+  const [fromCacheNotice, setFromCacheNotice] = useState(false)
   const [attempt, setAttempt] = useState(0)
   // Register §4.2 — defaults to false (an ordinary empty day) until the check below
   // (fired only when the day's own fetch comes back empty) proves otherwise.
@@ -422,6 +426,55 @@ export function TodayScreen({
   const networkMode = useNetworkMode()
   const strip = useMemo(() => stripAround(initialDay ?? todayKey), [initialDay, todayKey])
 
+  /** §6.1's offline promise, finally kept (2026-09-07).
+   *
+   * `writeWindow` has primed two days of sessions into IndexedDB since the offline
+   * machinery shipped, and **nothing ever read them back** — `cachedSessions` had no caller
+   * outside its own tests. So the app carried the data for a basement and then, in a
+   * basement, showed "could not load" over the top of it. The register was genuinely
+   * offline-capable; the screen that reaches the register was not.
+   *
+   * The cache holds `CACHE_WINDOW_DAYS`, so this can only answer for today and tomorrow.
+   * That is why an empty result here still fails the screen rather than rendering an empty
+   * day: "no sessions" reads as a day off, and saying it about a Thursday nobody cached
+   * would be the exact lie S11 already forbids.
+   *
+   * The shapes differ and the gap is filled honestly rather than with zeroes.
+   * `CachedSession` has no `staff` and no `headcount` — `/sync/bootstrap` does not send
+   * them — so the meta row shows no coach and the card falls back to its own
+   * "not saved on this device" line for counts, which is true. `headcount: 0` would have
+   * drawn "0 חניכים" on a full class.
+   */
+  const fromCache = useCallback(async (): Promise<SessionRow[] | null> => {
+    try {
+      const rows = await cachedSessions(offlineStore())
+      const forDay = rows.filter(
+        (row) => row.kind !== 'event' && studioDayKey(row.starts_at) === day,
+      )
+      if (forDay.length === 0) return null
+      return forDay.map((row) => ({
+        id: row.id,
+        group_id: row.group_id,
+        group_name: row.group_name,
+        training_year_id: '',
+        starts_at: row.starts_at,
+        ends_at: row.ends_at,
+        location_id: null,
+        location_name: row.location_name,
+        status: row.status,
+        is_manually_edited: false,
+        is_ad_hoc: false,
+        cancel_reason: null,
+        // Absent from the cache, and named absent rather than invented — see above.
+        staff: [],
+        attendance_taken: row.attendance_taken,
+        headcount: 0,
+      }))
+    } catch {
+      return null
+    }
+  }, [day])
+
   useEffect(() => {
     let live = true
     client
@@ -430,14 +483,29 @@ export function TodayScreen({
         to: day,
         coachPersonId: coachFilter || undefined,
       })
-      .then((loaded) => live && setSessions(loaded))
+      .then((loaded) => {
+        if (!live) return
+        setSessions(loaded)
+        setFromCacheNotice(false)
+      })
       // S11 — the day's list used to reject unhandled and render as an empty day, which
       // is the one lie this screen must never tell: "no sessions" reads as a day off.
-      .catch(() => live && setFailed(true))
+      // The cache is tried FIRST now, and only a cache that has nothing for this day falls
+      // through to the failure screen.
+      .catch(async () => {
+        const cached = await fromCache()
+        if (!live) return
+        if (cached) {
+          setSessions(cached)
+          setFromCacheNotice(true)
+        } else {
+          setFailed(true)
+        }
+      })
     return () => {
       live = false
     }
-  }, [client, coachFilter, day, attempt])
+  }, [client, coachFilter, day, attempt, fromCache])
 
   // §4.1 — events are not scoped by the coach filter (an event has no single instructing
   // coach the way a session does), so they are fetched once and merged by day alone. A
@@ -723,6 +791,19 @@ export function TodayScreen({
           ))}
         </select>
       </label>
+
+      {/* Said out loud. A coach reading a cached list has to know it may be stale — the
+          alternative is a screen that looks live and is not, which is worse than the
+          "could not load" it replaces. */}
+      {fromCacheNotice ? (
+        <p
+          role="status"
+          data-testid="schedule-from-cache"
+          className="rounded-2xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800"
+        >
+          {t(locale, 'schedule.today.fromCache')}
+        </p>
+      ) : null}
 
       {/* Sessions decide the empty state — an event with no session on a day-off still
           means "nothing routine today", and `noTrainingYear` is a training-year concept

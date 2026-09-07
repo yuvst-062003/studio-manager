@@ -8,6 +8,8 @@ export const schedule: Bundle = {
   'today.backToToday': 'Back to today',
   'today.openRoster': 'Open the register',
   'today.closeSession': 'Close the session',
+  // Counterpart of he/schedule.ts's fromCache.
+  'today.fromCache': 'No connection — this is the list saved on this device. It may be out of date.',
   'today.empty': 'No classes today',
   'today.emptyHint': 'Activity days are set in the group’s weekly schedule',
   'today.noTrainingYear': 'No training year covers this date',

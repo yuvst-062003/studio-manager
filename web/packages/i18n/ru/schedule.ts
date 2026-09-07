@@ -11,6 +11,8 @@ export const schedule: Bundle = {
   'today.backToToday': 'Вернуться к сегодня',
   'today.openRoster': 'Открыть перекличку',
   'today.closeSession': 'Закрыть занятие',
+  // Counterpart of he/schedule.ts's fromCache.
+  'today.fromCache': 'Нет связи — это список, сохранённый на устройстве. Он может быть устаревшим.',
   'today.empty': 'Сегодня занятий нет',
   'today.emptyHint': 'Дни занятий задаются в недельном расписании группы',
   'today.noTrainingYear': 'Ни один учебный год не охватывает эту дату',
