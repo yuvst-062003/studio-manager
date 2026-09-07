@@ -119,6 +119,17 @@ failure so the next reader can tell whether it still applies.
 - **When something you shipped misbehaves, read your own diff before theorising.** Service
   workers, caches and account roles are interesting and were not the cause. The bug was in
   ten lines written an hour earlier.
+- **How a deploy works is in `docs/deploy/railway-runbook.md`. Do not infer it from the
+  Dockerfile.** The api's `CMD` is uvicorn-only *by design* and says nothing about
+  migrations: Railway's per-service pre-deploy step runs `alembic upgrade head` against the
+  new image, before the container that serves traffic starts. So **deploying is the whole
+  procedure** — `railway up` per service, four services, nothing else. Reading the CMD
+  instead of the runbook invented an entire manual ritual: a hand-run migration, a hunt for
+  a database backup to make it safe, and a migrate-*then*-deploy order that cannot work,
+  because a running image only carries the revisions it was built with — which is why
+  `alembic upgrade head` against the old image printed nothing and changed nothing. The
+  runbook already said all of this, and had already been corrected once for this same
+  mistake on 2026-09-02. Read it before touching production.
 
 ## Compact instructions
 When compacting, always preserve: the list of modified files, the current plan or
