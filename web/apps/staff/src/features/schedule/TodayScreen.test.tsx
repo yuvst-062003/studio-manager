@@ -152,6 +152,37 @@ describe('TodayScreen (9a / 1d)', () => {
     )
   })
 
+  it("opens on the CLUB's day for a manager who also coaches, not on their own", async () => {
+    // Owner-reported 2026-09-07: the month calendar showed the club's sessions and
+    // לוח זמנים said "אין שיעורים היום" on a day that had one — because that session
+    // belonged to a different coach and the screen had quietly filtered to the viewer.
+    //
+    // `viewerIsCoach`'s own doc states the rule this broke: "a coach opening the app wants
+    // their own day, a manager wants the club's." The default asked only the first half,
+    // so anybody who is BOTH — most owners of a small club — got the coach's answer.
+    const client = stub()
+    render(
+      screenFor({ client, viewerIsCoach: true, viewerIsManager: true, viewerPersonId: 'p1' }),
+    )
+
+    await waitFor(() => expect(client.listSessions).toHaveBeenCalled())
+    expect(client.listSessions).toHaveBeenLastCalledWith(
+      expect.objectContaining({ coachPersonId: undefined }),
+    )
+  })
+
+  it('still opens on their own day for a coach who is not a manager', async () => {
+    // The other half of the same rule, so a fix for the manager cannot quietly take the
+    // coach's default away with it.
+    const client = stub()
+    render(screenFor({ client, viewerIsCoach: true, viewerPersonId: 'p1' }))
+
+    await waitFor(() => expect(client.listSessions).toHaveBeenCalled())
+    expect(client.listSessions).toHaveBeenLastCalledWith(
+      expect.objectContaining({ coachPersonId: 'p1' }),
+    )
+  })
+
   it('never offers the coach filter to a coach', async () => {
     // Owner-reported 2026-09-07. `coachFilter` already defaults to the signed-in coach's
     // own person id, so the only OTHER thing this control could do is show somebody

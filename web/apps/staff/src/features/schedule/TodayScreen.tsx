@@ -405,8 +405,15 @@ export function TodayScreen({
 }) {
   const todayKey = useMemo(() => studioDayKey(today), [today])
   const [day, setDay] = useState(initialDay ?? todayKey)
+  //: `!viewerIsManager` is the half this was missing, and the prop above already stated
+  //: the rule it was breaking: "a coach opening the app wants their own day, A MANAGER
+  //: WANTS THE CLUB'S". The code only asked the first question, so somebody who is BOTH —
+  //: a manager who also coaches, which is most owners of a small club — silently opened on
+  //: their own day. Owner-reported 2026-09-07: the month calendar showed the club's
+  //: sessions and לוח זמנים said "אין שיעורים היום" on a day that had one, because that
+  //: one belonged to a different coach.
   const [coachFilter, setCoachFilter] = useState<string>(
-    viewerIsCoach && viewerPersonId ? viewerPersonId : '',
+    viewerIsCoach && !viewerIsManager && viewerPersonId ? viewerPersonId : '',
   )
   const [sessions, setSessions] = useState<SessionRow[]>([])
   const [events, setEvents] = useState<EventOut[]>([])
