@@ -182,6 +182,17 @@ export const billing: Bundle = {
   // `{{total}}` arrives already formatted — agorot are never divided at a call site.
   'shop.placedBody': 'נוצרו {{count}} חיובים על סך {{total}}. המאמן יימסור את הפריטים באימון הקרוב.',
   'shop.placedPay': 'מעבר לתשלומים',
+  // The choice at the moment of purchase (owner, 2026-09-07). Both routes existed on
+  // the payments screen and both take charge ids, so the shop offers them over the
+  // charges it just created rather than sending the parent to another screen.
+  'shop.payHow': 'איך תשלמו על ההזמנה?',
+  'shop.payCard': 'כרטיס אשראי',
+  'shop.payCash': 'מזומן במועדון',
+  'shop.paySending': 'רגע…',
+  'shop.payLater': 'אחר כך, דרך מסך התשלומים',
+  'shop.cashDoneTitle': 'הודענו למנהל',
+  'shop.cashDoneBody': 'רשמנו שתשלמו {{total}} במזומן. המנהל יסמן כשהכסף יגיע.',
+  'shop.payFailed': 'לא הצלחנו להמשיך לתשלום. ההזמנה נשמרה — אפשר לשלם ממסך התשלומים.',
   'shop.placedClose': 'סגירה',
   'shop.checkoutFailed': 'ההזמנה לא נשלחה. נסו שוב.',
   // -- ההזמנות שלי, moved here from פרופיל on the owner's review of 2026-09-06: they are

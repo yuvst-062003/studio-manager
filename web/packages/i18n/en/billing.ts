@@ -121,6 +121,17 @@ export const billing: Bundle = {
   'shop.placedTitle': 'Your order has been sent to the club',
   'shop.placedBody': '{{count}} charges were created, totalling {{total}}. Your coach will hand the items over at the next session.',
   'shop.placedPay': 'Go to payments',
+  // The choice at the moment of purchase (owner, 2026-09-07). Both routes existed on
+  // the payments screen and both take charge ids, so the shop offers them over the
+  // charges it just created rather than sending the parent to another screen.
+  'shop.payHow': 'How will you pay for this order?',
+  'shop.payCard': 'Credit card',
+  'shop.payCash': 'Cash at the club',
+  'shop.paySending': 'One moment…',
+  'shop.payLater': 'Later, from the payments screen',
+  'shop.cashDoneTitle': 'The manager has been told',
+  'shop.cashDoneBody': 'We recorded that you will pay {{total}} in cash. The manager will mark it once the money arrives.',
+  'shop.payFailed': 'We could not continue to payment. Your order is saved — you can pay from the payments screen.',
   'shop.placedClose': 'Close',
   'shop.checkoutFailed': "The order wasn't sent. Please try again.",
   'shop.ordersCta': 'My orders',

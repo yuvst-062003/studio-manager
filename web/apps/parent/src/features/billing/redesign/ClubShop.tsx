@@ -19,6 +19,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiFetch, formatAgorot, formatDateInStudioZone } from '@studio/core'
 import type { Locale } from '@studio/i18n'
 import { t } from '@studio/i18n'
+import { DEMO_SIMULATOR, makeParentBillingClient } from '../PaymentsSection'
+import { PaymentOverlay } from '../PaymentOverlay'
+import type { PaymentOverlayRequest } from '../PaymentOverlay'
 import { ShopScreen } from './ShopScreen'
 import { OrdersSheet } from './OrdersSheet'
 import type { OrderRow } from './OrdersSheet'
@@ -38,6 +41,10 @@ export function ClubShop({ locale }: { locale: Locale }) {
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
   const [cart, setCart] = useState<readonly CartLine[]>([])
+  /** The uPay form, when a card order has been opened. Same overlay the payments screen
+   *  uses — the parent never leaves the shop for it. */
+  const [overlay, setOverlay] = useState<PaymentOverlayRequest | null>(null)
+  const billing = useMemo(() => makeParentBillingClient(apiFetch), [])
   const [checkout, setCheckout] = useState<CheckoutState>({ kind: 'idle' })
   // ההזמנות שלי — moved here from פרופיל on the owner's review of 2026-09-06.
   const [orders, setOrders] = useState<readonly OrderRow[] | null>(null)
@@ -163,11 +170,59 @@ export function ClubShop({ locale }: { locale: Locale }) {
           kind: 'placed',
           lines: body.charge_ids.length,
           totalAgorot: body.total_agorot,
+          chargeIds: body.charge_ids,
         })
         setCart([])
       })
       .catch(() => setCheckout({ kind: 'failed' }))
   }, [cart])
+
+  /**
+   * Pay for the order that was just placed, without leaving the shop.
+   *
+   * **Neither route is new.** `createOrder`/`orderForm` is the same pair the payments
+   * screen opens the uPay overlay with, and `createPromise` is the same call that raises a
+   * cash promise and notifies the managers (`PaymentPromiseService._notify_managers`). Both
+   * take charge ids and nothing else, which is why the shop can offer them over the charges
+   * `POST /me/orders/items` just returned rather than growing a third payment path.
+   *
+   * A failure here is NOT an order failure: the charges exist either way, and saying "your
+   * order failed" over a placed order would send a parent to order it a second time. That
+   * is what `settleFailed` is for, and why it keeps the charge ids so a retry is possible.
+   */
+  const payByCard = useCallback(async () => {
+    if (checkout.kind !== 'placed' && checkout.kind !== 'settleFailed') return
+    const { lines, totalAgorot, chargeIds } = checkout
+    setCheckout({ kind: 'settling', lines, totalAgorot, chargeIds })
+    try {
+      // One payment, no prepaid months: an item order is a one-off, not a subscription.
+      const { public_ref: publicRef } = await billing.createOrder([...chargeIds], 1, 0)
+      const form = await billing.orderForm(publicRef)
+      if (form.action === DEMO_SIMULATOR.action) {
+        // No live form exists in this deployment; the order is open and the IPN settles it.
+        setCheckout({ kind: 'promised', totalAgorot })
+        return
+      }
+      setOverlay({ kind: 'checkout', form })
+      setCheckout({ kind: 'placed', lines, totalAgorot, chargeIds })
+    } catch {
+      setCheckout({ kind: 'settleFailed', lines, totalAgorot, chargeIds })
+    }
+  }, [billing, checkout])
+
+  const payByCash = useCallback(async () => {
+    if (checkout.kind !== 'placed' && checkout.kind !== 'settleFailed') return
+    const { lines, totalAgorot, chargeIds } = checkout
+    setCheckout({ kind: 'settling', lines, totalAgorot, chargeIds })
+    try {
+      // `alreadyPaid: false` explicitly — this is "I will pay", not "I already did", and
+      // the two are different claims to a manager. Zero prepaid months, as above.
+      await billing.createPromise([...chargeIds], 'cash', 0, false)
+      setCheckout({ kind: 'promised', totalAgorot })
+    } catch {
+      setCheckout({ kind: 'settleFailed', lines, totalAgorot, chargeIds })
+    }
+  }, [billing, checkout])
 
   const state: 'ready' | 'loading' | 'failed' = failed
     ? 'failed'
@@ -193,11 +248,26 @@ export function ClubShop({ locale }: { locale: Locale }) {
         }
         onRemoveLine={(index) => setCart((current) => current.filter((_, at) => at !== index))}
         checkout={checkout}
+        onPayByCard={payByCard}
+        onPayByCash={payByCash}
         onCheckout={placeOrder}
         onCheckoutClose={() => setCheckout({ kind: 'idle' })}
         money={money}
         onOpenOrders={() => setOrdersOpen(true)}
       />
+
+      {overlay ? (
+        <PaymentOverlay
+          locale={locale}
+          onClose={() => setOverlay(null)}
+          onComplete={() => {
+            setOverlay(null)
+            // The IPN settles the charges; the shop's own list re-reads on the next open.
+            setCheckout({ kind: 'idle' })
+          }}
+          request={overlay}
+        />
+      ) : null}
 
       {ordersOpen ? (
         <OrdersSheet

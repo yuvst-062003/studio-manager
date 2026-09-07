@@ -22,6 +22,8 @@ export function ShopScreen({
   onSetQuantity,
   onRemoveLine,
   checkout,
+  onPayByCard,
+  onPayByCash,
   onCheckout,
   onCheckoutClose,
   money,
@@ -38,6 +40,10 @@ export function ShopScreen({
   onSetQuantity: (index: number, quantity: number) => void
   onRemoveLine: (index: number) => void
   checkout: CheckoutState
+  /** Opens the uPay overlay over the charges the order just created. */
+  onPayByCard: () => void
+  /** Raises the cash promise, which is what tells the manager. */
+  onPayByCash: () => void
   onCheckout: () => void
   onCheckoutClose: () => void
   /** Integer agorot -> a formatted string. NEVER divide by 100 in this file. */
@@ -464,9 +470,34 @@ export function ShopScreen({
 
             {/* Content */}
             <div className="p-5 overflow-y-auto space-y-4 no-scrollbar flex-1">
-              {checkout.kind === 'placed' ? (
+              {checkout.kind === 'promised' ? (
+                /* Cash. The promise is raised and the managers have been notified — the
+                   parent is told exactly that, rather than being sent to a payments screen
+                   with nothing left to do on it. */
+                <div data-testid="shop-cash-done" className="text-center">
+                  <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3.5 shadow-inner border border-emerald-100">
+                    <CheckCircle2 className="w-9 h-9" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-xl font-black text-[#0A1938] dark:text-slate-50 mb-1">
+                    {t(locale, 'billing.shop.cashDoneTitle')}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+                    {fill(t(locale, 'billing.shop.cashDoneBody'), { total: money(checkout.totalAgorot) })}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onCheckoutClose()
+                      setIsCartOpen(false)
+                    }}
+                    className="w-full bg-[#05163E] hover:bg-[#0A1938] text-white font-bold py-3.5 rounded-xl text-xs transition shadow-md active:scale-95 cursor-pointer"
+                  >
+                    {t(locale, 'billing.shop.placedClose')}
+                  </button>
+                </div>
+              ) : checkout.kind === 'placed' || checkout.kind === 'settling' || checkout.kind === 'settleFailed' ? (
                 <div data-testid="shop-placed" className="text-center">
-                  <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3.5 shadow-inner border border-emerald-100 animate-bounce">
+                  <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3.5 shadow-inner border border-emerald-100">
                     <CheckCircle2 className="w-9 h-9" aria-hidden="true" />
                   </div>
                   <h3 className="text-xl font-black text-[#0A1938] dark:text-slate-50 mb-1">{t(locale, 'billing.shop.placedTitle')}</h3>
@@ -476,8 +507,45 @@ export function ShopScreen({
                       total: money(checkout.totalAgorot),
                     })}
                   </p>
-                  <a href="#/payments" className="block text-center text-sm font-bold text-[#2563EB] mb-3">
-                    {t(locale, 'billing.shop.placedPay')}
+
+                  {/* The question at the moment of purchase. Both buttons act on the charges
+                      the order just created; neither leaves the shop. */}
+                  <p className="text-xs font-bold text-[#0A1938] dark:text-slate-100 mb-2">
+                    {t(locale, 'billing.shop.payHow')}
+                  </p>
+                  <div className="flex gap-2 mb-3">
+                    <button
+                      type="button"
+                      data-testid="shop-pay-card"
+                      disabled={checkout.kind === 'settling'}
+                      onClick={onPayByCard}
+                      className="flex-1 bg-[#0056c5] hover:bg-blue-800 disabled:opacity-60 text-white font-bold py-3 rounded-xl text-xs transition shadow-xs active:scale-95 cursor-pointer"
+                    >
+                      {checkout.kind === 'settling'
+                        ? t(locale, 'billing.shop.paySending')
+                        : t(locale, 'billing.shop.payCard')}
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="shop-pay-cash"
+                      disabled={checkout.kind === 'settling'}
+                      onClick={onPayByCash}
+                      className="flex-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-60 text-slate-700 dark:text-slate-200 font-bold py-3 rounded-xl text-xs transition active:scale-95 cursor-pointer"
+                    >
+                      {t(locale, 'billing.shop.payCash')}
+                    </button>
+                  </div>
+
+                  {checkout.kind === 'settleFailed' ? (
+                    /* The ORDER stands. Saying otherwise would send a parent to place it a
+                       second time, and they would be charged twice for one delivery. */
+                    <p data-testid="shop-pay-failed" role="alert" className="text-[11px] text-red-700 dark:text-red-400 mb-3">
+                      {t(locale, 'billing.shop.payFailed')}
+                    </p>
+                  ) : null}
+
+                  <a href="#/payments" className="block text-center text-xs font-bold text-[#2563EB] mb-3">
+                    {t(locale, 'billing.shop.payLater')}
                   </a>
                   <button
                     type="button"

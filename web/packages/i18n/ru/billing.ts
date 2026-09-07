@@ -124,6 +124,17 @@ export const billing: Bundle = {
   'shop.placedTitle': 'Заказ отправлен в клуб',
   'shop.placedBody': 'Создано начислений: {{count}} на сумму {{total}}. Тренер передаст товары на ближайшей тренировке.',
   'shop.placedPay': 'Перейти к оплате',
+  // The choice at the moment of purchase (owner, 2026-09-07). Both routes existed on
+  // the payments screen and both take charge ids, so the shop offers them over the
+  // charges it just created rather than sending the parent to another screen.
+  'shop.payHow': 'Как вы оплатите заказ?',
+  'shop.payCard': 'Банковская карта',
+  'shop.payCash': 'Наличные в клубе',
+  'shop.paySending': 'Секунду…',
+  'shop.payLater': 'Позже, через экран платежей',
+  'shop.cashDoneTitle': 'Менеджер уведомлён',
+  'shop.cashDoneBody': 'Мы записали, что вы оплатите {{total}} наличными. Менеджер отметит поступление денег.',
+  'shop.payFailed': 'Не удалось перейти к оплате. Заказ сохранён — оплатить можно на экране платежей.',
   'shop.placedClose': 'Закрыть',
   'shop.checkoutFailed': 'Заказ не отправлен. Попробуйте ещё раз.',
   'shop.ordersCta': 'Мои заказы',

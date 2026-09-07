@@ -58,5 +58,17 @@ export type CartLine = {
 export type CheckoutState =
   | { kind: 'idle' }
   | { kind: 'sending' }
-  | { kind: 'placed'; lines: number; totalAgorot: number }
+  /**
+   * The order exists as charges. `chargeIds` is what makes the choice below possible:
+   * both payment routes — the card order and the cash promise — take charge ids and
+   * nothing else, so the shop can offer them without inventing a third path.
+   */
+  | { kind: 'placed'; lines: number; totalAgorot: number; chargeIds: readonly string[] }
+  /** A method was chosen and is being acted on. Distinct from `sending`, which is the
+   *  order itself: this one can fail while the order stands, and it must not read as
+   *  "your order failed". */
+  | { kind: 'settling'; lines: number; totalAgorot: number; chargeIds: readonly string[] }
+  /** Cash: the promise is raised and the manager has been told. */
+  | { kind: 'promised'; totalAgorot: number }
+  | { kind: 'settleFailed'; lines: number; totalAgorot: number; chargeIds: readonly string[] }
   | { kind: 'failed' }
