@@ -70,7 +70,7 @@ describe('ScheduleSection (staff)', () => {
     ).toBeInTheDocument()
   })
 
-  it('offers a way from היום to the date picker', async () => {
+  it('offers exactly one calendar door from היום', async () => {
     // 9b is reachable or it is not delivered. INVENTORY calls it "בחירת תאריך — יומן מלא,
     // טווח, קפיצה", which is a screen a coach opens from the day strip.
     render(
@@ -81,9 +81,14 @@ describe('ScheduleSection (staff)', () => {
         today="2026-11-03T12:00:00Z"
       />,
     )
-    const open = await screen.findByTestId('open-date-picker')
+    // ONE calendar door, not two (owner, 2026-09-07). The header used to carry
+    // `open-date-picker` -> 9b beside this one, and a header that offers the same errand
+    // twice makes a coach choose before they can do it. This is the month grid, which shows
+    // what is happening beyond tomorrow — the reason a coach opens a calendar at all.
+    const open = await screen.findByTestId('open-month-calendar')
     expect(open).toHaveAccessibleName()
-    expect(open).toHaveAttribute('href', '#/schedule/date')
+    expect(open).toHaveAttribute('href', '#/calendar')
+    expect(screen.queryByTestId('open-date-picker')).not.toBeInTheDocument()
   })
 
   it('returns to היום on the day a coach picks', async () => {

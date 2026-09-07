@@ -114,7 +114,6 @@ import type { CSSProperties, ReactNode } from 'react'
 import {
   AlertCircle,
   Ban,
-  Calendar as CalendarIcon,
   CalendarDays,
   CheckCircle2,
   ChevronLeft,
@@ -678,18 +677,16 @@ export function TodayScreen({
           `today-summary`. */}
       <header className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <a
-            href="#/schedule/date"
-            data-testid="open-date-picker"
-            aria-label={t(locale, 'schedule.datePicker.title')}
-            className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-xs border border-blue-100 active:scale-95 transition-all shrink-0"
-          >
-            <CalendarIcon className="w-5 h-5" aria-hidden="true" />
-          </a>
-          {/* §4.7 (checkpoint C11) — the month calendar, a separate door from the day
-              picker just above: that one opens 9b (pick a single day or a range within
-              roughly a week either side); this one opens the FULL month grid, the one
-              screen that can show a coach what is happening beyond tomorrow. */}
+          {/* ONE calendar door (owner, 2026-09-07). There were two side by side, and a
+              header that offers the same errand twice makes a coach choose between them
+              before they can do it. The one that went was `open-date-picker` -> 9b, the
+              older screen moved in here from `ScheduleSection`'s own header bar; this one
+              is §4.7's month grid, and it is the better of the two on its own terms — it
+              shows what is happening beyond tomorrow, which is the whole reason a coach
+              opens a calendar.
+              9b's extra half was a date RANGE, and losing it costs nothing: `ScheduleSection`
+              kept `range.from` and threw the end away ("היום shows one day"), so the range
+              picker was two inputs feeding one value the month grid supplies with a tap. */}
           <a
             href="#/calendar"
             data-testid="open-month-calendar"

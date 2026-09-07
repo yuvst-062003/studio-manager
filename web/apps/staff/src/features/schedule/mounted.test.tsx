@@ -83,8 +83,10 @@ describe('the staff app mounts lane SCHEDULE', () => {
     render(<App />)
 
     await waitFor(() => expect(screen.getByTestId('staff-today')).toBeInTheDocument())
-    // The half of the screen the tour cannot fake.
-    expect(screen.getByTestId('open-date-picker')).toBeInTheDocument()
+    // The half of the screen the tour cannot fake. Was `open-date-picker` until the
+    // duplicate calendar door was removed (owner, 2026-09-07); the month grid is the one
+    // that stayed.
+    expect(screen.getByTestId('open-month-calendar')).toBeInTheDocument()
   })
 
   it('renders 9b at #/schedule/date', async () => {
