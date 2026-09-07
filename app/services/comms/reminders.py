@@ -57,6 +57,14 @@ EVENT_KIND = "event.rsvp_reminder"
 #: under §5.11's `payment` switch with no edit there.
 PREPAY_ENDING_KIND = "billing.prepay_ending"
 
+#: Owner report #18 -- "nothing tells a parent they owe money". Its own kind for exactly the
+#: reason `PREPAY_ENDING_KIND` is: the rate limit is per (kind, subject), so sharing
+#: `DEBT_KIND` would let a manager's manual reminder pressed that morning swallow the monthly
+#: notice, and the monthly notice swallow a manual reminder for the rest of the day. Under
+#: `billing.` so `app/services/comms/kinds.py` puts it under §5.11's `payment` switch on the
+#: prefix, with no edit there.
+CHARGE_RAISED_KIND = "billing.charge_raised"
+
 
 class QuietHoursError(Exception):
     """No messages after 21:00. The refusal is the feature."""
@@ -199,6 +207,57 @@ class ReminderService:
             actor_person_id=actor_person_id,
             at=at,
             audit_action="billing.prepay_ending_notified",
+            audit_entity=("payer", first),
+        )
+
+    def remind_charge_raised(
+        self,
+        payer_person_ids: list[uuid.UUID],
+        *,
+        period: tuple[int, int],
+        actor_person_id: uuid.UUID | None,
+        at: datetime,
+    ) -> dict[str, int]:
+        """Owner report #18 -- the month's charge is waiting, said the day it is raised.
+
+        **The gap this closes.** §5.10 dues a tuition charge on `period_end`, the last day of
+        the month it bills, and the debt ladder starts three days after that. So a family
+        charged on 1 November first heard from the product on 3 December, and what it said was
+        that they were in arrears. Nothing said "there is a charge to pay" while there was
+        still a month to pay it in.
+
+        **Addressed to the payer, not to every guardian**, the same call `remind_debt` and
+        `remind_prepay_ending` both make (§6.3, one message per household). It matters more
+        here than for the debt ladder, which writes to every guardian: this notice carries a
+        payment action, and `app/services/comms/actions.py::InboxActionResolver` resolves that
+        action against the RECIPIENT's own balance -- so a non-paying guardian would be handed
+        a payment card marked already settled, for a debt nobody has paid.
+
+        `subject` is the period, so the rate limit is exact: a retried run on the same day is
+        silent, and next month is a different subject rather than a message the 24-hour window
+        happens to be past.
+
+        The body names no amount. §11.7 keeps money out of a payload copied to a push service,
+        and the number is on the payments screen the notification opens -- which is the screen
+        the report asked for, reached through the `payment` action kind rather than through a
+        `#/` path this service has no business naming.
+        """
+        recipients = set(
+            self.session.execute(select(Person.id).where(Person.id.in_(payer_person_ids))).scalars()
+        )
+        first = payer_person_ids[0] if payer_person_ids else uuid.uuid4()
+        year, month = period
+        label = f"{year:04d}-{month:02d}"
+        return self._send(
+            kind=CHARGE_RAISED_KIND,
+            recipients=recipients,
+            subject=label,
+            title="חיוב חדש לתשלום",
+            body="החיוב לחודש הזה נוסף לחשבון. אפשר לשלם דרך מסך התשלומים.",
+            payload={"period": label},
+            actor_person_id=actor_person_id,
+            at=at,
+            audit_action="billing.charge_raised_notified",
             audit_entity=("payer", first),
         )
 

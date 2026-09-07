@@ -92,6 +92,11 @@ class Tally:
     #: `undeliverable` is: a rung that silently sent nothing looks exactly like a month in
     #: which nobody's prepayment ended.
     prepay_deferred: int = 0
+    #: Owner report #18 -- households told the month's charge is waiting, on the day it was
+    #: raised rather than five weeks later.
+    charge_notices: int = 0
+    #: And the ones quiet hours refused, counted for the same reason `prepay_deferred` is.
+    charge_notices_deferred: int = 0
 
 
 def _notify(
@@ -241,6 +246,55 @@ def notify_prepay_ending(
     return tally
 
 
+def notify_charges_raised(
+    session: TenantSession, *, at: datetime, studio_id: uuid.UUID, tally: Tally | None = None
+) -> Tally:
+    """Owner report #18 -- "nothing tells a parent they owe money".
+
+    **The gap, precisely.** §5.10 dues a tuition charge on `period_end` -- the last day of the
+    month it bills -- and `escalate_debt` above starts three days after a charge passes its
+    due date. So a family charged on 1 November first heard from the product on 3 December,
+    and what it said was that they were in arrears. Nothing said "there is a charge to pay"
+    while there was still a month to pay it in, which is why the owner reported the product as
+    saying nothing at all.
+
+    **Same shape as rung zero, for the family rung zero excludes.**
+    `payers_whose_prepay_ends` skips anybody who owes money right now, and `payers_owing_for`
+    is only ever those who do -- so the two audiences are disjoint by construction and no
+    household hears both messages in one morning. Bounded to the run day for the same reason
+    rung zero is: "this family owes for November" stays true for thirty days, and a daily job
+    asking it without a bound sends thirty messages.
+
+    **`ReminderService`, not `_notify`.** The ladder above reaches
+    `NotificationService.enqueue` directly, so §5.4a's 21:00-08:00 refusal and the 24h rate
+    limit do not apply to it. This message goes through the service that enforces both. The
+    refusal is counted, never swallowed, and never fails the run: every state change the run
+    made already happened, and a message that did not go out is not a reason to leave a studio
+    unbilled.
+
+    Called AFTER `BillingRunService.run`, which is what makes the audience honest -- step 7
+    has spent every family's existing credit by then, so a household who paid ahead is already
+    settled and is not in the list.
+
+    `actor_person_id=None` because nobody pressed anything.
+    """
+    tally = tally or Tally()
+    payers = BillingRunService(session).payers_owing_for(
+        studio_id, period_year=at.year, period_month=at.month
+    )
+    if not payers:
+        return tally
+    try:
+        result = ReminderService(session).remind_charge_raised(
+            payers, period=(at.year, at.month), actor_person_id=None, at=at
+        )
+    except QuietHoursError:
+        tally.charge_notices_deferred += len(payers)
+        return tally
+    tally.charge_notices += result["sent"]
+    return tally
+
+
 # -- §5.10's 'IPN never arrives' row -------------------------------------------
 def sweep_stale_orders(
     session: Session, *, at: datetime, studio_id: uuid.UUID, tally: Tally | None = None
@@ -285,6 +339,10 @@ def run_daily(
     prepayment ending from something other than a debt reminder. Inlined in `main()`, that
     order was only assertable by opening a database, a scheduler and eight studios. Here a
     test can drive a month of mornings through the same code the cron drives.
+
+    `notify_charges_raised` sits beside rung zero for the same reason and under the same
+    condition: it is the run day's other message, to the households rung zero deliberately
+    excludes. Neither can precede the run, because both read what step 7 left behind.
     """
     tally = tally or Tally()
     if _is_run_day(session, studio_id, at.date()):
@@ -293,6 +351,7 @@ def run_daily(
         )
         tally.charges_created += run.charges_created
         notify_prepay_ending(session, at=at, tally=tally)
+        notify_charges_raised(session, at=at, studio_id=studio_id, tally=tally)
     escalate_debt(session, at=at, tally=tally)
     sweep_stale_orders(session, at=at, studio_id=studio_id, tally=tally)
     return tally
@@ -336,8 +395,18 @@ def _run_job() -> dict[str, int]:
         "undeliverable": tally.undeliverable,
         "prepay_notices": tally.prepay_notices,
         "prepay_deferred": tally.prepay_deferred,
+        "charge_notices": tally.charge_notices,
+        "charge_notices_deferred": tally.charge_notices_deferred,
     }
     logger.info("billing jobs complete", extra=counts)
+    if tally.charge_notices_deferred:
+        # Quiet hours refused them, exactly as they can refuse rung zero. Same reasoning, and
+        # the same fix: the cron hour, not a retry. WARNING so it is visible rather than
+        # inferred from a gap between `charge_notices` and the number of families billed.
+        logger.warning(
+            "charge notices refused by quiet hours",
+            extra={"charge_notices_deferred": tally.charge_notices_deferred},
+        )
     if tally.prepay_deferred:
         # Quiet hours refused them. Not a failure -- the run is complete and the credit is
         # spent -- but the households on rung zero were not told, and the fix is the cron

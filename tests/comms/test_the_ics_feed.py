@@ -19,7 +19,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from app.services.comms.ics import FeedEvent, fold, local_stamp, render_feed
+from app.services.comms.ics import (
+    DIRECTIONS_LABEL,
+    FeedEvent,
+    fold,
+    local_stamp,
+    render_feed,
+)
 from tests.comms.conftest import T0
 
 
@@ -39,6 +45,16 @@ def _event(**kwargs) -> FeedEvent:
 
 def _lines(ics: str) -> list[str]:
     return ics.split("\r\n")
+
+
+def _unfold(ics: str) -> str:
+    """RFC 5545 §3.1's unfolding, which is what a client does before reading a value.
+
+    A percent-encoded Hebrew address runs past 75 octets on its own, so every assertion
+    about a directions link has to read the value the way a calendar client reads it rather
+    than the way the file happens to be wrapped.
+    """
+    return ics.replace("\r\n ", "")
 
 
 # -- the calendar wrapper -----------------------------------------------------
@@ -205,9 +221,15 @@ def test_the_feed_carries_no_medical_and_no_financial_data() -> None:
     """§5.12, stated as a constraint on this renderer: "The feed contains no medical and no
     financial data."
 
-    `FeedEvent` has five text fields and none of them can hold a balance or a health flag,
+    `FeedEvent` has six text fields and none of them can hold a balance or a health flag,
     which is the durable version of that sentence -- the URL is unauthenticated and, once
     subscribed, is fetched by Google's servers on their schedule and outside our control.
+
+    `directions_url` was added for owner report #23 and is listed here deliberately rather
+    than waived: it is a maps link built from an address a manager typed into the club's own
+    settings, which is neither medical nor financial, and it is public information the club
+    prints on its front door. The set stays exhaustive so that the next field somebody adds
+    still has to argue for itself here.
     """
     assert set(FeedEvent.__dataclass_fields__) == {
         "uid",
@@ -217,6 +239,7 @@ def test_the_feed_carries_no_medical_and_no_financial_data() -> None:
         "location",
         "description",
         "cancelled",
+        "directions_url",
     }
 
 
@@ -225,3 +248,49 @@ def test_the_dtstamp_is_utc_because_it_is_not_a_wall_clock_time() -> None:
     human turns up at. §5.12 asks for Asia/Jerusalem on DTSTART and DTEND specifically."""
     ics = render_feed([_event()], name="ג", at=T0)
     assert f"DTSTAMP:{T0.strftime('%Y%m%dT%H%M%SZ')}" in ics
+
+
+# -- #23: a calendar entry that can send a parent to the club ------------------
+def test_a_session_carries_the_directions_link_as_a_url_property() -> None:
+    """Owner report #23 -- "calendar reminders carry no Waze / directions link".
+
+    RFC 5545 §3.8.4.6's `URL` is the property a calendar entry's associated link belongs in,
+    and it is a URI rather than TEXT: it is emitted verbatim, because TEXT escaping would
+    turn a `,` in a query string into `\\,` and hand the parent a broken link.
+    """
+    link = "https://waze.com/ul?q=%D7%94%D7%A8%D7%A6%D7%9C%201&navigate=yes"
+    ics = render_feed([_event(directions_url=link)], name="ג'ודו", at=T0)
+    assert f"URL:{link}" in _unfold(ics)
+
+
+def test_the_directions_link_is_repeated_in_the_description() -> None:
+    """`URL` is the correct property and is not the one every client shows.
+
+    Apple Calendar renders it; Google Calendar drops it on most import paths, and what
+    Google DOES render — auto-linked — is the description. A parent standing outside the
+    wrong building is not helped by the semantically correct field, so the link goes in
+    both and the description keeps whatever it already said.
+    """
+    link = "https://waze.com/ul?q=%D7%94&navigate=yes"
+    ics = _unfold(
+        render_feed([_event(description="מאמן: יוסי", directions_url=link)], name="ג", at=T0)
+    )
+    assert f"DESCRIPTION:מאמן: יוסי\\n{DIRECTIONS_LABEL} {link}" in ics
+
+
+def test_a_session_with_no_description_still_gets_one_for_the_link() -> None:
+    """§5.12's guardian sessions carry no description at all — `_guardian_sessions` passes
+    `description=None`. A link that only appeared beside an existing description would
+    therefore never reach the one kind of entry #23 was reported about."""
+    link = "https://waze.com/ul?q=%D7%94&navigate=yes"
+    ics = _unfold(render_feed([_event(description=None, directions_url=link)], name="ג", at=T0))
+    assert f"DESCRIPTION:{DIRECTIONS_LABEL} {link}" in ics
+
+
+def test_an_entry_with_no_address_carries_no_link_to_nowhere() -> None:
+    """The parent app's own rule, from `DirectionsActions.tsx`: "Nothing renders without an
+    address. A navigation link to an empty query opens a map of nowhere, which is worse than
+    saying the club has not set one." A feed cannot say anything, so it says nothing."""
+    ics = render_feed([_event(description=None, directions_url=None)], name="ג", at=T0)
+    assert not [line for line in _lines(ics) if line.startswith("URL:")]
+    assert not [line for line in _lines(ics) if line.startswith("DESCRIPTION:")]

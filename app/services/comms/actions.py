@@ -55,6 +55,19 @@ ACTION_BY_KIND: dict[str, str] = {
     "billing.reminder": "payment",
     "billing.prepay_ending": "payment",
     "billing.payment_failed": "payment",
+    # Owner report #18. The rung the monthly run raises on the day it raises a charge. The
+    # SERVER names the fact and the parent app's `features/comms/actionCatalogue.ts` maps
+    # `payment` to `#/payments`, so the button the owner asked for needs no client change --
+    # which is the whole reason this map is keyed on a kind rather than shipping a route.
+    #
+    # `billing.overdue.day3|7|14` are deliberately still absent. They are the same fact and
+    # they SHOULD carry the same button, but `app/workers/billing.py::_chase` sends them to
+    # every guardian rather than to the payer, and `_payment` below resolves `outstanding`
+    # against the recipient's own balance -- so mapping them today would put a settled-looking
+    # payment card in front of a second parent for a debt nobody has paid. Reported rather
+    # than fixed here: the fix is in who the ladder addresses, which is a change to shipped
+    # behaviour nobody asked for in this report.
+    "billing.charge_raised": "payment",
     "event.rsvp_reminder": "event_rsvp",
     "trial.followup": "trial_join",
 }

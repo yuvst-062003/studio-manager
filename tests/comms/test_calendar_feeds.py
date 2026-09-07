@@ -21,6 +21,7 @@ from datetime import timedelta
 
 from app.models.comms import CalendarFeed
 from app.models.events import Event, EventRegistration
+from app.services.comms.feeds import waze_url
 from sqlalchemy import select
 from tests.comms.conftest import T0
 
@@ -321,3 +322,131 @@ def test_rotating_a_feed_that_does_not_exist_is_a_404(client, as_guardian_of, a_
     parent = as_guardian_of(a_student)
     response = client.post(f"/api/v1/calendar-feeds/{uuid.uuid4()}/rotate", headers=parent.headers)
     assert response.status_code == 404
+
+
+# -- #23: the entry has to be able to send a family to the door ----------------
+def _body(client, app_session, caller, subject_type: str = "guardian") -> str:
+    """The feed as a calendar client reads it — fetched, then unfolded (RFC 5545 §3.1).
+
+    A percent-encoded Hebrew address runs past 75 octets on its own, so every one of these
+    assertions would be checking the wrapping rather than the value without this.
+    """
+    _feeds(client, caller)
+    raw = _fetch(client, _token_of(app_session, caller.person_id, subject_type)).text
+    return raw.replace("\r\n ", "")
+
+
+def test_a_lesson_carries_a_waze_link_to_the_hall_it_is_held_in(
+    client, app_session, as_guardian_of, an_enrolled_student, a_session
+) -> None:
+    """Owner report #23. The URL shape is the parent app's own, from
+    `web/apps/parent/src/features/people/redesign/DirectionsActions.tsx::routeLinks` — an
+    ordinary https universal link with `navigate=yes`, not a `waze://` scheme that opens
+    nothing when the app is absent."""
+    parent = as_guardian_of(an_enrolled_student)
+    body = _body(client, app_session, parent)
+    assert f"URL:{waze_url('הרצל 1, תל אביב')}" in body
+
+
+def test_the_hall_address_wins_over_the_clubs_own(
+    client, app_session, studio, as_guardian_of, an_enrolled_student, a_session
+) -> None:
+    """A club with a second hall is the whole reason `location.address` exists. Sending a
+    family to head office for a lesson held at the school down the road is the failure a
+    club-wide address would introduce."""
+    studio.settings = {"address": "ויצמן 3, רמת גן"}
+    app_session.commit()
+
+    parent = as_guardian_of(an_enrolled_student)
+    body = _body(client, app_session, parent)
+    assert waze_url("הרצל 1, תל אביב") in body
+    assert waze_url("ויצמן 3, רמת גן") not in body
+
+
+def test_a_hall_with_no_address_falls_back_to_the_clubs(
+    client, app_session, studio, as_guardian_of, an_enrolled_student, a_session
+) -> None:
+    """`location.address` is nullable and most clubs never fill it in. The address a manager
+    typed into settings — the one `#/directions` already shows the family — is the answer
+    when the room has none of its own."""
+    from app.models.schedule import Session as SessionRow
+    from app.models.structure import Location
+
+    location_id = app_session.get(SessionRow, a_session).location_id
+    app_session.get(Location, location_id).address = None
+    studio.settings = {"address": "ויצמן 3, רמת גן"}
+    app_session.commit()
+
+    parent = as_guardian_of(an_enrolled_student)
+    assert waze_url("ויצמן 3, רמת גן") in _body(client, app_session, parent)
+
+
+def test_a_club_that_has_set_no_address_anywhere_links_to_nowhere(
+    client, app_session, studio, as_guardian_of, an_enrolled_student, a_session
+) -> None:
+    """`DirectionsActions.tsx`: "Nothing renders without an address. A navigation link to an
+    empty query opens a map of nowhere, which is worse than saying the club has not set
+    one." The feed has no way to say so, so it emits no link at all."""
+    from app.models.schedule import Session as SessionRow
+    from app.models.structure import Location
+
+    location_id = app_session.get(SessionRow, a_session).location_id
+    app_session.get(Location, location_id).address = None
+    app_session.commit()
+
+    parent = as_guardian_of(an_enrolled_student)
+    body = _body(client, app_session, parent)
+    assert "BEGIN:VEVENT" in body
+    assert "URL:" not in body
+
+
+def test_a_coach_covering_a_lesson_gets_the_same_link(
+    client, app_session, as_assistant_coach, a_staffed_session, a_session, a_coached_group
+) -> None:
+    """A substitute is the person in the product who most needs directions: §5.12 gives them
+    the session precisely because they staff one lesson and belong to no group."""
+    a_staffed_session(as_assistant_coach.person_id, is_substitute=True)
+    body = _body(client, app_session, as_assistant_coach, "coach")
+    assert f"URL:{waze_url('הרצל 1, תל אביב')}" in body
+
+
+def test_an_event_at_someone_elses_dojo_navigates_there_and_not_to_the_club(
+    client, app_session, studio, as_guardian_of, an_enrolled_student
+) -> None:
+    """§5.8's `location_text` is free text precisely because a competition is at somebody
+    else's dojo. Handing a family the club's own address for it would be worse than no link:
+    they would arrive somewhere, confidently, on the wrong side of town."""
+    studio.settings = {"address": "ויצמן 3, רמת גן"}
+    event = Event(
+        studio_id=studio.id,
+        type="competition",
+        title="אליפות החורף",
+        starts_at=T0 + timedelta(days=20),
+        ends_at=T0 + timedelta(days=20, hours=5),
+        location_text="היכל הספורט, תל אביב",
+        status="published",
+    )
+    app_session.add(event)
+    app_session.flush()
+    app_session.add(
+        EventRegistration(
+            studio_id=studio.id, event_id=event.id, student_id=an_enrolled_student, rsvp="yes"
+        )
+    )
+    app_session.commit()
+
+    parent = as_guardian_of(an_enrolled_student)
+    body = _body(client, app_session, parent)
+    assert waze_url("היכל הספורט, תל אביב") in body
+    assert waze_url("ויצמן 3, רמת גן") not in body
+
+
+def test_the_link_is_byte_for_byte_the_one_the_parent_app_builds() -> None:
+    """One URL shape, not two. `routeLinks` in the parent app encodes with
+    `encodeURIComponent`, whose unreserved set keeps `!*'()` where Python's `quote` would
+    percent-encode them — so the `safe=` argument is what makes the two strings identical
+    rather than merely equivalent. A family comparing the link in their calendar with the
+    one on the הוראות הגעה screen should not find two different URLs."""
+    assert waze_url("Rothschild Blvd (Bldg. 3!), Tel Aviv") == (
+        "https://waze.com/ul?q=Rothschild%20Blvd%20(Bldg.%203!)%2C%20Tel%20Aviv&navigate=yes"
+    )

@@ -41,6 +41,15 @@ from app.services.events.ics import as_utc_stamp, escape_text
 
 JERUSALEM = ZoneInfo("Asia/Jerusalem")
 
+#: What the directions link is called where a client renders the description as prose.
+#:
+#: Hebrew here rather than in `web/packages/i18n/he/comms.ts` because there is no client to
+#: translate it: this string is baked into a file Google fetches on its own schedule and
+#: renders in whatever calendar the family already uses. Nothing in the request says who is
+#: reading -- the URL is unauthenticated by design -- so the studio's own language is the
+#: only one available, and §9's three locales have nowhere to be chosen between.
+DIRECTIONS_LABEL = "ניווט:"
+
 #: Israel's own clock-change rules, from tzdata's `Zion` zone.
 #:
 #: **The EU rule is close and wrong.** Israel springs forward on the FRIDAY BEFORE the last
@@ -79,7 +88,7 @@ VTIMEZONE_ASIA_JERUSALEM = (
 class FeedEvent:
     """One row in a subscribed calendar.
 
-    Five text fields and a flag, and that is the whole shape. §5.12 forbids medical and
+    Six text fields and a flag, and that is the whole shape. §5.12 forbids medical and
     financial data in the feed, and a structure with nowhere to put either is a stronger
     guarantee than a rule somebody has to remember when they add a column.
     """
@@ -95,6 +104,18 @@ class FeedEvent:
     #: §5.12 puts the coach here.
     description: str | None = None
     cancelled: bool = False
+    #: Owner report #23 -- "calendar reminders carry no Waze / directions link". A maps
+    #: handoff for the address this entry is held at, built by
+    #: `app/services/comms/feeds.py::waze_url` in the parent app's own URL shape.
+    #:
+    #: **Not medical and not financial**, which is the only test §5.12 sets for a field in
+    #: this structure. It is an address a manager typed into the club's settings -- the same
+    #: one `#/directions` already shows every family, and the one printed on the club's
+    #: front door.
+    #:
+    #: `None` when nothing knows an address. See `_event_lines`: a link to an empty query
+    #: opens a map of nowhere, which is worse than no link at all.
+    directions_url: str | None = None
 
 
 def local_stamp(moment: datetime) -> str:
@@ -160,8 +181,26 @@ def _event_lines(event: FeedEvent, *, at: datetime) -> list[str]:
     # line in some clients and as a location named "" in others.
     if event.location:
         lines.append(f"LOCATION:{escape_text(event.location)}")
-    if event.description:
-        lines.append(f"DESCRIPTION:{escape_text(event.description)}")
+    if event.directions_url:
+        # RFC 5545 §3.8.4.6. A URI value, NOT a TEXT one -- so it is emitted verbatim rather
+        # than through `escape_text`, which would turn a `,` in a query string into `\,` and
+        # hand the parent a link that opens nothing.
+        lines.append(f"URL:{event.directions_url}")
+    # **The same link twice, on purpose.** `URL` is the property this belongs in and is not
+    # the property every client shows: Apple Calendar renders it, Google drops it on most
+    # import paths and auto-links the description instead. Owner report #23 is a parent
+    # standing outside the wrong building, and being semantically correct in a field their
+    # calendar does not draw would not have helped them.
+    description = "\n".join(
+        part
+        for part in (
+            event.description,
+            f"{DIRECTIONS_LABEL} {event.directions_url}" if event.directions_url else None,
+        )
+        if part
+    )
+    if description:
+        lines.append(f"DESCRIPTION:{escape_text(description)}")
     lines.append("END:VEVENT")
     return lines
 
@@ -193,6 +232,7 @@ def render_feed(events: Sequence[FeedEvent], *, name: str, at: datetime) -> str:
 
 
 __all__ = [
+    "DIRECTIONS_LABEL",
     "JERUSALEM",
     "VTIMEZONE_ASIA_JERUSALEM",
     "FeedEvent",

@@ -23,13 +23,14 @@ from __future__ import annotations
 import secrets
 import uuid
 from datetime import datetime, timedelta
+from urllib.parse import quote
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.db import get_engine
-from app.core.tenancy import TenantSession
+from app.core.tenancy import TenantSession, require_current_studio_id
 from app.models.comms import CalendarFeed
 from app.models.events import Event, EventRegistration
 from app.models.people import Enrollment, Student
@@ -37,6 +38,7 @@ from app.models.person import Guardian, Person
 from app.models.schedule import Session as SessionRow
 from app.models.schedule import SessionStaff
 from app.models.structure import Class, Group, Location
+from app.models.studio import Studio
 from app.services.comms.errors import FeedNotFoundError
 from app.services.comms.ics import FeedEvent
 
@@ -55,9 +57,53 @@ LOOK_AHEAD = timedelta(days=365)
 #: treated as an identifier and logged, and it carries a third of the entropy.
 TOKEN_BYTES = 32
 
+#: The characters JavaScript's `encodeURIComponent` leaves alone and Python's `quote` does
+#: not. `quote` already spares `-_.~`; these five are the whole remaining difference, and
+#: naming them is what lets `waze_url` produce the byte-for-byte string the parent app does.
+_ENCODE_URI_COMPONENT_SAFE = "!*'()"
+
 
 def new_token() -> str:
     return secrets.token_urlsafe(TOKEN_BYTES)
+
+
+def waze_url(address: str) -> str:
+    """Owner report #23 -- a calendar entry that can send a family to the club.
+
+    **The parent app's URL shape, reused rather than reinvented.**
+    `web/apps/parent/src/features/people/redesign/DirectionsActions.tsx::routeLinks` already
+    builds this string for the הוראות הגעה button, and its own header says why it is an
+    ordinary https universal link: `waze://` opens nothing when the app is absent -- a dead
+    tap with no error, the worst of the three outcomes -- while `https://waze.com/ul` is
+    taken by the installed app and handled by a browser otherwise. `navigate=yes` starts the
+    route rather than only dropping a pin.
+
+    **`safe="!*'()"` is what makes the two strings identical rather than merely equivalent.**
+    JavaScript's `encodeURIComponent` leaves those five characters alone and Python's `quote`
+    percent-encodes them, so without this a street name with a parenthesis produces two
+    different URLs for one address -- and the one place a family would notice is the one
+    place it matters, comparing the link in their calendar against the button in the app.
+    """
+    encoded = quote(address, safe=_ENCODE_URI_COMPONENT_SAFE)
+    return f"https://waze.com/ul?q={encoded}&navigate=yes"
+
+
+def directions_url(*candidates: str | None) -> str | None:
+    """A maps link for the first address anything actually knows, or None.
+
+    `DirectionsActions.tsx` states the rule this enforces: "Nothing renders without an
+    address. A navigation link to an empty query opens a map of nowhere, which is worse than
+    saying the club has not set one." A feed has no way to say the club has not set one, so
+    when nothing knows an address it emits no link at all.
+
+    Blank-but-present is treated as absent. `location.address` and `studio.settings.address`
+    are both free text a manager typed, and a field they opened and left empty is not an
+    address.
+    """
+    for candidate in candidates:
+        if isinstance(candidate, str) and candidate.strip():
+            return waze_url(candidate.strip())
+    return None
 
 
 def feed_url(token: str) -> str:
@@ -182,6 +228,27 @@ class CalendarFeedService:
             return self._coach_sessions(person_id, window)
         return self._guardian_sessions(person_id, window) + self._guardian_events(person_id, window)
 
+    def _club_address(self) -> str | None:
+        """The address a manager typed into settings, or None.
+
+        `studio.settings["address"]` and not a column: `app/services/structure/logo.py`
+        already serves it to the parent app's הוראות הגעה screen from the same key, and §4.3
+        pins the studio's COLUMN list while "settings includes:" is deliberately open. Read
+        once per feed render rather than per event -- a year of sessions is one row's worth
+        of address.
+
+        Read through `Session.get` on the tenant session: `studio` is the tenant rather than
+        a tenant-scoped table, so it carries no `studio_id` for the filter to match on, and
+        `require_current_studio_id` is the same primary key `app/routers/studio.py` reads it
+        by. It fails closed with no studio in context, which is what the caller wants -- the
+        feed route enters `use_studio` before any of this runs.
+        """
+        studio = self._session.get(Studio, require_current_studio_id())
+        if studio is None:
+            return None
+        address = (studio.settings or {}).get("address")
+        return address if isinstance(address, str) else None
+
     def _guardian_sessions(
         self, person_id: uuid.UUID, window: tuple[datetime, datetime]
     ) -> list[FeedEvent]:
@@ -190,7 +257,14 @@ class CalendarFeedService:
         `SUMMARY` names the CHILD -- §5.12's example is `דנה · ג'ודו/מתחילים` -- because a
         family with two children in different groups is looking at one calendar and needs to
         know which lesson is whose.
+
+        **`LOCATION` is the room's NAME and the directions link is its ADDRESS** (owner report
+        #23). Keeping them apart is the point: `אולם ראשי` is what a parent reads at a glance
+        and navigates nowhere, and an address pasted into `SUMMARY` or `LOCATION` to make it
+        tappable would make every row in the calendar unreadable to buy one that was already
+        available as a link.
         """
+        club_address = self._club_address()
         rows = self._session.execute(
             select(SessionRow, Person, Class, Group, Location)
             .join(Enrollment, Enrollment.group_id == SessionRow.group_id)
@@ -217,6 +291,13 @@ class CalendarFeedService:
                 location=location.name if location is not None else None,
                 description=None,
                 cancelled=session_row.status == "cancelled",
+                # The HALL's own address first. A club with a second hall is the whole reason
+                # `location.address` exists, and sending a family to head office for a lesson
+                # held at the school down the road is the failure a club-wide address would
+                # introduce. Most clubs never fill it in, which is what the fallback is for.
+                directions_url=directions_url(
+                    location.address if location is not None else None, club_address
+                ),
             )
             for session_row, child, class_row, group, location in rows
         ]
@@ -234,6 +315,7 @@ class CalendarFeedService:
         `fee_agorot` is on `event` and is deliberately not read -- §5.12 forbids financial data
         in the feed.
         """
+        club_address = self._club_address()
         rows = self._session.execute(
             select(Event, Location)
             .join(EventRegistration, EventRegistration.event_id == Event.id)
@@ -258,6 +340,16 @@ class CalendarFeedService:
                 location=event.location_text or (location.name if location else None),
                 description=event.description,
                 cancelled=event.status == "cancelled",
+                # `location_text` FIRST, and this is the one place the order matters more than
+                # it does for a lesson: §5.8's free-text venue exists because a competition is
+                # at somebody else's dojo, so navigating to the club instead would be worse
+                # than no link -- the family would arrive somewhere, confidently, on the wrong
+                # side of town.
+                directions_url=directions_url(
+                    event.location_text,
+                    location.address if location is not None else None,
+                    club_address,
+                ),
             )
             for event, location in rows
         ]
@@ -273,7 +365,12 @@ class CalendarFeedService:
         `SUMMARY` is the GROUP and never a child's name. A roster does not belong in a
         subscribed calendar that syncs to a personal phone and is fetched indefinitely by
         Google.
+
+        The directions link is here for the same reason the sessions themselves are: a
+        substitute covering one lesson is the person in the product who most needs to be told
+        where the hall is.
         """
+        club_address = self._club_address()
         rows = self._session.execute(
             select(SessionRow, Class, Group, Location)
             .join(SessionStaff, SessionStaff.session_id == SessionRow.id)
@@ -296,6 +393,9 @@ class CalendarFeedService:
                 location=location.name if location is not None else None,
                 description=None,
                 cancelled=session_row.status == "cancelled",
+                directions_url=directions_url(
+                    location.address if location is not None else None, club_address
+                ),
             )
             for session_row, class_row, group, location in rows
         ]

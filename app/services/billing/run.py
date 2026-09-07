@@ -198,6 +198,50 @@ class BillingRunService:
         )
         return counter.charged - before
 
+    def payers_owing_for(
+        self, studio_id: uuid.UUID, *, period_year: int, period_month: int
+    ) -> list[uuid.UUID]:
+        """Every payer left owing money on a charge for one period. Owner report #18.
+
+        **Asked of the ledger, not of the run.** A run that crashed halfway and is retried
+        must reach the same families as one that did not, and only the charges know which
+        those are -- the same argument `_open_run` makes for keying idempotency on the unique
+        index rather than on the run's own bookkeeping.
+
+        **Asked AFTER step 7, which is what makes it honest.** `run()` raises every charge and
+        then spends existing credit against them inside one transaction, so a family who
+        handed over three months of cash is charged like everybody else and settled from their
+        own money before this question is put. Asking "who was charged" would message them;
+        asking "who is left owing" does not. §5.10's own rule: a family who has paid ahead
+        must never, at any instant, read as owing money.
+
+        `amount_agorot > 0` for the same reason `escalate_debt` filters on it: a credit is a
+        negative charge, and chasing a family for a discount the club granted them is the most
+        avoidable message in the product. `status == 'open'` excludes `settled`, and excludes
+        `written_off` and `void`, which are decisions a manager made.
+
+        Scoped to the PERIOD just billed. Last month's arrears are §5.10's day 3/7/14 ladder's
+        conversation, and two mechanisms speaking about the same money in the same week is how
+        a family stops reading either.
+
+        Sorted, so a run is reproducible and the audit row it produces names a stable first
+        subject -- `PrepayService.payers_whose_prepay_ends` sorts for the same reason.
+        """
+        return sorted(
+            set(
+                self._session.execute(
+                    select(Charge.payer_person_id).where(
+                        Charge.studio_id == studio_id,
+                        Charge.period_year == period_year,
+                        Charge.period_month == period_month,
+                        Charge.status == "open",
+                        Charge.amount_agorot > 0,
+                    )
+                ).scalars()
+            ),
+            key=str,
+        )
+
     # -- internals ------------------------------------------------------------
     def _apply_credit(self, tally: _Tally) -> None:
         """**Step 7 -- spend money that has already arrived.**
