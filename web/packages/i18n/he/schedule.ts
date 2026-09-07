@@ -626,7 +626,7 @@ export const schedule: Bundle = {
   // Named for the banner it was written for; `HomeSchedule` reuses it as a plain
   // bullet between a location and a coach, which is why it outlived the banner.
   'home.urgentSeparator': ' • ',
-  'home.allChildren': 'כל הילדים',
+  'home.allChildren': 'כל התלמידים',
   // -- the week strip. `weekStripLabel` names the landmark for a screen reader; the port
   //    first fell back to the day headline, which reads as a date rather than a control --
   'home.weekStripLabel': 'בחירת יום',

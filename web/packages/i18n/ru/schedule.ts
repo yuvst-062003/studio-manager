@@ -542,7 +542,7 @@ export const schedule: Bundle = {
   // Named for the banner it was written for; `HomeSchedule` reuses it as a plain
   // bullet between a location and a coach, which is why it outlived the banner.
   'home.urgentSeparator': ' • ',
-  'home.allChildren': 'Все дети',
+  'home.allChildren': 'Все ученики',
   'home.weekStripLabel': 'Выбор дня',
   'home.monthButton': 'Месяц',
   'home.monthButtonTitle': 'Открыть календарь на месяц',

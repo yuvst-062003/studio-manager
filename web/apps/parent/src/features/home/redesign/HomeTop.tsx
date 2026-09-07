@@ -80,7 +80,11 @@ export function HomeTop({
           עדכונים, which is a tab with its own badge. A permanent red block on the screen a
           parent opens to see when their child trains is an alarm that stops being read. */}
 
-      {/* Trainee Filter Chips Strip */}
+      {/* Owner-reported 2026-09-07: with ONE child this strip offered "כל הילדים 1" beside
+          that child's own name — two chips selecting the identical single trainee, and a
+          filter that can only ever filter to everything. Drawn only when there is more
+          than one child to choose between. */}
+      {childList.length > 1 ? (
       <div
         role="group"
         aria-label={t(locale, 'schedule.home.allChildren')}
@@ -135,6 +139,7 @@ export function HomeTop({
           )
         })}
       </div>
+      ) : null}
     </header>
   )
 }

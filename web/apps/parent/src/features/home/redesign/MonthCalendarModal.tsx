@@ -156,7 +156,9 @@ export function MonthCalendarModal({
         </div>
 
         {/* The same child filter the screen behind carries, so opening the modal does not
-            silently widen what you were looking at. */}
+            silently widen what you were looking at — and hidden on the same rule, so the
+            two agree: with one child there is nothing to filter between. */}
+        {childList.length > 1 ? (
         <div role="group" aria-label={t(locale, 'schedule.home.allChildren')} className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
           <button
             type="button"
@@ -199,6 +201,7 @@ export function MonthCalendarModal({
             </button>
           ))}
         </div>
+        ) : null}
 
         {/* The grid. A real table would be better for a screen reader, but the prototype
             draws a grid of buttons and the port keeps it — so the group carries a name and
