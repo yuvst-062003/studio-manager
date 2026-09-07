@@ -374,3 +374,134 @@ def test_a_negative_month_count_is_refused(
             prepay_months=-1,
             at=T0,
         )
+
+
+# -- "if they owe it, they can pay it" -----------------------------------------
+#
+# The guard above is right about a settled order and right about money that actually
+# arrived. It was wrong about the case it fires on most often: the SAME parent, coming
+# back to the SAME month, after closing the uPay tab without paying.
+#
+# What that refusal produced was a screen saying "you owe ₪208.33" above a button that
+# could not pay ₪208.33 — for a day or two in production, until the nightly sweep, and
+# for ever on staging, where `billing-run` is not scheduled at all
+# (infra/railway/jobs.json). The owner met it on their own account and could not read
+# their way out of it, which is the whole reason this exists.
+#
+# So the payer's own abandoned order is REPLACED rather than refused. The only thing
+# still protected is the window where money may already be moving: uPay's IPN lands
+# about five minutes after a real payment, so an order opened moments ago is left alone.
+def test_a_payers_own_abandoned_order_is_replaced_rather_than_refused(
+    tenant_session, studio, a_priced_student, three_open_months
+):
+    """A parent who closed the tab and came back must be able to pay the month they owe.
+
+    The first order is superseded rather than left holding the charge: two live orders
+    over one charge is the double-payment shape this whole section exists to prevent.
+    """
+    service = OrderService(tenant_session)
+    abandoned = service.create(
+        studio.id,
+        payer_person_id=a_priced_student.payer_person_id,
+        charge_ids=[three_open_months[0]],
+        max_payments=1,
+        at=T0,
+    )
+    fresh = service.create(
+        studio.id,
+        payer_person_id=a_priced_student.payer_person_id,
+        charge_ids=[three_open_months[0]],
+        max_payments=1,
+        at=T0 + timedelta(minutes=11),
+    )
+    assert fresh.id != abandoned.id
+    assert fresh.status == "pending"
+    assert abandoned.status == "expired"
+
+
+def test_an_order_opened_moments_ago_is_left_alone(
+    tenant_session, studio, a_priced_student, three_open_months
+):
+    """uPay's IPN arrives about five minutes after a real payment
+    (upay-integration.md). Replacing an order inside that window is the one way this
+    flow can take a family's money twice: the first payment settles against an order
+    we have already expired, and the second charges them again for the same month.
+    """
+    service = OrderService(tenant_session)
+    service.create(
+        studio.id,
+        payer_person_id=a_priced_student.payer_person_id,
+        charge_ids=[three_open_months[0]],
+        max_payments=1,
+        at=T0,
+    )
+    with pytest.raises(ConflictError):
+        service.create(
+            studio.id,
+            payer_person_id=a_priced_student.payer_person_id,
+            charge_ids=[three_open_months[0]],
+            max_payments=1,
+            at=T0 + timedelta(minutes=2),
+        )
+
+
+@pytest.mark.parametrize("held", ["paid", "amount_mismatch"])
+def test_an_order_money_arrived_against_is_never_replaced(
+    tenant_session, studio, a_priced_student, three_open_months, held
+):
+    """Neither of these is abandoned. `paid` settled the month; `amount_mismatch` means
+    real money arrived at the wrong amount and a human has to look at it. Replacing
+    either would offer the family a month they have already handed money over for.
+    """
+    service = OrderService(tenant_session)
+    order = service.create(
+        studio.id,
+        payer_person_id=a_priced_student.payer_person_id,
+        charge_ids=[three_open_months[0]],
+        max_payments=1,
+        at=T0,
+    )
+    order.status = held
+    tenant_session.flush()
+    with pytest.raises(ConflictError):
+        service.create(
+            studio.id,
+            payer_person_id=a_priced_student.payer_person_id,
+            charge_ids=[three_open_months[0]],
+            max_payments=1,
+            at=T0 + timedelta(days=1),
+        )
+
+
+def test_a_month_held_only_by_the_payers_own_abandoned_order_reads_as_payable(
+    tenant_session, studio, a_priced_student, three_open_months
+):
+    """The read side of the same rule, and the half the screen depends on.
+
+    `create` accepting the charge while `covered_charge_ids` still calls it covered would
+    grey the row out on a screen whose button pays it — the exact contradiction the old
+    screen showed. Asked WITHOUT a payer (the manager's listing) the answer is unchanged:
+    an order still holds its charge, and a manager looking at the ledger should see that.
+    """
+    service = OrderService(tenant_session)
+    service.create(
+        studio.id,
+        payer_person_id=a_priced_student.payer_person_id,
+        charge_ids=[three_open_months[0]],
+        max_payments=1,
+        at=T0,
+    )
+    later = T0 + timedelta(minutes=11)
+    assert service.covered_charge_ids(list(three_open_months)) == {three_open_months[0]}
+    assert (
+        service.covered_charge_ids(
+            list(three_open_months),
+            payer_person_id=a_priced_student.payer_person_id,
+            at=later,
+        )
+        == set()
+    )
+    selectable = service.selectable_charges(
+        studio.id, payer_person_id=a_priced_student.payer_person_id, at=later
+    )
+    assert three_open_months[0] in [row.id for row in selectable]

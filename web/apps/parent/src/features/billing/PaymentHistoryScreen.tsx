@@ -196,7 +196,7 @@ function filterLabel(locale: Locale, filter: Filter): string {
  * renders as מזומן and says nothing about how it actually arrived, which is exactly the
  * fact §10 added `cheque` to stop losing.
  */
-function methodKey(method: PaymentOut['method']): string {
+export function methodKey(method: PaymentOut['method']): string {
   return method === 'upay_card'
     ? 'card'
     : method === 'standing_order'

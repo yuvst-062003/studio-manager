@@ -47,16 +47,25 @@ ORDER_TTL_HOURS = 24
 #: `payment_order.prepay_months`.
 MAX_PREPAY_MONTHS = 12
 
+#: How long one of the payer's OWN pending orders is left alone before a fresh attempt may
+#: replace it. See `_replaceable_order_ids`: this is the window in which money may already
+#: be moving, and it is the whole of what the replacement rule still refuses.
+#:
+#: uPay's IPN lands about five minutes after a real payment (upay-integration.md). Ten
+#: minutes is that, doubled, because the cost of the two errors is not symmetric: too long
+#: and a parent waits a few minutes before retrying, too short and the IPN settles an order
+#: we have already expired while the family is being charged a second time for the month.
+REPLACE_GRACE_MINUTES = 10
+
 #: The statuses that still hold a claim on a charge. `failed` and `expired` release theirs.
 #: `amount_mismatch` KEEPS its claim: real money arrived against that order, and offering
 #: the same charges for a second card payment before a human has looked would invite the
 #: family to pay twice for one month.
+#:
+#: `ChargeOut.is_covered_elsewhere` is the same predicate seen from the read side, which is
+#: why this is one public tuple and not two hand-copied ones that would drift the moment a
+#: sixth order status appears.
 HOLDING_STATUSES = ("pending", "paid", "amount_mismatch")
-
-#: Kept as a private alias so the existing call sites below read unchanged. The public name
-#: exists because `ChargeOut.is_covered_elsewhere` is the same predicate seen from the read
-#: side, and two hand-copied tuples would drift the moment a sixth order status appears.
-_HOLDING_STATUSES = HOLDING_STATUSES
 
 
 class MerchantEmailMissingError(RuntimeError):
@@ -80,8 +89,104 @@ class OrderService:
         self._session = session
 
     # -- selection -------------------------------------------------------------
+    # -- whose claim is real, and whose is only an abandoned tab ---------------
+    def _replaceable_order_ids(
+        self, *, payer_person_id: uuid.UUID, charge_ids: Sequence[uuid.UUID], at: datetime
+    ) -> set[uuid.UUID]:
+        """The payer's own pending orders over these charges that a fresh attempt may take.
+
+        **"If they owe it, they can pay it."** The double-payment guard was written against
+        a stranger's order and against money that had arrived, and it is right about both.
+        The case it actually fired on was neither: the same parent, the same month, back
+        after closing the uPay tab. It left a screen saying "you owe X" above a button that
+        could not pay X -- for a day or two in production, until `sweep_stale_orders`, and
+        for ever on staging, where `billing-run` is not a scheduled job at all
+        (infra/railway/jobs.json).
+
+        Three conditions, and each one is load-bearing:
+
+        * `status == 'pending'` -- `paid` settled the month and `amount_mismatch` means real
+          money arrived at the wrong amount and a human must look. Neither is abandoned, and
+          `HOLDING_STATUSES` keeps them holding.
+        * the payer is the caller -- a charge is owed by one person, so this is belt and
+          braces rather than the primary check, but the primary check is in `create` and
+          this method is also read by projections that never call it.
+        * it was opened more than `REPLACE_GRACE_MINUTES` ago.
+
+        **Age is read from `expires_at`, not `created_at`.** `expires_at` is written from
+        the `at` the caller passed, so it moves with `app.core.clock.now()` and with
+        `X-Dev-Now`; `created_at` is a database default and would make this rule untestable
+        against an injected clock -- a test pinned to November would compare a row stamped
+        with the wall clock and pass for the wrong reason. A NULL `expires_at` is left alone
+        for the same reason `expire_stale` skips it: an order nothing can date is an order
+        nothing should quietly discard.
+        """
+        if not charge_ids:
+            return set()
+        opened_at = PaymentOrder.expires_at - timedelta(hours=ORDER_TTL_HOURS)
+        return set(
+            self._session.execute(
+                select(PaymentOrder.id)
+                .join(PaymentOrderCharge, PaymentOrderCharge.payment_order_id == PaymentOrder.id)
+                .where(
+                    PaymentOrder.status == "pending",
+                    PaymentOrder.payer_person_id == payer_person_id,
+                    PaymentOrder.expires_at.is_not(None),
+                    opened_at <= at - timedelta(minutes=REPLACE_GRACE_MINUTES),
+                    PaymentOrderCharge.charge_id.in_(charge_ids),
+                )
+            ).scalars()
+        )
+
+    def _claims(
+        self,
+        charge_ids: Sequence[uuid.UUID],
+        *,
+        payer_person_id: uuid.UUID | None,
+        at: datetime | None,
+    ) -> set[uuid.UUID]:
+        """Which of these charges are held by a claim the given viewer cannot take over.
+
+        With no payer this is `HOLDING_STATUSES` and nothing else -- the manager's view, and
+        what every caller got before replacement existed. With a payer and a clock, the
+        payer's own abandoned orders stop counting, so that a row this returns is exactly a
+        row `create` would refuse for that person. Two spellings of "covered" that could
+        disagree is how a screen comes to grey out a charge its own button pays.
+        """
+        if not charge_ids:
+            return set()
+        replaceable: set[uuid.UUID] = set()
+        if payer_person_id is not None and at is not None:
+            replaceable = self._replaceable_order_ids(
+                payer_person_id=payer_person_id, charge_ids=charge_ids, at=at
+            )
+        return self._claimed_charge_ids(charge_ids, ignoring=replaceable)
+
+    def _claimed_charge_ids(
+        self, charge_ids: Sequence[uuid.UUID], *, ignoring: set[uuid.UUID]
+    ) -> set[uuid.UUID]:
+        """`HOLDING_STATUSES` over these charges, minus the orders named in `ignoring`.
+
+        Split out of `_claims` because `create` has already worked out which orders it is
+        about to supersede and must not ask a second time: the two answers are what it
+        refuses on and what it expires, and a second query between them is a second chance
+        for them to disagree.
+        """
+        rows = self._session.execute(
+            select(PaymentOrderCharge.charge_id, PaymentOrder.id)
+            .join(PaymentOrder, PaymentOrder.id == PaymentOrderCharge.payment_order_id)
+            .where(
+                PaymentOrder.status.in_(HOLDING_STATUSES),
+                PaymentOrderCharge.charge_id.in_(charge_ids),
+            )
+        ).all()
+        # A charge may be named by more than one order -- an abandoned attempt and a later
+        # one that settled. It is covered if ANY order still holding it is one this viewer
+        # cannot take over, which is why the partition is per row and not per charge.
+        return {charge_id for charge_id, order_id in rows if order_id not in ignoring}
+
     def selectable_charges(
-        self, studio_id: uuid.UUID, *, payer_person_id: uuid.UUID
+        self, studio_id: uuid.UUID, *, payer_person_id: uuid.UUID, at: datetime | None = None
     ) -> list[Charge]:
         """§5.10 -- 'the N oldest unpaid tuition charges **across every student this person
         is the payer for**'.
@@ -89,15 +194,13 @@ class OrderService:
         Oldest first, which is what `billing.card.oldestFirst` states on the screen and what
         `1b`'s own spec notes the artboard leaves implicit.
 
-        Excludes anything already covered by an open or paid order: §5.10's primary
+        Excludes anything covered by a claim this payer cannot take over: §5.10's primary
         double-payment guard, and the one that works no matter which route the parent uses.
+        `at` is what tells their own abandoned attempt apart from everyone else's claim --
+        omitted, every holding order counts, which is the behaviour this had before
+        replacement existed.
         """
-        claimed = (
-            select(PaymentOrderCharge.charge_id)
-            .join(PaymentOrder, PaymentOrder.id == PaymentOrderCharge.payment_order_id)
-            .where(PaymentOrder.status.in_(_HOLDING_STATUSES))
-        )
-        return list(
+        rows = list(
             self._session.execute(
                 select(Charge)
                 .where(
@@ -106,13 +209,24 @@ class OrderService:
                     Charge.status == "open",
                     # A credit is a negative charge and there is nothing to pay on it.
                     Charge.amount_agorot > 0,
-                    Charge.id.notin_(claimed),
                 )
                 .order_by(Charge.due_date, Charge.id)
             ).scalars()
         )
+        covered = self._claims(
+            [row.id for row in rows],
+            payer_person_id=payer_person_id if at is not None else None,
+            at=at,
+        )
+        return [row for row in rows if row.id not in covered]
 
-    def covered_charge_ids(self, charge_ids: Sequence[uuid.UUID]) -> set[uuid.UUID]:
+    def covered_charge_ids(
+        self,
+        charge_ids: Sequence[uuid.UUID],
+        *,
+        payer_person_id: uuid.UUID | None = None,
+        at: datetime | None = None,
+    ) -> set[uuid.UUID]:
         """Which of these charges are already claimed by an open or paid order.
 
         The read-side twin of `selectable_charges`'s `notin_(claimed)`. That method answers
@@ -128,18 +242,7 @@ class OrderService:
         An empty input short-circuits. `IN ()` is legal SQL for SQLAlchemy to emit but the
         round trip is pure cost on the common case of a family with nothing outstanding.
         """
-        if not charge_ids:
-            return set()
-        return set(
-            self._session.execute(
-                select(PaymentOrderCharge.charge_id)
-                .join(PaymentOrder, PaymentOrder.id == PaymentOrderCharge.payment_order_id)
-                .where(
-                    PaymentOrder.status.in_(HOLDING_STATUSES),
-                    PaymentOrderCharge.charge_id.in_(charge_ids),
-                )
-            ).scalars()
-        )
+        return self._claims(charge_ids, payer_person_id=payer_person_id, at=at)
 
     def has_active_subscription(self, payer_person_id: uuid.UUID) -> bool:
         """§5.10's second double-payment protection, and it is a **warning, not a block**.
@@ -211,16 +314,13 @@ class OrderService:
                 f"max_payments={max_payments}: the merchant account offers 1..{MAX_INSTALLMENTS}"
             )
 
-        claimed = set(
-            self._session.execute(
-                select(PaymentOrderCharge.charge_id)
-                .join(PaymentOrder, PaymentOrder.id == PaymentOrderCharge.payment_order_id)
-                .where(
-                    PaymentOrder.status.in_(_HOLDING_STATUSES),
-                    PaymentOrderCharge.charge_id.in_(charge_ids),
-                )
-            ).scalars()
+        # The payer's own abandoned attempts do not count against them, and the orders that
+        # do not count are exactly the ones this call is about to expire. Both sets come
+        # from one read so they cannot disagree.
+        superseded = self._replaceable_order_ids(
+            payer_person_id=payer_person_id, charge_ids=charge_ids, at=at
         )
+        claimed = self._claimed_charge_ids(charge_ids, ignoring=superseded)
         total = 0
         charges: list[Charge] = []
         for charge_id in charge_ids:
@@ -255,6 +355,21 @@ class OrderService:
             # `payment_order_amount_positive` is the CHECK; this is the same rule with a
             # message, and it catches a selection that is all credits.
             raise RefusedError("an order for nothing would open uPay for zero shekels")
+
+        # Superseding happens only once every refusal above has been passed. An order this
+        # call goes on to reject -- somebody else's charge in the basket, an instalment
+        # count the merchant account does not offer -- must leave the parent's earlier
+        # attempt exactly as it found it.
+        #
+        # A superseded order is released whole, including any charge the new basket does
+        # not name: it was abandoned, `sweep_stale_orders` would have released it anyway,
+        # and half-expiring an order would leave a row whose charges nobody can account for.
+        if superseded:
+            for stale in self._session.execute(
+                select(PaymentOrder).where(PaymentOrder.id.in_(superseded))
+            ).scalars():
+                stale.status = "expired"
+            self._session.flush()
 
         order = PaymentOrder(
             studio_id=studio_id,

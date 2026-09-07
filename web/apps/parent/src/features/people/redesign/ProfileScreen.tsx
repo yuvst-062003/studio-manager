@@ -23,6 +23,7 @@ import { ProfileHeader } from './ProfileTop'
 import { ProfileMenu } from './ProfileMenu'
 import type { MenuKey } from './ProfileMenu'
 import { ClubSheet, PaymentsSheet, SettingsSheet, TraineesSheet } from './sheets'
+import type { ChequeRoute, MandateLinkRow } from './sheets'
 import { PersonalDetailsSheet } from './PersonalDetails'
 import { Sheet } from './Sheet'
 import { SheetFailed } from './SheetFailed'
@@ -44,6 +45,21 @@ type StudentRow = {
   group_names?: string[]
 }
 
+/** `/me/payment-promises` on the wire, narrowed to what this screen reads: which method a
+ *  family pays by, and whether a cheque promise is already with the manager. */
+type PromiseRow = {
+  id: string
+  status: 'pending' | 'received' | 'declined'
+  method: string
+  total_agorot: number
+  claimed_plan_id: string | null
+  decided_at: string | null
+}
+
+/** `/me/charges?status=open`, narrowed to what a cheque promise needs: which charges it
+ *  settles, and what they come to. */
+type OpenCharge = { id: string; amount_agorot: number }
+
 export function ProfileScreen({
   locale,
   onLocaleChange,
@@ -63,6 +79,17 @@ export function ProfileScreen({
   const [methodLabel, setMethodLabel] = useState<string | null>(null)
   const [methodIsCard, setMethodIsCard] = useState(false)
   const [charges, setCharges] = useState<readonly CoverageCharge[] | null>(null)
+  // ── אמצעי תשלום, moved here from the payments screen on 2026-09-07 ──────────────────
+  // הוראת קבע and צ׳קים are both set up ONCE — a mandate moves the money by itself and a
+  // season of cheques is handed over in one go — so neither is a monthly decision and
+  // neither belongs on the screen that asks "what do I owe right now".
+  const [mandateLinks, setMandateLinks] = useState<readonly MandateLinkRow[]>([])
+  const [chequeTerms, setChequeTerms] = useState<{ months: number; monthlyAgorot: number } | null>(
+    null,
+  )
+  const [openCharges, setOpenCharges] = useState<readonly OpenCharge[] | null>(null)
+  const [promises, setPromises] = useState<readonly PromiseRow[] | null>(null)
+  const [chequeBusy, setChequeBusy] = useState(false)
 
   const [open, setOpen] = useState<MenuKey | 'settings' | null>(null)
   const [savingDetails, setSavingDetails] = useState(false)
@@ -169,11 +196,63 @@ export function ProfileScreen({
       .then(async (response) => {
         if (!live) return
         if (!response.ok) return setFailed((current) => ({ ...current, money: true }))
-        const body = (await response.json()) as { items?: { method?: string | null }[] }
-        const method = body.items?.[0]?.method ?? null
+        const body = (await response.json()) as { items?: PromiseRow[] }
+        const rows = body.items ?? []
+        setPromises(rows)
+        const method = rows[0]?.method ?? null
         setMethodLabel(method ? t(locale, `billing.method.${method}`) : null)
         // The PCI note is only true for a card payer; see `PaymentsSheet`.
         setMethodIsCard(method === 'upay_card' || method === 'card')
+      })
+      .catch(() => live && setFailed((current) => ({ ...current, money: true })))
+
+    // Read LIVE on every visit, and deliberately outside any precache: a stale roster is
+    // an inconvenience, a stale mandate link sends a family to sign at the wrong amount and
+    // nobody finds out until the reconciliation queue disagrees months later.
+    void apiFetch('/api/v1/me/standing-order-links')
+      .then(async (response) => {
+        if (!live) return
+        if (!response.ok) return setFailed((current) => ({ ...current, money: true }))
+        const body = (await response.json()) as {
+          items: { student_name: string; plan_name: string; amount_agorot: number; url: string }[]
+        }
+        setMandateLinks(
+          body.items.map((row) => ({
+            studentName: row.student_name,
+            planName: row.plan_name,
+            amountAgorot: row.amount_agorot,
+            url: row.url,
+          })),
+        )
+      })
+      .catch(() => live && setFailed((current) => ({ ...current, money: true })))
+
+    // The club's cheque term and this payer's monthly price. Read rather than computed:
+    // `months × monthly` is integer arithmetic on money (G2) and the server is the one
+    // place that holds both numbers.
+    void apiFetch('/api/v1/me/prepay-terms')
+      .then(async (response) => {
+        if (!live) return
+        if (!response.ok) return setFailed((current) => ({ ...current, money: true }))
+        const body = (await response.json()) as {
+          cheque_prepay_months: number
+          monthly_total_agorot: number
+        }
+        setChequeTerms({
+          months: body.cheque_prepay_months,
+          monthlyAgorot: body.monthly_total_agorot,
+        })
+      })
+      .catch(() => live && setFailed((current) => ({ ...current, money: true })))
+
+    // The charges a cheque promise would settle. `?status=open` and not the unfiltered read
+    // below: a promise raised over a settled charge is one a manager has to decline.
+    void apiFetch('/api/v1/me/charges?status=open')
+      .then(async (response) => {
+        if (!live) return
+        if (!response.ok) return setFailed((current) => ({ ...current, money: true }))
+        const body = (await response.json()) as { items: OpenCharge[] }
+        setOpenCharges(body.items)
       })
       .catch(() => live && setFailed((current) => ({ ...current, money: true })))
 
@@ -208,6 +287,63 @@ export function ProfileScreen({
   )
 
   const money = useCallback((agorot: number) => formatAgorot(agorot), [])
+
+  /**
+   * The cheque route's whole state, or `null` while its own reads are in flight.
+   *
+   * `null` rather than zeroes: a button priced at nothing raises a promise for nothing,
+   * which a manager then has to decline — and the family has no idea why.
+   */
+  const cheque: ChequeRoute | null = useMemo(() => {
+    if (chequeTerms === null || openCharges === null || promises === null) return null
+    // One live promise at a time across BOTH routes — the service refuses a second over
+    // the same charges, so a button that still offered itself would be offering a 409. A
+    // plan CLAIM names no charge and must not lock this: a family whose claim waits with
+    // the manager can still hand over cheques.
+    const pending =
+      promises.find((row) => row.status === 'pending' && row.claimed_plan_id === null) ?? null
+    const latestDecided =
+      promises.find((row) => row.method === 'cheque' && row.decided_at !== null) ?? null
+    return {
+      months: chequeTerms.months,
+      monthlyTotalAgorot: chequeTerms.monthlyAgorot,
+      openAgorot: openCharges.reduce((sum, charge) => sum + charge.amount_agorot, 0),
+      chargeIds: openCharges.map((charge) => charge.id),
+      pendingAgorot: pending?.method === 'cheque' ? pending.total_agorot : null,
+      blocked: pending !== null && pending.method !== 'cheque',
+      declined: pending === null && latestDecided?.status === 'declined',
+      busy: chequeBusy,
+      onRequest: () => {
+        if (chequeBusy) return
+        setChequeBusy(true)
+        void apiFetch('/api/v1/me/payment-promises', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            charge_ids: openCharges.map((charge) => charge.id),
+            method: 'cheque',
+            // A COUNT, never an amount: the server prices the months from the payer's own
+            // monthly total, the same way the card and cash routes do.
+            prepay_months: chequeTerms.monthlyAgorot > 0 ? chequeTerms.months : 0,
+            // "I will bring them", not "I already did". Different claims to a manager.
+            already_paid: false,
+            claimed_plan_id: null,
+          }),
+        })
+          .then((response) => {
+            setChequeBusy(false)
+            if (!response.ok) return setFailed((current) => ({ ...current, money: true }))
+            // Re-read rather than patch the row in: the promise's own total is priced by
+            // the server, and a locally-invented one is a second place money is computed.
+            retry()
+          })
+          .catch(() => {
+            setChequeBusy(false)
+            setFailed((current) => ({ ...current, money: true }))
+          })
+      },
+    }
+  }, [chequeTerms, openCharges, promises, chequeBusy, retry])
 
   const saveDetails = useCallback((next: MyDetails) => {
     setSavingDetails(true)
@@ -296,6 +432,8 @@ export function ProfileScreen({
           onRetry={retry}
           methodLabel={methodLabel}
           methodIsCard={methodIsCard}
+          mandateLinks={mandateLinks}
+          cheque={cheque}
           money={money}
           monthLabel={(year, month) => formatMonthLabel(year, month, locale)}
           onClose={close}

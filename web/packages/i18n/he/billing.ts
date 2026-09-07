@@ -489,4 +489,46 @@ export const billing: Bundle = {
   'unpriced.noPayer': 'אין הורה משלם',
   'unpriced.since': 'הצטרפו ב־{date}',
   'unpriced.open': 'לכרטיס החניך',
+
+  // ── תשלומים, rebuilt 2026-09-07 ──────────────────────────────────────────────
+  //
+  // The screen answers "do I owe money, and how do I pay it right now", and the copy is
+  // built around the three rules that make it honest:
+  //
+  //  1. `pay.owed` labels a number that NEVER moves. Choosing a method does not change
+  //     what the family owes, so the debt has its own word and the button has another.
+  //  2. `pay.payCard`/`pay.payCash` carry `{{total}}`, because the button must state what
+  //     it is about to charge. 'לתשלום' with the figure somewhere above it is the shape
+  //     that let ₪208.33 owed sit over buttons offering ₪500, ₪750 and ₪3,000.
+  //  3. When the figure jumps, a line says why — and `pay.cashTerm` names the CLUB as the
+  //     one who chose three months, because it is the club's rule and not the parent's.
+  'pay.title': 'תשלומים',
+  'pay.owed': 'יש לשלם',
+  'pay.months': '{{count}} חודשים',
+  'pay.months.one': 'חודש אחד',
+  'pay.clearTitle': 'אין חוב פתוח',
+  'pay.clearBody': 'כל מה שנפתח עד היום שולם. אפשר גם לשלם חודשים מראש.',
+  'pay.howTitle': 'איך תשלמו?',
+  'pay.methodCard': 'אשראי',
+  'pay.methodCash': 'מזומן',
+  'pay.monthsTitle': 'כמה חודשים?',
+  // The "why the number jumped" line, card side. The parent chose this one.
+  'pay.forward': '{{count}} חודשים קדימה',
+  'pay.forward.one': 'חודש אחד קדימה',
+  // …and cash side, where the club chose it. Naming the club is the point: the screen
+  // stopped presenting the club's collection rule as if it were the parent's choice.
+  'pay.cashTerm': 'המועדון גובה {{count}} חודשים מראש במזומן',
+  'pay.cashTerm.one': 'המועדון גובה חודש אחד מראש במזומן',
+  'pay.cashNote': 'המועדון ירשום את התשלום כשהכסף יתקבל.',
+  'pay.payCard': 'לתשלום {{total}}',
+  'pay.payCash': 'אשלם במזומן {{total}}',
+  'pay.working': 'רגע…',
+  'pay.nothingPayable': 'אין כרגע חיוב שאפשר לשלם.',
+  'pay.covered': 'תשלום שכבר נפתח מכסה {{total}}',
+  'pay.failed': 'לא הצלחנו להמשיך לתשלום. נסו שוב.',
+  'pay.paidAhead': 'שולם מראש',
+  'pay.lastPayment': 'התשלום האחרון',
+  'pay.noPayments': 'אין עדיין תשלומים',
+  'pay.allPayments': 'כל התשלומים',
+  'pay.secureNote': 'עסקה מאובטחת ע״פ תקן PCI-DSS',
 }

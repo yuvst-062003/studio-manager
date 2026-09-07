@@ -10,7 +10,7 @@ what proves the rename was a rename.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from app.models.billing import Charge, Payment, PaymentAllocation, PricePlan
@@ -19,8 +19,8 @@ from app.models.person import Person, RoleAssignment
 from app.schemas.billing import ManualPaymentIn, PaymentOut
 from app.services.billing import BillingService
 from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
+from app.services.billing.orders import REPLACE_GRACE_MINUTES, OrderService
 from app.services.billing.payment_promise import PaymentPromiseService
-from app.services.billing.orders import OrderService
 from app.services.billing.payments import PaymentService
 from sqlalchemy import select
 from tests.billing.conftest import MONTHLY_AGOROT, T0
@@ -556,3 +556,36 @@ def test_a_charge_under_an_open_card_order_cannot_also_be_promised_as_cash(
             charge_ids=[charge_id],
             at=T0,
         )
+
+
+def test_a_charge_under_the_payers_OWN_abandoned_card_order_can_be_promised_as_cash(
+    tenant_session, app_session, studio, a_priced_student
+):
+    """The other half of "if they owe it, they can pay it" (owner asked, 2026-09-07).
+
+    The refusal above is right while the card payment may still be in flight, and wrong
+    once it plainly is not. A parent who opened uPay, closed it, and came back to say
+    "cash" instead was told their own abandoned tab had already covered the month -- so
+    the cash route was shut too, and the family had no way at all to pay what the screen
+    said they owed until the nightly sweep ran. On staging `billing-run` is not scheduled
+    (infra/railway/jobs.json), so the sweep never ran and the block was permanent.
+
+    `REPLACE_GRACE_MINUTES` is the whole of what is still refused, and the test above
+    holds that line: inside the window the answer is still ConflictError.
+    """
+    charge_id = _charge(app_session, studio, a_priced_student, 9)
+    OrderService(tenant_session).create(
+        studio.id,
+        payer_person_id=a_priced_student.payer_person_id,
+        charge_ids=[charge_id],
+        max_payments=1,
+        at=T0,
+    )
+    promise = PaymentPromiseService(tenant_session).create(
+        studio.id,
+        payer_person_id=a_priced_student.payer_person_id,
+        charge_ids=[charge_id],
+        at=T0 + timedelta(minutes=REPLACE_GRACE_MINUTES + 1),
+    )
+    assert promise.status == "pending"
+    assert promise.total_agorot == MONTHLY_AGOROT

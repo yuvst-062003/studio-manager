@@ -149,13 +149,28 @@ def _charge_out(
     )
 
 
-def _charge_page(session: TenantSessionDep, pairs: list[tuple[Charge, int]]) -> list[ChargeOut]:
+def _charge_page(
+    session: TenantSessionDep,
+    pairs: list[tuple[Charge, int]],
+    *,
+    payer_person_id: uuid.UUID | None = None,
+) -> list[ChargeOut]:
     """§5.10's covered-elsewhere flag, resolved once per page rather than once per row.
 
     Both charge listings need it and neither should issue a query per row: `12f` renders a
     year of charges, so a per-row lookup is twelve round trips to answer one question.
+
+    `payer_person_id` is the person READING, and passing it is what makes the flag mean
+    "you cannot pay this" rather than "an order exists". Their own abandoned attempt is one
+    `OrderService.create` would take over, so a screen told it was covered would grey out a
+    row its own button pays. Omitted for the manager's ledger, where an order holding a
+    charge is a fact worth seeing.
     """
-    covered = OrderService(session).covered_charge_ids([charge.id for charge, _ in pairs])
+    covered = OrderService(session).covered_charge_ids(
+        [charge.id for charge, _ in pairs],
+        payer_person_id=payer_person_id,
+        at=now() if payer_person_id is not None else None,
+    )
     return [
         _charge_out(charge, allocated, is_covered_elsewhere=charge.id in covered)
         for charge, allocated in pairs
@@ -788,14 +803,15 @@ def my_charges(
     allocations: a client rendering `amount_agorot` alone shows a part-paid charge as
     wholly outstanding.
     """
+    caller = _caller(request)
     pairs, next_cursor = BillingService(session).list_charges(
-        payer_person_id=_caller(request),
+        payer_person_id=caller,
         status=charge_status,
         after=after,
         limit=limit,
     )
     return ChargePage(
-        items=_charge_page(session, pairs),
+        items=_charge_page(session, pairs, payer_person_id=caller),
         next_cursor=next_cursor,
         has_more=next_cursor is not None,
     )

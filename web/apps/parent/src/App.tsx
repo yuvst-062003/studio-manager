@@ -81,10 +81,7 @@ import { ProfileScreen } from './features/people/redesign/ProfileScreen'
 import { StudentCardSection } from './features/people/StudentCardSection'
 import { registerBillingSections } from './features/billing/StudentCardBillingSection'
 import { DirectionsScreen } from './features/people/DirectionsScreen'
-// §5.10's payments tab. Mounted here because nothing imported it: `PaymentsScreen` is
-// artboard `12f`, the subject of E2E-3 and E2E-4, and it was unreachable in a running app.
-import { PaymentsSection } from './features/billing/PaymentsSection'
-// `12f` behind the hash PaymentsSection already links to, and §5.10's return leg (P1).
+// `12f` behind the hash the payments tab links to, and §5.10's return leg (P1).
 import { PaymentHistorySection } from './features/billing/PaymentHistorySection'
 import { PaymentCompleteSection } from './features/billing/PaymentCompleteSection'
 // The training-plan screen, per child. `#/plan/<studentId>` for the same reason `#/belts/`
@@ -97,6 +94,7 @@ import { TrainingPlanSection } from './features/billing/TrainingPlanSection'
 import type { MandateLink } from './features/billing/billingClient'
 import { makeParentBillingClient } from './features/billing/PaymentsSection'
 import { ClubShop } from './features/billing/redesign/ClubShop'
+import { ParentPayments } from './features/billing/redesign/ParentPayments'
 // §6.1 step 6 — the BLOCKING declaration. Mounted here because nothing imported it
 // (HB-w6-health-gate-unmounted): the gate, the form and the pad were built and tested in
 // W3 and a guardian with an unsigned declaration still reached home.
@@ -815,7 +813,10 @@ function AuthedApp() {
             // No `access.parent` guard needed and none added: the routes behind this
             // screen resolve the payer from the session, so a person with no charges sees
             // an empty state rather than somebody else's money.
-            <PaymentsSection locale={locale} />
+            // The 2026-09-07 rebuild. `PaymentsScreen` + `PaymentsSection` are replaced by
+            // the screen that answers one question; both stay on disk until it is accepted
+            // end to end, the same way `ShopSection` and `ProfileSection` did.
+            <ParentPayments locale={locale} />
           ) : planStudentId ? (
             // Same reasoning as the payments screen above: the route resolves the family
             // from the session, so a student id that is not this caller's child answers

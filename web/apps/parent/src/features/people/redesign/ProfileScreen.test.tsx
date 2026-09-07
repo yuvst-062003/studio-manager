@@ -204,3 +204,102 @@ describe('the accessibility menu inside הגדרות', () => {
     expect(screen.getByText(t('he', 'common.a11y.statement.title'))).toBeInTheDocument()
   })
 })
+
+// הוראת קבע and צ׳קים moved here from תשלומים on 2026-09-07. Both are set up ONCE — a
+// mandate moves the money by itself and a season of cheques is handed over in one go — so
+// neither is a monthly decision, and on the payments screen they competed every month with
+// the one that is.
+describe('אמצעי תשלום, moved into the תשלומים sheet', () => {
+  const LINK = {
+    student_name: 'יובל כהן',
+    plan_name: 'פעמיים בשבוע',
+    amount_agorot: 25_000,
+    url: 'https://pay.example.invalid/mandate/1',
+  }
+
+  /** Every read answers something real, so the sheet draws both routes. */
+  function stubMoney() {
+    const calls: { url: string; init?: RequestInit }[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        calls.push({ url, init })
+        const body = url.includes('/me/standing-order-links')
+          ? JSON.stringify({ items: [LINK] })
+          : url.includes('/me/prepay-terms')
+            ? JSON.stringify({
+                cash_prepay_months: 3,
+                cheque_prepay_months: 12,
+                monthly_total_agorot: 25_000,
+              })
+            : url.includes('/me/charges?status=open')
+              ? JSON.stringify({ items: [{ id: 'ch-1', amount_agorot: 20_833 }] })
+              : url.includes('/me/balance')
+                ? JSON.stringify({ balance_agorot: 20_833, open_charge_count: 1, credit_agorot: 0 })
+                : '{"items":[]}'
+        return new Response(body, { status: 200 })
+      }),
+    )
+    return calls
+  }
+
+  async function openPayments() {
+    renderScreen()
+    await userEvent.click(await screen.findByTestId('profile-row-payments'))
+    return screen.findByTestId('sheet-payments')
+  }
+
+  it('offers one mandate link per child, at the amount it will charge', async () => {
+    // A uPay shared link is fixed at ONE amount and the page it opens does not say which,
+    // so a bare link has a family sign one mandate and underpay for the other child every
+    // month. The name and the figure beside it are the whole reason it is a list.
+    stubMoney()
+    const sheet = await openPayments()
+    expect(sheet).toContainElement(screen.getByTestId('sheet-payments-standing-order'))
+    const link = screen.getByTestId('sheet-standing-order-link')
+    expect(link).toHaveAttribute('href', LINK.url)
+    // Opens away from the app, so following it does not lose פרופיל.
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(screen.getByTestId('sheet-standing-order-row')).toHaveTextContent('יובל כהן')
+    expect(screen.getByTestId('sheet-standing-order-row')).toHaveTextContent('250₪')
+  })
+
+  it('prices the cheque route as open charges PLUS the club’s term', async () => {
+    // ₪208.33 open and twelve months at ₪250.00. Shown broken down rather than as one
+    // figure, because ₪3,208.33 with no explanation is the number a parent phones about.
+    stubMoney()
+    await openPayments()
+    expect(screen.getByTestId('sheet-cheque-total')).toHaveTextContent('3,208.33₪')
+    expect(screen.getByTestId('sheet-cheque-term')).toBeInTheDocument()
+  })
+
+  it('raises a cheque promise over the open charges and the term', async () => {
+    const calls = stubMoney()
+    await openPayments()
+    await userEvent.click(screen.getByTestId('sheet-cheque-request'))
+    await waitFor(() => {
+      const posted = calls.find(
+        (call) => call.url.includes('/me/payment-promises') && call.init?.method === 'POST',
+      )
+      expect(posted, 'no cheque promise was raised — the manager would never hear').toBeDefined()
+      const body = JSON.parse(String(posted!.init!.body))
+      expect(body.charge_ids).toEqual(['ch-1'])
+      expect(body.method).toBe('cheque')
+      // A COUNT, never an amount: the server prices the months from the payer's own total.
+      expect(body.prepay_months).toBe(12)
+      expect(body.already_paid).toBe(false)
+    })
+  })
+
+  it('no longer sends a parent to the payments screen to arrange a method', async () => {
+    // That screen answers "what do I owe right now". Pointing at it from here was pointing
+    // at the wrong place the moment these two routes moved.
+    stubMoney()
+    const sheet = await openPayments()
+    const method = screen.getByTestId('sheet-payments-method')
+    expect(sheet).toContainElement(method)
+    expect(method.querySelector('a[href="#/payments"]')).toBeNull()
+  })
+})

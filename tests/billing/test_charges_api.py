@@ -8,8 +8,12 @@ assertion that it does not.
 
 from __future__ import annotations
 
+from datetime import date, timedelta
+
 import pytest
-from tests.billing.conftest import MONTHLY_AGOROT
+from app.models.billing import Charge
+from app.services.billing.orders import REPLACE_GRACE_MINUTES, OrderService
+from tests.billing.conftest import MONTHLY_AGOROT, PERIOD, T0
 
 
 def test_a_manager_lists_the_charges_a_payer_owes(
@@ -479,3 +483,62 @@ def test_a_payer_reads_the_same_flag_on_their_own_charges(
     assert response.status_code == 200, response.text
     rows = response.json()["items"]
     assert rows == [] or all("is_covered_elsewhere" in row for row in rows)
+
+
+def test_a_month_held_only_by_the_callers_own_abandoned_order_reads_as_payable(
+    client, as_manager, as_guardian_of, a_priced_student, app_session, studio, tenant_session
+):
+    """The seam, not the service (owner asked, 2026-09-07).
+
+    `OrderService.create` now takes over the payer's own abandoned order rather than
+    refusing it, and `covered_charge_ids` agrees when it is told who is asking. Neither is
+    worth anything unless `/me/charges` passes the caller down: a screen that greys the row
+    out has a button under it that would pay, which is exactly the contradiction the old
+    payments screen showed -- ₪208.33 owed, and nothing on the page able to pay it.
+
+    The manager's `/charges` is asserted in the same test and deliberately answers the OTHER
+    way. An order holds its charge and the ledger should say so; only the person who opened
+    that order gets to take it over.
+    """
+    parent = as_guardian_of(a_priced_student.student_id)
+    charge = Charge(
+        studio_id=studio.id,
+        payer_person_id=parent.person_id,
+        student_id=a_priced_student.student_id,
+        kind="tuition",
+        period_year=PERIOD[0],
+        period_month=PERIOD[1],
+        amount_agorot=MONTHLY_AGOROT,
+        due_date=date(2026, 11, 30),
+        status="open",
+        created_by="billing_run",
+    )
+    app_session.add(charge)
+    app_session.commit()
+
+    OrderService(tenant_session).create(
+        studio.id,
+        payer_person_id=parent.person_id,
+        charge_ids=[charge.id],
+        max_payments=1,
+        at=T0,
+    )
+    tenant_session.commit()
+
+    # Past the grace window, on the ONE clock: `X-Dev-Now` is what moves `now()`, and the
+    # rule reads an order's age from `expires_at`, which was written from the same clock.
+    later = {"X-Dev-Now": (T0 + timedelta(minutes=REPLACE_GRACE_MINUTES + 1)).isoformat()}
+
+    mine = client.get("/api/v1/me/charges", headers={**parent.headers, **later})
+    assert mine.status_code == 200, mine.text
+    rows = {row["id"]: row["is_covered_elsewhere"] for row in mine.json()["items"]}
+    assert rows[str(charge.id)] is False
+
+    ledger = client.get(
+        "/api/v1/charges",
+        params={"payer_person_id": str(parent.person_id)},
+        headers={**as_manager.headers, **later},
+    )
+    assert ledger.status_code == 200, ledger.text
+    seen = {row["id"]: row["is_covered_elsewhere"] for row in ledger.json()["items"]}
+    assert seen[str(charge.id)] is True

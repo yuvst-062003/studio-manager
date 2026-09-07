@@ -2,7 +2,7 @@
 # comments across a round-trip, so every explanation belongs in a `why:` or
 # `source:` field rather than in a comment that would silently disappear.
 version: 1
-updated: 2026-09-06
+updated: 2026-09-07
 waves:
   - id: W0
     milestone: M0
@@ -819,6 +819,43 @@ waves:
           and C are recorded in the spec's Provenance table rather than discarded.
         status: shipped
         on: 2026-09-01
+      - id: S5b
+        title: Screen 5, rebuilt — one question, one honest button
+        why: >-
+          S5 kept B's spirit inside a constraint that has since been re-read. §5.10 asks
+          that no route be HIDDEN and that no payment mode be stored on a person; it does
+          not ask that four routes compete on one screen every month. הוראת קבע and צ׳קים
+          are both arranged once — a mandate moves the money by itself and a season of
+          cheques is handed over in one go — so they moved to פרופיל → תשלומים, under
+          אמצעי תשלום, with the `/me/standing-order-links` read that feeds them. Both are
+          still reachable, still visible, and still stored nowhere.
+
+          What is left answers one question, and the three rules that make it honest are
+          the whole of the rebuild. The debt leads and never moves: choosing a method or a
+          number of months cannot change what the family owes, which the old screen let it
+          do. The button states the amount it is about to charge, computed once in `pay.ts`
+          where a test holds it — the failure it replaces was ₪208.33 owed above buttons
+          offering ₪500, ₪750 and ₪3,000, none of them the debt. And when that amount
+          jumps, a line says why; on the cash side it names the CLUB as the one who chose
+          three months, because it is the club's collection rule and the screen had been
+          presenting it as the parent's choice.
+
+          The instalment picker S5 left open is gone rather than restyled. It was the
+          second of two stacked segmented controls on a screen whose point is that there is
+          one question, and no order this screen opens asks uPay for more than one payment.
+
+          One behaviour changed underneath it, and it is why the owner could not pay their
+          own ₪208.33 at all: `OrderService.create` refused a charge covered by ANY holding
+          order, including the payer's own abandoned tab. It now supersedes that order
+          instead — marked `expired`, an existing status, so no migration and no contract
+          change — outside a ten-minute window in which uPay's IPN may still be in flight.
+          `paid` and `amount_mismatch` keep their claim, because money arrived. The read
+          side agrees when it is told who is asking, so a row the screen greys out is
+          exactly a row the server would decline; and the cash route reads the same rule,
+          because a family whose card page has just failed them is exactly the family that
+          reaches for cash.
+        status: shipped
+        on: 2026-09-07
       - id: S6
         title: Screen 6 — calendar
         status: pending

@@ -129,7 +129,13 @@ class PaymentPromiseService:
         # of NotificationService below.
         from app.services.billing.orders import OrderService
 
-        covered = OrderService(self._session).covered_charge_ids(charge_ids)
+        # The payer and the clock are what make this the SAME rule as the card route's
+        # rather than a stricter one. Without them a family whose own uPay tab was closed
+        # unpaid lost the cash route too, and cash is exactly where a parent goes when the
+        # card page has just failed them.
+        covered = OrderService(self._session).covered_charge_ids(
+            charge_ids, payer_person_id=payer_person_id, at=at
+        )
 
         already_pending = set(
             self._session.execute(
