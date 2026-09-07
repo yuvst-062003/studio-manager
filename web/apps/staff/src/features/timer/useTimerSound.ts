@@ -9,7 +9,7 @@
 // nothing for the rest of the workout without the resume in `ensureAudio`. `ensureAudio`
 // is called from `useTimerEngine`'s `start`, which only ever runs from the play button's
 // own click handler — a genuine gesture, not an effect.
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 
 type TimerSound = {
   /** Create the context on first call, resume it if a background/backgrounding
@@ -20,12 +20,36 @@ type TimerSound = {
   playFinish: () => void
 }
 
+/**
+ * Make the timer audible with the iPhone's ring/silent switch set to SILENT.
+ *
+ * **This is the bug a coach actually reports as "there is no sound".** Web Audio on iOS
+ * defaults to the `auto` session type, which the hardware mute switch silences — and a
+ * phone that lives in a kitbag beside a mat is on silent. Nothing in the app is wrong;
+ * the OS is doing what it was told. `playback` is the type that says "this is content the
+ * user asked for", and it plays through the switch.
+ *
+ * Safari 17+ only, and guarded rather than feature-detected against a list: every other
+ * browser simply has no `audioSession`, where the mute switch does not exist as a concept
+ * and there is nothing to opt out of.
+ */
+function claimPlaybackAudioSession(): void {
+  try {
+    const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession
+    if (session) session.type = 'playback'
+  } catch {
+    // Setting it is best-effort. A browser that rejects the value still plays through the
+    // ordinary path; it just obeys the mute switch, which is where it started.
+  }
+}
+
 export function useTimerSound(enabled: boolean): TimerSound {
   const ctxRef = useRef<AudioContext | null>(null)
 
   const ensureAudio = useCallback(() => {
     try {
       if (!ctxRef.current) {
+        claimPlaybackAudioSession()
         const Ctor =
           window.AudioContext ??
           (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
@@ -38,6 +62,31 @@ export function useTimerSound(enabled: boolean): TimerSound {
       // No Web Audio in this environment (or a construction/resume failure) — the timer
       // still runs, silently.
     }
+  }, [])
+
+  /**
+   * Come back from a lock screen or another app, and the rest of the workout is audible.
+   *
+   * **The module header promised this and nothing implemented it.** It said a coach who
+   * "glances at another app mid-round and comes back would hear nothing for the rest of the
+   * workout without the resume in `ensureAudio`" — true, except `ensureAudio` only ever ran
+   * from the play button, so a round begun before the glance never got one. iOS suspends
+   * the context on background; only a resume brings it back, and there is no tap coming
+   * because the timer is already running.
+   *
+   * `useWakeLock` has re-acquired on this exact event since it was written; this is the
+   * same shape for the same reason.
+   */
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      const ctx = ctxRef.current
+      // Only resume a context that already exists. Creating one here would be creating it
+      // outside a gesture, which is what leaves it suspended in the first place.
+      if (ctx && ctx.state === 'suspended') void ctx.resume()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
 
   const playTone = useCallback(

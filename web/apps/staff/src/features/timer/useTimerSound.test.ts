@@ -71,7 +71,17 @@ function installAudio(state: AudioContextState = 'running') {
     writable: true,
     value: FakeAudioContext,
   })
-  return { played, resume, contexts: () => constructed }
+  return { played, resume, contexts: () => constructed, ctxState: () => state }
+}
+
+/** Safari 17's audio session, which is what the iPhone mute switch actually consults. */
+function installAudioSession() {
+  const session = { type: 'auto' }
+  Object.defineProperty(globalThis.navigator, 'audioSession', {
+    configurable: true,
+    value: session,
+  })
+  return session
 }
 
 beforeEach(() => {
@@ -211,5 +221,57 @@ describe('the timer actually makes a sound', () => {
     act(() => vi.advanceTimersByTime(500))
 
     expect(audio.played).toEqual([])
+  })
+})
+
+describe('the two reasons a coach hears nothing on a real phone', () => {
+  it('claims the playback audio session, so the ring/silent switch does not mute it', () => {
+    // **The one a coach reports as "there is no sound".** iOS defaults Web Audio to the
+    // `auto` session type, which the hardware mute switch silences — and a phone beside a
+    // mat is on silent. Nothing in the app is broken; the OS is doing as it was told.
+    const session = installAudioSession()
+    installAudio()
+    const { result } = renderHook(() => useTimerEngine())
+
+    act(() => result.current.togglePlay())
+
+    expect(session.type).toBe('playback')
+    // @ts-expect-error -- test cleanup of a property this test defines itself.
+    delete globalThis.navigator.audioSession
+  })
+
+  it('does not fall over where there is no audioSession at all', () => {
+    // Every browser but Safari. There is no mute switch to opt out of.
+    const audio = installAudio()
+    const { result } = renderHook(() => useTimerEngine())
+
+    act(() => result.current.togglePlay())
+
+    expect(audio.contexts()).toBe(1)
+  })
+
+  it('resumes the context when the coach comes back from another app', async () => {
+    // The module header promised this and nothing implemented it: `ensureAudio` only ever
+    // ran from the play button, so a round begun BEFORE the glance never got one, and iOS
+    // leaves the context suspended. The rest of the workout was silent with no tap coming.
+    const audio = installAudio('suspended')
+    const { result } = renderHook(() => useTimerEngine())
+    act(() => result.current.togglePlay())
+    audio.resume.mockClear()
+
+    document.dispatchEvent(new Event('visibilitychange'))
+
+    expect(audio.resume).toHaveBeenCalled()
+  })
+
+  it('does not create a context on a visibility change alone', () => {
+    // Creating one outside a gesture is what leaves it suspended in the first place. A
+    // coach who has never pressed play gets no context and no sound, which is correct.
+    const audio = installAudio()
+    renderHook(() => useTimerEngine())
+
+    document.dispatchEvent(new Event('visibilitychange'))
+
+    expect(audio.contexts()).toBe(0)
   })
 })
