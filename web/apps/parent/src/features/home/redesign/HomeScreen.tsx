@@ -70,7 +70,6 @@ export function HomeScreen({
   intents,
   urgent,
   debtLabel,
-  unreadCount,
   todayKey,
   writer,
   cancelReasonLabel,
@@ -98,7 +97,6 @@ export function HomeScreen({
   intents: Intents
   urgent: HomeUrgent
   debtLabel: string | null
-  unreadCount: number
   /** `YYYY-MM-DD` in the studio's zone. Passed in rather than read from the clock here, so
    *  a test can put the screen on a Tuesday without stubbing `Date`. */
   todayKey: string
@@ -365,7 +363,6 @@ export function HomeScreen({
         onReportAbsence={() => {
           globalThis.location.hash = '#/absence'
         }}
-        unreadCount={unreadCount}
         onOpenNotifications={() => {
           // The prototype opens a coach-notifications modal. This product has one inbox and
           // it is a whole tab (§4), so the bell goes there rather than to a second, emptier

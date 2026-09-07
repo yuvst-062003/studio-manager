@@ -1,4 +1,4 @@
-import { Bell, BellRing, Plus } from 'lucide-react'
+import { Bell, Plus } from 'lucide-react'
 
 import { fill } from '@studio/core'
 import { t } from '@studio/i18n'
@@ -16,7 +16,6 @@ export function HomeTop({
   debtLabel,
   onUrgentAction,
   onReportAbsence,
-  unreadCount,
   onOpenNotifications,
 }: {
   /** The club's name. Replaces the prototype's hardcoded "מועדון ג׳ודו גלדיאטור". */
@@ -36,7 +35,6 @@ export function HomeTop({
   debtLabel: string | null
   onUrgentAction: () => void
   onReportAbsence: () => void
-  unreadCount: number
   onOpenNotifications: () => void
 }) {
   const greeting = familyName ? fill(t(locale, 'schedule.home.greetingFamily'), { name: familyName }) : t(locale, 'schedule.home.greeting')
@@ -59,8 +57,6 @@ export function HomeTop({
   // reason in it, which is worse than no alarm.
   const isUrgent = urgentDetail !== ''
 
-  const notificationsLabel =
-    unreadCount > 0 ? `${t(locale, 'schedule.home.notificationsLabel')} (${unreadCount})` : t(locale, 'schedule.home.notificationsLabel')
 
   return (
     <header className="p-4 pt-6 space-y-3">
@@ -89,28 +85,20 @@ export function HomeTop({
             <span>{t(locale, 'schedule.home.reportAbsence')}</span>
           </button>
 
-          {/* Notification Bell */}
+          {/* A way into עדכונים, and NOT a second unread indicator (owner, 2026-09-07).
+              The red count and the ringing-bell state were removed: the tab bar already
+              badges עדכונים, and two counts for one inbox means two things to keep in
+              agreement and two places a stale number can sit. The tab badge is the one the
+              parent sees from every screen, so it is the one that stays. */}
           <button
             type="button"
             data-testid="home-notifications"
             onClick={onOpenNotifications}
-            className="relative p-2.5 rounded-2xl bg-white dark:bg-slate-900 hover:bg-slate-50 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 shadow-xs active:scale-95 transition-all cursor-pointer group"
+            className="p-2.5 rounded-2xl bg-white dark:bg-slate-900 hover:bg-slate-50 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 shadow-xs active:scale-95 transition-all cursor-pointer group"
             title={t(locale, 'schedule.home.notificationsTitle')}
-            aria-label={notificationsLabel}
+            aria-label={t(locale, 'schedule.home.notificationsLabel')}
           >
-            {unreadCount > 0 ? (
-              <BellRing className="w-5 h-5 text-[#2563EB] group-hover:rotate-12 transition-transform" />
-            ) : (
-              <Bell className="w-5 h-5 text-slate-600 dark:text-slate-300 group-hover:rotate-12 transition-transform" />
-            )}
-            {unreadCount > 0 && (
-              <span
-                aria-hidden="true"
-                className="absolute -top-1.5 -end-1.5 bg-[#ba1a1a] text-white text-[10px] font-black rounded-full h-5 min-w-[20px] px-1 flex items-center justify-center border-2 border-white shadow-xs"
-              >
-                {unreadCount}
-              </span>
-            )}
+            <Bell className="w-5 h-5 text-slate-600 dark:text-slate-300 group-hover:rotate-12 transition-transform" />
           </button>
         </div>
       </div>

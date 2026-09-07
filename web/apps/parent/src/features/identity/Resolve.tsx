@@ -38,13 +38,11 @@ import { makeParentScheduleClient } from '../schedule/client'
 export function Resolve({
   session,
   locale,
-  notificationCount = 0,
 }: {
   session: Session
   locale: Locale
   /** The unread count the shell already fetches for the tab badge. Passed down rather than
    *  read again: one `/me/notifications` read per screen, and one number on it. */
-  notificationCount?: number
 }) {
   // A session with memberships but NO active studio has no tenant scope, and every
   // tenant-scoped route answers 401 without one. The picker below is skipped at a single
@@ -360,7 +358,6 @@ export function Resolve({
             : [],
       }}
       debtLabel={debtAgorot > 0 ? formatAgorot(debtAgorot) : null}
-      unreadCount={notificationCount}
       todayKey={studioDayKey(new Date())}
       writer={{
         reportAbsence: (sessionId, studentId, reason) =>

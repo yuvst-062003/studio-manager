@@ -967,9 +967,12 @@ function AuthedApp() {
                   globalThis.location.hash = '#/install'
                 }}
               />
-              {/* The unread count the tab badge already has — passed down so בית's bell
-                  shows the same number rather than fetching it a second time. */}
-              <Resolve session={session} locale={locale} notificationCount={pendingCount} />
+              {/* No unread count goes down here any more (owner, 2026-09-07). בית's bell
+                  used to carry the same number the tab bar badges עדכונים with; one inbox
+                  showing two counts is two places for a stale one to sit. `pendingCount`
+                  still feeds `updatesBadgeCount` above, which is the badge that is visible
+                  from every screen rather than only from home. */}
+              <Resolve session={session} locale={locale} />
             </>
           )}
           </HealthGate>
