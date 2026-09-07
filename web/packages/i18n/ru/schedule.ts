@@ -679,6 +679,7 @@ export const schedule: Bundle = {
   'staffCalendar.title': 'Месячный календарь',
   'staffCalendar.subtitle': 'Все занятия и мероприятия месяца одним взглядом',
   'staffCalendar.back': 'Назад к расписанию',
+  'staffCalendar.jumpToToday': 'Сегодня',
   'staffCalendar.openButton': 'Открыть месячный календарь',
   'staffCalendar.fileConstraint': 'Подать заявку',
   'staffCalendar.legend.label': 'Легенда календаря',

@@ -772,6 +772,10 @@ export const schedule: Bundle = {
   'staffCalendar.title': 'הלוח החודשי',
   'staffCalendar.subtitle': 'כל השיעורים והאירועים של החודש, במבט אחד',
   'staffCalendar.back': 'חזרה ללוח הזמנים',
+  // The pill between the two month arrows. It referenced `datePicker.jumpToToday`
+  // until 9b was deleted (2026-09-07) and took the whole `datePicker.*` block with
+  // it, leaving the call site rendering its own key at the user.
+  'staffCalendar.jumpToToday': 'היום',
   'staffCalendar.openButton': 'פתיחת הלוח החודשי',
   // כפתור הכותרת שפותח את `#/constraints` — אותו מסך שכבר מקושר מלשונית החשבון
   // (`constraint.account.*` למעלה); זהו קישור שני, לא תחליף. מנוסח כמו בפרוטוטייפ.

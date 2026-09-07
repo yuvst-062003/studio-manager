@@ -697,7 +697,7 @@ export function CalendarScreen({
               onClick={jumpToToday}
               type="button"
             >
-              {t(locale, 'schedule.datePicker.jumpToToday')}
+              {t(locale, 'schedule.staffCalendar.jumpToToday')}
             </button>
             <button
               aria-label={t(locale, 'schedule.week.view.nextMonth')}

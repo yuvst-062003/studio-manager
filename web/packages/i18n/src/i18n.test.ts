@@ -1,3 +1,5 @@
+import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { join, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { DIRECTION, LOCALES, NAMESPACES, REFERENCE_LOCALE, translatePlural, t, translate, bundles } from '../index'
 import type { Bundle, Namespace } from '../types'
@@ -115,13 +117,57 @@ describe('plural (register §9 — "1 שיעורים" has no plural rule)', () =
   })
 })
 
-describe('referenced nav labels resolve (regression 2026-08-29)', () => {
-  // The manager-only cash item in the staff nav (App.tsx) referenced
-  // `billing.cash.manager.title`, which existed in no locale, so the drawer showed the
-  // raw key. Parity checks locale-vs-locale; it cannot see a key a component references
-  // but nobody defines. This pins the labels the staff manager nav actually uses.
-  it.each(LOCALES)('%s translates the manager cash nav item', (locale) => {
-    expect(t(locale, 'billing.cash.manager.title')).not.toBe('billing.cash.manager.title')
+describe('every referenced key resolves (regressions 2026-08-29, 2026-09-07)', () => {
+  // **Parity cannot see this class of bug at all.** It compares locale against locale, so
+  // a key that every locale is missing — because a component references one nobody
+  // defines — is perfectly consistent and perfectly broken. The screen renders the raw
+  // key at the user.
+  //
+  // It has now shipped three times. `billing.cash.manager.title` put a raw key in the
+  // staff drawer (2026-08-29). `schedule.datePicker.jumpToToday` put one on the month
+  // calendar's today button (2026-09-07) — that one was collateral from deleting 9b, the
+  // old date picker: the call site stayed behind when its whole `datePicker.*` block went
+  // with the screen. Both were pinned one key at a time, which only ever catches the key
+  // someone already found.
+  //
+  // So this reads the call sites instead of listing them. Anything shaped
+  // `t(locale, 'ns.key')` in an app or package — `translate` and `translatePlural` too —
+  // must resolve in Hebrew, the reference locale every other one falls back through.
+  // Dynamically built keys do not match the literal pattern and are simply not covered;
+  // a gate that catches the static 99% beats the hand-written list it replaces.
+  // `process.cwd()` rather than `import.meta.url`: vitest's root IS web/, and under this
+  // config import.meta.url is not a file: URL, so fileURLToPath throws at collection time.
+  const WEB_ROOT = process.cwd()
+  const CALL_SITE = /\b(?:t|translate|translatePlural)\(\s*[A-Za-z0-9_.[\]'"]+\s*,\s*'([a-z][A-Za-z0-9_]*\.[^']+)'/g
+
+  function sourceFiles(dir: string, out: string[] = []): string[] {
+    for (const entry of readdirSync(dir)) {
+      if (entry === 'node_modules' || entry === 'dist') continue
+      const path = join(dir, entry)
+      if (statSync(path).isDirectory()) sourceFiles(path, out)
+      else if (/\.tsx?$/.test(path)) out.push(path)
+    }
+    return out
+  }
+
+  it('no component references a key that Hebrew does not define', () => {
+    const offenders: string[] = []
+    const files = [
+      ...sourceFiles(join(WEB_ROOT, 'apps')),
+      ...sourceFiles(join(WEB_ROOT, 'packages')),
+    ]
+    // The bundles themselves are excluded: `he/common.ts` is where keys are DEFINED, and
+    // its own doc comments quote keys that may since have been renamed.
+    for (const file of files.filter((f) => !f.includes(`${sep}i18n${sep}`))) {
+      for (const [, key] of readFileSync(file, 'utf8').matchAll(CALL_SITE)) {
+        const [namespace, ...rest] = key.split('.')
+        if (!NAMESPACES.includes(namespace as Namespace)) continue
+        if (bundles[REFERENCE_LOCALE][namespace as Namespace][rest.join('.')] === undefined) {
+          offenders.push(`${key}  <-  ${file.replace(WEB_ROOT, '')}`)
+        }
+      }
+    }
+    expect(offenders, `keys referenced but never defined:\n${offenders.join('\n')}`).toEqual([])
   })
 })
 

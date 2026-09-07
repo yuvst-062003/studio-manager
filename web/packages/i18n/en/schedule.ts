@@ -684,6 +684,7 @@ export const schedule: Bundle = {
   'staffCalendar.title': 'Month calendar',
   'staffCalendar.subtitle': 'Every session and event this month, at a glance',
   'staffCalendar.back': 'Back to schedule',
+  'staffCalendar.jumpToToday': 'Today',
   'staffCalendar.openButton': 'Open the month calendar',
   // The header action that opens `#/constraints` — a second link to the route the
   // account tab already links (`constraint.account.*` above), not a replacement.
