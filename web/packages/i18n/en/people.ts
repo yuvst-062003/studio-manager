@@ -803,6 +803,7 @@ export const people: Bundle = {
   'joinWizard.options.grade.grade_8': 'Grade 8',
   'joinWizard.options.grade.grade_9': 'Grade 9',
   'joinWizard.options.grade.highschool': 'High school',
+  'joinWizard.options.grade.post_highschool': 'After high school',
 
   // BELT_OPTIONS -> joinWizard.options.belt.*
   'joinWizard.options.belt.white': 'White belt',

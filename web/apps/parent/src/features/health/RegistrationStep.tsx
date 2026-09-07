@@ -81,6 +81,22 @@ export function RegistrationStep({
   schoolClassRequired = true,
   initial,
 }: RegistrationStepProps) {
+  /**
+   * Bug #9 — 'the wizard asks for parent + pickup details even for an adult'.
+   *
+   * `school_class_required` is `"grade" in required_registration_fields(...)`, which is
+   * `not is_self_guarding(...)` — the SAME server fact, so this reads it rather than adding
+   * a second boolean to the wire that could disagree with the first. Self-guarding means
+   * "the sole guardian IS the student", not "no guardian rows found"
+   * (`app/services/health/agreement.py`), so a nineteen-year-old whose mother still signs
+   * is not one and still gets the parent form.
+   *
+   * הורה 2 and מורשי איסוף are both questions about somebody ELSE's authority over this
+   * student. A grown member has no other parent to name on their own registration and
+   * nobody collects them from training; the fields were optional, which made them merely
+   * baffling rather than blocking, and baffling is still what the owner reported.
+   */
+  const selfGuarding = !schoolClassRequired
   const [childId, setChildId] = useState('')
   const [grade, setGrade] = useState('')
   const [address, setAddress] = useState(initial?.address ?? '')
@@ -131,7 +147,12 @@ export function RegistrationStep({
     if (!valid || sending) return
     const [otherFirst = '', ...otherRest] = otherFullName.trim().split(/\s+/)
     const otherLast = otherRest.join(' ')
-    const contacts = pickups
+    // Never send what was never asked. The state below survives a `schoolClassRequired`
+    // that flips while the form is open (a sibling switch), and a stale second parent
+    // riding along on an adult's own registration would be a person nobody typed.
+    const contacts = selfGuarding
+      ? []
+      : pickups
       .map((entry) => ({ name: entry.name.trim(), phone: entry.phone.trim() }))
       // A repeatable row the parent tabbed past is not a person.
       .filter((entry) => entry.name !== '')
@@ -152,7 +173,8 @@ export function RegistrationStep({
         last_name: null,
         phone: null,
       },
-      other_parent: otherFullName.trim()
+      other_parent:
+        !selfGuarding && otherFullName.trim()
         ? {
             first_name: otherFirst,
             last_name: otherLast || null,
@@ -252,30 +274,38 @@ export function RegistrationStep({
             onChange={(event) => setAliyahYear(event.target.value)}
             value={aliyahYear}
           />
-          <TextField
-            hint={optional}
-            label={`${t(locale, 'health.registration.otherParent')} · ${t(locale, 'health.registration.fullName')}`}
-            onChange={(event) => setOtherFullName(event.target.value)}
-            value={otherFullName}
-          />
-          <TextField
-            error={idError(otherId, false)}
-            hint={optional}
-            inputMode="numeric"
-            label={`${t(locale, 'health.registration.otherParent')} · ${t(locale, 'health.registration.nationalId')}`}
-            onChange={(event) => setOtherId(event.target.value)}
-            value={otherId}
-          />
-          <TextField
-            hint={optional}
-            inputMode="tel"
-            label={`${t(locale, 'health.registration.otherParent')} · ${t(locale, 'health.registration.phoneMobile')}`}
-            onChange={(event) => setOtherPhone(event.target.value)}
-            value={otherPhone}
-          />
+          {/* Not rendered at all for an adult, on the same reasoning the school class
+              already uses above: an optional field nobody can answer still invites them
+              to try. */}
+          {selfGuarding ? null : (
+            <>
+              <TextField
+                hint={optional}
+                label={`${t(locale, 'health.registration.otherParent')} · ${t(locale, 'health.registration.fullName')}`}
+                onChange={(event) => setOtherFullName(event.target.value)}
+                value={otherFullName}
+              />
+              <TextField
+                error={idError(otherId, false)}
+                hint={optional}
+                inputMode="numeric"
+                label={`${t(locale, 'health.registration.otherParent')} · ${t(locale, 'health.registration.nationalId')}`}
+                onChange={(event) => setOtherId(event.target.value)}
+                value={otherId}
+              />
+              <TextField
+                hint={optional}
+                inputMode="tel"
+                label={`${t(locale, 'health.registration.otherParent')} · ${t(locale, 'health.registration.phoneMobile')}`}
+                onChange={(event) => setOtherPhone(event.target.value)}
+                value={otherPhone}
+              />
+            </>
+          )}
         </div>
       </Card>
 
+      {selfGuarding ? null : (
       <Card>
         <h3>{t(locale, 'health.registration.pickup')}</h3>
         <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-caption)' }}>
@@ -335,6 +365,7 @@ export function RegistrationStep({
           </Button>
         </div>
       </Card>
+      )}
 
       {showErrors && !valid ? (
         <Alert iconLabel={t(locale, 'health.registration.required')} live tone="danger">

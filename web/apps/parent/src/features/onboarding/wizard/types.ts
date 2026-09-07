@@ -17,6 +17,9 @@ export type GradeKey =
   | 'grade_8'
   | 'grade_9'
   | 'highschool'
+  /** Bug #9 — after תיכון. `מסגרת` is half of this field's own label ('כיתה / מסגרת'), and
+   *  a member between school and whatever comes next has one of those but not the other. */
+  | 'post_highschool'
 
 export type HealthFund = 'clalit' | 'maccabi' | 'meuhedet' | 'leumit'
 

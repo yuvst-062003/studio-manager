@@ -103,6 +103,10 @@ const GRADE_KEYS = [
   'grade_8',
   'grade_9',
   'highschool',
+  // Bug #9 — the list stopped at תיכון, so a member who has finished school had nothing to
+  // pick. Last, and after `highschool`, because the order IS the progression: a select whose
+  // options run kindergarten → י״ב → post-school is read without reading it.
+  'post_highschool',
 ] as const
 
 const BELT_KEYS = [

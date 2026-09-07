@@ -373,6 +373,33 @@ describe('RegistrationStep', () => {
     expect(body.signer.national_id).toBe('100000017')
   })
 
+  it('asks an adult for no second parent and no pickup contacts (#9)', async () => {
+    // The owner's #9: 'wizard asks for parent + pickup details even for an adult'. The
+    // grade was already dropped for a self-guarding student; הורה 2 and the מלווים מורשים
+    // list were not, so a grown member was asked to name their other parent and who is
+    // allowed to collect them from training.
+    render(
+      <RegistrationStep
+        locale="he"
+        onSubmit={vi.fn()}
+        schoolClassRequired={false}
+        studentName="יובל בוגר"
+      />,
+    )
+    expect(screen.queryByText(t('he', 'health.registration.pickup'))).not.toBeInTheDocument()
+    expect(
+      screen.queryByText(t('he', 'health.registration.otherParent'), { exact: false }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('still asks a parent for both (#9)', async () => {
+    render(<RegistrationStep locale="he" onSubmit={vi.fn()} studentName="ילד" />)
+    expect(screen.getAllByText(t('he', 'health.registration.pickup')).length).toBeGreaterThan(0)
+    expect(
+      screen.getAllByText(t('he', 'health.registration.otherParent'), { exact: false }).length,
+    ).toBeGreaterThan(0)
+  })
+
   it('lets an adult who is their own guardian through with no school class', async () => {
     // `selfStudent` in the join form makes a student of the parent themselves, and the
     // registration gate then demanded a כיתה nobody could answer. The server stopped
