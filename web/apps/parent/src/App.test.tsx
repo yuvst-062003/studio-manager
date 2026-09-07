@@ -133,9 +133,14 @@ describe('parent app', () => {
     // just no longer blocks. The banner's CTA routes to #/install, where the original
     // walkthrough (share-sheet steps on iOS, a real prompt on Chromium) still lives.
     render(<App />)
-    const cta = await screen.findByRole('button', {
-      name: t('he', 'common.install.banner.cta'),
-    })
+    // 10s, not `findByRole`'s 1s default: the banner appears only after the app has walked
+    // `/auth/refresh` -> `/auth/me` -> `/me/students` -> notifications, and four chained
+    // fetches do not settle inside a second on a machine running the whole suite.
+    const cta = await screen.findByRole(
+      'button',
+      { name: t('he', 'common.install.banner.cta') },
+      { timeout: 10_000 },
+    )
     expect(screen.getByText(t('he', 'common.install.banner.text'))).toBeInTheDocument()
     cta.click()
     await waitFor(() => expect(screen.getByTestId('install-walkthrough')).toBeInTheDocument())
@@ -1254,7 +1259,10 @@ describe('§3 Door C — /?invite=<token> opens the shared wizard, not the old g
     expect(
       within(secondDialog).getByLabelText(new RegExp(`^${STUDENT_FORM_COPY.firstName}\\s*\\*?$`)),
     ).toHaveValue('')
-  }, 15000)
+    // 30s, not 15: this drives the whole join wizard — five parts, a canvas signature
+    // and a dozen awaited steps — and it exceeded 15s on a machine running eighty test
+    // files at once. The budget was sized for the test idle, not for the suite.
+  }, 30_000)
 
   // task 9b -- the exact case that was broken: a returning family whose OTHER children
   // are already fully onboarded (`next: null`) used to have the wizard never open at
