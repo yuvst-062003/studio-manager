@@ -495,6 +495,7 @@ export default function App() {
               fetcher={apiFetch}
               today={today}
               canEdit={viewerCanWritePlan}
+              attendanceClient={attendanceClient}
             />
           ) : onInstall ? (
             // Needs no access guard: installing the app is every signed-in person's

@@ -67,6 +67,22 @@ export interface StaffAttendanceClient {
    * when it is missing.
    */
   addSessionNote?(sessionId: string, body: string, kind: 'plan' | 'summary'): Promise<void>
+  /**
+   * §6.2's read half — `GET /sessions/{id}/notes?kind=plan`, latest first, or `null` when
+   * the session has no briefing. `AnyStaff`, unlike the write above: reading one is what
+   * makes leaving a briefing FOR an assistant work at all.
+   *
+   * This exists because the offline cache holds two days (§6.1) and the calendar looks
+   * past them, so a screen showing next Tuesday has no cached briefing to render and
+   * cannot ask the cache for one. `TodayScreen` never calls it — its text rides down with
+   * the session on `GET /sync/bootstrap`, and a second fetch for a string already in hand
+   * would be a round trip bought for nothing.
+   *
+   * Optional for the same reason `addSessionNote` is: callers out of this pass's scope
+   * keep satisfying the interface without a mechanical edit, and a screen that lacks it
+   * renders no briefing rather than pretending there is none.
+   */
+  sessionPlan?(sessionId: string): Promise<string | null>
 }
 
 /** Mirrors `app/schemas/attendance.py::AttendanceOut`, narrowed to what `2d` draws. */
@@ -115,6 +131,16 @@ export function makeStaffAttendanceClient(fetcher: Fetcher): StaffAttendanceClie
         `${API}/students/${studentId}/attendance?limit=${limit}`,
       )
       return body.items
+    },
+    async sessionPlan(sessionId) {
+      const body = await json<{ items: { body: string }[] }>(
+        `${API}/sessions/${sessionId}/notes?kind=plan`,
+      )
+      // `list_notes` orders by id, so the newest briefing is the LAST row: `add_note`
+      // appends rather than replacing, and a session briefed twice must show the second
+      // one. Reading `[0]` would render a superseded plan and look like a save that
+      // silently failed.
+      return body.items.at(-1)?.body ?? null
     },
     async addSessionNote(sessionId, body, kind) {
       const response = await fetcher(`${API}/sessions/${sessionId}/notes`, {

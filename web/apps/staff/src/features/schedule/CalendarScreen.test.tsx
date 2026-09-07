@@ -121,8 +121,69 @@ function renderCalendar(props: Partial<Parameters<typeof CalendarScreen>[0]> = {
   )
 }
 
+function briefingStub(plans: Record<string, string | null> = {}) {
+  return {
+    // Annotated rather than left as a bare `vi.fn()`: the prop is a
+    // `Pick<StaffAttendanceClient, ...>`, and an untyped mock widens to `Procedure` and
+    // stops satisfying it.
+    addSessionNote: vi.fn<(id: string, body: string, kind: 'plan' | 'summary') => Promise<void>>(
+      async () => undefined,
+    ),
+    sessionPlan: vi.fn(async (id: string) => plans[id] ?? null),
+  }
+}
+
 afterEach(() => {
   setForcedMode(null)
+})
+
+describe('§6.2 — the briefing, on the screen where next week is planned', () => {
+  it('shows the marker for a session that already has a briefing, and opens it', async () => {
+    renderCalendar({ attendanceClient: briefingStub({ s1: 'עבודה על אוצ׳י־גארי' }) })
+    await userEvent.click(await screen.findByTestId('calendar-day-2026-11-10'))
+
+    const marker = await screen.findByTestId('session-briefing-marker')
+    expect(marker.dataset.hasBriefing).toBe('true')
+
+    await userEvent.click(marker)
+    expect(await screen.findByText('עבודה על אוצ׳י־גארי')).toBeInTheDocument()
+  })
+
+  it('lets a lead coach write one for a session they are not teaching', async () => {
+    // The whole point of a briefing: it is left FOR whoever ends up on the mat. The
+    // session's only staff member is `p1`; the viewer is a manager who is not on it.
+    const client = briefingStub()
+    renderCalendar({ canEdit: true, attendanceClient: client })
+    await userEvent.click(await screen.findByTestId('calendar-day-2026-11-10'))
+
+    await userEvent.click(await screen.findByTestId('session-briefing-marker'))
+    await userEvent.click(await screen.findByTestId('session-plan-edit'))
+    await userEvent.type(await screen.findByTestId('session-plan-input'), 'להתחיל בחימום ארוך')
+    await userEvent.click(screen.getByTestId('session-plan-save'))
+
+    await waitFor(() =>
+      expect(client.addSessionNote).toHaveBeenCalledWith('s1', 'להתחיל בחימום ארוך', 'plan'),
+    )
+  })
+
+  it('draws no marker for an assistant coach on a session with no briefing', async () => {
+    // Nothing to read and nothing they may write — decision 16's third state, which draws
+    // no control at all rather than a button that refuses.
+    renderCalendar({ canEdit: false, attendanceClient: briefingStub() })
+    await userEvent.click(await screen.findByTestId('calendar-day-2026-11-10'))
+
+    await screen.findByTestId('calendar-session-row')
+    expect(screen.queryByTestId('session-briefing-marker')).not.toBeInTheDocument()
+  })
+
+  it('reads a plan once per session on the day, not once per month', async () => {
+    const client = briefingStub()
+    renderCalendar({ attendanceClient: client })
+    await userEvent.click(await screen.findByTestId('calendar-day-2026-11-10'))
+
+    await waitFor(() => expect(client.sessionPlan).toHaveBeenCalledWith('s1'))
+    expect(client.sessionPlan).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('the month grid', () => {

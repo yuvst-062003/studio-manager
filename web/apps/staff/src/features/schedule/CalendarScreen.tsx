@@ -35,13 +35,23 @@
 // two cards that start identical and drift the next time either screen changes.
 //
 // One deliberate simplification from that reuse: every card here renders with
-// `roster={undefined}`, `briefingText={null}` and `canWritePlan={false}`. The offline
-// cache holds only today and tomorrow (§6.1), so a roster read here would be honest for at
-// most two of a month's thirty-odd days and "not saved on this device" for the rest — a
-// screen whose entire purpose is looking BEYOND the cache has no business reading it for
-// two special-cased days and not the others. `SessionCard` already has an honest fallback
-// for "no roster" (`schedule.session.rosterUnavailable`) and renders it uniformly here,
-// which is the correct trade for a screen this forward-looking.
+// `roster={undefined}`. The offline cache holds only today and tomorrow (§6.1), so a roster
+// read here would be honest for at most two of a month's thirty-odd days and "not saved on
+// this device" for the rest — a screen whose entire purpose is looking BEYOND the cache has
+// no business reading it for two special-cased days and not the others. `SessionCard`
+// already has an honest fallback for "no roster" (`schedule.session.rosterUnavailable`) and
+// renders it uniformly here, which is the correct trade for a screen this forward-looking.
+//
+// **The briefing was in that paragraph and should not have been (2026-09-07).** It shipped
+// as `briefingText={null}` and `canWritePlan={false}` for the same cache reason, and the
+// result was that the one screen a senior coach uses to plan NEXT week could not write the
+// briefing for it — the same session offered an editor from the schedule tab and refused
+// one here, which is two doors giving two answers about one permission. The cache argument
+// does not carry: unlike a roster, a briefing is a single string per session, `GET
+// /sessions/{id}/notes?kind=plan` is `AnyStaff`, and this screen is already a network
+// screen that says so. So the day's plans are FETCHED for the handful of sessions actually
+// on the selected day — not the month, which would be thirty pointless requests — and the
+// marker is then accurate rather than absent.
 //
 // **Editing (decisions 8, 9).** Tapping a session's own edit button opens `SessionEditSheet`
 // below, offering change-coach, cancel and move — the SAME sheet for every role, per
@@ -93,6 +103,7 @@ import type { Fetcher, SessionRow, StaffScheduleClient } from './client'
 import { mergeTimeline, timelineStates } from './timeline'
 import type { EventOut, StaffEventsClient } from '../events/client'
 import type { CoachConstraintRow, CoachConstraintsClient } from '../constraints'
+import type { StaffAttendanceClient } from '../attendance/client'
 
 const pad = (value: number): string => String(value).padStart(2, '0')
 
@@ -404,6 +415,7 @@ export function CalendarScreen({
   fetcher,
   today,
   canEdit,
+  attendanceClient,
 }: {
   locale: Locale
   client: StaffScheduleClient
@@ -424,6 +436,10 @@ export function CalendarScreen({
   /** `owner`/`manager`/`lead_coach` — decision 8, computed once in `App.tsx` from the same
    *  membership `viewerCanWritePlan` already reads, not re-derived here. */
   canEdit: boolean
+  /** §6.2's briefing, read and written. Optional like `eventsClient`: a caller without one
+   *  gets a working grid whose cards simply carry no briefing marker, never a marker that
+   *  opens an editor with nothing behind it. */
+  attendanceClient?: Pick<StaffAttendanceClient, 'addSessionNote' | 'sessionPlan'>
 }) {
   const todayKey = useMemo(() => studioDayKey(today), [today])
   const [year, setYear] = useState(() => Number(todayKey.slice(0, 4)))
@@ -436,6 +452,9 @@ export function CalendarScreen({
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
   const [editingSession, setEditingSession] = useState<SessionRow | null>(null)
+  /** §6.2 — the selected day's briefings, by session id. `undefined` for a session whose
+   *  plan has not been read yet (the marker stays quiet), `null` once read and empty. */
+  const [plans, setPlans] = useState<Record<string, string | null | undefined>>({})
   // S11 — a failed read distinguishes offline from broken (S5's network state), the same
   // rule `DatePickerScreen`/`StudentsSearch`/`TodayScreen` already follow.
   const networkMode = useNetworkMode()
@@ -557,6 +576,48 @@ export function CalendarScreen({
     [events, filteredSessions, selectedDay],
   )
   const dayStates = useMemo(() => timelineStates(dayItems, today), [dayItems, today])
+
+  // The selected day's briefings, one request per session actually on that day — a handful,
+  // never the month. Best-effort by design: a plan that fails to load leaves its marker off
+  // rather than failing the whole grid, because the agenda underneath it is still correct
+  // and a briefing is not what a coach opened a calendar to see.
+  const sessionIdsOnDay = useMemo(
+    () =>
+      dayItems
+        .filter((item) => item.kind === 'session')
+        .map((item) => item.id)
+        .join(','),
+    [dayItems],
+  )
+  useEffect(() => {
+    const readPlan = attendanceClient?.sessionPlan
+    if (!readPlan || !sessionIdsOnDay) return undefined
+    let live = true
+    for (const sessionId of sessionIdsOnDay.split(',')) {
+      void readPlan(sessionId)
+        .then((plan) => {
+          if (live) setPlans((current) => ({ ...current, [sessionId]: plan }))
+        })
+        .catch(() => undefined)
+    }
+    return () => {
+      live = false
+    }
+    // Keyed on the joined ids rather than the array: `dayItems` is a fresh array on every
+    // render, and depending on it directly would re-fetch every plan on every keystroke in
+    // the group filter.
+  }, [attendanceClient, sessionIdsOnDay])
+
+  /** Mirrors `TodayScreen`'s own `saveBriefing` exactly, including the optimistic write —
+   *  the sheet must show what was just typed without a second round trip. */
+  const saveBriefing = useCallback(
+    (sessionId: string) => async (body: string): Promise<void> => {
+      if (!attendanceClient?.addSessionNote) throw new Error('addSessionNote is not implemented')
+      await attendanceClient.addSessionNote(sessionId, body, 'plan')
+      setPlans((current) => ({ ...current, [sessionId]: body }))
+    },
+    [attendanceClient],
+  )
 
   const closeEdit = useCallback(() => setEditingSession(null), [])
   const onEditChanged = useCallback(() => {
@@ -768,13 +829,13 @@ export function CalendarScreen({
                   <div className="min-w-0 flex-1">
                     {item.kind === 'session' ? (
                       <SessionCard
-                        briefingText={null}
-                        canWritePlan={false}
+                        briefingText={plans[item.id] ?? null}
+                        canWritePlan={canEdit && attendanceClient?.addSessionNote !== undefined}
                         chaseFamilies={() => async () => []}
                         locale={locale}
                         onEdit={() => setEditingSession(item.session)}
                         roster={undefined}
-                        saveBriefing={() => async () => undefined}
+                        saveBriefing={saveBriefing}
                         session={item.session}
                         state={dayStates[index]!}
                         today={today}
