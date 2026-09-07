@@ -157,6 +157,99 @@ describe('the number that never moves', () => {
   })
 })
 
+describe("the owner's #17 — ₪375 on the screen and ₪900 on the button", () => {
+  // Reported against the screen this one replaced (`PaymentsScreen.tsx`, before the
+  // 2026-09-07 rebuild), where the top line and the button were two unrelated
+  // computations. The rebuild's rules make that shape impossible, and the shape is what
+  // the report is about — so the owner's own figures are pinned here rather than left as
+  // a claim in a handoff document.
+  beforeEach(() => {
+    charges = [{ ...CHARGE, amount_agorot: 37_500 }]
+    terms = { cash_prepay_months: 3, cheque_prepay_months: 12, monthly_total_agorot: 30_000 }
+  })
+
+  it('charges exactly what it says is owed, with nothing to reconcile', async () => {
+    await open()
+    expect(screen.getByTestId('pay-owed-amount')).toHaveTextContent('375₪')
+    expect(payButton()).toHaveTextContent('375₪')
+    expect(screen.queryByTestId('pay-forward-note')).toBeNull()
+  })
+
+  it('names the club when the cash block is what raises the number', async () => {
+    // ₪900 IS on this screen — it is three months at ₪300, which is the club's own cash
+    // term and not a choice the parent made. The defect was never the figure; it was a
+    // figure with nothing beside it. ₪375 + ₪900 = ₪1,275, and the button says so.
+    const user = await open()
+    await user.click(screen.getByTestId('pay-method-cash'))
+    expect(screen.getByTestId('pay-owed-amount')).toHaveTextContent('375₪')
+    expect(screen.getByTestId('pay-cash-term')).toHaveTextContent(
+      t('he', 'billing.pay.cashTerm').replace('{{count}}', '3'),
+    )
+    expect(payButton()).toHaveTextContent('1,275₪')
+  })
+})
+
+describe('splitting a card payment (bug #16)', () => {
+  it('asks uPay for the number of instalments the parent picked', async () => {
+    // The owner's #16 — 'no way to split a card payment into instalments'. The backend has
+    // taken `max_payments` since M6 and the screen this one replaced had the chips; the
+    // rebuild dropped them and hardcoded 1, so the control existed everywhere except where
+    // a parent could reach it.
+    const user = await open()
+    await user.click(screen.getByTestId('pay-instalments-3'))
+    await user.click(payButton())
+    await waitFor(() => {
+      const order = calls.find((call) => call.path.startsWith('/api/v1/payment-orders?'))
+      expect(order).toBeDefined()
+      expect(order!.path).toContain('max_payments=3')
+    })
+  })
+
+  it('says what each instalment costs, so the total is not arithmetic to do', async () => {
+    // Rule 2 of this screen: no figure on it is assembled from two others. ₪208.33 over
+    // three is ₪69.45 then two of ₪69.44 — `instalmentSplit` puts the odd agora on the
+    // first, and the copy says which is which rather than rounding in silence.
+    const user = await open()
+    await user.click(screen.getByTestId('pay-instalments-3'))
+    expect(screen.getByTestId('pay-split-note')).toHaveTextContent('69.45₪')
+    expect(screen.getByTestId('pay-split-note')).toHaveTextContent('69.44₪')
+    // The BUTTON still states the whole charge — the split is how it is collected, not a
+    // smaller thing being bought.
+    expect(payButton()).toHaveTextContent('208.33₪')
+  })
+
+  it('says nothing at all about a split when there is one payment', async () => {
+    await open()
+    expect(screen.queryByTestId('pay-split-note')).toBeNull()
+  })
+
+  it('offers no split under cash, which is handed over once', async () => {
+    const user = await open()
+    await user.click(screen.getByTestId('pay-method-cash'))
+    expect(screen.queryByTestId('pay-instalments')).toBeNull()
+  })
+
+  it('opens a NEW order when the instalment count changes', async () => {
+    // The `pendingOrder` reuse key must carry the split: an order opened for one payment
+    // and then reused for three would put the parent on a uPay page for terms they did not
+    // pick — the same failure the month count already guards against.
+    const user = await open()
+    formResponse = () => jsonResponse({ detail: 'nope' }, 500)
+    await user.click(payButton())
+    await waitFor(() => expect(screen.getByTestId('pay-error')).toBeInTheDocument())
+    orderResponse = () => jsonResponse({ public_ref: 'ref-2' })
+    formResponse = () =>
+      jsonResponse({ action: 'https://app.upay.co.il/checkout', fields: { ref: 'ref-2' } })
+    await user.click(screen.getByTestId('pay-instalments-2'))
+    await user.click(payButton())
+    await waitFor(() => {
+      const orders = calls.filter((call) => call.path.startsWith('/api/v1/payment-orders?'))
+      expect(orders).toHaveLength(2)
+      expect(orders[1]!.path).toContain('max_payments=2')
+    })
+  })
+})
+
 describe('what the button says it will charge', () => {
   it('starts at the whole debt, exactly', async () => {
     await open()

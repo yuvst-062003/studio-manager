@@ -30,7 +30,8 @@ import { Banknote, ChevronLeft, CreditCard, Lock } from 'lucide-react'
 import { fill } from '@studio/core'
 import { plural, t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { MONTH_CHIPS, askFor, coveredAgorot, debtAgorot, owedMonths } from './pay'
+import { instalmentSplit } from '../billingClient'
+import { INSTALMENT_CHIPS, MONTH_CHIPS, askFor, coveredAgorot, debtAgorot, owedMonths } from './pay'
 import type { Ask, DebtRow, PayMethod, PayTerms } from './pay'
 
 /** The newest payment that actually stands, projected for the strip at the foot. */
@@ -101,9 +102,23 @@ export function PayScreen({
     () => MONTH_CHIPS.find((chip) => chip >= owed) ?? Math.max(...MONTH_CHIPS),
   )
 
+  /** Bug #16 — §5.10's second chip group. One payment by default: a split is something a
+   *  family asks for, never something the screen assumes on their behalf. */
+  const [instalments, setInstalments] = useState(1)
+
   const debt = useMemo(() => debtAgorot(debts), [debts])
   const covered = useMemo(() => coveredAgorot(debts), [debts])
-  const ask = useMemo(() => askFor(method, debts, months, terms), [method, debts, months, terms])
+  const ask = useMemo(
+    () => askFor(method, debts, months, terms, instalments),
+    [method, debts, months, terms, instalments],
+  )
+  /** What each card payment comes to. `instalmentSplit` is integer arithmetic on agorot
+   *  and puts the remainder on the FIRST payment, so the parts sum to the total exactly —
+   *  which is why the copy names the first separately when it differs. */
+  const split = useMemo(
+    () => instalmentSplit(ask.totalAgorot, ask.instalments),
+    [ask.totalAgorot, ask.instalments],
+  )
 
   // The subtitle under the debt: which month, and whose. Both are DATA — the separator is
   // punctuation, so nothing here is a sentence a translator would need.
@@ -281,6 +296,63 @@ export function PayScreen({
                 {plural(locale, 'billing.pay.forward', ask.forwardMonths)}
               </p>
             ) : null}
+
+            {/* ── bug #16: how many payments. The card's second question, and the last
+                one before the button. Below the months rather than beside them: "three
+                months" and "three payments" are different things and a row of chips
+                sharing a line would read as one control with two labels. */}
+            <fieldset data-testid="pay-instalments" className="border-0 p-0 m-0 mt-1">
+              <legend className="text-[15px] font-bold text-[#001849] dark:text-slate-100 px-1 mb-2.5">
+                {t(locale, 'billing.pay.instalmentsTitle')}
+              </legend>
+              <div className="grid grid-cols-3 gap-2">
+                {INSTALMENT_CHIPS.map((chip) => {
+                  const active = instalments === chip
+                  return (
+                    <label
+                      key={chip}
+                      data-testid={`pay-instalments-${chip}`}
+                      className={`cursor-pointer rounded-xl py-2.5 text-center text-[15px] font-bold transition-all has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#0056c5] ${
+                        active
+                          ? 'bg-[#001849] text-white shadow-md'
+                          : 'bg-[#e9edff] dark:bg-slate-800 text-[#161b28] dark:text-slate-200'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="pay-instalments"
+                        // Same reason as the month chips above: a bare digit is an
+                        // accessible name of "3", true of a page number and a price alike.
+                        aria-label={plural(locale, 'billing.pay.instalments', chip)}
+                        checked={active}
+                        onChange={() => setInstalments(chip)}
+                        className="sr-only"
+                      />
+                      <span className="tabular-nums">{chip}</span>
+                    </label>
+                  )
+                })}
+              </div>
+              {ask.instalments > 1 ? (
+                // Rule 2, applied to the split: the button states the whole charge, so
+                // this states what one payment comes to rather than leaving a parent to
+                // divide. `splitFirst` when the odd agora lands on the first — '3 of
+                // ₪69.44' would be a penny short of ₪208.33, and quietly.
+                <p
+                  data-testid="pay-split-note"
+                  className="mt-2 text-[12px] text-[#444650] dark:text-slate-400 px-1"
+                >
+                  {split.first === split.rest
+                    ? fill(plural(locale, 'billing.pay.splitEqual', split.count), {
+                        each: money(split.rest),
+                      })
+                    : fill(plural(locale, 'billing.pay.splitFirst', split.count - 1), {
+                        first: money(split.first),
+                        rest: money(split.rest),
+                      })}
+                </p>
+              ) : null}
+            </fieldset>
           </fieldset>
         ) : (
           /* ── cash. The club's rule, said as the club's ───────────────────────── */

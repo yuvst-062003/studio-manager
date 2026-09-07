@@ -166,13 +166,22 @@ export function ParentPayments({ locale }: { locale: Locale }) {
           refresh()
           return
         }
-        // One payment, never a split: the instalment picker went with the rebuild, so
-        // nothing on this screen can ask uPay for more than one.
-        const key = `${ask.chargeIds.join(',')}|${ask.forwardMonths}`
+        // Bug #16 — the split reaches uPay as `max_payments`, the parameter
+        // `app/routers/payments.py` has taken since M6 and which the rebuild hardcoded to
+        // 1. It is part of the reuse KEY as well: an order opened for one payment and then
+        // handed back for three would put the parent on a uPay page for terms they did not
+        // pick, which is the same failure the month count is already keyed against.
+        const key = `${ask.chargeIds.join(',')}|${ask.forwardMonths}|${ask.instalments}`
         const publicRef =
           pendingOrder?.key === key
             ? pendingOrder.publicRef
-            : (await billing.createOrder([...ask.chargeIds], 1, ask.forwardMonths)).public_ref
+            : (
+                await billing.createOrder(
+                  [...ask.chargeIds],
+                  ask.instalments,
+                  ask.forwardMonths,
+                )
+              ).public_ref
         setPendingOrder({ publicRef, key })
         const form = await billing.orderForm(publicRef)
         setPendingOrder(null)

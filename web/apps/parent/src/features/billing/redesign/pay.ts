@@ -14,6 +14,10 @@
 //     come back beside the total, so the line that explains it is read off the same
 //     computation rather than re-derived beside it.
 //
+// Bug #16 added `instalments` to the same `Ask`, for the same reason the two month counts
+// are on it: the order request and the line that explains the split must be two readings of
+// one computation, never two computations that agree today.
+//
 // G2 throughout: every amount is an integer count of agorot and nothing here divides.
 import { oldestMonths, selectionTotal } from '../billingClient'
 import type { ChargeOut } from '../billingClient'
@@ -24,6 +28,11 @@ export type PayMethod = 'card' | 'cash'
 
 /** §5.10's card chips. The ceiling the club's own rule is measured against. */
 export const MONTH_CHIPS = [1, 2, 3, 6] as const
+
+/** §5.10's other chip group, restored for bug #16. `1..3`, not `1..MAX_INSTALLMENTS`:
+ *  twelve is what `app/integrations/upay/form.py` will *accept*, and three is what §5.10
+ *  offers a parent — the screen this one replaced offered exactly these. */
+export const INSTALMENT_CHIPS = [1, 2, 3] as const
 
 export type DebtRow = {
   charge: ChargeOut
@@ -64,6 +73,15 @@ export type Ask = {
   forwardMonths: number
   /** What the button charges. The only total on the screen. */
   totalAgorot: number
+  /**
+   * Bug #16 — how many card payments uPay collects the total in. Always 1 for cash, which
+   * is handed over once.
+   *
+   * **It never changes `totalAgorot`.** A split is how the money is collected, not a
+   * smaller thing being bought, and a screen where picking "3" made the headline figure
+   * shrink would be the same "two figures to assemble" defect from the other direction.
+   */
+  instalments: number
 }
 
 /** Every open charge, whoever is holding it. The number that never moves. */
@@ -114,6 +132,7 @@ export function askFor(
   debts: readonly DebtRow[],
   months: number,
   terms: PayTerms,
+  instalments = 1,
 ): Ask {
   const canPrepay = terms.monthlyTotalAgorot > 0
   const open = payable(debts)
@@ -125,6 +144,8 @@ export function askFor(
       settledMonths: owedMonths(debts),
       forwardMonths,
       totalAgorot: selectionTotal(open) + forwardMonths * terms.monthlyTotalAgorot,
+      // Cash is counted out once across a counter. A split is a card instruction.
+      instalments: 1,
     }
   }
   // Debt first, always. `oldestMonths` caps itself at what exists, so asking it for six
@@ -139,5 +160,6 @@ export function askFor(
     settledMonths,
     forwardMonths,
     totalAgorot: selectionTotal(chosen) + forwardMonths * terms.monthlyTotalAgorot,
+    instalments: Math.max(1, instalments),
   }
 }

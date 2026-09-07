@@ -520,6 +520,15 @@ export const billing: Bundle = {
   'pay.cashTerm': 'המועדון גובה {{count}} חודשים מראש במזומן',
   'pay.cashTerm.one': 'המועדון גובה חודש אחד מראש במזומן',
   'pay.cashNote': 'המועדון ירשום את התשלום כשהכסף יתקבל.',
+  // Bug #16 — the split. The button keeps saying the whole charge; these say how it
+  // is collected. `splitFirst` exists because `instalmentSplit` puts the odd agora on
+  // the first payment, and '3 תשלומים של ₪69.44' would be ₪0.01 short of the total.
+  'pay.instalmentsTitle': 'לכמה תשלומים?',
+  'pay.instalments': '{{count}} תשלומים בכרטיס',
+  'pay.instalments.one': 'תשלום אחד בכרטיס',
+  'pay.splitEqual': '{{count}} תשלומים של {{each}}',
+  'pay.splitFirst': 'תשלום ראשון {{first}}, ואחריו {{count}} תשלומים של {{rest}}',
+  'pay.splitFirst.one': 'תשלום ראשון {{first}}, ואחריו תשלום של {{rest}}',
   'pay.payCard': 'לתשלום {{total}}',
   'pay.payCash': 'אשלם במזומן {{total}}',
   'pay.working': 'רגע…',
