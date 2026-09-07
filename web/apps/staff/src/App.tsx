@@ -1,6 +1,6 @@
 // §6.1's staff first launch, in its stated order:
 //
-//   1 שפה (BEFORE login) → 2 welcome → 3 resolve → 4 tour → 5 התראות → 6 offline prime
+//   1 שפה (BEFORE login) → 2 welcome → 3 resolve → 4 התראות → 5 offline prime
 //
 // The install WALL that used to sit in front of all of it fell in the 2026-08-27 feature
 // pass: the app runs fully in a browser tab, and installing is InstallBanner's nudge plus
@@ -488,7 +488,7 @@ export default function App() {
             />
           ) : null}
           {/* §6.1's first-run routing still owns the DEFAULT screen: `Resolve` decides
-              between the setup wizard, the tour and the refusal. Both W2 lanes hang a
+              between the setup wizard, today and the refusal. Both W2 lanes hang a
               screen off a hash in front of it, and neither claims the fallback — an
               unknown hash still falls through to `Resolve`.
 
@@ -584,12 +584,12 @@ export default function App() {
             // blocks on this fetch".
             //
             // The FETCH starts at launch: `useOfflinePriming` runs on mount above, so the
-            // cache is filling while the coach walks through the tour and Today. What is
+            // cache is filling while the coach reaches Today. What is
             // gated here is the roster itself — the one screen a missing cache actually
             // costs something on, and the one this lane owns.
             //
-            // §6.1's own order puts the prime after the tour, and the tour lives in
-            // `features/identity/Resolve.tsx`, which belongs to no lane in this wave.
+            // §6.1's own order puts the prime after first-run routing, which lives in
+            // `features/identity/Resolve.tsx` and belongs to no lane in this wave.
             // `OfflinePrimingGate` and `useOfflinePriming` are exported from this lane's
             // barrel so whoever owns that sequence can put the gate in front of Today
             // without reopening anything here.
@@ -715,7 +715,6 @@ export default function App() {
               />
               <Resolve
                 session={session}
-                locale={locale}
                 wizard={<SetupWizard client={setupClient} locale={locale} />}
               />
             </>

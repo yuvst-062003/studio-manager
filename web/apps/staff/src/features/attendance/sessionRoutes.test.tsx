@@ -81,7 +81,6 @@ function coachFetch() {
 
 beforeEach(() => {
   setOfflineStore(memoryStore())
-  globalThis.localStorage?.setItem('studio.staff.tour-seen', '1')
   vi.stubGlobal('fetch', coachFetch())
 })
 

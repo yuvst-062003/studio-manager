@@ -3,7 +3,7 @@
 // **The hole.** `REQUIRED_CONSENT_TYPES` is `("terms", "privacy")` and applies to a PERSON,
 // not to a parent: `POST /privacy/consents` takes no subject and records whoever is calling
 // it. The parent app has blocked on it since M4. The staff app never did — `AccessGate` ->
-// `Resolve` -> tour -> today, with nothing in between — so a coach who reads a child's
+// `Resolve` -> today, with nothing in between — so a coach who reads a child's
 // health flag on a roster, sees a family's phone number and marks a register of minors had
 // accepted neither the terms nor the privacy policy. That is the one population in the
 // product with the most access to other people's data and the only one that signed nothing.

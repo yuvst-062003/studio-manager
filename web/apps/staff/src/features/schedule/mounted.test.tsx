@@ -9,9 +9,9 @@
 // `src/App.test.tsx` belongs to M1. It reaches up into `App` deliberately: the assertion
 // is about the wiring between the two, and it belongs with the half that keeps changing.
 //
-// **`staff-today` alone is not the assertion.** `features/identity/StaffTour.tsx` renders
-// that same test id once the tour is finished, so a test pinned to it would pass on a
-// screen this lane did not draw. `open-date-picker` exists only in `ScheduleSection`.
+// **`staff-today` alone is not the assertion.** `features/identity/StaffLanding.tsx` routes
+// to that same screen, so a test pinned to its test id would pass on a screen this lane did
+// not draw. `open-date-picker` exists only in `ScheduleSection`.
 import { render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
@@ -83,7 +83,7 @@ describe('the staff app mounts lane SCHEDULE', () => {
     render(<App />)
 
     await waitFor(() => expect(screen.getByTestId('staff-today')).toBeInTheDocument())
-    // The half of the screen the tour cannot fake. Was `open-date-picker` until the
+    // The half of the screen first-run routing cannot fake. Was `open-date-picker` until the
     // duplicate calendar door was removed (owner, 2026-09-07); the month grid is the one
     // that stayed.
     expect(screen.getByTestId('open-month-calendar')).toBeInTheDocument()
@@ -120,13 +120,13 @@ describe('the staff app mounts lane SCHEDULE', () => {
 
   it('leaves §6.1 first-run routing alone on every other hash', async () => {
     // The schedule branch must not become the app's default screen: `Resolve` still owns
-    // the wizard/tour/refusal decision.
+    // the wizard/today/refusal decision.
     globalThis.location.hash = ''
     vi.stubGlobal('fetch', signedInAs(['lead_coach']))
 
     render(<App />)
 
-    await waitFor(() => expect(screen.getByTestId('staff-tour')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('staff-landing')).toBeInTheDocument())
     expect(screen.queryByTestId('open-date-picker')).toBeNull()
   })
 

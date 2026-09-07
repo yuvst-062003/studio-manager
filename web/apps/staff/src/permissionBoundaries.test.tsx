@@ -69,7 +69,6 @@ function staffFetch(roles: string[]) {
 beforeEach(() => {
   setOfflineStore(memoryStore())
   globalThis.localStorage?.clear()
-  globalThis.localStorage?.setItem('studio.staff.tour-seen', '1')
   globalThis.location.hash = ''
 })
 

@@ -219,11 +219,6 @@ export const common: Bundle = {
   // 2026-09-03 — every refusal screen's own account-chooser line, so "טעיתי בחשבון" is
   // obviously fixable at a glance rather than something to guess at before hitting sign out.
   'refusal.signedInAs': 'מחוברים בתור {email}',
-  'tour.1': 'כאן השיעורים של היום',
-  'tour.2': 'לחיצה לסימון נוכחות',
-  'tour.3': 'עובד גם בלי אינטרנט',
-  'tour.skip': 'דילוג',
-  'tour.next': 'הבא',
   'studioPicker.title': 'איזה סטודיו?',
   // §6.5's iOS install walkthrough. There is no API to prompt with on iOS, so the steps
   // are taught — and the share icon is NAMED, because a picture beside 'tap the icon' is

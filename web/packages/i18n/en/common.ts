@@ -193,11 +193,6 @@ export const common: Bundle = {
   // 2026-09-03 — every refusal screen's own account-chooser line, so "wrong account" is
   // obviously fixable at a glance rather than something to guess at before hitting sign out.
   'refusal.signedInAs': 'signed in as {email}',
-  'tour.1': "here are today's sessions",
-  'tour.2': 'tap to mark attendance',
-  'tour.3': 'works without internet too',
-  'tour.skip': 'skip',
-  'tour.next': 'next',
   'studioPicker.title': 'which studio?',
   // §6.5's iOS install walkthrough.
   'install.title': 'install the app',

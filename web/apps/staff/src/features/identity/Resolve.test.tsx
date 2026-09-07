@@ -1,7 +1,7 @@
 // §6.1's staff first-launch branch, its non-refusal arms:
 //
 //   owner who has not dismissed the wizard → studio setup wizard, resumable
-//   manager / coach with role assignments  → 3-screen tour → offline priming → Today
+//   manager / coach with role assignments  → offline priming → Today
 //
 // The third arm — no role assignment anywhere → the refusal screen — moved to
 // `AccessGate` (2026-09-02); `AccessGate.test.tsx` carries the tests that used to live
@@ -68,14 +68,14 @@ describe('decideOutcome', () => {
     expect(decideOutcome(session(), null)).toBe('wizard')
   })
 
-  it('routes an owner who dismissed the wizard to the tour', () => {
-    expect(decideOutcome(session(), '2026-08-25T10:00:00+00:00')).toBe('tour')
+  it('routes an owner who dismissed the wizard to today', () => {
+    expect(decideOutcome(session(), '2026-08-25T10:00:00+00:00')).toBe('today')
   })
 
   it('does not re-open the wizard for an owner who SKIPPED every step', () => {
     // The defect this rule replaces. Under 'does this studio have classes?', an owner who
     // skipped step 3 has no classes and is thrown back in on every launch, forever.
-    expect(decideOutcome(session(), '2026-08-25T10:00:00+00:00')).toBe('tour')
+    expect(decideOutcome(session(), '2026-08-25T10:00:00+00:00')).toBe('today')
   })
 
   it('never routes a coach to the wizard', () => {
@@ -84,7 +84,7 @@ describe('decideOutcome', () => {
     const coach = session({
       studios: [{ ...BASE_STUDIO, roles: ['lead_coach'] }],
     })
-    expect(decideOutcome(coach, null)).toBe('tour')
+    expect(decideOutcome(coach, null)).toBe('today')
   })
 
   it('never routes a manager to the wizard either', () => {
@@ -93,7 +93,7 @@ describe('decideOutcome', () => {
     const manager = session({
       studios: [{ ...BASE_STUDIO, roles: ['manager'] }],
     })
-    expect(decideOutcome(manager, null)).toBe('tour')
+    expect(decideOutcome(manager, null)).toBe('today')
   })
 })
 
@@ -106,31 +106,30 @@ describe('Resolve', () => {
     render(
       <Resolve
         session={session({ studios: [{ ...BASE_STUDIO, roles: ['coach'] }] })}
-        locale="he"
         wizard={<p data-testid="wizard-stub" />}
       />,
     )
-    await waitFor(() => expect(screen.getByTestId('staff-tour')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('staff-landing')).toBeInTheDocument())
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
   it('routes an owner who has never dismissed the wizard into it', async () => {
     stubSetup(null)
-    render(<Resolve session={session()} locale="he" wizard={<p data-testid="wizard-stub" />} />)
+    render(<Resolve session={session()} wizard={<p data-testid="wizard-stub" />} />)
     await waitFor(() => expect(screen.getByTestId('staff-wizard')).toBeInTheDocument())
   })
 
-  it('routes an owner who dismissed it into the tour', async () => {
+  it('routes an owner who dismissed it into today', async () => {
     stubSetup('2026-08-25T10:00:00+00:00')
-    render(<Resolve session={session()} locale="he" wizard={<p data-testid="wizard-stub" />} />)
-    await waitFor(() => expect(screen.getByTestId('staff-tour')).toBeInTheDocument())
+    render(<Resolve session={session()} wizard={<p data-testid="wizard-stub" />} />)
+    await waitFor(() => expect(screen.getByTestId('staff-landing')).toBeInTheDocument())
   })
 
   it('survives the wizard being reopened by hand after a dismiss', async () => {
     // The rail's own entry points stay reachable from Settings; what dismiss stops is the
     // AUTO-routing, which is exactly the distinction §5.1 draws.
     stubSetup('2026-08-25T10:00:00+00:00')
-    render(<Resolve session={session()} locale="he" wizard={<p data-testid="wizard-stub" />} />)
+    render(<Resolve session={session()} wizard={<p data-testid="wizard-stub" />} />)
     await waitFor(() => expect(screen.queryByTestId('staff-wizard')).not.toBeInTheDocument())
   })
 
@@ -143,7 +142,7 @@ describe('Resolve', () => {
         throw new TypeError('offline')
       }),
     )
-    render(<Resolve session={session()} locale="he" wizard={<p data-testid="wizard-stub" />} />)
-    await waitFor(() => expect(screen.getByTestId('staff-tour')).toBeInTheDocument())
+    render(<Resolve session={session()} wizard={<p data-testid="wizard-stub" />} />)
+    await waitFor(() => expect(screen.getByTestId('staff-landing')).toBeInTheDocument())
   })
 })

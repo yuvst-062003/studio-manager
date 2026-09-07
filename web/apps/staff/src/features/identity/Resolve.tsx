@@ -3,7 +3,10 @@
 //   3  resolve  ├─ owner of a studio that has not been set up
 //               │     → studio setup wizard (§5.1), resumable
 //               └─ manager / coach with role assignments
-//                     → 3-screen tour → offline priming → Today
+//                     → offline priming → Today
+//
+// §6.1's 3-screen tour used to sit on that second arm. It was removed on 2026-09-07 --
+// see `StaffLanding.tsx`, which now holds the routing the tour was quietly doing.
 //
 // The third arm — "no role assignment anywhere → refusal" — moved to `AccessGate`
 // (2026-09-02), which wraps this component's caller rather than living inside it — see
@@ -26,10 +29,9 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '@studio/core'
 import type { Session } from '@studio/core'
-import type { Locale } from '@studio/i18n'
-import { StaffTour } from './StaffTour'
+import { StaffLanding } from './StaffLanding'
 
-export type ResolveOutcome = 'loading' | 'wizard' | 'tour'
+export type ResolveOutcome = 'loading' | 'wizard' | 'today'
 
 /**
  * `dismissedAt` is three-valued on purpose:
@@ -50,16 +52,14 @@ export function decideOutcome(
   // else. §5.1 is narrower still — the wizard is what the OWNER is routed into once they
   // accept — so a manager configures a studio from Settings rather than from here.
   const isOwner = active?.roles.includes('owner') ?? false
-  return isOwner && dismissedAt === null ? 'wizard' : 'tour'
+  return isOwner && dismissedAt === null ? 'wizard' : 'today'
 }
 
 export function Resolve({
   session,
-  locale,
   wizard,
 }: {
   session: Session
-  locale: Locale
   /** The setup wizard, injected. It lives in @studio/ui because §5.1 routes both the
    *  staff app and the dashboard into the same one. */
   wizard: React.ReactNode
@@ -105,7 +105,7 @@ export function Resolve({
 
   if (outcome === 'loading') return <p data-testid="staff-resolving" />
   if (outcome === 'wizard') return <div data-testid="staff-wizard">{wizard}</div>
-  return <StaffTour locale={locale} />
+  return <StaffLanding />
 }
 
 /** Any non-null value routes away from the wizard; this one names WHY it is not null. */
