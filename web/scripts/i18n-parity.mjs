@@ -24,6 +24,22 @@
  *
  * Orphan keys, missing namespace files, non-string values and empty strings are hard
  * errors in every locale: none of them is a translation gap, they are all bugs.
+ *
+ * ── And DUPLICATE keys, which this script could not see until 2026-09-07 ──────────
+ * Every check below reads a bundle that has already been `import`ed, and JavaScript
+ * silently collapses a repeated key in an object literal — last one wins. So a namespace
+ * file carrying the same key twice arrived here as ONE entry, and this script reported it
+ * clean. It was not a missing rule; it was a rule the implementation could not express.
+ *
+ * It bit for real: twelve duplicate keys landed across three locales when two lanes edited
+ * `he/schedule.ts` in the same wave, and the gate that exists to catch exactly that said
+ * everything was fine.
+ *
+ * The fix reads the SOURCE rather than the module — `duplicateKeys` below walks the
+ * TypeScript AST for the exported object literal and counts property names in file order.
+ * The AST and not a regex, for the reason this file already gives about transpiling: a
+ * regex over `'key':` would match one inside a Hebrew string and miss one written with a
+ * line break after the colon.
  */
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
@@ -35,6 +51,51 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const DEFAULT_ROOT = resolve(HERE, '../packages/i18n')
 
 export const POLICY = { en: 'strict', ru: 'report' }
+
+/**
+ * Property names that appear more than once in `export const <ns> = { ... }`.
+ *
+ * Walks the AST rather than the imported object, because the imported object is exactly
+ * where the information has already been lost. Only the top level of the literal is
+ * counted — the bundles are flat by construction, and descending would count a key inside
+ * an interpolation object as a sibling of the real ones.
+ */
+export function duplicateKeys(source, ns) {
+  const file = ts.createSourceFile(`${ns}.ts`, source, ts.ScriptTarget.ES2022, true)
+  const counts = new Map()
+
+  const walk = (node) => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === ns &&
+      node.initializer
+    ) {
+      // `as const` / a type assertion wraps the literal; unwrap before reading it.
+      let literal = node.initializer
+      while (ts.isAsExpression(literal) || ts.isTypeAssertionExpression?.(literal)) {
+        literal = literal.expression
+      }
+      if (ts.isObjectLiteralExpression(literal)) {
+        for (const prop of literal.properties) {
+          if (!prop.name) continue
+          const key = ts.isStringLiteral(prop.name) || ts.isNumericLiteral(prop.name)
+            ? prop.name.text
+            : ts.isIdentifier(prop.name)
+              ? prop.name.text
+              : null
+          if (key === null) continue
+          counts.set(key, (counts.get(key) ?? 0) + 1)
+        }
+      }
+      return
+    }
+    ts.forEachChild(node, walk)
+  }
+  walk(file)
+
+  return [...counts.entries()].filter(([, n]) => n > 1).map(([key, n]) => ({ key, count: n }))
+}
 
 async function loadModule(path) {
   const source = await readFile(path, 'utf8')
@@ -70,6 +131,14 @@ export async function checkParity({ root = DEFAULT_ROOT, namespace } = {}) {
         )
         continue
       }
+      // BEFORE the import, because the import is what loses the evidence.
+      for (const { key, count } of duplicateKeys(await readFile(file, 'utf8'), ns)) {
+        errors.push(
+          `${locale}/${ns}.ts: \`${key}\` appears ${count} times — ` +
+            'a repeated key silently keeps the LAST value and drops the others',
+        )
+      }
+
       const bundle = (await loadModule(file))[ns]
       if (!bundle || typeof bundle !== 'object') {
         errors.push(`${locale}/${ns}.ts does not export \`${ns}\``)

@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { checkParity } from './i18n-parity.mjs'
+import { checkParity, duplicateKeys } from './i18n-parity.mjs'
 
 let root: string
 
@@ -24,6 +24,17 @@ function fixture(bundles: Record<string, Record<string, Record<string, string>>>
       )
     }
   }
+}
+
+/** Raw source, because `fixture` goes through `JSON.stringify` and an object cannot carry
+ *  a duplicate key — which is the whole point: the value this checker has to inspect
+ *  cannot be expressed in the value it used to inspect. */
+function rawFixture(locale: string, ns: string, body: string) {
+  mkdirSync(join(root, locale), { recursive: true })
+  writeFileSync(
+    join(root, locale, `${ns}.ts`),
+    `import type { Bundle } from '../types'\nexport const ${ns}: Bundle = ${body}\n`,
+  )
 }
 
 beforeEach(() => {
@@ -106,5 +117,64 @@ describe('i18n parity (seam 3, SPEC §9)', () => {
   it('checks the real tree it ships against', async () => {
     const { errors } = await checkParity({})
     expect(errors).toEqual([])
+  })
+})
+
+describe('duplicate keys — the hole this gate had until 2026-09-07', () => {
+  it('finds a key written twice, which the import collapses to one', () => {
+    const found = duplicateKeys(
+      'export const common: Bundle = {\n  \'a\': \'first\',\n  \'b\': \'x\',\n  \'a\': \'second\',\n}',
+      'common',
+    )
+    expect(found).toEqual([{ key: 'a', count: 2 }])
+  })
+
+  it('is not fooled by a colon inside a Hebrew value, which a regex would be', () => {
+    // The reason this walks the AST. `'שלום: עולם'` contains `: ` inside a string.
+    const found = duplicateKeys(
+      'export const common: Bundle = {\n  \'greet\': \'שלום: עולם\',\n  \'bye\': \'להתראות\',\n}',
+      'common',
+    )
+    expect(found).toEqual([])
+  })
+
+  it('sees a key whose value is on the next line', () => {
+    const found = duplicateKeys(
+      'export const common: Bundle = {\n  \'a\':\n    \'first\',\n  \'a\':\n    \'second\',\n}',
+      'common',
+    )
+    expect(found).toEqual([{ key: 'a', count: 2 }])
+  })
+
+  it('counts three of the same as three', () => {
+    const found = duplicateKeys(
+      'export const common: Bundle = {\'a\':\'1\',\'a\':\'2\',\'a\':\'3\'}',
+      'common',
+    )
+    expect(found).toEqual([{ key: 'a', count: 3 }])
+  })
+
+  it('fails the whole check, in any locale, not only the reference', async () => {
+    fixture({
+      he: { common: { hello: 'שלום' } },
+      en: { common: { hello: 'Hello' } },
+      ru: { common: { hello: 'Привет' } },
+    })
+    rawFixture('en', 'common', '{\n  \'hello\': \'Hello\',\n  \'hello\': \'Hello again\',\n}')
+
+    const { errors } = await checkParity({ root })
+    expect(errors.join('\n')).toMatch(/en\/common\.ts: `hello` appears 2 times/)
+  })
+
+  it('says WHY it matters — the last value wins and the others vanish', async () => {
+    fixture({
+      he: { common: { hello: 'שלום' } },
+      en: { common: { hello: 'Hello' } },
+      ru: { common: { hello: 'Привет' } },
+    })
+    rawFixture('he', 'common', '{\n  \'hello\': \'שלום\',\n  \'hello\': \'שלום שוב\',\n}')
+
+    const { errors } = await checkParity({ root })
+    expect(errors.join('\n')).toMatch(/silently keeps the LAST value/)
   })
 })
