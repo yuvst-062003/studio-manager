@@ -69,7 +69,6 @@ export const comms: Bundle = {
   // -- the push-disabled banner (§5.11) ---------------------------------------------
   'pushDisabled.title': 'Notifications are off',
   'pushDisabled.body': 'You will not hear about cancelled classes',
-  'pushDisabled.openSettings': 'Open settings',
   'pushDisabled.iosNeedsInstall':
     'On iPhone, add the app to your home screen to receive notifications',
   'pushEnabled.confirmation': 'Notifications are on',
@@ -164,5 +163,7 @@ export const comms: Bundle = {
   'updates.loading': 'Loading updates…',
   'updates.loadFailed': "We couldn't load your updates",
   'updates.retry': 'Try again',
+  // Counterpart of he/comms.ts's loadingMore.
+  'updates.loadingMore': 'Loading more updates…',
   'updates.loadMore': 'Load earlier updates',
 }

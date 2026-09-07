@@ -56,6 +56,9 @@ export function UpdatesScreen({
   const [failed, setFailed] = useState(false)
   const [cursor, setCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
+  /** A next page is in flight. The feed draws its own pending line from this, and the
+   *  sentinel will not fire a second request while it is true. */
+  const [loadingMore, setLoadingMore] = useState(false)
   const [filter, setFilter] = useState<UpdateFilter>({ kind: 'all' })
   const push = usePushRegistration(client, userAgent === undefined ? {} : { userAgent })
 
@@ -89,6 +92,7 @@ export function UpdatesScreen({
           // rather than an empty feed, which claims the club has never written to you.
           setRows((current) => current)
         })
+        .finally(() => setLoadingMore(false))
     },
     [client],
   )
@@ -96,6 +100,20 @@ export function UpdatesScreen({
   useEffect(() => {
     load(null)
   }, [load])
+
+  /**
+   * The next page, and the pending flag that goes with it.
+   *
+   * Separate from `load` rather than a branch inside it: `load(null)` is called from the
+   * mount effect, and a `setState` in the synchronous path of an effect body is a cascading
+   * render (`react-hooks/set-state-in-effect`). This one is only ever called from a tap or
+   * from the feed's own intersection observer — both events, neither an effect body.
+   */
+  const loadMore = useCallback(() => {
+    if (loadingMore || cursor === null) return
+    setLoadingMore(true)
+    load(cursor)
+  }, [cursor, load, loadingMore])
 
   const groups = useMemo(
     () => classify(rows ?? [], childrenById, catalogue),
@@ -136,6 +154,12 @@ export function UpdatesScreen({
             behaviour and restyled to the prototype's cards. It is rendered only where there
             is something to ask for — on iOS in a tab the banner above teaches the install
             instead, because the Push API is absent and this button would do nothing.
+
+            **`unasked` is now a state a parent leaves for good.** `decline` used to set it
+            back to `unasked`, so declining returned the parent to this very button and it
+            reappeared on every visit. It sets `declined` now, which is remembered per
+            device and renders nothing here — see `usePushRegistration`. §5.11 asks for the
+            DENIED banner to persist, which it still does; it never asked the invitation to.
 
             The OS dialog opens from the accept button and from nowhere else: on iOS a
             denial is permanent and cannot be re-requested in-app, so the one chance is
@@ -195,7 +219,8 @@ export function UpdatesScreen({
         state={failed && rows === null ? 'failed' : rows === null ? 'loading' : 'ready'}
         onRetry={() => load(null)}
         hasMore={hasMore}
-        onLoadMore={() => load(cursor)}
+        loadingMore={loadingMore}
+        onLoadMore={loadMore}
         onOpen={markRead}
         onMarkAllRead={markAllRead}
         dateLabel={(createdAt) => formatDateInStudioZone(createdAt, locale)}

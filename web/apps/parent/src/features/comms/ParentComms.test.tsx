@@ -74,6 +74,10 @@ function setDisplayMode(mode: 'standalone' | 'browser') {
 }
 
 beforeEach(() => {
+  // A declined pre-prompt is REMEMBERED per device now (2026-09-07), which is the whole
+  // point of it — and that makes it leak between tests in one file, where the earlier
+  // decline test would otherwise hide the offer from every test after it.
+  globalThis.localStorage?.clear()
   setDisplayMode('standalone')
   vi.stubGlobal('Notification', { permission: 'default', requestPermission: vi.fn() })
 })
@@ -250,11 +254,14 @@ describe('the push-disabled banner', () => {
   it('sends an iOS tab to the install rather than to OS settings', () => {
     // There is no permission to change on that device, so a settings button would lead
     // nowhere. The only thing that helps is installing the app.
+    //
+    // It named `pushDisabled.openSettings` until 2026-09-07, when that button was removed
+    // from every state — it was passed no handler by its one caller and did nothing when
+    // pressed. The assertion is now "no button", which is both what this test always meant
+    // and a claim that survives the string being deleted.
     render(<PushDisabledBanner state="unsupported-ios-tab" locale="he" />)
     expect(screen.getByText(t('he', 'comms.push.iosTabHasNoApi'))).toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: t('he', 'comms.pushDisabled.openSettings') }),
-    ).toBeNull()
+    expect(screen.queryByRole('button')).toBeNull()
   })
 
   it('says nothing at all once push is registered', () => {
@@ -426,3 +433,80 @@ describe('layout', () => {
 // what they were really about — that `outstanding` and `read_at` are different questions —
 // is held by `features/comms/redesign/classify.test.ts`, which tests the rule rather than
 // one rendering of it.
+
+describe('the four defects reported on עדכונים (2026-09-07)', () => {
+  const ENABLE = t('he', 'comms.push.enable')
+
+  it('stops offering push once the parent has declined, and stays stopped', async () => {
+    // **The bug.** `decline` set the state back to `unasked` — the exact state that draws
+    // the offer — so declining returned the parent to the button and it came back on every
+    // visit, forever.
+    const user = userEvent.setup()
+    const { unmount } = render(<Updates client={makeClient()} userAgent={ANDROID} />)
+
+    await user.click(await screen.findByRole('button', { name: ENABLE }))
+    await user.click(screen.getByRole('button', { name: t('he', 'comms.push.prePrompt.decline') }))
+
+    expect(screen.queryByRole('button', { name: ENABLE })).not.toBeInTheDocument()
+
+    // And on the next visit — a fresh mount, which is what a returning parent is.
+    unmount()
+    render(<Updates client={makeClient()} userAgent={ANDROID} />)
+    await waitFor(() => expect(screen.getByTestId('parent-updates')).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: ENABLE })).not.toBeInTheDocument()
+  })
+
+  it('still offers push to a parent who has never answered', async () => {
+    // The other half: the fix must not silence the invitation for everyone.
+    render(<Updates client={makeClient()} userAgent={ANDROID} />)
+    expect(await screen.findByRole('button', { name: ENABLE })).toBeInTheDocument()
+  })
+
+  it('does not claim "no updates" while a next page is still unfetched', async () => {
+    // The screen asserting an absence it had not established: a parent whose updates all
+    // sat on page two was told אין עדכונים over the top of them.
+    const client = makeClient({
+      inbox: vi.fn().mockResolvedValue({ items: [], next_cursor: 'c1', has_more: true }),
+    })
+    render(<Updates client={client} userAgent={ANDROID} />)
+
+    await waitFor(() => expect(screen.getByTestId('updates-more')).toBeInTheDocument())
+    expect(screen.queryByTestId('updates-empty')).not.toBeInTheDocument()
+  })
+
+  it('says "no updates" once there is genuinely nothing left to fetch', async () => {
+    render(<Updates client={makeClient()} userAgent={ANDROID} />)
+    expect(await screen.findByTestId('updates-empty')).toBeInTheDocument()
+  })
+
+  it('shows a pending line while the next page is loading', async () => {
+    // It was a bare text link with no pending state — pressing it looked like nothing had
+    // happened at all.
+    let release: (value: unknown) => void = () => {}
+    const client = makeClient({
+      inbox: vi
+        .fn()
+        .mockResolvedValueOnce({ items: [note()], next_cursor: 'c1', has_more: true })
+        .mockImplementationOnce(() => new Promise((resolve) => { release = resolve })),
+    })
+    render(<Updates client={client} userAgent={ANDROID} />)
+
+    await userEvent.click(await screen.findByTestId('updates-load-more'))
+
+    expect(await screen.findByTestId('updates-loading-more')).toBeInTheDocument()
+    release({ items: [], next_cursor: null, has_more: false })
+    await waitFor(() =>
+      expect(screen.queryByTestId('updates-loading-more')).not.toBeInTheDocument(),
+    )
+  })
+
+  it('draws no settings button on the push-disabled banner', () => {
+    // It rendered for every denied parent and its one caller passed no handler, so pressing
+    // it did nothing. `inert-buttons.test.ts` could not see it: the handler is written in
+    // the component as an optional prop, and that guard reads one file at a time.
+    render(<PushDisabledBanner locale="he" state="denied" />)
+
+    expect(screen.getByTestId('push-disabled-banner')).toBeInTheDocument()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+})

@@ -33,6 +33,16 @@ export type PushState =
   | 'unsupported'
   /** Askable, and nothing has been asked yet. */
   | 'unasked'
+  /**
+   * The parent said no to the value pre-prompt. Nothing is offered again.
+   *
+   * **This state did not exist until 2026-09-07, and its absence was the bug.** `decline`
+   * set the state back to `'unasked'` — the exact state that draws the offer — so a parent
+   * who declined was returned to the start and asked again on the next visit, and the next,
+   * forever. §5.11 wants the DENIED banner to persist, which it still does; it never asked
+   * for the invitation to.
+   */
+  | 'declined'
   /** The value pre-prompt is on screen; the OS dialog has not been opened. */
   | 'pre-prompt'
   /** The OS refused. §5.11's persistent banner takes over from here. */
@@ -43,6 +53,27 @@ export type PushState =
   | 'error'
 
 type PushCapableNavigator = Navigator & { serviceWorker?: ServiceWorkerContainer }
+
+/**
+ * Where a decline is remembered.
+ *
+ * `localStorage`, not the server: this is a device-level preference like the theme and the
+ * staff app's `TOUR_SEEN_KEY`, and the OS permission it is about is device-level too. A
+ * parent who declines on their phone and later opens the app on a tablet is a parent who
+ * has never been asked on that tablet, which is the honest reading.
+ */
+export const PUSH_DECLINED_KEY = 'studio.parent.push-declined'
+
+function wasDeclined(): boolean {
+  try {
+    return globalThis.localStorage?.getItem(PUSH_DECLINED_KEY) !== null
+  } catch {
+    // A private window, or storage the browser refuses. Asking again is the safe direction:
+    // the worst case is one more invitation, and the alternative is silently never offering
+    // push to a parent whose browser blocks storage.
+    return false
+  }
+}
 
 export function platformOf(userAgent: string): 'ios' | 'android' | 'web' {
   if (isIosSafari(userAgent)) return 'ios'
@@ -86,6 +117,9 @@ export function usePushRegistration(
     if (typeof globalThis.Notification === 'undefined') return 'unsupported'
     if (globalThis.Notification.permission === 'denied') return 'denied'
     if (globalThis.Notification.permission === 'granted') return 'unasked'
+    // Checked AFTER the permission states, never before: the OS is the authority on whether
+    // push is on, and a remembered decline must not hide a `denied` banner §5.11 requires.
+    if (wasDeclined()) return 'declined'
     return 'unasked'
   }, [platform, displayMode])
 
@@ -97,7 +131,15 @@ export function usePushRegistration(
 
   /** Show §5.11's value pre-prompt. Never the OS dialog directly. */
   const offer = useCallback(() => setState('pre-prompt'), [])
-  const decline = useCallback(() => setState('unasked'), [])
+  const decline = useCallback(() => {
+    try {
+      globalThis.localStorage?.setItem(PUSH_DECLINED_KEY, new Date().toISOString())
+    } catch {
+      // Storage refused. The decline still holds for this session — worse than remembering
+      // it, better than ignoring the answer the parent just gave.
+    }
+    setState('declined')
+  }, [])
 
   /**
    * The OS dialog, and only from the pre-prompt's accept button.

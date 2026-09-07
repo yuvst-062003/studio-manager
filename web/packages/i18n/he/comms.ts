@@ -93,7 +93,6 @@ export const comms: Bundle = {
   // -- the push-disabled banner (§5.11) ---------------------------------------------
   'pushDisabled.title': 'התראות כבויות',
   'pushDisabled.body': 'לא תקבלו עדכונים על ביטולי שיעורים',
-  'pushDisabled.openSettings': 'פתיחת ההגדרות',
   // §6.5 — on iOS there is no way to prompt; Web Push exists only for an installed app.
   'pushDisabled.iosNeedsInstall': 'באייפון יש להוסיף את האפליקציה למסך הבית כדי לקבל התראות',
   'pushEnabled.confirmation': 'התראות פעילות',
@@ -220,5 +219,9 @@ export const comms: Bundle = {
   'updates.loading': 'טוען עדכונים…',
   'updates.loadFailed': 'לא הצלחנו לטעון את העדכונים',
   'updates.retry': 'נסו שוב',
+  // The pending line at the end of the feed (2026-09-07). Scrolling to the bottom now
+  // fetches the next page, and without a word for it the wait looked like the feed
+  // simply ending.
+  'updates.loadingMore': 'טוען עוד עדכונים…',
   'updates.loadMore': 'טעינת עדכונים קודמים',
 }

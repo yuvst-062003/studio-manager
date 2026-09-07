@@ -37,6 +37,7 @@
 //   either. It reuses `comms.updates.filterAll` ("הכל") and calls `onFilterChange({ kind: 'all' })`
 //   — close enough to the prototype's intent to avoid a dead-end empty screen without
 //   inventing new copy.
+import { useEffect, useRef } from 'react'
 import {
   AlertCircle,
   Award,
@@ -124,6 +125,7 @@ export function UpdatesFeed({
   onRetry,
   hasMore,
   onLoadMore,
+  loadingMore = false,
   onOpen,
   onMarkAllRead,
   dateLabel,
@@ -149,6 +151,9 @@ export function UpdatesFeed({
   onRetry: () => void
   hasMore: boolean
   onLoadMore: () => void
+  /** A page is in flight. Draws the spinner at the end of the list, so scrolling into the
+   *  next page looks like loading rather than like the feed having stopped. */
+  loadingMore?: boolean
   /** Called with a row's id when its action is followed — reading is a side effect of
    *  ACTING, never of scrolling past. */
   onOpen: (id: string) => void
@@ -159,6 +164,30 @@ export function UpdatesFeed({
   /** A row's `createdAt` → a formatted date. Studio zone, done by the caller. */
   dateLabel: (createdAt: string) => string
 }) {
+  /**
+   * Scrolling to the end of the feed fetches the next page.
+   *
+   * A `ref` on a one-pixel element rather than a scroll listener: a listener fires on every
+   * frame of a flick and has to be throttled, and the thing it would compute — "is the
+   * bottom on screen" — is exactly what `IntersectionObserver` answers without the
+   * arithmetic.
+   *
+   * Guarded on `loadingMore` so a single pass of the sentinel does not fire two requests,
+   * and re-created when `hasMore` flips so the observer is not left watching a node that
+   * has been unmounted.
+   */
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const node = sentinelRef.current
+    // Absent in older WebViews and in jsdom — the button underneath is the path in both.
+    if (!node || !hasMore || loadingMore || typeof IntersectionObserver === 'undefined') return
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) onLoadMore()
+    })
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [hasMore, loadingMore, onLoadMore])
+
   const totalVisible = groups.urgent.length + groups.club.length + groups.personal.length
 
   return (
@@ -507,8 +536,13 @@ export function UpdatesFeed({
               </section>
             )}
 
-            {/* Empty Feed State */}
-            {totalVisible === 0 && (
+            {/* Empty Feed State.
+                **`&& !hasMore`, added 2026-09-07.** Without it a parent whose updates all
+                sit on page two was told "אין עדכונים" over the top of a feed that had
+                simply not been fetched yet — the screen asserting an absence it had not
+                established. It now says nothing until there is genuinely nothing left to
+                fetch, and the sentinel below does the fetching. */}
+            {totalVisible === 0 && !hasMore && (
               <div className={STATE_SHELL} data-testid="updates-empty">
                 <div className={STATE_ICON_WRAP}>
                   <Bell className="w-7 h-7" />
@@ -531,16 +565,35 @@ export function UpdatesFeed({
               </div>
             )}
 
+            {/* Scrolling to the end loads the next page (2026-09-07). It was a text link
+                with no pending state: pressing it looked like nothing had happened, and on a
+                phone a link at the bottom of a long feed is a thing nobody finds.
+
+                The button STAYS, underneath, and is not decoration — `IntersectionObserver`
+                is absent in older WebViews and never fires in jsdom, so without it the feed
+                would have no way to reach page two at all in those two places. Sighted
+                scrolling and keyboard both work; only one of them needs the observer. */}
             {hasMore && (
-              <div className="text-center pt-2">
-                <button
-                  type="button"
-                  data-testid="updates-load-more"
-                  onClick={onLoadMore}
-                  className="text-xs font-semibold text-[#0056c5] hover:underline"
-                >
-                  {t(locale, 'comms.updates.loadMore')}
-                </button>
+              <div className="text-center pt-2" data-testid="updates-more">
+                <div ref={sentinelRef} aria-hidden="true" className="h-px" />
+                {loadingMore ? (
+                  <p
+                    role="status"
+                    data-testid="updates-loading-more"
+                    className="text-xs font-semibold text-slate-400 py-2"
+                  >
+                    {t(locale, 'comms.updates.loadingMore')}
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    data-testid="updates-load-more"
+                    onClick={onLoadMore}
+                    className="text-xs font-semibold text-[#0056c5] hover:underline"
+                  >
+                    {t(locale, 'comms.updates.loadMore')}
+                  </button>
+                )}
               </div>
             )}
           </>

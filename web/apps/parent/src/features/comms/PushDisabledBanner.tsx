@@ -15,7 +15,7 @@
 // settings screen would show one, and the only thing that would help is installing the app.
 // Sending them to OS settings would be a button that leads nowhere.
 import type { CSSProperties } from 'react'
-import { Alert, Button } from '@studio/ui'
+import { Alert } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { PushState } from './usePushRegistration'
@@ -31,19 +31,23 @@ const bannerStyle: CSSProperties = {
 /**
  * §5.11 asks for "a button that opens OS settings directly", which no web API provides.
  *
- * `app-settings:` is iOS-only and works from a home-screen web app; Chrome exposes nothing
- * equivalent. So the control is rendered as an instruction the parent can follow rather than
- * as a link that silently does nothing on most devices — which is the honest version of the
- * same sentence.
+ * **So the button is gone (2026-09-07), and the prop with it.** `app-settings:` is iOS-only
+ * and only from an installed app; Chrome exposes nothing equivalent. What actually shipped
+ * was a `<Button onClick={onOpenSettings}>` whose one caller — `UpdatesScreen` — passed no
+ * handler, so it rendered on every denied parent's screen and did nothing at all when
+ * pressed. That is the exact defect `tools/__tests__/inert-buttons.test.ts` exists for; the
+ * guard missed it because the handler IS written here, as an optional prop, and the guard
+ * reads one file at a time. A prop nobody supplies is a blind spot it cannot see.
+ *
+ * The banner's own sentence already tells the parent notifications are off, which is the
+ * half of §5.11 that a web app can honestly keep.
  */
 export function PushDisabledBanner({
   state,
   locale,
-  onOpenSettings,
 }: {
   state: PushState
   locale: Locale
-  onOpenSettings?: () => void
 }) {
   // Registered, unasked, or mid-prompt: nothing to warn about yet. `unsupported` is a browser
   // with no Push API at all — a desktop that never had one — and telling that parent their
@@ -68,11 +72,6 @@ export function PushDisabledBanner({
       <Alert tone="pending" iconLabel={t(locale, 'comms.pushDisabled.title')}>
         {iosTab ? t(locale, 'comms.push.iosTabHasNoApi') : t(locale, 'comms.pushDisabled.body')}
       </Alert>
-      {iosTab ? null : (
-        <Button variant="secondary" onClick={onOpenSettings}>
-          {t(locale, 'comms.pushDisabled.openSettings')}
-        </Button>
-      )}
     </div>
   )
 }
