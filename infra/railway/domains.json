@@ -3,6 +3,10 @@
   "base_domain": "gladiatorclub.co.il",
   "railway_project": "studio-manager",
   "railway_project_id": "375bada8-df9f-4afe-8f24-aa37bb5da9ed",
+  "$comment_apex": "#25 (2026-09-08) -- the club's landing page answers at the APEX and at www, not only under app. Both are extra ORIGINS on the parent app, never a replacement for it: `app_origin` must keep naming exactly one reachable host per app, because that is where OAuth returns a signed-in user and a redirect to a second name for the same service is a coin toss. So they live here, where `allowed_origins` widens what the API ACCEPTS without widening where it SENDS people. All three share the registrable domain `gladiatorclub.co.il`, so the host-only SameSite=Lax refresh cookie is unaffected. Removal condition: none -- unlike a mid-migration entry these are permanent, and that is why they are named apart from `transitional_origins`.",
+  "extra_origins": {
+    "production": ["https://gladiatorclub.co.il", "https://www.gladiatorclub.co.il"]
+  },
   "environments": {
     "development": {
       "api": "http://localhost:8000",

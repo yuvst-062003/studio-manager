@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 
-from app.core.cors import DOMAINS_PATH, allowed_origins
+from app.core.cors import DOMAINS_PATH, allowed_origins, app_origin
 
 HOSTS = json.loads(DOMAINS_PATH.read_text(encoding="utf-8"))["environments"]
 
@@ -138,3 +138,33 @@ def test_an_unknown_environment_is_empty_rather_than_permissive():
     """Failing closed. An environment name nobody wrote down should reach no client, not
     every client."""
     assert allowed_origins("nowhere") == []
+
+
+def test_the_apex_and_www_reach_the_api_in_production() -> None:
+    """#25 — the club's landing page answers at `gladiatorclub.co.il` and at `www.`, not
+    only under `app.`.
+
+    The landing page calls `/public/*` cross-origin like every other screen, so a host the
+    allowlist does not carry renders the club's shop window as a load failure — and the
+    apex is the one URL printed on a flyer.
+    """
+    origins = allowed_origins("production")
+    assert "https://gladiatorclub.co.il" in origins
+    assert "https://www.gladiatorclub.co.il" in origins
+    #: Still there, and still the host OAuth returns a signed-in parent to.
+    assert "https://app.gladiatorclub.co.il" in origins
+
+
+def test_the_apex_is_an_origin_and_never_an_app_host() -> None:
+    """`app_origin` decides where OAuth sends a signed-in user back to, and it must keep
+    naming exactly ONE reachable host per app: two names for the same service is a coin
+    toss, and the losing side is a parent who signs in and lands on the wrong hostname
+    holding a cookie set on the other one."""
+    assert app_origin("parent", "production") == "https://app.gladiatorclub.co.il"
+
+
+def test_no_other_environment_acquires_the_apex() -> None:
+    """Staging shares the registrable domain, so a widening applied to the wrong entry
+    would let the production marketing host talk to the staging API."""
+    for env in ("staging", "development"):
+        assert "https://gladiatorclub.co.il" not in allowed_origins(env)

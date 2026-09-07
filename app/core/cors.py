@@ -84,6 +84,29 @@ def _transitional() -> dict[str, list[str]]:
     return transitional
 
 
+def _extra() -> dict[str, list[str]]:
+    """Origins an environment answers PERMANENTLY, beyond its one host per app.
+
+    #25 -- the club's landing page answers at `gladiatorclub.co.il` and `www.` as well as
+    under `app.`, because the apex is the URL on a flyer. Every one of those calls
+    `/public/*` cross-origin like any other screen, so a host missing from this list renders
+    the club's shop window as a load failure.
+
+    **Separate from `_transitional` above, and the difference is the removal condition.**
+    That list is mid-migration scaffolding that a later change is meant to delete; these do
+    not go away, and filing them together would make somebody tidying up the first one
+    delete the second.
+
+    The same rule holds for both: this widens what the API ACCEPTS and never what
+    `app_origin` returns. A second name for one service is a coin toss about where OAuth
+    sends a signed-in parent back to, and the losing side lands on a hostname holding a
+    cookie set on the other one.
+    """
+    data: dict[str, Any] = json.loads(DOMAINS_PATH.read_text(encoding="utf-8"))
+    extra: dict[str, list[str]] = data.get("extra_origins", {})
+    return extra
+
+
 def allowed_origins(env: str) -> list[str]:
     """The origins the API answers credentialed cross-origin requests from.
 
@@ -102,7 +125,7 @@ def allowed_origins(env: str) -> list[str]:
     if origins:
         origins += [
             origin
-            for origin in _transitional().get(resolved, [])
+            for origin in [*_transitional().get(resolved, []), *_extra().get(resolved, [])]
             if _PLACEHOLDER not in origin and origin not in origins
         ]
     return origins
