@@ -11,8 +11,22 @@ import { HomeTop } from './HomeTop'
 import type { HomeChild } from './types'
 
 const CHILDREN: HomeChild[] = [
-  { id: 'c1', firstName: 'יובל', beltColorHex: '#fff' },
-  { id: 'c2', firstName: 'איתי', beltColorHex: '#00f' },
+  {
+    id: 'c1',
+    firstName: 'יובל',
+    displayName: 'יובל סטולין',
+    groupNames: ['קבוצה 1'],
+    beltColorHex: '#ffffff',
+    beltName: 'לבן',
+  },
+  {
+    id: 'c2',
+    firstName: 'איתי',
+    displayName: 'איתי סטולין',
+    groupNames: ['קבוצה 2'],
+    beltColorHex: '#0000ff',
+    beltName: 'כחול',
+  },
 ]
 
 function renderTop(childList: readonly HomeChild[]) {
@@ -34,13 +48,14 @@ describe('HomeTop trainee filter', () => {
     renderTop([CHILDREN[0]!])
     expect(screen.queryByTestId('home-chip-all')).toBeNull()
     // The child's own chip goes with it — it was the other half of the same pair.
-    expect(screen.queryByText('יובל')).toBeNull()
+    expect(screen.queryByTestId('home-chip-c1')).toBeNull()
   })
 
   it('draws it for a family with two', () => {
     renderTop(CHILDREN)
     expect(screen.getByTestId('home-chip-all')).toBeInTheDocument()
-    expect(screen.getByText('יובל')).toBeInTheDocument()
-    expect(screen.getByText('איתי')).toBeInTheDocument()
+    // By test id, not by text: a chip reads "יובל (לבן)" when the child has a belt.
+    expect(screen.getByTestId('home-chip-c1')).toBeInTheDocument()
+    expect(screen.getByTestId('home-chip-c2')).toBeInTheDocument()
   })
 })
