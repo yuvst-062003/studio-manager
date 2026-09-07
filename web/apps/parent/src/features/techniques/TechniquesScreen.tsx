@@ -84,8 +84,20 @@ function TechniqueRow({
   )
 }
 
+/**
+ * What the switch is showing. `Category` itself stays exactly the two the sport has —
+ * `SUBCATEGORIES` and `Technique.category` are keyed by it, and a third member called
+ * "saved" would be a view state smuggled into the domain.
+ */
+type Shown = Category | 'saved'
+
 export function TechniquesScreen({ locale }: { locale: Locale }) {
-  const [category, setCategory] = useState<Category>('nage-waza')
+  // The shelf used to be reachable only by having already used it: it rendered above the
+  // library when it had something in it, and a child who had never saved a technique had
+  // nothing on screen telling them they could (owner, 2026-09-07). It is a segment now, so
+  // it is visible before it is useful — which is the only way anybody finds it.
+  const [shown, setShown] = useState<Shown>('nage-waza')
+  const category: Category = shown === 'saved' ? 'nage-waza' : shown
   const [query, setQuery] = useState('')
   const [shelf, setShelf] = useState(loadShelf)
 
@@ -102,6 +114,13 @@ export function TechniquesScreen({ locale }: { locale: Locale }) {
     () => shelf.favourites.map(techniqueBySlug).filter((t) => t !== undefined),
     [shelf],
   )
+
+  /** The shelf, narrowed by the search box — a child who searches while on their own list
+   *  is asking about that list, not about the whole library. */
+  const savedMatches = useMemo(() => {
+    const matching = new Set(searchTechniques(query).map((technique) => technique.slug))
+    return mine.filter((technique) => matching.has(technique.slug))
+  }, [mine, query])
 
   // Search runs across BOTH categories, then the segmented control narrows the result.
   // Searching only inside the selected one means a child who types a hold while throws
@@ -123,15 +142,16 @@ export function TechniquesScreen({ locale }: { locale: Locale }) {
 
       <SegmentedControl
         legend={t(locale, 'techniques.title')}
-        onValueChange={(next) => setCategory(next as Category)}
+        onValueChange={(next) => setShown(next as Shown)}
         options={[
           { value: 'nage-waza', label: t(locale, 'techniques.category.nage-waza.short') },
           { value: 'katame-waza', label: t(locale, 'techniques.category.katame-waza.short') },
+          { value: 'saved', label: t(locale, 'techniques.shelf.title') },
         ]}
-        value={category}
+        value={shown}
       />
 
-      {mine.length > 0 && query === '' ? (
+      {shown !== 'saved' && mine.length > 0 && query === '' ? (
         <section className="studio-techniques__family" data-testid="my-techniques">
           <SectionHeader level={3} title={t(locale, 'techniques.shelf.title')} />
           <p className="studio-techniques__shelf-hint">{t(locale, 'techniques.shelf.hint')}</p>
@@ -149,7 +169,28 @@ export function TechniquesScreen({ locale }: { locale: Locale }) {
         </section>
       ) : null}
 
-      {nothingAnywhere ? (
+      {shown === 'saved' ? (
+        savedMatches.length === 0 ? (
+          <EmptyState
+            description={t(locale, 'techniques.shelf.empty.hint')}
+            title={t(locale, 'techniques.shelf.empty.title')}
+          />
+        ) : (
+          <section className="studio-techniques__family" data-testid="saved-techniques">
+            <div className="studio-techniques__rows">
+              {savedMatches.map((technique) => (
+                <TechniqueRow
+                  key={technique.slug}
+                  locale={locale}
+                  onToggle={() => toggle(technique.slug)}
+                  saved
+                  technique={technique}
+                />
+              ))}
+            </div>
+          </section>
+        )
+      ) : nothingAnywhere ? (
         <EmptyState
           description={t(locale, 'techniques.search.empty.hint')}
           title={t(locale, 'techniques.search.empty.title')}

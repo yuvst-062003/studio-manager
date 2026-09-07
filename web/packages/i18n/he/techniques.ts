@@ -44,6 +44,10 @@ export const techniques: Bundle = {
   'detail.back': 'חזרה לרשימה',
   'shelf.title': 'הטכניקות שלי',
   'shelf.hint': 'הטכניקות שסימנתם — טוקוי־וואזה',
+  // The segment's own empty state: it is visible before it is useful, so it has to
+  // say how to fill it.
+  'shelf.empty.title': 'עוד לא שמרתם טכניקות',
+  'shelf.empty.hint': 'בכל טכניקה בספרייה יש כפתור הוספה — מה שתסמנו יופיע כאן.',
   'shelf.add': 'הוספה לטכניקות שלי',
   'shelf.add.named': 'הוספת {{name}} לטכניקות שלי',
   'shelf.remove.named': 'הסרת {{name}} מהטכניקות שלי',

@@ -36,6 +36,10 @@ export const techniques: Bundle = {
   'detail.back': 'Назад к списку',
   'shelf.title': 'Мои приёмы',
   'shelf.hint': 'Сохранённые вами — ваши токуй-вадза',
+  // The segment's own empty state: it is visible before it is useful, so it has to
+  // say how to fill it.
+  'shelf.empty.title': 'Пока нет сохранённых приёмов',
+  'shelf.empty.hint': 'У каждого приёма в библиотеке есть кнопка добавления — отмеченное появится здесь.',
   'shelf.add': 'Добавить к моим приёмам',
   'shelf.add.named': 'Добавить {{name}} к моим приёмам',
   'shelf.remove.named': 'Убрать {{name}} из моих приёмов',

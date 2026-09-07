@@ -32,6 +32,10 @@ export const techniques: Bundle = {
   'detail.back': 'Back to the list',
   'shelf.title': 'My techniques',
   'shelf.hint': 'The ones you saved — your tokui-waza',
+  // The segment's own empty state: it is visible before it is useful, so it has to
+  // say how to fill it.
+  'shelf.empty.title': 'No saved techniques yet',
+  'shelf.empty.hint': 'Every technique in the library has an add button — what you mark appears here.',
   'shelf.add': 'Add to my techniques',
   'shelf.add.named': 'Add {{name}} to my techniques',
   'shelf.remove.named': 'Remove {{name}} from my techniques',

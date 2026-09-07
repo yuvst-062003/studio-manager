@@ -7,6 +7,7 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
+import { t } from '@studio/i18n'
 import { TECHNIQUES, familiesOf, ijfUrl, searchTechniques, techniqueBySlug, videoUrl } from './data'
 import { formatSeconds, loadShelf, saveShelf, setStartAt, toggleFavourite } from './shelf'
 import { matchTechniquesPath } from './index'
@@ -337,5 +338,60 @@ describe('adding from the list', () => {
     unmount()
     render(<TechniqueDetail locale="he" slug="uchi-mata" />)
     expect(screen.getByTestId('save-technique')).toHaveAttribute('aria-pressed', 'true')
+  })
+})
+
+// ---------------------------------------------------------------------------------
+// "In the techniques screen there is no button to go to my list / my favourites and
+// inspect them" (owner, 2026-09-07).
+//
+// The shelf existed and worked — it just rendered above the library only once it had
+// something in it. So the only way to discover you could save a technique was to have
+// already saved one. It is a segment now: visible before it is useful.
+// ---------------------------------------------------------------------------------
+describe('the saved segment', () => {
+  it('offers the switch even to a child who has saved nothing', () => {
+    saveShelf({ favourites: [], startAt: {} })
+    render(<TechniquesScreen locale="he" />)
+    expect(screen.getByRole('radio', { name: t('he', 'techniques.shelf.title') })).toBeInTheDocument()
+  })
+
+  it('says how to fill the list when it is empty, rather than showing a blank screen', async () => {
+    saveShelf({ favourites: [], startAt: {} })
+    render(<TechniquesScreen locale="he" />)
+    await userEvent.click(screen.getByRole('radio', { name: t('he', 'techniques.shelf.title') }))
+    expect(screen.getByText(t('he', 'techniques.shelf.empty.title'))).toBeInTheDocument()
+    expect(screen.getByText(t('he', 'techniques.shelf.empty.hint'))).toBeInTheDocument()
+  })
+
+  it('shows the saved techniques, and only those', async () => {
+    saveShelf({ favourites: ['uchi-mata'], startAt: {} })
+    render(<TechniquesScreen locale="he" />)
+    await userEvent.click(screen.getByRole('radio', { name: t('he', 'techniques.shelf.title') }))
+    const list = screen.getByTestId('saved-techniques')
+    expect(within(list).getByTestId('technique-row-uchi-mata')).toBeInTheDocument()
+    // The library is not underneath it.
+    expect(screen.queryByTestId('technique-families')).toBeNull()
+  })
+
+  it('does not draw the shelf twice — the segment IS the shelf', async () => {
+    saveShelf({ favourites: ['uchi-mata'], startAt: {} })
+    render(<TechniquesScreen locale="he" />)
+    expect(screen.getByTestId('my-techniques')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('radio', { name: t('he', 'techniques.shelf.title') }))
+    expect(screen.queryByTestId('my-techniques')).toBeNull()
+  })
+
+  it('narrows the saved list by the search box too', async () => {
+    saveShelf({ favourites: ['uchi-mata', 'kesa-gatame'], startAt: {} })
+    render(<TechniquesScreen locale="he" />)
+    await userEvent.click(screen.getByRole('radio', { name: t('he', 'techniques.shelf.title') }))
+    await userEvent.type(
+      screen.getByLabelText(t('he', 'techniques.search.placeholder')),
+      techniqueBySlug('uchi-mata')!.nameRomaji,
+    )
+    const list = screen.getByTestId('saved-techniques')
+    expect(within(list).getByTestId('technique-row-uchi-mata')).toBeInTheDocument()
+    expect(within(list).queryByTestId('technique-row-kesa-gatame')).toBeNull()
   })
 })
