@@ -608,6 +608,7 @@ export const people: Bundle = {
   'joinWizard.form.guardianFirstName': 'Guardian\'s first name',
   'joinWizard.form.guardianLastName': 'Guardian\'s last name',
   'joinWizard.form.guardianNationalId': 'Guardian\'s national ID',
+  'joinWizard.form.phone': 'Mobile phone',
   'joinWizard.form.guardianPhone': 'Mobile phone',
   'joinWizard.form.guardianEmail': 'Guardian\'s email',
   'joinWizard.form.aliyahYear': 'Year of aliyah',

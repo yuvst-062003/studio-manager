@@ -248,6 +248,7 @@ export function studentFormCopy(locale: Locale) {
     guardianFirstName: t(locale, 'people.joinWizard.form.guardianFirstName'),
     guardianLastName: t(locale, 'people.joinWizard.form.guardianLastName'),
     guardianNationalId: t(locale, 'people.joinWizard.form.guardianNationalId'),
+    phone: t(locale, 'people.joinWizard.form.phone'),
     guardianPhone: t(locale, 'people.joinWizard.form.guardianPhone'),
     guardianEmail: t(locale, 'people.joinWizard.form.guardianEmail'),
     aliyahYear: t(locale, 'people.joinWizard.form.aliyahYear'),

@@ -120,6 +120,24 @@ export function PartDetails({
             onChange={(event) => onChange({ beltId: event.target.value })}
           />
         ) : null}
+        {/* Bug #28 — the adult's OWN mobile, and only the adult's. A minor's number reaches
+            the club through the guardian block below, which is who the club actually rings;
+            asking a child for a phone as well would be collecting a number nobody uses.
+            Required, because it is the account holder's one reachable line — and because
+            being unreachable is how a family finds out their number never saved. */}
+        {!minor ? (
+          <TextField
+            label={copy.phone}
+            type="tel"
+            dir="ltr"
+            required
+            value={student.phone}
+            placeholder={copy.phonePlaceholder}
+            error={errorFor('phone')}
+            onChange={(event) => onChange({ phone: event.target.value })}
+            onBlur={() => onBlurField('phone')}
+          />
+        ) : null}
         {/* §10 — an ACCESS field, not a contact one: it is how an adult member or an older
             child signs in as themselves. Optional, because a young child has no address. */}
         <TextField

@@ -610,6 +610,7 @@ export const people: Bundle = {
   'joinWizard.form.guardianFirstName': 'Имя родителя',
   'joinWizard.form.guardianLastName': 'Фамилия родителя',
   'joinWizard.form.guardianNationalId': 'Удостоверение личности родителя',
+  'joinWizard.form.phone': 'Мобильный телефон',
   'joinWizard.form.guardianPhone': 'Мобильный телефон',
   'joinWizard.form.guardianEmail': 'Эл. почта родителя',
   'joinWizard.form.aliyahYear': 'Год репатриации',

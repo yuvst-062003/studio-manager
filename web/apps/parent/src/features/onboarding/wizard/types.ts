@@ -84,6 +84,12 @@ export type StudentDraft = {
   address: string
   city: string
   email: string
+  /** The member's OWN mobile. Bug #28 — asked only of an adult, who is their own account
+   *  holder: a minor's number reaches the club through `guardianPhone`, and the club rings
+   *  the parent. Without it `toRegisterPayload` had nothing to fall back to and wrote a
+   *  NULL `Person.phone` for every adult who registered themselves, which is the number
+   *  that "did not load" on the profile screen. */
+  phone: string
   grade: GradeKey | ''
   beltId: string
   /** `שנת עליה`, the STUDENT's own. Optional and free-form, like the paper form's block 4.
@@ -168,6 +174,7 @@ export function emptyStudent(id: string, defaults?: Partial<StudentDraft>): Stud
     address: '',
     city: '',
     email: '',
+    phone: '',
     grade: '',
     beltId: '',
     aliyahYear: '',

@@ -716,6 +716,9 @@ export const people: Bundle = {
   'joinWizard.form.guardianFirstName': 'שם פרטי של ההורה',
   'joinWizard.form.guardianLastName': 'שם משפחה של ההורה',
   'joinWizard.form.guardianNationalId': 'תעודת זהות של ההורה',
+  // Bug #28 — the ADULT member's own mobile. Same words as the guardian's, because it is
+  // the same question asked of whoever the account holder is.
+  'joinWizard.form.phone': 'טלפון נייד',
   'joinWizard.form.guardianPhone': 'טלפון נייד',
   'joinWizard.form.guardianEmail': 'דוא״ל של ההורה',
   //: `שנת עליה` — block 4 of the club's paper form, asked of the student and of the

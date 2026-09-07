@@ -89,6 +89,40 @@ describe("the belt picker (bug #10)", () => {
   })
 })
 
+describe('the account holder\u2019s phone (bug #28)', () => {
+  function renderFor(birthDate: string) {
+    render(
+      <StudentFormSheet
+        locale="he"
+        initial={{ ...EXISTING, birthDate }}
+        groups={[]}
+        plans={[]}
+        belts={[]}
+        healthSchema={{ sections: [] } as never}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+      />,
+    )
+  }
+
+  it('asks an adult for their own mobile', () => {
+    // The owner's #28 — 'phone number did not load'. Nothing was broken on the way OUT:
+    // an adult member's number was never asked for, so `Person.phone` was written NULL and
+    // `GET /me/profile` had nothing to return.
+    renderFor('1996-02-02')
+    expect(screen.getByLabelText(COPY.phone, { exact: false })).toBeInTheDocument()
+  })
+
+  it('asks a minor for nothing — the club rings the guardian', () => {
+    renderFor('2015-05-05')
+    // The guardian block carries the number for a child, and it is the one the club uses.
+    expect(screen.getByLabelText(COPY.guardianPhone, { exact: false })).toBeInTheDocument()
+    // Two fields sharing a label would make this ambiguous, which is itself the assertion:
+    // exactly one 'טלפון נייד' on a minor's panel, and it is the guardian's.
+    expect(screen.getAllByLabelText(COPY.phone, { exact: false })).toHaveLength(1)
+  })
+})
+
 describe('discarding an edit', () => {
   it('never calls window.confirm', async () => {
     // The assertion that keeps the system dialog gone. A spy rather than a deletion: if the

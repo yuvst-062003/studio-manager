@@ -27,6 +27,7 @@ export const VALIDATION_COPY = {
   guardianIdRequired: 'שדה חובה: נא להזין תעודת זהות של ההורה',
   guardianIdInvalid: 'תעודת זהות הורה אינה תקינה',
   guardianPhoneRequired: 'שדה חובה: נא להזין מספר נייד של ההורה',
+  phoneRequired: 'שדה חובה: נא להזין מספר נייד',
   phoneInvalid: 'מספר טלפון אינו תקין (לפחות 9 ספרות)',
   guardianEmailRequired: 'שדה חובה: נא להזין כתובת דוא״ל של ההורה',
   pickupNameRequired: 'שדה חובה: נא להזין שם מלווה מורשה',
@@ -54,6 +55,7 @@ export type FieldKey =
   | 'city'
   | 'email'
   | 'grade'
+  | 'phone'
   | 'guardianFirstName'
   | 'guardianLastName'
   | 'guardianNationalId'
@@ -109,6 +111,14 @@ export function fieldError(
     case 'email':
       if (!student.email.trim()) return null
       return EMAIL.test(student.email.trim()) ? null : VALIDATION_COPY.emailInvalid
+    //: Bug #28 — the ADULT's own mobile, mirroring `guardianPhone` below exactly: asked of
+    //: whoever the account holder is, required of them, and not asked at all of the other.
+    //: A minor is reached through their guardian; asking a child for a number as well
+    //: would collect one nobody rings.
+    case 'phone':
+      if (minor) return null
+      if (!student.phone.trim()) return VALIDATION_COPY.phoneRequired
+      return digitsOf(student.phone).length >= 9 ? null : VALIDATION_COPY.phoneInvalid
     //: `REQUIRED_REGISTRATION_FIELDS_SELF` drops this: a school class is a fact about a
     //: school-age child and a grown adult has no answer for it.
     case 'grade':
@@ -208,6 +218,7 @@ export const FIELDS_BY_PART: Record<FormPart, readonly FieldKey[]> = {
     'address',
     'city',
     'email',
+    'phone',
     'grade',
     'guardianFirstName',
     'guardianLastName',

@@ -153,4 +153,33 @@ describe('toRegisterPayload — שנת עליה and הורה 2', () => {
   it('never sends a home phone, because the form no longer asks for one', () => {
     expect(toRegisterPayload([minorDraft()], OPTIONS).signer.phone_home).toBeNull()
   })
+
+  it('sends an ADULT member’s own mobile as the account phone (#28)', () => {
+    // The owner's #28 — 'phone number did not load'. Every other signer field already
+    // falls back to the student's own (`guardianFirstName || firstName`,
+    // `guardianNationalId || nationalId`, `guardianAliyahYear || aliyahYear`); `phone` was
+    // the one that did not, because there was no student-side field to fall back TO.
+    //
+    // So `Person.phone` was written NULL for every adult who registered themselves, and
+    // `GET /me/profile` — which reads that column straight — had nothing to return. The
+    // screen was right: the number was never collected.
+    const adult = {
+      ...emptyStudent('s4'),
+      firstName: 'איגור',
+      lastName: 'פטרוב',
+      birthDate: '1996-02-02',
+      nationalId: '100000009',
+      address: 'יפו 1',
+      city: 'תל אביב',
+      phone: '054-9876543',
+    }
+    expect(toRegisterPayload([adult], OPTIONS).phone).toBe('054-9876543')
+  })
+
+  it('still prefers the guardian’s mobile for a minor (#28)', () => {
+    // The account holder is the GUARDIAN when there is one, so a child who happens to
+    // carry their own number must not displace the parent the club actually rings.
+    const child = { ...minorDraft(), phone: '054-0000000' }
+    expect(toRegisterPayload([child], OPTIONS).phone).toBe('050-1234567')
+  })
 })

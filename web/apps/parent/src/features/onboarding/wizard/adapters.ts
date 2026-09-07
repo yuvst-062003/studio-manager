@@ -125,7 +125,10 @@ export function toRegisterPayload(
   return {
     first_name: signerSource.guardianFirstName || signerSource.firstName,
     last_name: signerSource.guardianLastName || signerSource.lastName,
-    phone: signerSource.guardianPhone || null,
+    //: The same fallback every other signer field on this object uses. Bug #28: this line
+    //: was `guardianPhone || null` with no second half, because the student had no phone
+    //: field at all — so an adult member's account was created with no number on it.
+    phone: signerSource.guardianPhone || signerSource.phone || null,
     signer: {
       national_id: signerSource.guardianNationalId || signerSource.nationalId,
       address: signerSource.address,
