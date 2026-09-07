@@ -117,9 +117,12 @@ describe('11a — handing an item over', () => {
     // D-M6-15. The scope banner's rule: pending hand-over AND marked present today. The
     // list arrives as a prop from the roster, so the cross-lane read of M5's marks is
     // visible at the call site rather than buried in a query.
+    // Queried by ROLE, not by label: the picker is a chip-styled radio group now — eighteen
+    // bare `<input type=radio>` and their labels ran into one unreadable paragraph on a
+    // phone — and `role="radio"` with `aria-checked` is what a screen reader still hears.
     renderSheet({ presentStudents: [PRESENT[0]] })
-    expect(screen.getByLabelText('דנה')).toBeInTheDocument()
-    expect(screen.queryByLabelText('יוסי')).not.toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'דנה' })).toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: 'יוסי' })).not.toBeInTheDocument()
   })
 
   it('cannot confirm before an item is picked', () => {
