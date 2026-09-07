@@ -5,6 +5,7 @@
 // this file asserts used to be asserted against `<Resolve>` directly; the behavior is
 // unchanged, only which component owns it.
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
 import { AccessGate } from './AccessGate'
@@ -130,6 +131,81 @@ describe('AccessGate', () => {
       </AccessGate>,
     )
     expect(container.textContent).not.toMatch(/(מנהל|מאמן)\s*\d/)
+  })
+})
+
+// #32 — the screen the owner met walking the deployed parent app on 2026-09-08.
+//
+// > "The error page needs a redesign. The club logo centred, an error message or a prompt
+// > for an invitation code, and a way back to sign-in. No redirect to the other app."
+//
+// It was `@studio/ui`'s shared `RefusalScreen` — three apps' refusal in one component,
+// whose §6.1 contract is "told which app is theirs and given a direct link". That link is
+// the thing the owner is refusing: a parent who signs in and is told to go to `/staff` has
+// been sent somewhere that will refuse them too. The staff app and the dashboard keep
+// `RefusalScreen` untouched; the parent app now draws its own.
+describe('#32 — the parent refusal screen', () => {
+  function refused() {
+    return render(
+      <AccessGate
+        session={session({ access: { staff: true, parent: false }, studios: [] })}
+        locale="he"
+      >
+        {protectedContent}
+      </AccessGate>,
+    )
+  }
+
+  it('sends nobody to the other app — no link off this app at all', () => {
+    const { container } = refused()
+    expect(container.querySelector('a[href="/staff"]')).toBeNull()
+    expect(screen.queryByText(t('he', 'common.refusal.parent.otherApp'))).toBeNull()
+    // Not just that ONE href: nothing here may leave the parent app. A refusal that
+    // bounces the visitor is the defect, whichever origin it bounces them to.
+    for (const anchor of [...container.querySelectorAll('a')]) {
+      expect(anchor.getAttribute('href') ?? '').toMatch(/^#\//)
+    }
+  })
+
+  it('centres the club logo', () => {
+    refused()
+    const logo = screen.getByTestId('refusal-logo')
+    // An accessible name, not a decorative image: it is the only thing on the screen that
+    // says whose club this is.
+    expect(logo).toHaveAccessibleName(t('he', 'common.appName.parent'))
+    expect(logo.className).toContain('mx-auto')
+  })
+
+  it('says what went wrong AND offers the invitation code', () => {
+    refused()
+    expect(screen.getByText(t('he', 'common.refusal.parent.title'))).toBeInTheDocument()
+    // §6.1 step 3's 'no match' arm is the other half of the owner's "or", and it stays
+    // reachable without a second tap: a correctly-invited parent whose email differs from
+    // the invitation by one character cannot tell their case from a genuine refusal.
+    expect(screen.getByLabelText(t('he', 'common.auth.inviteCodeLabel'))).toBeInTheDocument()
+  })
+
+  it('offers the way back to sign-in, and names it that', () => {
+    refused()
+    expect(
+      screen.getByRole('button', { name: t('he', 'common.auth.backToSignIn') }),
+    ).toBeInTheDocument()
+  })
+
+  it('still signs out when that way back is taken', async () => {
+    const signOut = vi.fn()
+    render(
+      <AccessGate
+        session={session({ access: { staff: false, parent: false }, studios: [], signOut })}
+        locale="he"
+      >
+        {protectedContent}
+      </AccessGate>,
+    )
+    await userEvent.click(
+      screen.getByRole('button', { name: t('he', 'common.auth.backToSignIn') }),
+    )
+    expect(signOut).toHaveBeenCalled()
   })
 })
 

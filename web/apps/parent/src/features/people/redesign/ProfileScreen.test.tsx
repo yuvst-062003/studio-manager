@@ -205,6 +205,38 @@ describe('the accessibility menu inside הגדרות', () => {
   })
 })
 
+// #29 — the SEAM, not the component. `CalendarSyncPopup.test.tsx` proves the popup itself;
+// this proves הגדרות actually opens it, which is the half the owner reported broken: the
+// row led to `#/calendar` — לוח הילד, a whole calendar screen — instead of the subscribe
+// controls its own label promised.
+describe('סנכרון יומן inside הגדרות', () => {
+  it('opens the subscribe popup rather than navigating to the calendar screen', async () => {
+    stubClub()
+    renderScreen()
+    await userEvent.click(await screen.findByTestId('profile-row-settings'))
+
+    const row = await screen.findByTestId('row-calendar-sync')
+    // A control, not a link. A row that navigates is the defect.
+    expect(row.tagName).toBe('BUTTON')
+    expect(row).not.toHaveAttribute('href')
+
+    await userEvent.click(row)
+    expect(await screen.findByTestId('calendar-sync-popup')).toBeInTheDocument()
+  })
+
+  it('still leads to לוח הילד, from a row that says so', async () => {
+    // `#/calendar` had exactly one link in the whole signed-in app and it was the row above,
+    // mislabelled. Splitting them must not strand the screen — the two rows now say which
+    // is which.
+    stubClub()
+    renderScreen()
+    await userEvent.click(await screen.findByTestId('profile-row-settings'))
+    const link = await screen.findByTestId('link-calendar')
+    expect(link).toHaveAttribute('href', '#/calendar')
+    expect(link).toHaveTextContent(t('he', 'people.profile.trainingCalendar'))
+  })
+})
+
 // הוראת קבע and צ׳קים moved here from תשלומים on 2026-09-07. Both are set up ONCE — a
 // mandate moves the money by itself and a season of cheques is handed over in one go — so
 // neither is a monthly decision, and on the payments screen they competed every month with

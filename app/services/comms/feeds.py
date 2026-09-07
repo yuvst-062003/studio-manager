@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import secrets
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from urllib.parse import quote
 
 from sqlalchemy import select
@@ -221,9 +221,36 @@ class CalendarFeedService:
 
     # -- what is in it --------------------------------------------------------
     def events_for(
-        self, person_id: uuid.UUID, subject_type: str, *, at: datetime
+        self,
+        person_id: uuid.UUID,
+        subject_type: str,
+        *,
+        at: datetime,
+        date_from: date | None = None,
+        date_to: date | None = None,
     ) -> list[FeedEvent]:
+        """The entries a subscriber's calendar should hold.
+
+        Bug #29 — the סנכרון יומן popup asks the family for a date range, and until this the
+        route took no parameters and this window was always `LOOK_BACK`/`LOOK_AHEAD`. A
+        question whose answer is discarded is worse than one never asked: a parent who chose
+        one week subscribed to thirteen months with nothing on screen saying so.
+
+        Both ends optional and independent, because the fixed window is still the right
+        answer for the links already in parents' calendars — every one of those carries no
+        parameters and must keep behaving exactly as it did.
+
+        A date, not a datetime: the popup offers two `<input type="date">`, and `date_to` is
+        inclusive of its whole day for the reason a person means the whole day when they name
+        it. The end is pushed to the following midnight rather than to 23:59:59, so a lesson
+        at 23:30 on the last day is in.
+        """
         window = (at - LOOK_BACK, at + LOOK_AHEAD)
+        if date_from is not None:
+            window = (datetime.combine(date_from, time.min, tzinfo=UTC), window[1])
+        if date_to is not None:
+            end_of = datetime.combine(date_to + timedelta(days=1), time.min, tzinfo=UTC)
+            window = (window[0], end_of)
         if subject_type == "coach":
             return self._coach_sessions(person_id, window)
         return self._guardian_sessions(person_id, window) + self._guardian_events(person_id, window)

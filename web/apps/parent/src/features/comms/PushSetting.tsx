@@ -17,6 +17,7 @@
 // OS dialog opens from the accept button and from nowhere else, because on iOS a refusal is
 // permanent and cannot be asked again from inside the app.
 import { Bell } from 'lucide-react'
+import { Alert } from '@studio/ui'
 import { apiFetch } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -59,12 +60,23 @@ export function PushSetting({
           asked, rather than every time they open their inbox. */}
       <PushDisabledBanner locale={locale} state={push.state} />
 
-      {/* Asked outright: this screen IS the intent the old two-step collected. */}
+      {/* Asked outright: this screen IS the intent the old two-step collected.
+
+          **The question wears `Alert` (owner, 2026-09-08: "shaped like the manager app's
+          alerts").** The manager app's alerts are exactly this primitive — every
+          `staff-alerts` card in `apps/staff/.../ConflictSection.tsx` is an `Alert` with a
+          control under it — so matching that shape is reusing the component, not copying a
+          look that could drift from it. `pending` and not `danger` for the same reason
+          `PushDisabledBanner` gives: a parent who has not turned push on has not done
+          anything wrong.
+
+          `live` stays off, per `Alert`'s own docstring: this is standing page content a
+          parent walked into Settings to find, not something that just happened. */}
       {push.state === 'unasked' || push.state === 'pre-prompt' ? (
         <div data-testid="push-pre-prompt" className="space-y-2 text-start">
-          <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+          <Alert tone="pending" iconLabel={t(locale, 'comms.push.settingTitle')}>
             {t(locale, 'comms.push.prePrompt.body')}
-          </p>
+          </Alert>
           <div className="flex gap-2">
             <button
               type="button"

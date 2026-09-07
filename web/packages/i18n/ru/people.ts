@@ -504,7 +504,24 @@ export const people: Bundle = {
   'profile.themeAuto': 'Автоматически',
   'profile.privacy': 'Приватность и мои данные',
   'profile.calendarFeed': 'Синхронизация календаря',
+  // лоח הילד (12b) at `#/calendar`. It used to hide behind the label above, which is how
+  // tapping "calendar sync" opened a calendar screen instead of the subscribe controls
+  // (owner, 2026-09-08). Two rows now, each saying what it opens.
+  'profile.trainingCalendar': 'Расписание тренировок',
   'profile.close': 'Закрыть',
+  // -- #29's calendar-sync popup ----------------------------------------------------
+  // A date range, then three ICON-ONLY controls. Every one of those three names is an
+  // `aria-label` and nothing else appears inside the control, so these strings are the
+  // only thing a screen reader has to go on.
+  'profile.calendarSync.subtitle': 'Выберите период и добавьте тренировки в свой календарь',
+  'profile.calendarSync.rangeLegend': 'Период',
+  'profile.calendarSync.from': 'С даты',
+  'profile.calendarSync.to': 'По дату',
+  'profile.calendarSync.rangeBackwards': 'Дата окончания раньше даты начала',
+  'profile.calendarSync.copy': 'Скопировать ссылку на календарь',
+  'profile.calendarSync.google': 'Добавить в Google Календарь',
+  'profile.calendarSync.apple': 'Добавить в календарь iOS',
+  'profile.calendarSync.copied': 'Ссылка скопирована',
   'profile.loading': 'Загрузка…',
   // -- when a פרופיל sheet's own read failed --------------------------------------
   'profile.sheetFailed': 'Не удалось загрузить данные',

@@ -450,3 +450,73 @@ def test_the_link_is_byte_for_byte_the_one_the_parent_app_builds() -> None:
     assert waze_url("Rothschild Blvd (Bldg. 3!), Tel Aviv") == (
         "https://waze.com/ul?q=Rothschild%20Blvd%20(Bldg.%203!)%2C%20Tel%20Aviv&navigate=yes"
     )
+
+
+# -- the range the subscriber picked (bug #29) ---------------------------------
+
+
+def test_the_feed_honours_a_from_and_to_the_subscriber_chose(
+    client, app_session, studio, as_guardian_of, an_enrolled_student, a_session
+) -> None:
+    """#29's popup asks for a date range, and a question whose answer is discarded is worse
+    than one never asked.
+
+    The סנכרון יומן popup builds its link with `?from=&to=`. Until this the route took no
+    parameters at all and `events_for` applied its own fixed `LOOK_BACK`/`LOOK_AHEAD`, so a
+    parent who picked one week subscribed to thirteen months and had no way to tell.
+    """
+    from app.models.schedule import Session as SessionRow
+
+    far = SessionRow(
+        studio_id=studio.id,
+        group_id=app_session.get(SessionRow, a_session).group_id,
+        training_year_id=app_session.get(SessionRow, a_session).training_year_id,
+        starts_at=T0 + timedelta(days=200),
+        ends_at=T0 + timedelta(days=200, hours=1),
+        status="scheduled",
+    )
+    app_session.add(far)
+    app_session.commit()
+
+    parent = as_guardian_of(an_enrolled_student)
+    _feeds(client, parent)
+    token = _token_of(app_session, parent.person_id, "guardian")
+
+    #: The whole year, as before — both sessions.
+    whole = client.get(f"/api/v1/calendar/{token}.ics").text
+    assert f"UID:session-{a_session}" in whole
+    assert f"UID:session-{far.id}" in whole
+
+    #: A week from T0 — the near session only.
+    narrow = client.get(
+        f"/api/v1/calendar/{token}.ics",
+        params={"from": (T0).date().isoformat(), "to": (T0 + timedelta(days=7)).date().isoformat()},
+    )
+    assert narrow.status_code == 200, narrow.text
+    assert f"UID:session-{a_session}" in narrow.text
+    assert f"UID:session-{far.id}" not in narrow.text
+
+
+def test_a_backwards_range_is_refused_rather_than_silently_emptied(
+    client, app_session, as_guardian_of, an_enrolled_student
+) -> None:
+    """A 422 that names the problem costs one round trip; an empty calendar that looks
+    correct costs a family a term of missed lessons before anybody notices."""
+    parent = as_guardian_of(an_enrolled_student)
+    _feeds(client, parent)
+    token = _token_of(app_session, parent.person_id, "guardian")
+    response = client.get(
+        f"/api/v1/calendar/{token}.ics", params={"from": "2026-12-01", "to": "2026-11-01"}
+    )
+    assert response.status_code == 422, response.text
+
+
+def test_a_feed_with_no_range_is_unchanged(
+    client, app_session, as_guardian_of, an_enrolled_student, a_session
+) -> None:
+    """Every link already in a parent's calendar has no parameters on it, and must keep
+    behaving exactly as it did."""
+    parent = as_guardian_of(an_enrolled_student)
+    _feeds(client, parent)
+    body = _fetch(client, _token_of(app_session, parent.person_id, "guardian")).text
+    assert f"UID:session-{a_session}" in body

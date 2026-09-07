@@ -55,23 +55,55 @@ export type PushState =
 type PushCapableNavigator = Navigator & { serviceWorker?: ServiceWorkerContainer }
 
 /**
- * Where a decline is remembered.
+ * The device's record of the LAST launch's answer — bug #27.
  *
- * `localStorage`, not the server: this is a device-level preference like the theme and the
- * staff app's `TOUR_SEEN_KEY`, and the OS permission it is about is device-level too. A
- * parent who declines on their phone and later opens the app on a tablet is a parent who
- * has never been asked on that tablet, which is the honest reading.
+ * `localStorage`, the same convention `THEME_STORAGE_KEY` follows: this is a device-level
+ * preference, and the OS permission it is about is device-level too. A parent who answers
+ * on their phone and later opens the app on a tablet is a parent who has never been asked
+ * on that tablet, which is the honest reading.
+ *
+ * **It stores which answer, not merely that one was given.** The key it replaces
+ * (`PUSH_DECLINED_KEY`, below) recorded only a refusal, so a parent who said YES had
+ * nothing written down at all — and `initial` mapped their granted permission back to
+ * `'unasked'`, which is the exact state that draws the invitation. The owner walked the
+ * deployed app on 2026-09-08 and met that invitation on every launch.
+ */
+export const PUSH_ANSWER_KEY = 'studio.parent.push-answer'
+
+/**
+ * The 2026-09-07 key, still READ and never written.
+ *
+ * Every parent who declined before #27 landed has this set and nothing under
+ * `PUSH_ANSWER_KEY`. Dropping it would ask all of them again on their next launch —
+ * which is the bug, arriving from the other direction.
  */
 export const PUSH_DECLINED_KEY = 'studio.parent.push-declined'
 
-function wasDeclined(): boolean {
+export type PushAnswer = 'granted' | 'declined'
+
+function rememberedAnswer(): PushAnswer | null {
   try {
-    return globalThis.localStorage?.getItem(PUSH_DECLINED_KEY) !== null
+    const answer = globalThis.localStorage?.getItem(PUSH_ANSWER_KEY)
+    if (answer === 'granted' || answer === 'declined') return answer
+    return globalThis.localStorage?.getItem(PUSH_DECLINED_KEY) == null ? null : 'declined'
   } catch {
     // A private window, or storage the browser refuses. Asking again is the safe direction:
     // the worst case is one more invitation, and the alternative is silently never offering
     // push to a parent whose browser blocks storage.
-    return false
+    //
+    // `== null` above and not `!== null`: `globalThis.localStorage?.…` is `undefined` when
+    // there is no storage object at all, and `undefined !== null` is `true` — which read as
+    // "this parent declined" on every browser without storage.
+    return null
+  }
+}
+
+function remember(answer: PushAnswer): void {
+  try {
+    globalThis.localStorage?.setItem(PUSH_ANSWER_KEY, answer)
+  } catch {
+    // Storage refused. The answer still holds for this session — worse than remembering it,
+    // better than ignoring the answer the parent just gave.
   }
 }
 
@@ -116,10 +148,19 @@ export function usePushRegistration(
     if (platform === 'ios' && displayMode === 'browser') return 'unsupported-ios-tab'
     if (typeof globalThis.Notification === 'undefined') return 'unsupported'
     if (globalThis.Notification.permission === 'denied') return 'denied'
-    if (globalThis.Notification.permission === 'granted') return 'unasked'
+    // **#27.** This returned `'unasked'` — and `'unasked'` is the state `PushSetting` draws
+    // the invitation for, so the one parent who had already said yes was asked again on
+    // every single launch. A granted permission IS an answer, and the most recent one:
+    // whatever this device has written down, the OS outranks it.
+    if (globalThis.Notification.permission === 'granted') return 'registered'
     // Checked AFTER the permission states, never before: the OS is the authority on whether
-    // push is on, and a remembered decline must not hide a `denied` banner §5.11 requires.
-    if (wasDeclined()) return 'declined'
+    // push is on, and a remembered answer must not hide a `denied` banner §5.11 requires.
+    //
+    // A remembered `'granted'` reaching here means the parent granted and later revoked the
+    // permission in OS settings. `'declined'` is the right state for both: it says nothing
+    // is on, it nags nobody, and it keeps the one door — Settings' `push-enable` button —
+    // open for a parent who walks in to change their mind.
+    if (rememberedAnswer() !== null) return 'declined'
     return 'unasked'
   }, [platform, displayMode])
 
@@ -132,12 +173,7 @@ export function usePushRegistration(
   /** Show §5.11's value pre-prompt. Never the OS dialog directly. */
   const offer = useCallback(() => setState('pre-prompt'), [])
   const decline = useCallback(() => {
-    try {
-      globalThis.localStorage?.setItem(PUSH_DECLINED_KEY, new Date().toISOString())
-    } catch {
-      // Storage refused. The decline still holds for this session — worse than remembering
-      // it, better than ignoring the answer the parent just gave.
-    }
+    remember('declined')
     setState('declined')
   }, [])
 
@@ -158,6 +194,12 @@ export function usePushRegistration(
       setState('denied')
       return
     }
+    // #27 — written the moment the OS answers, and BEFORE the subscribe that can fail.
+    // The parent has answered either way; whether the token then reached our server is a
+    // different question, and the `error` state below is what says so. Recording it only
+    // on the happy path would have a parent whose `subscribe()` failed asked again next
+    // launch, which is the bug this key exists to close.
+    remember('granted')
     try {
       // HB-push-transport's second break: this used to call `subscribe` with no
       // `applicationServerKey` at all, which Chrome and Safari both reject outright. Fetched
@@ -208,7 +250,13 @@ export function usePushRegistration(
         await client.deregisterPush(JSON.stringify(subscription))
         await subscription.unsubscribe()
       }
-      setState('unasked')
+      // `'declined'`, not `'unasked'` — #27 made that distinction load-bearing. `'unasked'`
+      // now falls through to `initial`, and `initial` reads the OS permission, which
+      // `unsubscribe()` does not revoke: a parent who switched notifications OFF would have
+      // been told, one render later, that they were on. Turning them off IS an answer, so
+      // it is recorded like one.
+      remember('declined')
+      setState('declined')
     } catch {
       setState('error')
     }

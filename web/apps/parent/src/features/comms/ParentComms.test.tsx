@@ -1,4 +1,7 @@
-// Parent artboard `2b` (עדכוני מועדון) under **D9.1**, §5.11's banner and §5.12's panel.
+// Parent artboard `2b` (עדכוני מועדון) under **D9.1**, and §5.11's push.
+//
+// §5.12's subscribe panel was tested here until #29 (2026-09-08) deleted it; its
+// replacement is covered by `features/people/redesign/CalendarSyncPopup.test.tsx`.
 //
 // **The load-bearing test is the one about a route that does not exist.** §2.3 puts in-app
 // two-way chat out of scope, §5.11 permits exactly two levels — a push notification and a
@@ -15,14 +18,12 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
-import { CalendarSync } from './CalendarSync'
 import { EventCalendarButtons, eventIcsUrl } from './EventCalendarButtons'
 import { PushDisabledBanner } from './PushDisabledBanner'
 import { PushSetting } from './PushSetting'
 import { UpdatesScreen } from './redesign/UpdatesScreen'
 import { platformOf, urlBase64ToUint8Array } from './usePushRegistration'
 import type { NotificationOut, ParentCommsClient } from './commsClient'
-import { googleSubscribeUrl, webcalUrl } from './commsClient'
 
 const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15'
 const ANDROID = 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120'
@@ -60,7 +61,6 @@ function makeClient(over: Partial<ParentCommsClient> = {}): ParentCommsClient {
     preferences: vi.fn().mockResolvedValue({ groups: [] }),
     setPreference: vi.fn().mockResolvedValue({ groups: [] }),
     calendarFeeds: vi.fn().mockResolvedValue({ feeds: [] }),
-    rotateFeed: vi.fn(),
     ...over,
   } as unknown as ParentCommsClient
 }
@@ -238,6 +238,61 @@ describe('asking for push permission', () => {
   })
 })
 
+// -- #27: asked ONCE, and it remembers ----------------------------------------
+/**
+ * Owner, walking the deployed parent app (2026-09-08): *"it should remeber each time i
+ * open it"* — the invitation came back on every launch.
+ *
+ * A decline was already remembered (`PUSH_DECLINED_KEY`, 2026-09-07). A GRANT was not:
+ * `usePushRegistration`'s `initial` mapped `Notification.permission === 'granted'` to
+ * `'unasked'`, and `'unasked'` is the state that draws the invitation. So the one parent
+ * who had said YES was the one who kept being asked.
+ */
+describe('#27 — the permission question is asked once', () => {
+  it('does not re-ask a parent whose OS already granted it', async () => {
+    vi.stubGlobal('Notification', { permission: 'granted', requestPermission: vi.fn() })
+    render(<Push client={makeClient()} userAgent={ANDROID} />)
+
+    expect(await screen.findByTestId('push-setting')).toBeInTheDocument()
+    expect(screen.queryByTestId('push-pre-prompt')).toBeNull()
+    expect(screen.getByTestId('push-on')).toBeInTheDocument()
+  })
+
+  it('records the answer on the device, so the NEXT launch does not ask either', async () => {
+    // The seam, not the component: this mounts, answers, unmounts and mounts again — the
+    // second mount is the "next launch" the owner reported, and a state that lives only in
+    // `useState` passes every test that never remounts.
+    const requestPermission = vi.fn().mockResolvedValue('granted')
+    vi.stubGlobal('Notification', { permission: 'default', requestPermission })
+    stubServiceWorker(vi.fn().mockResolvedValue({ endpoint: 'https://push.example.invalid/a' }))
+
+    const first = render(<Push client={makeClient()} userAgent={ANDROID} />)
+    await userEvent.click(
+      await screen.findByRole('button', { name: t('he', 'comms.push.prePrompt.accept') }),
+    )
+    await waitFor(() => expect(screen.queryByTestId('push-pre-prompt')).toBeNull())
+    first.unmount()
+
+    // A fresh launch. The OS still says `default` here on purpose: the browser is not the
+    // only thing that has to remember, and this app's own record is what the owner meant.
+    render(<Push client={makeClient()} userAgent={ANDROID} />)
+    expect(screen.queryByTestId('push-pre-prompt')).toBeNull()
+  })
+
+  it('wears the manager app\'s alert shape, not a bare browser-style prompt', async () => {
+    // "shaped like the manager app's alerts" (owner). The manager app's alerts ARE
+    // `@studio/ui`'s `Alert` — `apps/staff/src/features/attendance/ConflictSection.tsx`
+    // builds every `staff-alerts` card from it. Asserted through the primitive's own
+    // semantics (an `img` role carrying the alert's label) rather than a class name, so
+    // this still means something after a restyle.
+    render(<Push client={makeClient()} userAgent={ANDROID} />)
+    const prePrompt = await screen.findByTestId('push-pre-prompt')
+    expect(
+      within(prePrompt).getByRole('img', { name: t('he', 'comms.push.settingTitle') }),
+    ).toBeInTheDocument()
+  })
+})
+
 // -- §5.11's persistent banner ------------------------------------------------
 describe('the push-disabled banner', () => {
   it('offers no way to dismiss it', () => {
@@ -283,116 +338,14 @@ describe('the push-disabled banner', () => {
 })
 
 // -- §5.12's three buttons ----------------------------------------------------
-describe('the calendar panel', () => {
-  const feed = {
-    id: 'f1',
-    subject_type: 'guardian' as const,
-    url: 'https://api.example.test/api/v1/calendar/abc.ics',
-    rotated_at: null,
-  }
-
-  function feedClient(over: Partial<ParentCommsClient> = {}) {
-    return makeClient({
-      calendarFeeds: vi.fn().mockResolvedValue({ feeds: [feed] }),
-      ...over,
-    })
-  }
-
-  it('offers Google, Apple and copy — the three §5.12 names', async () => {
-    render(<CalendarSync client={feedClient()} locale="he" />)
-    expect(
-      await screen.findByRole('link', { name: t('he', 'comms.calendar.addGoogle') }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('link', { name: t('he', 'comms.calendar.addApple') }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: t('he', 'comms.calendar.copyLink') }),
-    ).toBeInTheDocument()
-  })
-
-  it('builds the Apple button as a webcal:// URL', async () => {
-    // The scheme is the whole point: webcal:// opens the native SUBSCRIBE sheet, while the
-    // https:// form downloads a one-off snapshot that never updates again — which looks like
-    // it worked and silently stops reflecting the timetable.
-    render(<CalendarSync client={feedClient()} locale="he" />)
-    const apple = await screen.findByRole('link', {
-      name: t('he', 'comms.calendar.addApple'),
-    })
-    expect(apple).toHaveAttribute('href', webcalUrl(feed.url))
-    expect(apple.getAttribute('href')).toMatch(/^webcal:\/\//)
-  })
-
-  it('builds the Google button as a subscribe deep link, not a download', async () => {
-    render(<CalendarSync client={feedClient()} locale="he" />)
-    const google = await screen.findByRole('link', {
-      name: t('he', 'comms.calendar.addGoogle'),
-    })
-    expect(google).toHaveAttribute('href', googleSubscribeUrl(feed.url))
-    expect(google.getAttribute('href')).toContain('calendar.google.com')
-  })
-
-  it('shows a parent the three buttons and nothing else', async () => {
-    // Owner decision, 2026-08-30. The rotate control revoked access to a timetable the
-    // club publishes anyway, so its only reachable outcome was a parent breaking their own
-    // synced calendar; the ~24h lag sentence was a caveat about a risk that goes with it,
-    // on a screen where §5.11's push is what actually carries a cancellation.
-    render(<CalendarSync client={feedClient()} locale="he" />)
-    await screen.findByRole('link', { name: t('he', 'comms.calendar.addGoogle') })
-    expect(screen.queryByRole('button', { name: t('he', 'comms.calendar.rotate') })).toBeNull()
-    expect(screen.queryByText(t('he', 'comms.calendar.refreshDelay'))).toBeNull()
-  })
-
-  it('keeps rotation for a coach, and warns before it happens', async () => {
-    // A coach's feed carries who is teaching what and where, and is published nowhere.
-    // §5.12's "rotating invalidates the old URL immediately" still holds there, so the
-    // warning is a gate rather than a toast after the fact.
-    const coachFeed = { ...feed, subject_type: 'coach' as const }
-    const rotateFeed = vi.fn().mockResolvedValue({ ...coachFeed, rotated_at: '2026-11-12T09:00:00Z' })
-    render(
-      <CalendarSync
-        client={makeClient({
-          calendarFeeds: vi.fn().mockResolvedValue({ feeds: [coachFeed] }),
-          rotateFeed,
-        })}
-        locale="he"
-        subjectType="coach"
-      />,
-    )
-
-    await userEvent.click(
-      await screen.findByRole('button', { name: t('he', 'comms.calendar.rotate') }),
-    )
-    expect(screen.getByTestId('rotate-warning')).toBeInTheDocument()
-    expect(rotateFeed).not.toHaveBeenCalled()
-
-    await userEvent.click(screen.getByRole('button', { name: t('he', 'comms.calendar.rotate') }))
-    await waitFor(() => expect(rotateFeed).toHaveBeenCalledWith('f1'))
-    expect(screen.getByTestId('calendar-rotated')).toBeInTheDocument()
-  })
-
-  it('copies the subscription URL', async () => {
-    const onCopy = vi.fn()
-    render(<CalendarSync client={feedClient()} locale="he" onCopy={onCopy} />)
-    await userEvent.click(
-      await screen.findByRole('button', { name: t('he', 'comms.calendar.copyLink') }),
-    )
-    expect(onCopy).toHaveBeenCalledWith(feed.url)
-    expect(screen.getByText(t('he', 'comms.calendar.linkCopied'))).toBeInTheDocument()
-  })
-
-  it("tells a coach what is in THEIR feed, which is not what is in a parent's", async () => {
-    const coachFeed = { ...feed, id: 'f2', subject_type: 'coach' as const }
-    render(
-      <CalendarSync
-        client={makeClient({ calendarFeeds: vi.fn().mockResolvedValue({ feeds: [coachFeed] }) })}
-        locale="he"
-        subjectType="coach"
-      />,
-    )
-    expect(await screen.findByText(t('he', 'comms.calendar.coachSubtitle'))).toBeInTheDocument()
-  })
-})
+//
+// **The panel they lived on is gone (#29, 2026-09-08).** `CalendarSync.tsx` was deleted,
+// not unrouted: the owner reported that הגדרות → סנכרון יומן opened לוח הילד with the
+// subscribe controls buried below it. The three controls are now a popup off that row,
+// and every assertion this block held moved with them to
+// `features/people/redesign/CalendarSyncPopup.test.tsx` — the webcal:// scheme, the
+// Google deep link, the copy, and a coach's rotation staying out of a parent's app. The
+// coach's own panel is `apps/staff/src/features/comms/CoachCalendarFeed.tsx` and always was.
 
 // -- §5.12's per-event button -------------------------------------------------
 describe('the per-event add button', () => {

@@ -1,12 +1,15 @@
 // The four sheets פרופיל's menu opens. Each wraps markup that already existed as a section
 // on the old stacked screen — the reorder of 2026-09-06 changed where they live, not what
 // they look like inside.
+import { useMemo, useState } from 'react'
 import { Award, ChevronLeft, Plus } from 'lucide-react'
 import { PushSetting } from '../../comms/PushSetting'
+import { makeParentCommsClient } from '../../comms/commsClient'
 import { AccessibilityMenu } from '@studio/ui'
-import { fill } from '@studio/core'
+import { apiFetch, fill } from '@studio/core'
 import { plural, t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { CalendarSyncPopup } from './CalendarSyncPopup'
 import { Sheet } from './Sheet'
 import { SheetFailed } from './SheetFailed'
 import { ProfilePreferences } from './ProfileTop'
@@ -514,6 +517,12 @@ export function SettingsSheet({
   account: AccountControlsProps & { locale: Parameters<typeof AccountControls>[0]['locale'] }
   onClose: () => void
 }) {
+  // #29's popup, opened from the row below and from nowhere else. Local state rather than
+  // another `MenuKey` on `ProfileScreen`: this one opens ON TOP of הגדרות instead of
+  // replacing it, which is what makes it a popup rather than a sixth sheet.
+  const [calendarSyncOpen, setCalendarSyncOpen] = useState(false)
+  const commsClient = useMemo(() => makeParentCommsClient(apiFetch), [])
+
   return (
     <Sheet
       title={t(locale, 'people.profile.menuSettings')}
@@ -542,14 +551,32 @@ export function SettingsSheet({
           <span>{t(locale, 'people.profile.privacy')}</span>
           <ChevronLeft className="w-4 h-4 text-slate-400" aria-hidden="true" />
         </a>
+        {/* **Two rows where there was one (#29, owner 2026-09-08).** The single row was
+            labelled 'סנכרון יומן' and pointed at `#/calendar` — לוח הילד, a whole calendar
+            SCREEN, with the subscribe panel stacked below it. So the label promised the
+            subscribe controls and the tap delivered a calendar.
+
+            Splitting them keeps both honest, and keeps לוח הילד reachable: `#/calendar` had
+            exactly one link in the entire signed-in app and it was this one. */}
         <a
           href="#/calendar"
           data-testid="link-calendar"
           className="flex items-center justify-between px-3.5 py-3 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer"
         >
-          <span>{t(locale, 'people.profile.calendarFeed')}</span>
+          <span>{t(locale, 'people.profile.trainingCalendar')}</span>
           <ChevronLeft className="w-4 h-4 text-slate-400" aria-hidden="true" />
         </a>
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded={calendarSyncOpen}
+          data-testid="row-calendar-sync"
+          onClick={() => setCalendarSyncOpen(true)}
+          className="w-full flex items-center justify-between px-3.5 py-3 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer"
+        >
+          <span>{t(locale, 'people.profile.calendarFeed')}</span>
+          <ChevronLeft className="w-4 h-4 text-slate-400" aria-hidden="true" />
+        </button>
         {/* נגישות. The SAME control the signed-out screens float in the corner — the panel,
             the adjustments and the legally required statement are all `AccessibilityMenu`'s;
             only the opener is drawn here, so this row cannot drift from that one. It sits
@@ -573,6 +600,14 @@ export function SettingsSheet({
       </div>
 
       <AccountControls {...account} />
+
+      {calendarSyncOpen ? (
+        <CalendarSyncPopup
+          locale={locale}
+          client={commsClient}
+          onClose={() => setCalendarSyncOpen(false)}
+        />
+      ) : null}
     </Sheet>
   )
 }

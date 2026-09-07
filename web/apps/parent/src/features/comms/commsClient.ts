@@ -94,8 +94,11 @@ export function makeParentCommsClient(fetcher: Fetcher) {
     calendarFeeds: async (): Promise<{ feeds: CalendarFeedOut[] }> =>
       json(await fetcher('/api/v1/calendar-feeds')),
 
-    rotateFeed: async (feedId: string): Promise<CalendarFeedOut> =>
-      json(await fetcher(`/api/v1/calendar-feeds/${feedId}/rotate`, { method: 'POST' })),
+    // `rotateFeed` was here until #29 (2026-09-08). Its only caller was `CalendarSync`'s
+    // COACH panel, and this is the parent app — a guardian never saw that control, because
+    // the club ruled the timetable is not a secret ("so what if someone sees the schedule.
+    // It is already public"). A coach rotates from `apps/staff`'s own client, which keeps
+    // the method. Deleted with the panel rather than left as a route nothing calls.
   }
 }
 

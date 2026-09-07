@@ -19,8 +19,10 @@ that should sit outside its own gate."
 from __future__ import annotations
 
 import uuid
+from datetime import date
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import Response
 from pydantic import BaseModel
 
@@ -96,7 +98,11 @@ def rotate_calendar_feed(
 
 
 @router.get("/calendar/{token}.ics", response_class=Response)
-def calendar_feed(token: str) -> Response:
+def calendar_feed(
+    token: str,
+    date_from: Annotated[date | None, Query(alias="from")] = None,
+    date_to: Annotated[date | None, Query(alias="to")] = None,
+) -> Response:
     """§5.12's subscription. Unauthenticated, token-secured, RFC 5545.
 
     **The 404 carries nothing.** No "this studio has no such feed", no distinction between a
@@ -109,6 +115,15 @@ def calendar_feed(token: str) -> Response:
     Google refreshes on its own schedule, up to ~24h — which is why §5.11's push exists and
     why `calendar.refreshDelay` says so on the screen.
     """
+    # Bug #29 -- refused, not silently emptied. A backwards range renders a valid, empty
+    # calendar that looks exactly like a club with nothing scheduled; a family would find
+    # out at the end of a term. A 422 that names it costs one round trip, and the popup
+    # already refuses the same shape before it ever builds this URL.
+    if date_from is not None and date_to is not None and date_to < date_from:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "range_backwards", "message": "to must not precede from"},
+        )
     resolved = resolve_feed(token)
     if resolved is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
@@ -119,7 +134,9 @@ def calendar_feed(token: str) -> Response:
         use_studio(studio_id),
         TenantSession(bind=get_engine(), expire_on_commit=False) as scoped,
     ):
-        events = CalendarFeedService(scoped).events_for(person_id, subject_type, at=at)
+        events = CalendarFeedService(scoped).events_for(
+            person_id, subject_type, at=at, date_from=date_from, date_to=date_to
+        )
         # `X-WR-CALNAME` is what the subscriber sees the calendar called in their own app.
         # The studio's name would be nicer and would mean reading `studio` here; the subject
         # type is what distinguishes a person's TWO feeds from each other, which is the

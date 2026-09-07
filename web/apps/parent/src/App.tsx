@@ -43,8 +43,6 @@ import { ScheduleSection, isCalendarRoute } from './features/schedule/ScheduleSe
 // staff roster, the dashboard count and `הודעתם מראש` are all built to read.
 import { AbsenceScreen, makeAbsenceClient } from './features/absence'
 import { registerAttendanceSections } from './features/attendance'
-// §5.12's subscription panel, rendered under the calendar it feeds (P1).
-import { CalendarSync } from './features/comms'
 import { makeParentScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
 import { PublicLanding, makeLandingClient, matchLandingPath } from './features/landing'
@@ -779,8 +777,13 @@ function AuthedApp() {
               Neither blocks the app. `App.test.tsx`'s "no second payment question" guards
               it. */}
           {session.access.parent && isCalendarRoute(hash) ? (
-            <>
-              <ScheduleSection
+            // §5.12's subscription panel used to stand under this calendar. **Deleted, not
+            // moved out of the way (#29, 2026-09-08):** the owner reported that הגדרות →
+            // סנכרון יומן — whose one job is the subscribe controls — opened THIS screen and
+            // buried them below a whole month of lessons. They are a popup on that row now
+            // (`features/people/redesign/CalendarSyncPopup.tsx`), so `#/calendar` is לוח
+            // הילד and nothing else, and there is no second copy of §5.12 to drift.
+            <ScheduleSection
                 locale={locale}
                 client={scheduleClient}
                 hash={hash}
@@ -789,11 +792,7 @@ function AuthedApp() {
                 // one: the deadline, the refusal codes and the no-queue rule are all
                 // already correct there, and two clients is two places for them to drift.
                 absence={absenceClient}
-              />
-              {/* §5.12 — the feed subscription lives under the calendar it feeds, which
-                  is where a parent thinking about calendars already is (P1). */}
-              <CalendarSync client={commsClient} locale={locale} />
-            </>
+            />
           ) : onAbsence ? (
             // `12a`. The children come from the same read §6.1's gate makes; inside the
             // gate they are non-null. The screen itself refuses to work offline, on

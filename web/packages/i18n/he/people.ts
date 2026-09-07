@@ -601,7 +601,24 @@ export const people: Bundle = {
   'profile.themeAuto': 'אוטומטי',
   'profile.privacy': 'פרטיות והנתונים שלי',
   'profile.calendarFeed': 'סנכרון יומן',
+  // לוח הילד (12b) at `#/calendar`. It used to hide behind the 'סנכרון יומן' label above,
+  // which is how tapping "calendar sync" opened a calendar screen instead of the subscribe
+  // controls (owner, 2026-09-08). Two rows now, each saying what it opens.
+  'profile.trainingCalendar': 'לוח האימונים',
   'profile.close': 'סגירה',
+  // -- #29's סנכרון יומן popup ------------------------------------------------------
+  // A date range, then three ICON-ONLY controls. Every one of those three names is an
+  // `aria-label` and nothing else appears inside the control, so these strings are the
+  // only thing a screen reader has to go on.
+  'profile.calendarSync.subtitle': 'בחרו טווח תאריכים והוסיפו את האימונים ליומן שלכם',
+  'profile.calendarSync.rangeLegend': 'טווח תאריכים',
+  'profile.calendarSync.from': 'מתאריך',
+  'profile.calendarSync.to': 'עד תאריך',
+  'profile.calendarSync.rangeBackwards': 'תאריך הסיום מוקדם מתאריך ההתחלה',
+  'profile.calendarSync.copy': 'העתקת קישור היומן',
+  'profile.calendarSync.google': 'הוספה ליומן Google',
+  'profile.calendarSync.apple': 'הוספה ליומן iOS',
+  'profile.calendarSync.copied': 'הקישור הועתק',
   'profile.loading': 'טוען…',
   // -- when a פרופיל sheet's own read failed --------------------------------------
   // Each of the screen's reads used to end `.catch(() => setChildren([]))`, so a network

@@ -1710,7 +1710,7 @@ export interface paths {
          *     process alive", and a database it cannot reach does not make it dead. Letting the
          *     failure propagate would turn every database blip into a page.
          */
-        get: operations["read_health_api_v1_health_head"];
+        get: operations["read_health_api_v1_health_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1723,7 +1723,7 @@ export interface paths {
          *     process alive", and a database it cannot reach does not make it dead. Letting the
          *     failure propagate would turn every database blip into a page.
          */
-        head: operations["read_health_api_v1_health_head"];
+        head: operations["read_health_api_v1_health_get"];
         patch?: never;
         trace?: never;
     };
@@ -3084,6 +3084,11 @@ export interface paths {
          * Create Studio
          * @description §5.1 -- 'Studios are provisioned by the platform operator, never self-created.
          *     There is no צור סטודיו button anywhere in the staff app.'
+         *
+         *     A slug already in use is a 409 and not the unique constraint's IntegrityError. That
+         *     error escaped the route as a 500, and the console has exactly one rendering for a
+         *     failure with no code -- so the operator was told "the action failed" and left to guess
+         *     which of the two fields to change.
          */
         post: operations["create_studio_api_v1_platform_studios_post"];
         delete?: never;
@@ -14339,7 +14344,10 @@ export interface operations {
     };
     calendar_feed_api_v1_calendar__token__ics_get: {
         parameters: {
-            query?: never;
+            query?: {
+                from?: string | null;
+                to?: string | null;
+            };
             header?: never;
             path: {
                 token: string;
@@ -15998,7 +16006,7 @@ export interface operations {
             };
         };
     };
-    read_health_api_v1_health_head: {
+    read_health_api_v1_health_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -16018,7 +16026,7 @@ export interface operations {
             };
         };
     };
-    read_health_api_v1_health_head: {
+    read_health_api_v1_health_get: {
         parameters: {
             query?: never;
             header?: never;

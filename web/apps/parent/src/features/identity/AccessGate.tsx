@@ -13,7 +13,6 @@
 // guardian row never reaches this shell". This component IS that shell boundary: `App.tsx`
 // mounts it above `AppShell`, and `AppShell` renders only as `children`, once passed.
 import { useEffect, useState } from 'react'
-import { RefusalScreen } from '@studio/ui'
 import type { Session } from '@studio/core'
 import { apiFetch } from '@studio/core'
 import { t } from '@studio/i18n'
@@ -21,9 +20,14 @@ import type { Locale } from '@studio/i18n'
 // §2 decision 3 -- "cleared ... on sign-out," the second of this app's two sign-out
 // call sites (App.tsx's account drawer is the other).
 import { clearAllJoinDrafts } from '../onboarding/joinDraftStorage'
+import { ParentRefusalScreen } from './ParentRefusalScreen'
 
-/** Where the staff app lives, so §6.1's second refusal is a link rather than a dead end. */
-const STAFF_APP_URL = '/staff'
+// **`STAFF_APP_URL` and `RefusalScreen` are gone (#32, owner 2026-09-08).** The shared
+// component's §6.1 contract is "told which app is theirs and given a direct link", and the
+// owner's ruling is that the parent app must send nobody to `/staff`: the account this
+// screen actually refuses is one that belongs to nothing anywhere (any Google account can
+// authenticate), so the "direct link" was a second door that refuses them again. The staff
+// app and the dashboard still import `RefusalScreen` and are deliberately unchanged.
 
 /** Task 9b §2 -- what `POST /accept-invitation` names, the moment it names it. `id` is
  *  the invited `Student`; `name` is `null` only for the (staff/manager) invitations that
@@ -116,39 +120,25 @@ export function AccessGate({
   }
 
   if (!session.access.parent) {
+    // One screen now, not a refusal plus a bare `<section>` bolted under it. §6.1 step 3's
+    // 'no match' branch is inside it and still one tap deep, for the reason it always was:
+    // a correctly-invited parent whose email differs from the invitation by one character
+    // has no way forward at all without it, and that person cannot tell their situation
+    // from a genuine refusal.
     return (
-      <>
-        <RefusalScreen
-          which="parent"
-          otherAppUrl={STAFF_APP_URL}
-          onSignOut={() => {
-            clearAllJoinDrafts()
-            void session.signOut()
-          }}
-          locale={locale}
-          email={session.email}
-        />
-        {/* §6.1 step 3's 'no match' branch. Without it, a correctly-invited parent whose
-            email differs from the invitation by one character has no way forward at all
-            — and that person cannot tell their situation from a genuine refusal. */}
-        <section data-testid="parent-no-match">
-          <p>{t(locale, 'common.auth.notFound')}</p>
-          <label htmlFor="invite-code">{t(locale, 'common.auth.inviteCodeLabel')}</label>
-          <input
-            id="invite-code"
-            value={code}
-            onChange={(event) => setCode(event.target.value)}
-          />
-          <button
-            type="button"
-            onClick={() => {
-              void redeem(code)
-            }}
-          >
-            {t(locale, 'common.auth.haveInviteCode')}
-          </button>
-        </section>
-      </>
+      <ParentRefusalScreen
+        locale={locale}
+        email={session.email}
+        code={code}
+        onCodeChange={setCode}
+        onRedeem={() => {
+          void redeem(code)
+        }}
+        onSignOut={() => {
+          clearAllJoinDrafts()
+          void session.signOut()
+        }}
+      />
     )
   }
 

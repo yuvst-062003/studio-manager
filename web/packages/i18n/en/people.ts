@@ -502,7 +502,24 @@ export const people: Bundle = {
   'profile.themeAuto': 'Automatic',
   'profile.privacy': 'Privacy and my data',
   'profile.calendarFeed': 'Calendar sync',
+  // לוח הילד (12b) at `#/calendar`. It used to hide behind the 'Calendar sync' label above,
+  // which is how tapping "calendar sync" opened a calendar screen instead of the subscribe
+  // controls (owner, 2026-09-08). Two rows now, each saying what it opens.
+  'profile.trainingCalendar': 'Training calendar',
   'profile.close': 'Close',
+  // -- #29's calendar-sync popup ----------------------------------------------------
+  // A date range, then three ICON-ONLY controls. Every one of those three names is an
+  // `aria-label` and nothing else appears inside the control, so these strings are the
+  // only thing a screen reader has to go on.
+  'profile.calendarSync.subtitle': 'Pick a date range and add the sessions to your calendar',
+  'profile.calendarSync.rangeLegend': 'Date range',
+  'profile.calendarSync.from': 'From',
+  'profile.calendarSync.to': 'To',
+  'profile.calendarSync.rangeBackwards': 'The end date is before the start date',
+  'profile.calendarSync.copy': 'Copy the calendar link',
+  'profile.calendarSync.google': 'Add to Google Calendar',
+  'profile.calendarSync.apple': 'Add to iOS Calendar',
+  'profile.calendarSync.copied': 'Link copied',
   'profile.loading': 'Loading…',
   // -- when a פרופיל sheet's own read failed --------------------------------------
   'profile.sheetFailed': "We couldn't load this",
