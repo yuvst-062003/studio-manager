@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import base64
 import os
+import re
+import zlib
 from pathlib import Path
 
 import pytest
@@ -139,7 +141,9 @@ def test_the_pdf_embeds_a_hebrew_capable_font_rather_than_a_base14_one():
     base-14 fonts has a Hebrew glyph at all."""
     produced = render_declaration_pdf(**GOLDEN_INPUT)
     assert b"/FontFile2" in produced
-    assert b"NotoSansHebrew" in produced
+    # `NotoSansStudio`, not `NotoSansHebrew`: the face is that one merged with Noto Sans's
+    # Cyrillic (`scripts/build-pdf-font.py`), because §9's `ru` locale had no glyphs at all.
+    assert b"NotoSansStudio" in produced
     assert b"/Identity-H" in produced
     assert b"/CIDFontType2" in produced
 
@@ -260,3 +264,130 @@ def test_the_questionnaire_version_is_not_printed_on_the_document():
     produced = render_declaration_pdf(**GOLDEN_INPUT)
     other = render_declaration_pdf(**{**GOLDEN_INPUT, "template_version": 99})
     assert produced == other, "the version cannot be on the page if changing it changes nothing"
+
+
+# ==========================================================================================
+# Russian — §9's third locale, which this writer could not draw at all
+# ==========================================================================================
+# §9 ships `ru` as a first-class locale and `web/packages/i18n/ru/health.ts` really does send
+# `Да`/`Нет` as declaration answers. The face embedded here covered Hebrew and Latin and **no
+# Cyrillic whatsoever**, so a Russian-speaking family's signed declaration rendered its name,
+# its answers and its signature line as rows of `.notdef` boxes.
+#
+# Two defects, and the second hid behind the first: `_is_ltr_char` tested `char.isascii()`, so
+# Cyrillic classified as *neutral*, resolved to the base RTL direction, and came out reversed.
+# Fixing only the font would have shipped `воцензуК` — worse than boxes, because boxes are
+# visibly broken and a backwards name is not, to a reader who cannot read the script.
+#
+# §9's own test matrix says "every component in both `he` and `en`", which is why neither
+# defect was caught. `test_a_declaration_draws_no_missing_glyphs` below is the guard that does
+# not depend on someone remembering to add a locale: it fails for ANY script the face lacks.
+
+RUSSIAN_INPUT = {
+    **GOLDEN_INPUT,
+    "student_name": "Даниил Кузнецов",
+    "signed_by": "Екатерина Кузнецова",
+    "sections": [
+        RenderedSection(
+            title="Общее здоровье",
+            rows=[
+                ("Есть ли астма?", "Нет"),
+                ("Есть ли аллергия?", "Да — арахис"),
+                ("Телефон для экстренной связи", "050-0000000"),
+            ],
+        ),
+    ],
+    "signature_line": "Я, Екатерина Кузнецова, подтверждаю, что прочитала декларацию о здоровье",
+}
+
+
+def _drawn_glyph_ids(pdf: bytes) -> list[int]:
+    """Every glyph id the document actually paints.
+
+    Reads the content streams rather than the font's cmap on purpose. A cmap assertion proves
+    the face covers a character; only the drawn stream proves the character reached the page as
+    that glyph — which is the seam the two defects above slipped through.
+    """
+    ids: list[int] = []
+    for match in re.finditer(rb"stream\r?\n(.*?)\r?\nendstream", pdf, re.S):
+        try:
+            content = zlib.decompress(match.group(1))
+        except zlib.error:
+            continue  # the embedded font file and the signature raster
+        for run in re.findall(rb"<([0-9A-Fa-f]+)> Tj", content):
+            ids.extend(int(run[at : at + 4], 16) for at in range(0, len(run), 4))
+    return ids
+
+
+def test_cyrillic_inside_a_hebrew_sentence_keeps_its_own_order():
+    """Exactly what `test_latin_inside_a_hebrew_sentence_is_not_reversed` asserts, in the
+    script that was classified as neutral instead of as text."""
+    assert shape_rtl("שם: Кузнецов") == "Кузнецов :םש"
+
+
+def test_a_pure_cyrillic_string_is_untouched():
+    assert shape_rtl("Кузнецов") == "Кузнецов"
+
+
+def test_cyrillic_is_not_reversed_the_way_a_neutral_run_would_be():
+    """The precise defect: `_is_ltr_char` tested `isascii()`, so every Cyrillic letter was a
+    neutral and the run took the base RTL direction."""
+    assert shape_rtl("Даниил Кузнецов") == "Даниил Кузнецов"
+
+
+def test_the_embedded_face_covers_cyrillic():
+    from app.services.health.pdf import _font
+
+    face = _font()
+    missing = [c for c in "ДаниилКузнецовЕкатеринаЖШЩЪЫЬЭЮЯёй" if face.glyph(c) == 0]
+    assert not missing, f"the embedded face has no glyph for {''.join(missing)}"
+
+
+def test_a_russian_declaration_draws_no_missing_glyphs():
+    """The seam test. A Russian family's declaration must reach the page as real glyphs."""
+    produced = render_declaration_pdf(**RUSSIAN_INPUT)
+    assert 0 not in _drawn_glyph_ids(produced), "the document paints .notdef boxes"
+
+
+def test_a_declaration_draws_no_missing_glyphs():
+    """The same guard on the Hebrew fixture, so a future font swap that drops Hebrew or Latin
+    coverage fails here rather than on a family's signed document."""
+    produced = render_declaration_pdf(**GOLDEN_INPUT)
+    assert 0 not in _drawn_glyph_ids(produced)
+
+
+# ==========================================================================================
+# Base direction — a paragraph is not RTL just because the document is
+# ==========================================================================================
+# `shape_rtl` hardcoded the base direction to RTL, which is right for the Hebrew this document is
+# mostly made of and wrong for every LTR paragraph in it. Unicode resolves a neutral run at the
+# edge of a line to the *paragraph* direction (UBA N2), so a sentence-final full stop in a Russian
+# or English paragraph was classified RTL and emitted first: `.и/или руководителю клуба`.
+#
+# Invisible in Russian behind the missing glyphs, and invisible in English because nobody had
+# rendered an English declaration and looked at it. The club's `תנאי תשלום` are Hebrew, so the
+# only prose long enough to show it was in a locale nothing exercised.
+
+
+def test_a_russian_sentence_keeps_its_full_stop_at_the_end():
+    assert shape_rtl("и/или руководителю клуба.") == "и/или руководителю клуба."
+
+
+def test_a_russian_clause_keeps_its_comma_at_the_end():
+    assert shape_rtl("выдерживать нагрузку,") == "выдерживать нагрузку,"
+
+
+def test_an_english_sentence_keeps_its_full_stop_at_the_end():
+    """The same defect in the locale §9's matrix claims to cover."""
+    assert shape_rtl("Signed by the parent.") == "Signed by the parent."
+
+
+def test_a_hebrew_sentence_still_keeps_its_full_stop_on_the_left():
+    """The mirror case, and the reason the base direction has to be derived rather than fixed
+    either way: in an RTL paragraph the full stop genuinely does belong at the visual left."""
+    assert shape_rtl("ההורה חתם.") == ".םתח הרוהה"
+
+
+def test_hebrew_inside_a_russian_sentence_is_still_reversed():
+    """Base LTR does not mean 'no bidi'. An RTL run inside an LTR paragraph still reverses."""
+    assert shape_rtl("Клуб מועדון today") == "Клуб ןודעומ today"

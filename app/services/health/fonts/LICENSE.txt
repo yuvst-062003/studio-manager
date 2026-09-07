@@ -1,4 +1,27 @@
-Copyright 2022 The Noto Project Authors (https://github.com/notofonts/hebrew)
+NotoSansStudio-Regular.ttf is a MERGED face, built by scripts/build-pdf-font.py from
+the two Noto sources below. It is what app/services/health/pdf.py embeds in every signed
+health declaration; NotoSansHebrew-Regular.ttf is kept because it is one of the build's
+two inputs, not because anything renders with it directly.
+
+Why it exists: no single Noto face covers Hebrew and Cyrillic, and SPEC.md section 9 ships
+Hebrew, English and Russian. The merge is Hebrew (base, so its Hebrew and Latin glyphs are
+untouched) plus the Cyrillic block from the Latin/Greek/Cyrillic face.
+
+Both sources are OFL 1.1 with NO Reserved Font Name, so the merged result may carry a name
+of its own -- and does, because it is neither upstream face.
+
+  Hebrew glyphs, and the base of the merge:
+    Copyright 2022 The Noto Project Authors (https://github.com/notofonts/hebrew)
+    NotoSansHebrew-Regular.ttf
+    sha256 7ef36a2c3593758cdb622e1bdef4f84523e92fbc3ccc667438dd80ff54c2de88
+
+  Cyrillic glyphs (U+0400-U+04FF) and the U+2010-U+2027 punctuation Russian prose needs:
+    Copyright 2022 The Noto Project Authors
+    (https://github.com/notofonts/latin-greek-cyrillic)
+    NotoSans-Regular.ttf
+    sha256 141494de430d4f68e13c91138e10ae755909de8f5ff274db6f17becd393a2898
+
+Both are licensed under the SIL Open Font License, Version 1.1, and so is the merged face.
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

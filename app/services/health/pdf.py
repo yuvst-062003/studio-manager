@@ -1,8 +1,17 @@
-"""§5.5's signed PDF: a dependency-free writer with an embedded Hebrew face and explicit bidi.
+"""§5.5's signed PDF: a dependency-free writer with an embedded face and explicit bidi.
 
 §5.5, verbatim: *"Hebrew PDF rendering requires an embedded RTL-capable font (Noto Sans Hebrew) and
 explicit bidi handling. This is a known-fiddly area and gets its own test fixture comparing rendered
 output against a golden PDF."* All three clauses are load-bearing and each is answered here.
+
+**The face is Noto Sans Hebrew plus Cyrillic**, merged by `scripts/build-pdf-font.py`. §5.5 names
+the Hebrew face because Hebrew is the hard case; it is not an instruction to render only Hebrew.
+§9 has shipped `ru` as a first-class locale since launch and `web/packages/i18n/ru/health.ts` sends
+`Да`/`Нет` as declaration answers, but the Hebrew-only face had **no Cyrillic at all**, so a
+Russian-speaking family's name, answers and signature line rendered as rows of `.notdef` boxes on
+the one artefact a club might hand an insurer. `test_a_declaration_draws_no_missing_glyphs` is the
+guard that now fails for any script the face lacks, rather than waiting for someone to add a
+locale to a test matrix that §9 itself scoped to `he` and `en`.
 
 **Why this is written rather than imported.** `requirements-dev.txt` carries no PDF library and
 adding one is outside this lane's ownership — but that is the smaller reason. The larger one is the
@@ -41,10 +50,22 @@ from zoneinfo import ZoneInfo
 #: signature, which in Israel is most of them.
 STUDIO_TZ = ZoneInfo("Asia/Jerusalem")
 
-FONT_PATH = Path(__file__).parent / "fonts" / "NotoSansHebrew-Regular.ttf"
+#: Noto Sans Hebrew merged with Noto Sans's Cyrillic, built by `scripts/build-pdf-font.py`.
+#:
+#: **One face, not two, and that is the whole design.** §9 ships `he`, `en` and `ru`; no single
+#: Noto face covers Hebrew and Cyrillic together. Embedding two would mean splitting every text
+#: run by which face covers each character — a second split inside `_Page.text_rtl`, over the same
+#: string as the direction split but on different boundaries, plus two `/W` arrays and a `width()`
+#: that has to know which face it is measuring in. Merging offline keeps the single-font invariant
+#: that makes `_hex_glyphs`, `_wrap` and `width` as short as they are.
+#:
+#: It is also *smaller* than the Hebrew face it replaces — 53 KB against 113 KB — because the
+#: vendored Hebrew Noto is a **variable** font, and until this face landed every signed
+#: declaration embedded a `gvar`/`fvar`/`HVAR` variation system that no PDF viewer applies.
+FONT_PATH = Path(__file__).parent / "fonts" / "NotoSansStudio-Regular.ttf"
 #: The name that appears in `/BaseFont`. Fixed rather than read from the `name` table: a font
 #: update that renamed itself would silently change every golden fixture in the suite.
-FONT_NAME = "NotoSansHebrew"
+FONT_NAME = "NotoSansStudio"
 
 # -- page geometry, in PDF points (1/72") --------------------------------------
 PAGE_WIDTH = 595.0  # A4
@@ -87,25 +108,67 @@ def is_rtl_char(char: str) -> bool:
 
 
 def _is_ltr_char(char: str) -> bool:
-    """Latin letters and digits. Both behave the same way inside an RTL line: they keep their own
-    order and are positioned as a unit, which is why `054` does not come out as `450`."""
-    return char.isascii() and char.isalnum()
+    """Any letter or digit that is not RTL. All of them behave the same way inside an RTL line:
+    they keep their own order and are positioned as a unit, which is why `054` does not come out
+    as `450`.
+
+    **This tested `char.isascii()` until Cyrillic arrived**, which made every Russian letter a
+    *neutral* — and a neutral run resolves to the base direction, so `Кузнецов` came out as
+    `воцензуК` on a signed declaration. §9 has shipped `ru` as a first-class locale since launch;
+    the face embedded here had no Cyrillic at all, so the reversal was invisible behind a row of
+    `.notdef` boxes and only surfaced when the font was fixed.
+
+    `isalnum()` rather than `isalpha()` keeps the digits. `is_rtl_char` is consulted first by the
+    classifier in `shape_rtl`, so Hebrew — for which `isalnum()` is also true — never reaches
+    here. Arabic would be misclassified as LTR, and deliberately is not handled: §9 cut every
+    locale but `he`, `en` and `ru`, and a direction table for a script the product does not ship
+    is a guess nobody can test.
+    """
+    return char.isalnum() and not is_rtl_char(char)
+
+
+def base_direction(text: str) -> str:
+    """`'R'` or `'L'`, from the first strongly-directional character — Unicode's P2/P3.
+
+    **A paragraph is not right-to-left just because the document is.** This was hardcoded to `'R'`,
+    which is correct for the Hebrew that most of a declaration is made of and wrong for every LTR
+    paragraph in it: a neutral run at the edge of a line resolves to the base direction (UBA N2),
+    so the full stop ending a Russian or English sentence was classified RTL and emitted first —
+    `.и/или руководителю клуба`. Every sentence in the `ru` and `en` club terms had its terminal
+    punctuation on the wrong end.
+
+    Neither locale was ever looked at: Russian was a row of `.notdef` boxes because the embedded
+    face had no Cyrillic, and the club's `תנאי תשלום` are Hebrew, so no English prose in the
+    document was long enough for anyone to notice.
+
+    Falls back to `'R'` for text with no strong character at all — a bare `050-0000000`, a lone
+    dash — which keeps such a fragment behaving as it does inside the Hebrew form around it.
+    """
+    for char in text:
+        if is_rtl_char(char):
+            return "R"
+        if _is_ltr_char(char):
+            return "L"
+    return "R"
 
 
 def shape_rtl(text: str) -> str:
-    """Logical order in, **visual order out**, for a right-to-left paragraph.
+    """Logical order in, **visual order out**, for a bidirectional paragraph.
 
     A simplified Unicode bidi pass, sufficient for the character classes a health declaration
-    actually contains: Hebrew, Latin, digits, and the punctuation between them.
+    actually contains: Hebrew, Latin, Cyrillic, digits, and the punctuation between them.
 
-      1. classify each character as RTL, LTR-ish (Latin letter or digit), or neutral;
-      2. resolve each neutral run to the direction of its neighbours, or to the base direction
-         (RTL) when they disagree or it is at an edge;
-      3. emit the runs in reverse order — base RTL puts the first logical run rightmost — reversing
-         the characters inside each RTL run and mirroring its brackets, and leaving LTR runs alone.
+      1. derive the paragraph's base direction from its first strong character (`base_direction`);
+      2. classify each character as RTL, LTR-ish (a non-RTL letter or digit), or neutral;
+      3. resolve each neutral run to the direction of its neighbours, or to the base direction
+         when they disagree or it is at an edge;
+      4. emit the runs — reversed when the base is RTL, so the first logical run lands rightmost;
+         in order when it is LTR — reversing the characters inside each RTL run and mirroring its
+         brackets, and leaving LTR runs alone.
 
     `"טלפון 054"` → `"054 ןופלט"`: read right-to-left that is the original, and the phone number is
-    still the phone number. `"קובץ PDF מצורף"` keeps `PDF` spelled forwards.
+    still the phone number. `"קובץ PDF מצורף"` keeps `PDF` spelled forwards. `"Клуб מועדון today"`
+    → `"Клуб ןודעומ today"`: base LTR, and the Hebrew run inside it still reverses.
 
     **Not a full UBA implementation, and deliberately not.** The full algorithm has explicit
     embedding controls, isolates, and bracket-pair resolution, none of which appears in a question
@@ -114,6 +177,8 @@ def shape_rtl(text: str) -> str:
     """
     if not text:
         return ""
+
+    base = base_direction(text)
 
     # 1 -- classify. 'R', 'L', 'N'.
     classes = ["R" if is_rtl_char(c) else "L" if _is_ltr_char(c) else "N" for c in text]
@@ -131,13 +196,14 @@ def shape_rtl(text: str) -> str:
         before = classes[start - 1] if start > 0 else None
         after = classes[index] if index < len(resolved) else None
         # A neutral run takes its neighbours' direction only when they agree. Otherwise the base
-        # direction wins -- which for a Hebrew form is RTL, so the space before an English word
-        # belongs to the Hebrew around it.
-        direction = before if before is not None and before == after else "R"
+        # direction wins -- so in a Hebrew form the space before an English word belongs to the
+        # Hebrew around it, and in a Russian sentence the full stop after the last word does not
+        # jump to the front of the line.
+        direction = before if before is not None and before == after else base
         for position in range(start, index):
             resolved[position] = direction
 
-    # 3 -- runs, emitted right-to-left.
+    # 3 -- runs, emitted in base order.
     runs: list[tuple[str, str]] = []
     for char, direction in zip(text, resolved, strict=True):
         if runs and runs[-1][0] == direction:
@@ -146,7 +212,10 @@ def shape_rtl(text: str) -> str:
             runs.append((direction, char))
 
     out: list[str] = []
-    for direction, chunk in reversed(runs):
+    # Base RTL puts the first logical run rightmost, so the runs are emitted back to front. Base
+    # LTR leaves them in order. An RTL run reverses and mirrors its brackets either way -- that is
+    # a property of the run, not of the paragraph around it.
+    for direction, chunk in reversed(runs) if base == "R" else runs:
         if direction == "R":
             out.append("".join(_MIRRORED.get(c, c) for c in reversed(chunk)))
         else:
