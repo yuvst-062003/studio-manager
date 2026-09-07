@@ -111,6 +111,26 @@ class PaymentPromiseService:
             raise RefusedError(
                 "a payment promise needs a charge, a month bought forward, or a plan claim"
             )
+        # The symmetric half of `OrderService.create`'s own refusal, added 2026-09-07.
+        #
+        # A pending card order does NOT change `charge.status` -- it stays `open` until the
+        # IPN lands -- so the `status != open` check below cannot see one. Without this a
+        # parent could open uPay, close it unpaid, promise the same charge as cash, have the
+        # manager confirm it, and then finish the uPay page that was still live. Real money
+        # leaves twice; the overpayment lands as credit, which is a refund conversation the
+        # club should never have to have. The shop's card and cash buttons sit side by side,
+        # which is what makes that order of events easy to reach.
+        #
+        # Read through `OrderService` rather than re-querying: `HOLDING_STATUSES` is its
+        # definition of "covered", and a second spelling here is how the two come to
+        # disagree about which charges are claimed.
+        # Imported here, not at module scope: `orders` imports this module, and a top-level
+        # import makes the pair circular. Same shape as `_notify_managers`' deferred import
+        # of NotificationService below.
+        from app.services.billing.orders import OrderService
+
+        covered = OrderService(self._session).covered_charge_ids(charge_ids)
+
         already_pending = set(
             self._session.execute(
                 select(PaymentPromiseCharge.charge_id)
@@ -138,6 +158,10 @@ class PaymentPromiseService:
                 raise RefusedError(f"charge {charge_id} is {charge.status}, not open")
             if charge_id in already_pending:
                 raise ConflictError(f"charge {charge_id} is already in a pending promise")
+            if charge_id in covered:
+                raise ConflictError(
+                    f"charge {charge_id} is already covered by an open or paid order"
+                )
             outstanding = self._outstanding(charge)
             if outstanding <= 0:
                 raise RefusedError(f"charge {charge_id} has nothing outstanding")

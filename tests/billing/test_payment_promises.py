@@ -20,6 +20,7 @@ from app.schemas.billing import ManualPaymentIn, PaymentOut
 from app.services.billing import BillingService
 from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
 from app.services.billing.payment_promise import PaymentPromiseService
+from app.services.billing.orders import OrderService
 from app.services.billing.payments import PaymentService
 from sqlalchemy import select
 from tests.billing.conftest import MONTHLY_AGOROT, T0
@@ -521,3 +522,37 @@ def test_a_promise_to_pay_later_is_the_default(
         at=T0,
     )
     assert promised.already_paid is False
+
+
+def test_a_charge_under_an_open_card_order_cannot_also_be_promised_as_cash(
+    tenant_session, app_session, studio, a_priced_student
+):
+    """The one path that could take a family's money twice (owner asked, 2026-09-07).
+
+    `create` refused a charge already in a pending PROMISE, and `OrderService.create`
+    refuses one already covered by an open or paid ORDER. Neither knew about the other, and
+    a pending order does not change `charge.status` -- it stays `open` until the IPN lands.
+    So a parent could open uPay, close it without paying, say "cash" instead, have the
+    manager confirm the cash, and then complete the uPay page that was still live. Real
+    money leaves twice; the second becomes a credit, which is a refund conversation the
+    club should never have to have.
+
+    Card-then-cash is the reachable order because the shop puts both buttons side by side.
+    The other direction was already covered: `OrderService` reads `covered_charge_ids`, and
+    a confirmed promise settles the charge, which its `status != open` check then refuses.
+    """
+    charge_id = _charge(app_session, studio, a_priced_student, 9)
+    OrderService(tenant_session).create(
+        studio.id,
+        payer_person_id=a_priced_student.payer_person_id,
+        charge_ids=[charge_id],
+        max_payments=1,
+        at=T0,
+    )
+    with pytest.raises(ConflictError):
+        PaymentPromiseService(tenant_session).create(
+            studio.id,
+            payer_person_id=a_priced_student.payer_person_id,
+            charge_ids=[charge_id],
+            at=T0,
+        )

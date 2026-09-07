@@ -15,7 +15,7 @@
 // `total_agorot`, and it is the only number that can be right: the catalogue this screen
 // loaded may be minutes old, and a manager who repriced a גי in between would otherwise have
 // the app tell a parent one figure while charging another.
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { apiFetch, formatAgorot, formatDateInStudioZone } from '@studio/core'
 import type { Locale } from '@studio/i18n'
 import { t } from '@studio/i18n'
@@ -45,6 +45,10 @@ export function ClubShop({ locale }: { locale: Locale }) {
    *  uses — the parent never leaves the shop for it. */
   const [overlay, setOverlay] = useState<PaymentOverlayRequest | null>(null)
   const billing = useMemo(() => makeParentBillingClient(apiFetch), [])
+  /** A card order opened but not yet handed to the overlay. Held so a retry after a failed
+   *  form fetch reuses it instead of asking the server for a second order over charges it
+   *  has already claimed. */
+  const pendingRef = useRef<string | null>(null)
   const [checkout, setCheckout] = useState<CheckoutState>({ kind: 'idle' })
   // ההזמנות שלי — moved here from פרופיל on the owner's review of 2026-09-06.
   const [orders, setOrders] = useState<readonly OrderRow[] | null>(null)
@@ -195,8 +199,15 @@ export function ClubShop({ locale }: { locale: Locale }) {
     const { lines, totalAgorot, chargeIds } = checkout
     setCheckout({ kind: 'settling', lines, totalAgorot, chargeIds })
     try {
-      // One payment, no prepaid months: an item order is a one-off, not a subscription.
-      const { public_ref: publicRef } = await billing.createOrder([...chargeIds], 1, 0)
+      // **The retry reuses the order it already opened.** `OrderService.create` refuses a
+      // charge already covered by an open order, so if the FORM fetch is what failed, a
+      // second `createOrder` over the same charges 409s — and the parent could never reach
+      // the payment page at all. `PaymentsScreen` solves it the same way; this is that
+      // logic, not a second invention. One payment, no prepaid months: an item order is a
+      // one-off, not a subscription.
+      const publicRef =
+        pendingRef.current ?? (await billing.createOrder([...chargeIds], 1, 0)).public_ref
+      pendingRef.current = publicRef
       const form = await billing.orderForm(publicRef)
       if (form.action === DEMO_SIMULATOR.action) {
         // No live form exists in this deployment; the order is open and the IPN settles it.
@@ -205,6 +216,7 @@ export function ClubShop({ locale }: { locale: Locale }) {
       }
       setOverlay({ kind: 'checkout', form })
       setCheckout({ kind: 'placed', lines, totalAgorot, chargeIds })
+      pendingRef.current = null
     } catch {
       setCheckout({ kind: 'settleFailed', lines, totalAgorot, chargeIds })
     }

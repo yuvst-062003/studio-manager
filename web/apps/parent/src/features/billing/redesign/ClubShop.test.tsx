@@ -130,6 +130,27 @@ describe('paying for an order without leaving the shop', () => {
     expect(screen.getByTestId('shop-pay-cash')).toBeInTheDocument()
   })
 
+  it('retries a failed card attempt against the SAME order, not a second one', async () => {
+    // `OrderService.create` refuses a charge already covered by an open order. So if the
+    // form fetch is what failed, asking for a second order 409s and the parent can never
+    // reach the payment page — a dead end that looks like the club refusing their money.
+    let forms = 0
+    formResponse = () => {
+      forms += 1
+      return forms === 1
+        ? jsonResponse({ detail: 'boom' }, 500)
+        : jsonResponse({ action: 'https://app.upay.co.il/checkout', fields: {} })
+    }
+    const user = await placeAnOrder()
+    await user.click(screen.getByTestId('shop-pay-card'))
+    await waitFor(() => expect(screen.getByTestId('shop-pay-failed')).toBeInTheDocument())
+
+    await user.click(screen.getByTestId('shop-pay-card'))
+    await waitFor(() => expect(screen.getByTestId('payment-overlay')).toBeInTheDocument())
+    const orders = calls.filter((call) => call.path.startsWith('/api/v1/payment-orders?'))
+    expect(orders, 'a second order was opened over charges the first already claimed').toHaveLength(1)
+  })
+
   it('still offers the payments screen for a parent who wants to decide later', async () => {
     await placeAnOrder()
     expect(screen.getByText(t('he', 'billing.shop.payLater'))).toHaveAttribute('href', '#/payments')
