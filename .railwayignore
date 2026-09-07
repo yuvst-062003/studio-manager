@@ -1,0 +1,15 @@
+# Upload-time exclusions for `railway up`, which reads this file and not
+# .dockerignore. Mirrors .dockerignore: no service's Docker build reads any of
+# these, and docs/ alone is 43M of screenshots that timed out the upload.
+.venv/
+.git/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+**/node_modules/
+web/apps/*/dist/
+docs/
+tests/
+e2e/
