@@ -302,6 +302,8 @@ export const people: Bundle = {
   'landing.joinNow': 'Присоединяйтесь',
   'landing.learnMore': 'Подробнее',
   'landing.freeTrial': 'Бесплатная пробная тренировка',
+  'landing.themeToDark': 'Тёмная тема',
+  'landing.themeToLight': 'Светлая тема',
   'landing.siteNav': 'Навигация по странице',
   'landing.stepsTitle': 'Как проходит пробная тренировка',
   'landing.beltCaption': 'Лестница поясов клуба',

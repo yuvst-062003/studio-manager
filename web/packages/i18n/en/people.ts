@@ -299,6 +299,8 @@ export const people: Bundle = {
   'landing.joinNow': 'Join now',
   'landing.learnMore': 'Learn more',
   'landing.freeTrial': 'Free trial session',
+  'landing.themeToDark': 'Switch to dark mode',
+  'landing.themeToLight': 'Switch to light mode',
   'landing.siteNav': 'Page navigation',
   'landing.stepsTitle': 'What a trial lesson looks like',
   'landing.beltCaption': 'The club’s belt ladder',

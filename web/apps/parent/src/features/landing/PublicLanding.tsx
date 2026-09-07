@@ -22,7 +22,7 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { apiUrl } from '@studio/core'
-import { EmptyState, LoadFailed, MoneyDisplay, RangeText } from '@studio/ui'
+import { EmptyState, LoadFailed, MoneyDisplay, RangeText, useTheme } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { LandingClient, PublicGroup, PublicLanding as Landing } from './landingClient'
@@ -191,6 +191,39 @@ function DerivedSchedule({
         </div>
       </div>
     </section>
+  )
+}
+
+/**
+ * #26 — light/dark, on the marketing page itself.
+ *
+ * **A two-state button, not the app's three-way `system | light | dark` chooser.** A
+ * visitor is not configuring anything; they are looking at a page and want it darker or
+ * lighter. Writing an explicit preference is the point — `ThemeProvider` persists it, so a
+ * visitor who chooses dark here and later joins the club still has dark inside the app,
+ * which is the same storage key `פרופיל → מצב תצוגה` reads and writes.
+ *
+ * The accessible name is the DESTINATION ("switch to dark"), never the current state: a
+ * name that reads "currently light" describes rather than offers, and this control has no
+ * visible text of its own for a screen-reader user to fall back on.
+ */
+function ThemeToggle({ locale }: { locale: Locale }) {
+  const { resolved, setPreference } = useTheme()
+  const next = resolved === 'dark' ? 'light' : 'dark'
+  const label = t(locale, next === 'dark' ? 'people.landing.themeToDark' : 'people.landing.themeToLight')
+  return (
+    <button
+      type="button"
+      className="gl-theme-toggle"
+      data-testid="landing-theme-toggle"
+      aria-label={label}
+      title={label}
+      onClick={() => setPreference(next)}
+    >
+      {/* Decorative: the button's own `aria-label` above is the whole name, and reading the
+          glyph as well would say the same thing twice. */}
+      <span aria-hidden="true">{resolved === 'dark' ? '\u2600' : '\u263D'}</span>
+    </button>
   )
 }
 
@@ -372,6 +405,13 @@ export function PublicLanding({
                 {languagePicker}
               </div>
             ) : null}
+            <ThemeToggle locale={locale} />
+            {/* #26 — the page's own theme control. The dark palette below has followed
+                `prefers-color-scheme` since the outward-surface work, but a visitor whose
+                phone is set to light had no way to SEE it and one on a dark phone had no way
+                out. This is the one screen in the product a stranger meets before any
+                settings exist, so the control has to be on the page. */}
+
             <button type="button" className="gl-btn gl-btn--navy" onClick={openFlow} data-testid="landing-join">
               {t(locale, 'people.landing.joinNow')}
             </button>

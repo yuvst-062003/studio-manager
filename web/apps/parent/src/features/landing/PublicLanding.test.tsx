@@ -5,7 +5,7 @@
 // The tests that matter are the ones about what a STRANGER sees: this is the only screen
 // in the product somebody reaches with no account, and §5.4a calls it "the club's shop
 // window, not a form".
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
@@ -59,6 +59,19 @@ const DIRECTIONS = [
   { locale: 'en', dir: 'ltr' },
 ] as const satisfies readonly { locale: Locale; dir: 'rtl' | 'ltr' }[]
 
+/**
+ * **Every render here goes through `ThemeProvider`, because `App.tsx` mounts this page
+ * inside one and always has.** Bare `render(<PublicLanding/>)` tested a configuration
+ * production does not have, which stopped being harmless the moment #26 put a theme
+ * control in the header: `useTheme` throws outside its provider, by design.
+ *
+ * Wrapping here rather than editing thirty-three call sites, and it is the more faithful
+ * test either way — the seam, not the component in a shape nothing mounts.
+ */
+function render(ui: ReactElement) {
+  return rtlRender(<ThemeProvider>{ui}</ThemeProvider>)
+}
+
 function renderIn(
   ui: ReactElement,
   { locale = 'he', theme = 'light' }: { locale?: Locale; theme?: ResolvedTheme } = {},
@@ -66,7 +79,7 @@ function renderIn(
   globalThis.localStorage?.setItem(THEME_STORAGE_KEY, theme)
   document.documentElement.lang = locale
   document.documentElement.dir = DIRECTION[locale]
-  return render(<ThemeProvider>{ui}</ThemeProvider>)
+  return rtlRender(<ThemeProvider>{ui}</ThemeProvider>)
 }
 
 describe('PublicLanding — the shop window', () => {
@@ -194,6 +207,41 @@ describe('PublicLanding — the shop window', () => {
     )
     await waitFor(() => expect(screen.getByTestId('public-landing')).toBeInTheDocument())
     expect(document.documentElement).toHaveAttribute('data-theme', theme)
+  })
+
+  it('lets a visitor switch the page to dark and back (#26)', async () => {
+    // The owner's #26. The dark palette in `landing.css` has been complete for a while and
+    // follows `prefers-color-scheme` through `ThemeProvider` — but a visitor whose phone is
+    // set to light had no way to SEE it, and one on a dark phone had no way out. A marketing
+    // page is the one screen in this product a stranger meets before any settings exist, so
+    // the control has to be on the page itself.
+    const user = userEvent.setup()
+    renderIn(
+      <PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(LANDING)} />,
+      { theme: 'light' },
+    )
+    await screen.findByTestId('public-landing')
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+
+    await user.click(screen.getByTestId('landing-theme-toggle'))
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+
+    await user.click(screen.getByTestId('landing-theme-toggle'))
+    expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+  })
+
+  it('names what the toggle will do, not what the page currently is (#26)', async () => {
+    // An icon-only control with no accessible name is a control a screen-reader user cannot
+    // use at all, and `.claude/rules/ui-rtl-a11y.md` makes that a hard rule. The name says
+    // the DESTINATION: "switch to dark" is actionable, "currently light" is a status.
+    renderIn(
+      <PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(LANDING)} />,
+      { theme: 'light' },
+    )
+    await screen.findByTestId('public-landing')
+    expect(screen.getByTestId('landing-theme-toggle')).toHaveAccessibleName(
+      t('he', 'people.landing.themeToDark'),
+    )
   })
 
   it('is one component at both widths, not two trees', async () => {

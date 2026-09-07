@@ -1052,3 +1052,28 @@
     padding-block-end: var(--space-5);
   }
 }
+
+/* -- #26's theme toggle --------------------------------------------------------------
+ *
+ * Sized and shaped like the language picker beside it, so the header's end slot reads as
+ * one row of controls rather than a button that wandered in. `min-block-size` is §6.2's
+ * 44px touch target, which a bare glyph would otherwise miss by half. */
+.gl-theme-toggle {
+  align-items: center;
+  background: transparent;
+  border: 2px solid var(--gl-primary);
+  border-radius: 2px;
+  color: var(--gl-primary);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 1rem;
+  justify-content: center;
+  line-height: 1;
+  min-block-size: 44px;
+  min-inline-size: 44px;
+  padding: var(--space-2);
+}
+
+.gl-theme-toggle:hover {
+  background: var(--gl-surface-low);
+}

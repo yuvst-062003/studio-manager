@@ -356,6 +356,10 @@ export const people: Bundle = {
   'landing.joinNow': 'הצטרפו עכשיו',
   'landing.learnMore': 'למידה נוספת',
   'landing.freeTrial': 'אימון ניסיון חינם',
+  // #26 — the landing page's own theme control. The name says the DESTINATION, because
+  // that is what a control does; 'currently light' would be a status nobody can act on.
+  'landing.themeToDark': 'מעבר למצב כהה',
+  'landing.themeToLight': 'מעבר למצב בהיר',
   'landing.siteNav': 'ניווט בעמוד',
   'landing.stepsTitle': 'איך נראה שיעור ניסיון',
   'landing.beltCaption': 'מסלול החגורות במועדון',
