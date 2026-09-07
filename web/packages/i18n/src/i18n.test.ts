@@ -160,8 +160,11 @@ describe('every referenced key resolves (regressions 2026-08-29, 2026-09-07)', (
     // its own doc comments quote keys that may since have been renamed.
     for (const file of files.filter((f) => !f.includes(`${sep}i18n${sep}`))) {
       for (const [, key] of readFileSync(file, 'utf8').matchAll(CALL_SITE)) {
+        // `noUncheckedIndexedAccess` types a capture group as possibly undefined, and the
+        // group is optional in the type even though this pattern cannot match without it.
+        if (key === undefined) continue
         const [namespace, ...rest] = key.split('.')
-        if (!NAMESPACES.includes(namespace as Namespace)) continue
+        if (namespace === undefined || !NAMESPACES.includes(namespace as Namespace)) continue
         if (bundles[REFERENCE_LOCALE][namespace as Namespace][rest.join('.')] === undefined) {
           offenders.push(`${key}  <-  ${file.replace(WEB_ROOT, '')}`)
         }
