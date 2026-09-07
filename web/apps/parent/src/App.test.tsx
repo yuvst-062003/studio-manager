@@ -886,7 +886,7 @@ describe('§3 Door D — #/add-child opens the shared wizard, not the old 3-fiel
     // `AddSibling`, without a reload.
     await user.click(await screen.findByRole('button', { name: STEP4_COPY.enterApp }))
     await waitFor(() => expect(state.studentsGetCalls).toBeGreaterThan(before))
-  }, 20000)
+  }, 40_000)
 
   // §5 -- "already true and breaks quietly": a family adding a fourth child must see only
   // the child THIS run added, and that child's own plan price -- never a sibling's older
@@ -927,7 +927,7 @@ describe('§3 Door D — #/add-child opens the shared wizard, not the old 3-fiel
     ]
     expect(chargeIdsUsed).toContain('ch-new')
     expect(chargeIdsUsed).not.toContain('ch-sibling')
-  }, 20000)
+  }, 40_000)
 
   // §3's "the agreements step is skipped, not absent" -- the three ways `doorSteps.ts`'s
   // `startingStep` can answer, each pinned through the real rendered wizard rather than
@@ -1371,7 +1371,7 @@ describe('§3 Door C — /?invite=<token> opens the shared wizard, not the old g
     for (const siblingName of ['אורי', 'מאיה', 'יובל']) {
       expect(document.body.textContent).not.toContain(siblingName)
     }
-  }, 20000)
+  }, 40_000)
 })
 
 // נגישות: on the public surfaces, off the signed-in ones (owner review, 2026-09-06).

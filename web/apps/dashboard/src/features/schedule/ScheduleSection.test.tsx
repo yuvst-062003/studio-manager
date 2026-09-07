@@ -180,9 +180,14 @@ describe('ScheduleSection', () => {
     const { rerender } = render(view)
     await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(1))
 
+    // The rowheader appearing means the GROUPS arrived; the schedule preview is a second,
+    // later request, and this used to read its count the moment the first one landed. Under
+    // load that read `0` and the setup assertion below failed before the test had begun —
+    // `expected 0 to be greater than 0`. Wait for the call this test is actually about.
+    await waitFor(() => expect(vi.mocked(client.putSchedule).mock.calls.length).toBeGreaterThan(0))
+
     const groupCalls = vi.mocked(client.listGroups).mock.calls.length
     const previewCalls = vi.mocked(client.putSchedule).mock.calls.length
-    expect(previewCalls).toBeGreaterThan(0)
 
     rerender(view)
     rerender(view)
