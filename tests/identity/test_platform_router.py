@@ -124,6 +124,24 @@ def test_a_malformed_slug_is_refused(client, platform_admin):
         assert _new_studio(client, platform_admin, slug=bad).status_code == 422, bad
 
 
+def test_a_slug_that_is_already_taken_is_refused_by_name(client, platform_admin):
+    """`studio.slug` is UNIQUE, and nothing above the column said so.
+
+    The insert reached Postgres, the unique constraint fired, and the IntegrityError left
+    the route as a 500 -- which the console renders as its one generic "the action
+    failed". An operator whose club identifier is already in use is then told nothing at
+    all, retries the same value, and gets the same nothing. 409 with a code of its own is
+    one round trip and names the field to change.
+    """
+    slug = f"taken-{uuid.uuid4().hex[:8]}"
+    assert _new_studio(client, platform_admin, slug=slug).status_code == 201
+
+    again = _new_studio(client, platform_admin, name="מועדון אחר", slug=slug)
+
+    assert again.status_code == 409, again.text
+    assert again.json()["detail"]["code"] == "slug_taken"
+
+
 # -- 5.1's second link --------------------------------------------------------
 def test_inviting_an_owner_returns_the_token_exactly_once(client, platform_admin):
     """5.3's token is a bearer credential. It is returned here and stored as a hash, so a

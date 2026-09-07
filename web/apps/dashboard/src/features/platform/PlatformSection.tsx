@@ -12,7 +12,7 @@
 // surface, and a separate origin would be the cleaner separation — but it is also a new
 // Dockerfile, Railway service, domain and deploy for four endpoints, and the boundary
 // that actually matters is enforced by the API in either case.
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiFetch } from '@studio/core'
 import { EmptyState, LoadFailed } from '@studio/ui'
 import { t } from '@studio/i18n'
@@ -23,7 +23,7 @@ import { makePlatformClient } from './client'
 import type { OpsHealth, PlatformClient, PlatformStudio } from './client'
 
 export function PlatformSection({
-  client = makePlatformClient(apiFetch),
+  client: given,
   isPlatformAdmin,
   locale,
 }: {
@@ -31,6 +31,18 @@ export function PlatformSection({
   isPlatformAdmin: boolean
   locale: Locale
 }) {
+  // **`useMemo`, not a default parameter.** A default is re-evaluated on every render, so
+  // the client was a new object each time — which changed `load`'s identity, which re-ran
+  // the effect, which set state, which rendered again. The console requested
+  // `/platform/health` and `/platform/studios` in a loop for as long as it was open, and
+  // the first response to fail replaced the panel with a refusal and took whatever the
+  // operator had typed into the create form with it.
+  //
+  // Every other section in this app already builds its client this way
+  // (`ItemsSection`, `CommsSection`, `AttendanceSection` …). Nothing caught it because
+  // every test here passes a stub client, which is stable by construction — the one
+  // configuration `App.tsx` uses was the one nothing rendered.
+  const client = useMemo(() => given ?? makePlatformClient(apiFetch), [given])
   const [health, setHealth] = useState<OpsHealth | null>(null)
   const [studios, setStudios] = useState<PlatformStudio[] | null>(null)
   const [failed, setFailed] = useState(false)

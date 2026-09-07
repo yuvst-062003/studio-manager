@@ -80,11 +80,14 @@ export type PlatformClient = {
 }
 
 /** Every call throws on a non-2xx rather than returning a shape the screen has to
- *  inspect. The screens below all render the same refusal for any failure, because the
- *  distinctions the API draws here -- 403, 404, a slug collision -- are not distinctions
- *  the one person reading this screen can act on differently. */
+ *  inspect. The status rides ON the error, because two of the refusals ARE distinctions
+ *  the person reading this screen can act on: a slug already taken and a slug that is
+ *  malformed both name one field to change, and both used to render the same "the action
+ *  failed". A status only in the message is a string a rendering would have to parse. */
 async function json<T>(response: Response): Promise<T> {
-  if (!response.ok) throw new Error(String(response.status))
+  if (!response.ok) {
+    throw Object.assign(new Error(String(response.status)), { status: response.status })
+  }
   return (await response.json()) as T
 }
 

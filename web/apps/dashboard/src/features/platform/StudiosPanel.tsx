@@ -54,6 +54,9 @@ export function StudiosPanel({
   const [defaultLocale, setDefaultLocale] = useState<string>('he')
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
+  //: Why the last create was refused, when the route said something an operator can act
+  //: on. `null` is every other failure, which still renders `platform.error.failed`.
+  const [createRefusal, setCreateRefusal] = useState<string | null>(null)
 
   const [suspending, setSuspending] = useState<PlatformStudio | null>(null)
   const [invitingStudioId, setInvitingStudioId] = useState<string | null>(null)
@@ -65,6 +68,7 @@ export function StudiosPanel({
   async function submitStudio(): Promise<void> {
     setBusy(true)
     setFailed(false)
+    setCreateRefusal(null)
     try {
       await client.createStudio({
         name: name.trim(),
@@ -78,8 +82,15 @@ export function StudiosPanel({
       setName('')
       setSlug('')
       onChanged()
-    } catch {
-      setFailed(true)
+    } catch (error: unknown) {
+      // The two refusals a create actually returns both name ONE field to change, and
+      // both used to render the panel's generic "the action failed" — which sent the
+      // operator back to retype the same slug. The form is deliberately left open with
+      // what they typed still in it.
+      const status = (error as { status?: number } | null)?.status
+      if (status === 409) setCreateRefusal(t(locale, 'common.platform.new.slugTaken'))
+      else if (status === 422) setCreateRefusal(t(locale, 'common.platform.new.slugInvalid'))
+      else setFailed(true)
     } finally {
       setBusy(false)
     }
@@ -288,6 +299,11 @@ export function StudiosPanel({
               </option>
             ))}
           </SelectField>
+          {createRefusal ? (
+            <p data-testid="platform-create-refusal" role="alert">
+              {createRefusal}
+            </p>
+          ) : null}
           <Button
             data-testid="platform-create-submit"
             disabled={busy || !name.trim() || !slug.trim()}

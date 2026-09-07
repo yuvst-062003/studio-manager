@@ -16,6 +16,7 @@
 // would make them do.
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
+import { useAuthedImage } from '@studio/core'
 import {
   Button,
   Card,
@@ -251,7 +252,7 @@ export function ItemsScreen({
                 nothing to upload against until the row has been created. */}
             <div style={photoRowStyle}>
               {product.image_url ? (
-                <img alt="" src={product.image_url} style={thumbStyle} />
+                <ProductThumb productId={product.id} src={product.image_url} />
               ) : (
                 <p style={hintStyle}>{t(locale, 'billing.product.photoNone')}</p>
               )}
@@ -309,4 +310,27 @@ export function ItemsScreen({
           shows both. */}
     </div>
   )
+}
+
+/** The row's photograph, fetched through the session.
+ *
+ * `image_url` is a RELATIVE path to a route the API guards with the bearer token, and a
+ * bare `<img src>` against one fails twice on a deployed build: the browser resolves the
+ * path against the DASHBOARD's host — which answers every `/api` path with the SPA shell —
+ * and the tag cannot send an Authorization header even when it reaches the right host. So
+ * a manager uploaded a photo, the row's buttons changed to "replace" and "remove", and no
+ * picture ever appeared. That reads as an upload that did nothing, and is what "the shop
+ * cannot upload item images" was.
+ *
+ * `useAuthedImage` is the fix the studio logo already made on 2026-08-30 (see its own
+ * docstring, and `SettingsScreen`/`App.tsx`, which both render the logo through it). Its
+ * own component so the hook is per row — a hook cannot be called inside `.map`.
+ *
+ * It yields null while the bytes are in flight and for a refused fetch, and the tile is
+ * simply absent until then. `alt=""`: the item's name is beside it in the same row, and a
+ * screen reader reading the name twice is worse than not describing a decorative tile. */
+function ProductThumb({ productId, src }: { productId: string; src: string }) {
+  const url = useAuthedImage(src)
+  if (!url) return null
+  return <img alt="" data-testid={`product-thumb-${productId}`} src={url} style={thumbStyle} />
 }

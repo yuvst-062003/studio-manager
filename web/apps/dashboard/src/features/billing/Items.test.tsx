@@ -7,14 +7,19 @@
 // **The size rules are asserted at the boundary the server cannot police.** `sizes: []` is
 // a legal sizeless item there, so "sizes turned on with an empty list" — a parent-facing
 // picker with nothing in it — can only be caught where the toggle lives.
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
 import { ItemsScreen, sizesLabel } from './ItemsScreen'
 import { ItemsWizardStep } from './ItemsWizardStep'
 import { BLANK_ITEM, toInput, validateItem } from './ItemForm'
+import { makeDashboardBillingClient } from './billingClient'
 import type { DashboardBillingClient, ProductOut } from './billingClient'
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 const GI: ProductOut = {
   id: 'p1',
@@ -307,5 +312,78 @@ describe('the pure helpers', () => {
     // A free item is not orderable — the shop route refuses `price_agorot <= 0` — so
     // creating one here would make a row nothing can sell.
     expect(validateItem({ ...BLANK_ITEM, name: 'גי', price: '0' }, 'he').price).toBeDefined()
+  })
+})
+
+
+// -- the photograph ------------------------------------------------------------------
+//
+// The catalogue gained a photo per item on 2026-09-06 and shipped with no test on this
+// half at all. `POST /products/{id}/image` works and is covered on the server; what was
+// never rendered is the row AFTER a successful upload, which is the only thing the
+// manager who reported "the shop cannot upload item images" ever saw.
+describe('an item photo', () => {
+  const PHOTOGRAPHED: ProductOut = { ...GI, image_url: '/api/v1/products/p1/image' }
+
+  it('fetches the thumbnail through the session rather than pointing a bare <img> at it', async () => {
+    // `image_url` is a RELATIVE path to a route the API guards with the bearer token, so a
+    // bare `<img src>` fails twice on the deployed dashboard: the browser resolves the
+    // path against the dashboard's own host (which answers every `/api` path with the SPA
+    // shell), and the tag cannot send an Authorization header even when it reaches the
+    // right host. The manager uploads a photo, the row's buttons change, and no picture
+    // ever appears — which reads exactly like an upload that did nothing.
+    //
+    // `useAuthedImage` was written for this on 2026-08-30, for the studio logo, and both
+    // the dashboard's own logo renders already go through it.
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('png-bytes', { status: 200 })))
+    vi.stubGlobal(
+      'URL',
+      Object.assign(URL, {
+        createObjectURL: vi.fn(() => 'blob:product-photo'),
+        revokeObjectURL: vi.fn(),
+      }),
+    )
+
+    renderScreen(makeClient(), [PHOTOGRAPHED])
+
+    const thumb = await screen.findByTestId('product-thumb-p1')
+    await waitFor(() => expect(thumb).toHaveAttribute('src', 'blob:product-photo'))
+    expect(fetch).toHaveBeenCalledWith('/api/v1/products/p1/image', expect.anything())
+  })
+
+  it('carries the refusal status on the error the upload throws', async () => {
+    // `ItemsScreen` already reads `error.status` to tell "not a PNG/JPEG/WebP" from "too
+    // large" — two refusals that send a manager to different fixes. The client threw a
+    // bare `Error`, so that read was always `undefined` and every failure rendered the
+    // one generic "the upload failed", including the HEIC an iPhone hands over.
+    const fetcher = vi.fn(
+      async () => ({ ok: false, status: 415, json: async () => ({}) }) as unknown as Response,
+    )
+    const client = makeDashboardBillingClient(fetcher)
+
+    await expect(
+      client.uploadProductImage('p1', new File(['x'], 'photo.heic', { type: 'image/heic' })),
+    ).rejects.toMatchObject({ status: 415 })
+  })
+
+  it('says WHICH refusal an upload hit rather than only that it failed', async () => {
+    const client = makeClient({
+      uploadProductImage: vi
+        .fn()
+        .mockRejectedValue(Object.assign(new Error('415'), { status: 415 })),
+    })
+    renderScreen(client, [GI])
+
+    // A PNG by NAME: `accept` filters the picker, so the file that reaches the route is
+    // always one of the three — and the 415 comes from the server sniffing the bytes and
+    // finding they are not what the extension claimed.
+    await userEvent.upload(
+      screen.getByTestId('product-photo-p1'),
+      new File(['not really a png'], 'photo.png', { type: 'image/png' }),
+    )
+
+    expect(
+      await screen.findByText(t('he', 'billing.product.photoUnsupported')),
+    ).toBeInTheDocument()
   })
 })

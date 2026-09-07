@@ -33,6 +33,7 @@ from app.schemas.platform import (
     StudioOut,
 )
 from app.services.identity.platform import (
+    SlugTakenError,
     StudioNotFoundError,
     invite_owner,
     list_studios,
@@ -86,16 +87,28 @@ def create_studio(
     actor: PlatformAdminDep, body: ProvisionStudioRequest, session: SessionDep
 ) -> StudioOut:
     """§5.1 -- 'Studios are provisioned by the platform operator, never self-created.
-    There is no צור סטודיו button anywhere in the staff app.'"""
-    studio = provision_studio(
-        session,
-        name=body.name,
-        slug=body.slug,
-        timezone=body.timezone,
-        default_locale=body.default_locale,
-        created_by_identity_id=actor,
-        at=now(),
-    )
+    There is no צור סטודיו button anywhere in the staff app.'
+
+    A slug already in use is a 409 and not the unique constraint's IntegrityError. That
+    error escaped the route as a 500, and the console has exactly one rendering for a
+    failure with no code -- so the operator was told "the action failed" and left to guess
+    which of the two fields to change.
+    """
+    try:
+        studio = provision_studio(
+            session,
+            name=body.name,
+            slug=body.slug,
+            timezone=body.timezone,
+            default_locale=body.default_locale,
+            created_by_identity_id=actor,
+            at=now(),
+        )
+    except SlugTakenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "slug_taken", "message": "another club already uses that identifier"},
+        ) from exc
     session.commit()
     return StudioOut.model_validate(studio, from_attributes=True)
 

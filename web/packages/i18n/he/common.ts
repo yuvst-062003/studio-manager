@@ -205,6 +205,10 @@ export const common: Bundle = {
   'auth.registerToStudio': 'הרשמה לסטודיו',
   'auth.inviteCodeLabel': 'קוד הזמנה',
   'auth.inviteCodeSubmit': 'שליחה',
+  // #32 — the parent refusal screen's one way out. It said 'התנתקות', which is what the
+  // control DOES and not what the person at that screen wants; the thing they want is to
+  // come back as somebody else. Named for the destination, not the mechanism.
+  'auth.backToSignIn': 'חזרה להתחברות',
   'refusal.staff.title': 'אין לך גישה לאפליקציית הצוות',
   'refusal.staff.body': 'פנה למנהל הסטודיו שלך.',
   'refusal.staff.otherApp': 'אפליקציית ההורים',
@@ -603,6 +607,10 @@ export const common: Bundle = {
   'platform.new.locale': 'שפת ברירת מחדל',
   'platform.new.submit': 'הקמת מועדון',
   'platform.new.working': 'מקים…',
+  // A create that failed used to say only 'הפעולה נכשלה'. The two refusals the route
+  // actually returns name the field to change, and the operator can act on either.
+  'platform.new.slugTaken': 'המזהה הזה כבר תפוס. בחרו מזהה אחר.',
+  'platform.new.slugInvalid': 'המזהה יכול להכיל אותיות קטנות באנגלית, ספרות ומקפים בלבד.',
   'platform.invite.title': 'הזמנת בעלים',
   'platform.invite.email': 'דוא״ל',
   'platform.invite.firstName': 'שם פרטי',

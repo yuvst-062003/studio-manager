@@ -181,6 +181,9 @@ export const common: Bundle = {
   'auth.registerToStudio': 'register with a studio',
   'auth.inviteCodeLabel': 'invitation code',
   'auth.inviteCodeSubmit': 'submit',
+  // #32 — the parent refusal screen's one way out. Named for the destination, not the
+  // mechanism: 'sign out' is what it does, 'back to sign-in' is what the person wants.
+  'auth.backToSignIn': 'Back to sign-in',
   'refusal.staff.title': 'you do not have access to the staff app',
   'refusal.staff.body': 'contact your studio manager.',
   'refusal.staff.otherApp': 'the parent app',
@@ -533,6 +536,8 @@ export const common: Bundle = {
   'platform.new.locale': 'Default language',
   'platform.new.submit': 'Provision club',
   'platform.new.working': 'Provisioning…',
+  'platform.new.slugTaken': 'That slug already belongs to another club. Choose another.',
+  'platform.new.slugInvalid': 'A slug may contain lower-case letters, digits and hyphens only.',
   'platform.invite.title': 'Invite the owner',
   'platform.invite.email': 'Email',
   'platform.invite.firstName': 'First name',

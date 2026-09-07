@@ -11,10 +11,21 @@
 //   * a non-operator gets a refusal, not an empty console
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { t } from '@studio/i18n'
 import { OpsHealthPanel, jobState } from './OpsHealthPanel'
 import { PlatformSection } from './PlatformSection'
+import { makePlatformClient } from './client'
 import type { JobHealth, OpsHealth, PlatformClient, PlatformStudio } from './client'
+
+// The section builds its own client out of `apiFetch` when App.tsx gives it none, so the
+// only way to exercise that configuration is to own `apiFetch`. `vi.hoisted` because
+// `vi.mock` is lifted above every import.
+const { apiFetch } = vi.hoisted(() => ({ apiFetch: vi.fn() }))
+vi.mock('@studio/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@studio/core')>()),
+  apiFetch,
+}))
 
 const job = (overrides: Partial<JobHealth> = {}): JobHealth => ({
   name: 'billing-run',
@@ -209,6 +220,27 @@ describe('the platform console', () => {
     )
   })
 
+  it('names a slug that is already taken rather than saying only that it failed', async () => {
+    // `studio.slug` is UNIQUE. The insert used to reach the constraint and leave a 500,
+    // and the console renders one generic refusal for anything with no code — so an
+    // operator whose identifier was taken was told nothing and retried the same value.
+    // The form stays open with what they typed, because the fix is one field away.
+    const client = stubClient({
+      createStudio: vi.fn(() => Promise.reject(Object.assign(new Error('409'), { status: 409 }))),
+    })
+    render(<PlatformSection client={client} isPlatformAdmin locale="he" />)
+
+    await userEvent.click(await screen.findByTestId('platform-create-open'))
+    await userEvent.type(screen.getByLabelText('שם המועדון'), 'מועדון חדש')
+    await userEvent.type(screen.getByLabelText('מזהה באנגלית'), 'gladiator')
+    await userEvent.click(screen.getByTestId('platform-create-submit'))
+
+    expect(
+      await screen.findByText(t('he', 'common.platform.new.slugTaken')),
+    ).toBeInTheDocument()
+    expect(screen.getByLabelText('מזהה באנגלית')).toHaveValue('gladiator')
+  })
+
   it('asks before suspending, and does nothing when the answer is no', async () => {
     // Suspension removes the club from every studio switcher its members have. A large
     // effect from a small button is the one place a confirm earns its keep.
@@ -241,5 +273,90 @@ describe('the platform console', () => {
     render(<PlatformSection client={client} isPlatformAdmin locale="he" />)
 
     expect(await screen.findByTestId('load-failed')).toBeInTheDocument()
+  })
+})
+
+// -- the seam, with no `client` prop -------------------------------------------------
+//
+// Every test above hands `PlatformSection` a stub client, which is one stable object for
+// the life of the render. `App.tsx` hands it nothing, so the section builds its own — and
+// that is the ONE configuration the deployed console runs in and the one nothing covered.
+// CLAUDE.md: "Test the seam, not just the component."
+describe('the console App.tsx actually mounts', () => {
+  beforeEach(() => {
+    apiFetch.mockReset()
+    apiFetch.mockImplementation((path: string) =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve(
+            path.includes('/platform/health')
+              ? health()
+              : path.endsWith('/platform/studios')
+                ? { items: [studio()] }
+                : studio(),
+          ),
+      } as unknown as Response),
+    )
+  })
+
+  it('loads once rather than re-requesting for ever', async () => {
+    // A default parameter is re-evaluated on EVERY render, so a client built there is a
+    // new object each time — which changes `load`'s identity, which re-runs the effect,
+    // which sets state, which renders again. The console then hammers the API for as long
+    // as it is open, and the first response that fails unmounts the panel and takes
+    // whatever the operator had typed into the create form with it.
+    render(<PlatformSection isPlatformAdmin locale="he" />)
+
+    await screen.findByTestId('platform-studios')
+    // Deliberately NOT `act`: a console stuck in this loop never settles, so an `act`
+    // that waits for it to go quiet times out and reports a timeout rather than the
+    // defect. Two real-time sleeps and a count is what names it.
+    const settled = apiFetch.mock.calls.length
+    await new Promise((resolve) => setTimeout(resolve, 60))
+    expect(apiFetch.mock.calls.length).toBe(settled)
+  })
+
+  it('carries the refusal status on the error it throws', async () => {
+    // The screen can only tell 409 from 422 if the client hands it something to read.
+    // `new Error('409')` is a string a rendering would have to parse, and the panel's
+    // `error.status` read against it was always `undefined` — so every refusal rendered
+    // the same "the action failed".
+    apiFetch.mockResolvedValue({ ok: false, status: 409, json: () => Promise.resolve({}) })
+    const client = makePlatformClient(apiFetch as never)
+
+    await expect(
+      client.createStudio({
+        name: 'x',
+        slug: 'gladiator',
+        timezone: 'Asia/Jerusalem',
+        default_locale: 'he',
+      }),
+    ).rejects.toMatchObject({ status: 409 })
+  })
+
+  it('provisions a club through its own client, not only through a stub', async () => {
+    render(<PlatformSection isPlatformAdmin locale="he" />)
+
+    await userEvent.click(await screen.findByTestId('platform-create-open'))
+    await userEvent.type(screen.getByLabelText('שם המועדון'), 'מועדון חדש')
+    await userEvent.type(screen.getByLabelText('מזהה באנגלית'), 'new-club')
+    await userEvent.click(screen.getByTestId('platform-create-submit'))
+
+    await waitFor(() => {
+      // Indexed rather than destructured: `mock.calls` is `any[][]`, and TypeScript will
+      // not narrow an `any[]` into a two-element tuple.
+      const posted = apiFetch.mock.calls.find(
+        (call) => call[0] === '/api/v1/platform/studios' && call[1]?.method === 'POST',
+      )
+      expect(posted).toBeDefined()
+      expect(JSON.parse(String(posted?.[1]?.body))).toEqual({
+        name: 'מועדון חדש',
+        slug: 'new-club',
+        timezone: 'Asia/Jerusalem',
+        default_locale: 'he',
+      })
+    })
   })
 })

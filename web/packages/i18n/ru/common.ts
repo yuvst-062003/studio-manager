@@ -189,6 +189,9 @@ export const common: Bundle = {
   'auth.registerToStudio': 'записаться в студию',
   'auth.inviteCodeLabel': 'код приглашения',
   'auth.inviteCodeSubmit': 'отправить',
+  // #32 — the parent refusal screen's one way out. Named for the destination, not the
+  // mechanism.
+  'auth.backToSignIn': 'Вернуться ко входу',
   'refusal.staff.title': 'у вас нет доступа к приложению для персонала',
   'refusal.staff.body': 'обратитесь к менеджеру студии.',
   'refusal.staff.otherApp': 'приложение для родителей',
@@ -542,6 +545,8 @@ export const common: Bundle = {
   'platform.new.locale': 'Язык по умолчанию',
   'platform.new.submit': 'Создать клуб',
   'platform.new.working': 'Создание…',
+  'platform.new.slugTaken': 'Этот идентификатор уже занят другим клубом. Выберите другой.',
+  'platform.new.slugInvalid': 'Идентификатор может содержать только строчные латинские буквы, цифры и дефисы.',
   'platform.invite.title': 'Пригласить владельца',
   'platform.invite.email': 'Эл. почта',
   'platform.invite.firstName': 'Имя',

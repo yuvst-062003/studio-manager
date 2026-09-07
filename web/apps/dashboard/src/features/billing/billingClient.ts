@@ -66,8 +66,18 @@ export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' }
 
+/** The status rides ON the error as well as in its message.
+ *
+ *  `ItemsScreen` already told a manager whether a photo was the wrong format or too large
+ *  by reading `error.status` — a read that was always `undefined`, because a bare `Error`
+ *  carries nothing but a string. Every refusal therefore rendered the one generic "the
+ *  upload failed", which sends a manager back to the same file. */
 async function json<T>(response: Response): Promise<T> {
-  if (!response.ok) throw new Error(`${response.status} ${response.url}`)
+  if (!response.ok) {
+    throw Object.assign(new Error(`${response.status} ${response.url}`), {
+      status: response.status,
+    })
+  }
   return (await response.json()) as T
 }
 

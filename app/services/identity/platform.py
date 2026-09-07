@@ -17,6 +17,7 @@ import secrets
 import uuid
 from datetime import datetime, timedelta
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import with_all_tenants
@@ -40,6 +41,16 @@ INVITATION_TTL_DAYS = 14
 
 class StudioNotFoundError(LookupError):
     """The console addressed a studio that does not exist."""
+
+
+class SlugTakenError(ValueError):
+    """`studio.slug` is UNIQUE and this one already belongs to a club.
+
+    Checked here rather than left to the constraint: an IntegrityError raised out of the
+    route is a 500, and a 500 is the one answer the console cannot turn into a sentence an
+    operator can act on. The constraint stays the authority -- this is the refusal that
+    reaches a person.
+    """
 
 
 def provision_studio(
@@ -66,6 +77,13 @@ def provision_studio(
     without one is a funnel that stops there.
     """
     with with_all_tenants(reason=_PLATFORM_SCOPE):
+        # Before the insert, so the refusal arrives as an answer rather than as a broken
+        # session. A concurrent operator could still lose the race to the constraint; two
+        # people provisioning the same club at the same second is not the case this
+        # protects, and the constraint remains correct for it.
+        taken = session.execute(select(Studio.id).where(Studio.slug == slug)).scalar_one_or_none()
+        if taken is not None:
+            raise SlugTakenError(slug)
         studio = Studio(
             name=name,
             slug=slug,
