@@ -40,13 +40,16 @@ const LATE_EVENING: SessionRow = {
   staff: [],
 }
 
-function stub(sessions: SessionRow[] = [TUESDAY_EVENING]): ScheduleClient {
+function stub(
+  sessions: SessionRow[] = [TUESDAY_EVENING],
+  closures: unknown[] = [],
+): ScheduleClient {
   return {
     listSessions: vi.fn(async () => sessions),
     getSchedule: vi.fn(async () => []),
     putSchedule: vi.fn(),
     listTrainingYears: vi.fn(async () => []),
-    listClosures: vi.fn(async () => []),
+    listClosures: vi.fn(async () => closures),
     createClosure: vi.fn(),
     listHolidayPresets: vi.fn(async () => []),
     patchSession: vi.fn(async () => {
@@ -201,6 +204,52 @@ describe('WeekBoard (3a)', () => {
     render(<WeekBoard locale="he" client={stub([])} today="2026-11-03T12:00:00Z" />)
     expect(await screen.findByText(t('he', 'schedule.today.empty'))).toBeInTheDocument()
     expect(screen.getByText(t('he', 'schedule.today.emptyHint'))).toBeInTheDocument()
+  })
+
+  it('names the holiday behind an empty week (#20)', async () => {
+    // The owner's #20. §5.6 makes `materialize_sessions` skip a closed date, so a week the
+    // club is shut arrives as zero sessions — the manager's board said 'אין שיעורים היום'
+    // about a week they themselves had closed.
+    render(
+      <WeekBoard
+        locale="he"
+        client={stub([], [
+          {
+            id: 'c1',
+            training_year_id: 'y1',
+            date_from: '2026-11-01',
+            date_to: '2026-11-07',
+            reason: 'סוכות',
+            source: 'holiday_preset',
+          },
+        ])}
+        today="2026-11-03T12:00:00Z"
+      />,
+    )
+    expect(await screen.findByText(t('he', 'schedule.closure.dayClosed'))).toBeInTheDocument()
+    expect(screen.getByText('סוכות')).toBeInTheDocument()
+    expect(screen.queryByText(t('he', 'schedule.today.empty'))).not.toBeInTheDocument()
+  })
+
+  it('leaves an ordinary empty week alone when no closure touches it (#20)', async () => {
+    render(
+      <WeekBoard
+        locale="he"
+        client={stub([], [
+          {
+            id: 'c1',
+            training_year_id: 'y1',
+            date_from: '2027-04-22',
+            date_to: '2027-04-28',
+            reason: 'פסח',
+            source: 'holiday_preset',
+          },
+        ])}
+        today="2026-11-03T12:00:00Z"
+      />,
+    )
+    expect(await screen.findByText(t('he', 'schedule.today.empty'))).toBeInTheDocument()
+    expect(screen.queryByText(t('he', 'schedule.closure.dayClosed'))).not.toBeInTheDocument()
   })
 
   it('never shows a registration count', async () => {

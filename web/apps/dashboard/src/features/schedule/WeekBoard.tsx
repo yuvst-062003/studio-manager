@@ -38,8 +38,8 @@ import { makeDashboardAttendanceClient } from '../attendance'
 import { usePlanBadges } from '../billing/usePlanBadges'
 import { useLongPress } from './useLongPress'
 import { SessionPopover } from './SessionPopover'
-import { cancelReasonLabel } from './client'
-import type { ScheduleClient, SessionRow } from './client'
+import { cancelReasonLabel, closuresOverlapping } from './client'
+import type { Closure, ScheduleClient, SessionRow } from './client'
 
 const DAY_MS = 86_400_000
 
@@ -483,6 +483,8 @@ export function WeekBoard({
    *  positioned from the cell's own rect because `.week-grid` scrolls, and anything
    *  rendered INSIDE a scrolling box is clipped by it. */
   const [slot, setSlot] = useState<{ day: string; time: string; x: number; y: number } | null>(null)
+  /** Bug #20 — the club's closures, so an empty board can say why it is empty. */
+  const [closures, setClosures] = useState<Closure[]>([])
 
   useEffect(() => {
     let live = true
@@ -516,6 +518,33 @@ export function WeekBoard({
       live = false
     }
   }, [client, days, version])
+
+  // Bug #20 — why an empty board is empty. §5.6 makes `materialize_sessions` skip a closed
+  // date, so a week the club is shut arrives from the read above as an ABSENCE of rows: the
+  // board said 'אין שיעורים היום' about a week the manager had closed themselves. Asked
+  // once, not per view: `days` changes on every page of the board and a club's closures do
+  // not. A failure leaves the list empty, which renders as no claim rather than a wrong one.
+  useEffect(() => {
+    let live = true
+    void (async () => {
+      try {
+        const loaded = await client.listClosures()
+        if (live) setClosures(loaded)
+      } catch (error) {
+        console.error('WeekBoard: failed to load closures', error)
+      }
+    })()
+    return () => {
+      live = false
+    }
+  }, [client, version])
+
+  /** The closures the span ON SCREEN is covered by — `days` is a week or a month, and the
+   *  same array the sessions read above is bounded by, so the two can never disagree. */
+  const visibleClosures = useMemo(
+    () => closuresOverlapping(closures, days[0] as string, days[days.length - 1] as string),
+    [closures, days],
+  )
 
   const openSession = sessions.find((row) => row.id === openSessionId) ?? null
 
@@ -875,10 +904,21 @@ export function WeekBoard({
         setOpen={setOpen}
       />
 
+      {/* An empty board has two possible reasons and they are not interchangeable: a week
+          with nothing scheduled is a gap to fill, a week the club declared shut is not.
+          The description is the manager's own typed reason, verbatim — it is data, and
+          passing it through `t()` would print a key (bug #20). */}
       {sessions.length === 0 ? (
         <EmptyState
-          title={t(locale, 'schedule.today.empty')}
-          description={t(locale, 'schedule.today.emptyHint')}
+          title={t(
+            locale,
+            visibleClosures.length > 0 ? 'schedule.closure.dayClosed' : 'schedule.today.empty',
+          )}
+          description={
+            visibleClosures.length > 0
+              ? visibleClosures.map((closure) => closure.reason).join(' · ')
+              : t(locale, 'schedule.today.emptyHint')
+          }
         />
       ) : null}
 

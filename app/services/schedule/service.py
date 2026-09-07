@@ -309,6 +309,28 @@ class ScheduleService:
         rows = self.session.execute(_paged(stmt, cursor=cursor, limit=limit)).scalars().all()
         return _page_out(list(rows), limit)
 
+    def closures_overlapping(
+        self, *, date_from: date | None = None, date_to: date | None = None
+    ) -> list[StudioClosure]:
+        """Bug #20 — every closure that touches the window, ordered by when it starts.
+
+        **Overlap, not containment.** A range that opens in September and closes in
+        October (סוכות 2026-09-26→10-03) belongs to both months' calendars; a filter asking
+        for closures *inside* the window would drop it from both and leave two screens with
+        a silent gap where the reason should be.
+
+        No cursor, deliberately. A club declares single-figure closures a year, and a
+        calendar needs all of them at once to colour a month — a paged read would make the
+        caller loop to render one screen.
+        """
+        stmt = select(StudioClosure)
+        if date_to is not None:
+            stmt = stmt.where(StudioClosure.date_from <= date_to)
+        if date_from is not None:
+            stmt = stmt.where(StudioClosure.date_to >= date_from)
+        stmt = stmt.order_by(StudioClosure.date_from, StudioClosure.id)
+        return list(self.session.execute(stmt).scalars().all())
+
     def closure_specs(self, training_year_id: uuid.UUID) -> list[ClosureSpec]:
         rows = (
             self.session.execute(

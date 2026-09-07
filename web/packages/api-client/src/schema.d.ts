@@ -1715,7 +1715,15 @@ export interface paths {
         post?: never;
         delete?: never;
         options?: never;
-        head?: never;
+        /**
+         * Read Health
+         * @description Liveness. Deliberately carries no tenant data and needs no auth.
+         *
+         *     `revision` is best-effort and never affects `status`: this endpoint answers "is this
+         *     process alive", and a database it cannot reach does not make it dead. Letting the
+         *     failure propagate would turn every database blip into a page.
+         */
+        head: operations["read_health_api_v1_health_get"];
         patch?: never;
         trace?: never;
     };
@@ -1993,6 +2001,41 @@ export interface paths {
          *     wholly outstanding.
          */
         get: operations["my_charges_api_v1_me_charges_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/closures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Closures
+         * @description The club's closures, for a GUARDIAN (bug #20, 2026-09-08).
+         *
+         *     §5.6 makes `materialize_sessions` skip a closed date, so a holiday leaves **no session
+         *     row at all** — which is precisely why a parent's calendar rendered ראש השנה as an
+         *     ordinary empty day with nothing to say about it. The reason only exists on the closure,
+         *     and `GET /closures` above is `AnyStaff`, so the parent app could not reach one.
+         *
+         *     No role dependency, §3.1 — 'guardian is not a role' — on `/me/studio`'s pattern in
+         *     `app/routers/studio.py`: the shape is the club's shop window (holiday names and public
+         *     dates, the same thing pinned to the dojo door) and not a settings read. The studio comes
+         *     from the verified JWT through `TenantSessionDep`, so there is nothing in the URL for a
+         *     caller to point at another club with.
+         *
+         *     Unpaged, unlike the staff read: `ClosurePage` keeps one response shape for one
+         *     resource, and a calendar that had to follow a cursor to colour a month would be a
+         *     calendar that renders half a month while it does.
+         */
+        get: operations["my_closures_api_v1_me_closures_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -15906,6 +15949,26 @@ export interface operations {
             };
         };
     };
+    read_health_api_v1_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
     status_summary_api_v1_health_declarations_summary_get: {
         parameters: {
             query?: {
@@ -16301,6 +16364,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CursorPage_ChargeOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_closures_api_v1_me_closures_get: {
+        parameters: {
+            query?: {
+                from?: string | null;
+                to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_ClosureOut_"];
                 };
             };
             /** @description Validation Error */

@@ -139,7 +139,10 @@ export interface ScheduleClient {
     location_id?: string | null
   }): Promise<SessionRow>
   listTrainingYears(): Promise<TrainingYear[]>
-  listClosures(trainingYearId: string): Promise<Closure[]>
+  /** Bug #20 — the year id is optional now. The closures panel narrows to the year it is
+   *  editing; the board asks about a week and has no year in hand, only dates, and a
+   *  club's closures are single figures a year so the unfiltered read is cheap. */
+  listClosures(trainingYearId?: string): Promise<Closure[]>
   createClosure(body: Omit<Closure, 'id'>): Promise<{ sessions_cancelled: number }>
   listHolidayPresets(year: number): Promise<HolidayPreset[]>
 }
@@ -257,8 +260,12 @@ export function makeScheduleClient(fetcher: Fetcher): ScheduleClient {
       return body.items
     },
     async listClosures(trainingYearId) {
+      // 200 is far above any real club's closure count and still bounded — the same
+      // reasoning the staff app's `listClosures` and `bootstrap.py` both use.
+      const params = new URLSearchParams({ limit: '200' })
+      if (trainingYearId) params.set('training_year_id', trainingYearId)
       const body = await json<{ items: Closure[] }>(
-        await fetcher(`${API}/closures?training_year_id=${trainingYearId}`),
+        await fetcher(`${API}/closures?${params.toString()}`),
       )
       return body.items
     },
@@ -282,6 +289,17 @@ export function fill(template: string, values: Record<string, string | number>):
   return template.replace(/\{\{(\w+)\}\}/g, (whole, key) =>
     key in values ? String(values[key]) : whole,
   )
+}
+
+/** The closures whose `[date_from, date_to]` touch `[from, to]`, earliest first.
+ *
+ *  **Overlap, not containment** — סוכות opens on 26 September and closes on 3 October, and
+ *  a filter asking for closures *inside* the window would drop it from both weeks that
+ *  actually are shut. Lexicographic on ISO dates, which is exact. */
+export function closuresOverlapping(closures: Closure[], from: string, to: string): Closure[] {
+  return closures
+    .filter((c) => c.date_from <= to && from <= c.date_to)
+    .sort((left, right) => left.date_from.localeCompare(right.date_from))
 }
 
 /**

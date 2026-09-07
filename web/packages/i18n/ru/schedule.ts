@@ -170,6 +170,7 @@ export const schedule: Bundle = {
   'closure.dateTo': 'По',
   'closure.reason': 'Причина',
   'closure.empty': 'Дни закрытия не заданы',
+  'closure.dayClosed': 'Клуб закрыт',
   'closure.source.manual': 'Задано вручную',
   'closure.source.holidayPreset': 'Из списка праздников',
   'closure.preset.title': 'Праздники и памятные дни',

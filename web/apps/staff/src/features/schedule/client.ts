@@ -65,6 +65,17 @@ export interface SessionPatchInput {
   staff?: { person_id: string; role: 'lead_coach' | 'assistant_coach'; is_substitute: boolean }[]
 }
 
+/** Mirrors `app/schemas/schedule.py::ClosureOut`. */
+export interface ClosureRow {
+  id: string
+  training_year_id: string
+  date_from: string
+  date_to: string
+  /** The manager's own text (`ראש השנה`, `שיפוצים`) — data, never a translation key. */
+  reason: string
+  source: 'holiday_preset' | 'manual'
+}
+
 export interface StaffScheduleClient {
   listSessions(query: {
     from: string
@@ -80,6 +91,13 @@ export interface StaffScheduleClient {
    * year exists here at all" (§4.2's silent-skip failure mode) — see {@link yearCovers}.
    */
   listTrainingYears(): Promise<TrainingYearRow[]>
+  /**
+   * Bug #20 — the other half of "why is this day empty". §5.6 makes a closed date produce
+   * **no session row at all**, so a holiday and an ordinary day off arrive here identically.
+   * `GET /closures` is `AnyStaff` like `/training-years` above, and is asked for the same
+   * reason and on the same terms: only when the day came back empty.
+   */
+  listClosures(): Promise<ClosureRow[]>
   /** §4.7's calendar — change the coach or move the session. Mirrors the dashboard's own
    *  `ScheduleClient.patchSession`, same endpoint and shape. */
   patchSession(sessionId: string, body: SessionPatchInput): Promise<SessionRow>
@@ -106,6 +124,14 @@ export function makeStaffScheduleClient(fetcher: Fetcher): StaffScheduleClient {
       const response = await fetcher(`${API}/training-years?limit=200`)
       if (!response.ok) throw new Error(String(response.status))
       const body = (await response.json()) as { items: TrainingYearRow[] }
+      return body.items
+    },
+    async listClosures() {
+      // Same bound and the same reasoning as `listTrainingYears` above: a club declares
+      // single-figure closures a year, so 200 is far above any real count and still bounded.
+      const response = await fetcher(`${API}/closures?limit=200`)
+      if (!response.ok) throw new Error(String(response.status))
+      const body = (await response.json()) as { items: ClosureRow[] }
       return body.items
     },
     async patchSession(sessionId, body) {
@@ -135,6 +161,15 @@ export function makeStaffScheduleClient(fetcher: Fetcher): StaffScheduleClient {
  *  not yet activated is still evidence the gap is a rollover step away, not a dead end. */
 export function yearCovers(years: TrainingYearRow[], dayKey: string): boolean {
   return years.some((year) => year.starts_on <= dayKey && dayKey <= year.ends_on)
+}
+
+/** The closure whose `[date_from, date_to]` covers `dayKey`, or null.
+ *
+ *  Lexicographic on ISO dates, exactly like `yearCovers` above. The FIRST match wins and
+ *  the caller does not sort: overlapping closures are a manager's data-entry mistake, not a
+ *  case with a right answer, and naming one of the two beats naming neither. */
+export function closureOn(closures: ClosureRow[], dayKey: string): ClosureRow | null {
+  return closures.find((c) => c.date_from <= dayKey && dayKey <= c.date_to) ?? null
 }
 
 /**

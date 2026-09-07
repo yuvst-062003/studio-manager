@@ -9,6 +9,7 @@ function stub(): StaffScheduleClient {
   return {
     listSessions: vi.fn(async () => []),
     listTrainingYears: vi.fn(async () => []),
+    listClosures: vi.fn(async () => []),
   } as unknown as StaffScheduleClient
 }
 

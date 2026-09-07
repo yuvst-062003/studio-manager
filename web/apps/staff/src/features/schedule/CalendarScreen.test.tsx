@@ -80,6 +80,7 @@ function scheduleStub(overrides: Partial<StaffScheduleClient> = {}): StaffSchedu
   return {
     listSessions: vi.fn(async () => [session()]),
     listTrainingYears: vi.fn(async () => []),
+    listClosures: vi.fn(async () => []),
     patchSession: vi.fn(async (id, body) => session({ id, ...body })),
     cancelSession: vi.fn(async (id) => session({ id, status: 'cancelled', cancel_reason: 'x' })),
     ...overrides,

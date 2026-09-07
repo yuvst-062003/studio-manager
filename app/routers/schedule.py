@@ -16,6 +16,8 @@ claim a §13 invariant-3 guarantee about routes a coach never calls.
 from __future__ import annotations
 
 import uuid
+from datetime import date
+from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 
@@ -122,6 +124,44 @@ def list_closures(
         items=[ClosureOut.model_validate(r, from_attributes=True) for r in rows],
         next_cursor=next_cursor,
         has_more=next_cursor is not None,
+    )
+
+
+@router.get("/me/closures", response_model=ClosurePage)
+def my_closures(
+    request: Request,
+    session: TenantSessionDep,
+    date_from: Annotated[date | None, Query(alias="from")] = None,
+    date_to: Annotated[date | None, Query(alias="to")] = None,
+) -> ClosurePage:
+    """The club's closures, for a GUARDIAN (bug #20, 2026-09-08).
+
+    §5.6 makes `materialize_sessions` skip a closed date, so a holiday leaves **no session
+    row at all** — which is precisely why a parent's calendar rendered ראש השנה as an
+    ordinary empty day with nothing to say about it. The reason only exists on the closure,
+    and `GET /closures` above is `AnyStaff`, so the parent app could not reach one.
+
+    No role dependency, §3.1 — 'guardian is not a role' — on `/me/studio`'s pattern in
+    `app/routers/studio.py`: the shape is the club's shop window (holiday names and public
+    dates, the same thing pinned to the dojo door) and not a settings read. The studio comes
+    from the verified JWT through `TenantSessionDep`, so there is nothing in the URL for a
+    caller to point at another club with.
+
+    Unpaged, unlike the staff read: `ClosurePage` keeps one response shape for one
+    resource, and a calendar that had to follow a cursor to colour a month would be a
+    calendar that renders half a month while it does.
+    """
+    person_id = getattr(request.state, "person_id", None)
+    if not isinstance(person_id, uuid.UUID):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "unauthenticated", "message": "sign in first"},
+        )
+    rows = ScheduleService(session).closures_overlapping(date_from=date_from, date_to=date_to)
+    return ClosurePage(
+        items=[ClosureOut.model_validate(r, from_attributes=True) for r in rows],
+        next_cursor=None,
+        has_more=False,
     )
 
 

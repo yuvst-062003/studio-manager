@@ -6,7 +6,10 @@ import { ScheduleSection, isCalendarRoute } from './ScheduleSection'
 import type { ParentScheduleClient } from './client'
 
 function stub(): ParentScheduleClient {
-  return { listSessions: vi.fn(async () => []) } as unknown as ParentScheduleClient
+  return {
+    listSessions: vi.fn(async () => []),
+    listClosures: vi.fn(async () => []),
+  } as unknown as ParentScheduleClient
 }
 
 describe('isCalendarRoute', () => {

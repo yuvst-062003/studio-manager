@@ -15,7 +15,7 @@
 // strip and this screen as its two consumers. The legend is the screen's purpose.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { AttendanceMark, Card, EmptyState, SegmentedControl, StatusChip } from '@studio/ui'
+import { AttendanceMark, Card, EmptyState, RangeText, SegmentedControl, StatusChip } from '@studio/ui'
 import type { AttendanceState } from '@studio/ui'
 import {
   apiFetch,
@@ -26,8 +26,8 @@ import {
 } from '@studio/core'
 import { DIRECTION, t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { cancelReasonLabel } from './client'
-import type { ParentScheduleClient, SessionRow } from './client'
+import { cancelReasonLabel, closuresOverlapping } from './client'
+import type { ClosureRow, ParentScheduleClient, SessionRow } from './client'
 import { SessionAttendanceDialog, reportedKey } from './SessionAttendanceDialog'
 import type { AttendanceChild } from './SessionAttendanceDialog'
 
@@ -354,6 +354,31 @@ const overflowStyle: CSSProperties = {
   fontWeight: 'var(--weight-semibold)' as CSSProperties['fontWeight'],
 }
 
+//: Bug #20's notice. A card rather than an `EmptyState`: the month grid above it is not
+//: empty — it has the club's other lessons on it — so the reason belongs BESIDE the
+//: calendar, not in place of it. Only day view ever shows this over nothing at all.
+const closureNoticeStyle: CSSProperties = {
+  background: 'var(--surface)',
+  border: 'var(--border-width-hairline) solid var(--border)',
+  borderRadius: 'var(--radius-xl)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-1)',
+  padding: 'var(--space-3)',
+}
+
+const closureListStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 'var(--space-1)',
+  fontSize: 'var(--text-caption)',
+  listStyle: 'none',
+  margin: 0,
+  padding: 0,
+}
+
+const closureDatesStyle: CSSProperties = { color: 'var(--text-secondary)' }
+
 const legendStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(9rem, 1fr))',
@@ -537,6 +562,8 @@ export function ChildCalendar({
   const month = Number(anchor.slice(5, 7))
   const [sessions, setSessions] = useState<SessionRow[]>([])
   const [loaded, setLoaded] = useState(false)
+  // Bug #20 — the month's closures, so a day with no lesson can say why it has none.
+  const [closures, setClosures] = useState<ClosureRow[]>([])
   // **The next lessons are not a property of the open month.** See `horizonBounds`.
   const [horizon, setHorizon] = useState<SessionRow[]>([])
   // P3 — the attendance layer and its per-child switcher.
@@ -594,6 +621,25 @@ export function ChildCalendar({
       if (!live || rows === null) return
       setSessions(rows)
       setLoaded(true)
+    })()
+    return () => {
+      live = false
+    }
+  }, [bounds.from, bounds.to, client])
+
+  // Bug #20 — the reason an empty day is empty. §5.6 makes `materialize_sessions` skip a
+  // closed date, so ראש השנה reaches the read above as an ABSENCE of rows: there is nothing
+  // on the day to hang an explanation off, and the closure is the only place one exists.
+  //
+  // Asked over the same month bounds as the sessions read, so paging months refetches both
+  // together and the notice can never describe a month the grid is no longer showing. A
+  // failure leaves the list empty — an unanswered question renders as no claim, exactly as
+  // `loaded` does for `אין שיעורים בחודש הזה` above.
+  useEffect(() => {
+    let live = true
+    void (async () => {
+      const rows = await client.listClosures({ from: bounds.from, to: bounds.to }).catch(() => [])
+      if (live) setClosures(rows)
     })()
     return () => {
       live = false
@@ -779,6 +825,19 @@ export function ChildCalendar({
     if (view === 'week') return [weekOf(anchor)]
     return [[anchor]]
   }, [view, weeks, anchor])
+
+  /** Bug #20 — the closures the OPEN VIEW covers, not the month that was fetched. Week and
+   *  day view narrow the window well inside `bounds`, and a notice that kept naming the
+   *  whole month's holidays while the parent looked at a single Tuesday would be captioning
+   *  a day it knows nothing about. Read off `visibleWeeks` so the two can never disagree —
+   *  the padding cells are `''`, which sorts below every real key. */
+  const visibleClosures = useMemo(() => {
+    const days = visibleWeeks.flat().filter((cell) => cell !== '')
+    if (days.length === 0) return []
+    const from = days.reduce((a, b) => (a < b ? a : b))
+    const to = days.reduce((a, b) => (a > b ? a : b))
+    return closuresOverlapping(closures, from, to)
+  }, [closures, visibleWeeks])
 
   /** Every lesson on the pressed day, from both reads. */
   const sessionsOn = useCallback(
@@ -1038,6 +1097,37 @@ export function ChildCalendar({
           </div>
         ))}
       </div>
+
+      {/* Bug #20 — 'a day with no sessions gives no reason; a holiday should say so'. The
+          reason is the manager's own typed text, so it renders verbatim and is never passed
+          through `t()`; only the heading above it is translated. `role="status"` because it
+          appears and changes as the parent pages between months. */}
+      {visibleClosures.length > 0 ? (
+        <section data-testid="calendar-closures" role="status" style={closureNoticeStyle}>
+          <strong>{t(locale, 'schedule.closure.dayClosed')}</strong>
+          <ul style={closureListStyle}>
+            {visibleClosures.map((closure) => (
+              <li key={closure.id}>
+                {closure.reason}
+                {' · '}
+                <span style={closureDatesStyle}>
+                  {closure.date_from === closure.date_to ? (
+                    formatDateInStudioZone(`${closure.date_from}T12:00:00Z`, locale)
+                  ) : (
+                    // One LTR island for both ends and the dash — a bare template literal
+                    // here is the bidi bug `RangeText`'s docstring has now recorded three
+                    // times, and a closure range is exactly its shape.
+                    <RangeText
+                      from={formatDateInStudioZone(`${closure.date_from}T12:00:00Z`, locale)}
+                      to={formatDateInStudioZone(`${closure.date_to}T12:00:00Z`, locale)}
+                    />
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {/* **Five, not four.** `DayState` was five and `DAY_TONE` coloured five, but this
           list held four — so `לא סומן` shipped as a grey dot with nothing naming it, while

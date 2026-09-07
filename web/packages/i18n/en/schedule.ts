@@ -168,6 +168,7 @@ export const schedule: Bundle = {
   'closure.dateTo': 'To',
   'closure.reason': 'Reason',
   'closure.empty': 'No closure days set',
+  'closure.dayClosed': 'The club is closed',
   'closure.source.manual': 'Set manually',
   'closure.source.holidayPreset': 'From the holiday list',
   'closure.preset.title': 'Holidays and observances',

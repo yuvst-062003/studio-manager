@@ -142,8 +142,8 @@ import {
 import type { RosterRow } from '@studio/core'
 import { plural, t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { cancelReasonLabel, yearCovers } from './client'
-import type { SessionRow, StaffScheduleClient } from './client'
+import { cancelReasonLabel, closureOn, yearCovers } from './client'
+import type { ClosureRow, SessionRow, StaffScheduleClient } from './client'
 import { confirmationCounts, mergeTimeline, timelineStates } from './timeline'
 import type { DotState, TimelineItem } from './timeline'
 import type { EventOut, StaffEventsClient } from '../events/client'
@@ -425,6 +425,9 @@ export function TodayScreen({
   // Register §4.2 — defaults to false (an ordinary empty day) until the check below
   // (fired only when the day's own fetch comes back empty) proves otherwise.
   const [noTrainingYear, setNoTrainingYear] = useState(false)
+  // Bug #20 — the closure covering the day on screen, or null. Same default and the same
+  // honesty rule as `noTrainingYear`: an unanswered question renders as "ordinary day off".
+  const [closure, setClosure] = useState<ClosureRow | null>(null)
   // §4.1 — every roster row already carries `has_confirmation`/`has_absence_report`, and
   // both are already in the offline cache primed at §6.1's launch. Read here, never
   // fetched again: keyed by session id so each card's counts travel from THIS session's
@@ -571,6 +574,22 @@ export function TodayScreen({
       // A failed check must not invent a claim the day cannot back up — the ordinary
       // "no classes" empty state is the honest fallback, not a second failure mode.
       .catch(() => live && setNoTrainingYear(false))
+    return () => {
+      live = false
+    }
+  }, [client, day, onThisDay.length])
+
+  // Bug #20 — the second half of the same question, asked on exactly the same terms as the
+  // training-year check above: only on an empty day, and a failure answers "no closure"
+  // rather than inventing a holiday. `GET /closures` is `AnyStaff`, so a coach's own client
+  // can already ask.
+  useEffect(() => {
+    if (onThisDay.length > 0) return
+    let live = true
+    client
+      .listClosures()
+      .then((closures) => live && setClosure(closureOn(closures, day)))
+      .catch(() => live && setClosure(null))
     return () => {
       live = false
     }
@@ -835,12 +854,28 @@ export function TodayScreen({
           events are not governed by. `timelineItems` decides whether the LIST renders,
           because an event on an otherwise-empty day is still something to show. */}
       {timelineItems.length === 0 ? (
+        /* Three reasons a day can be empty, and they are not interchangeable. A missing
+           training year is a setup gap only a manager can close, so it outranks the other
+           two — a club with no year declared has no closures worth naming either. A closure
+           names itself with the manager's own words, which is why the description is the
+           reason verbatim and not a translated string (bug #20). */
         <EmptyState
-          title={t(locale, noTrainingYear ? 'schedule.today.noTrainingYear' : 'schedule.today.empty')}
-          description={t(
+          title={t(
             locale,
-            noTrainingYear ? 'schedule.today.noTrainingYearHint' : 'schedule.today.emptyHint',
+            noTrainingYear
+              ? 'schedule.today.noTrainingYear'
+              : closure
+                ? 'schedule.closure.dayClosed'
+                : 'schedule.today.empty',
           )}
+          description={
+            !noTrainingYear && closure
+              ? closure.reason
+              : t(
+                  locale,
+                  noTrainingYear ? 'schedule.today.noTrainingYearHint' : 'schedule.today.emptyHint',
+                )
+          }
         />
       ) : (
         <ul

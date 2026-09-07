@@ -14,7 +14,7 @@ import type { Locale } from '@studio/i18n'
 import { THEME_STORAGE_KEY, ThemeProvider } from '@studio/ui'
 import type { ResolvedTheme } from '@studio/ui'
 import { ChildCalendar } from './ChildCalendar'
-import type { ParentScheduleClient, SessionRow } from './client'
+import type { ClosureRow, ParentScheduleClient, SessionRow } from './client'
 
 const base = {
   group_id: 'g1',
@@ -68,8 +68,21 @@ const LATE: SessionRow = {
   status: 'scheduled',
 }
 
-function stub(sessions: SessionRow[] = [PAST, FUTURE]): ParentScheduleClient {
-  return { listSessions: vi.fn(async () => sessions) }
+function stub(
+  sessions: SessionRow[] = [PAST, FUTURE],
+  closures: ClosureRow[] = [],
+): ParentScheduleClient {
+  return { listSessions: vi.fn(async () => sessions), listClosures: vi.fn(async () => closures) }
+}
+
+/** ראש השנה, inside the November on screen so the month view sees it. */
+const CLOSED: ClosureRow = {
+  id: 'c1',
+  training_year_id: 'y1',
+  date_from: '2026-11-10',
+  date_to: '2026-11-12',
+  reason: 'ראש השנה',
+  source: 'holiday_preset',
 }
 
 function renderIn(
@@ -93,6 +106,29 @@ describe('ChildCalendar (12b)', () => {
     render(calendar())
     await waitFor(() => expect(screen.getAllByRole('cell')).toHaveLength(30))
     expect(screen.getAllByRole('columnheader')[0]).toHaveTextContent(t('he', 'schedule.weekday.0'))
+  })
+
+  it('names the holiday behind an empty day (#20)', async () => {
+    // The owner's #20. §5.6 makes `materialize_sessions` skip a closed date, so a holiday
+    // reaches this screen as an ABSENCE of session rows — the calendar drew ראש השנה as a
+    // blank Tuesday with nothing at all to say about it. The closure is the only place the
+    // reason exists, and `GET /me/closures` is what lets a parent read one.
+    render(calendar({ client: stub([], [CLOSED]) }))
+    const notice = await screen.findByTestId('calendar-closures')
+    expect(notice).toHaveTextContent(t('he', 'schedule.closure.dayClosed'))
+    expect(notice).toHaveTextContent('ראש השנה')
+  })
+
+  it('leaves the month alone when no closure touches it (#20)', async () => {
+    // A closure in April must not caption November. Without the overlap check the notice
+    // would caption every month of the year with the same holiday.
+    render(
+      calendar({
+        client: stub([], [{ ...CLOSED, date_from: '2027-04-22', date_to: '2027-04-28', reason: 'פסח' }]),
+      }),
+    )
+    await screen.findByTestId('calendar-legend')
+    expect(screen.queryByTestId('calendar-closures')).toBeNull()
   })
 
   it('splits upcoming from past', async () => {
@@ -294,6 +330,7 @@ describe('ChildCalendar (12b)', () => {
           (row) => row.starts_at.slice(0, 10) >= query.from && row.starts_at.slice(0, 10) <= query.to,
         )
       }),
+      listClosures: vi.fn(async () => []),
     }
     render(calendar({ client, today: '2026-08-30T09:00:00Z' }))
 

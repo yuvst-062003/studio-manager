@@ -21117,6 +21117,26 @@
         "tags": [
           "health"
         ]
+      },
+      "head": {
+        "description": "Liveness. Deliberately carries no tenant data and needs no auth.\n\n`revision` is best-effort and never affects `status`: this endpoint answers \"is this\nprocess alive\", and a database it cannot reach does not make it dead. Letting the\nfailure propagate would turn every database blip into a page.",
+        "operationId": "read_health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Read Health",
+        "tags": [
+          "health"
+        ]
       }
     },
     "/api/v1/health-declarations/summary": {
@@ -21787,6 +21807,74 @@
         "summary": "My Charges",
         "tags": [
           "billing"
+        ]
+      }
+    },
+    "/api/v1/me/closures": {
+      "get": {
+        "description": "The club's closures, for a GUARDIAN (bug #20, 2026-09-08).\n\n§5.6 makes `materialize_sessions` skip a closed date, so a holiday leaves **no session\nrow at all** — which is precisely why a parent's calendar rendered ראש השנה as an\nordinary empty day with nothing to say about it. The reason only exists on the closure,\nand `GET /closures` above is `AnyStaff`, so the parent app could not reach one.\n\nNo role dependency, §3.1 — 'guardian is not a role' — on `/me/studio`'s pattern in\n`app/routers/studio.py`: the shape is the club's shop window (holiday names and public\ndates, the same thing pinned to the dojo door) and not a settings read. The studio comes\nfrom the verified JWT through `TenantSessionDep`, so there is nothing in the URL for a\ncaller to point at another club with.\n\nUnpaged, unlike the staff read: `ClosurePage` keeps one response shape for one\nresource, and a calendar that had to follow a cursor to colour a month would be a\ncalendar that renders half a month while it does.",
+        "operationId": "my_closures_api_v1_me_closures_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CursorPage_ClosureOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Closures",
+        "tags": [
+          "schedule"
         ]
       }
     },

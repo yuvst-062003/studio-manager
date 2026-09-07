@@ -222,6 +222,11 @@ export const schedule: Bundle = {
   'closure.dateTo': 'עד תאריך',
   'closure.reason': 'סיבה',
   'closure.empty': 'לא הוגדרו ימי סגירה',
+  // Bug #20 (2026-09-08) — a closed date produces NO session row (§5.6 skips it in
+  // `materialize_sessions`), so every calendar drew ראש השנה as an ordinary quiet day.
+  // The title here; the description beside it is the closure's own `reason`, which is
+  // the manager's typed text and so is never translated.
+  'closure.dayClosed': 'המועדון סגור',
   'closure.source.manual': 'הוגדר ידנית',
   'closure.source.holidayPreset': 'מתוך רשימת החגים',
   // §5.6 — presets are OFFERED. The copy never states the club is closed.

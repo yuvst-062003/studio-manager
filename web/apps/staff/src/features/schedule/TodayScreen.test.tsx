@@ -14,7 +14,7 @@ import type { ResolvedTheme } from '@studio/ui'
 import { memoryStore, setOfflineStore, writeWindow } from '@studio/core'
 import type { OfflineStore, RosterRow as RosterRowData } from '@studio/core'
 import { TodayScreen } from './TodayScreen'
-import type { SessionRow, StaffScheduleClient } from './client'
+import type { ClosureRow, SessionRow, StaffScheduleClient } from './client'
 import type { EventOut, StaffEventsClient } from '../events/client'
 import type { StaffPeopleClient } from '../people'
 import type { StaffAttendanceClient } from '../attendance/client'
@@ -60,10 +60,12 @@ function stub(
   trainingYears: { starts_on: string; ends_on: string; status: string }[] = [
     { starts_on: '2026-09-01', ends_on: '2027-08-20', status: 'active' },
   ],
+  closures: ClosureRow[] = [],
 ): StaffScheduleClient {
   return {
     listSessions: vi.fn(async () => sessions),
     listTrainingYears: vi.fn(async () => trainingYears),
+    listClosures: vi.fn(async () => closures),
     // §4.7's calendar (checkpoint C11) — this screen (9a/1d) never calls either; present
     // only so this stub satisfies the interface's shape.
     patchSession: vi.fn(async () => TODAY_SESSION),
@@ -291,6 +293,50 @@ describe('TodayScreen (9a / 1d)', () => {
     expect(await screen.findByText(t('he', 'schedule.today.noTrainingYear'))).toBeInTheDocument()
     expect(screen.getByText(t('he', 'schedule.today.noTrainingYearHint'))).toBeInTheDocument()
     expect(screen.queryByText(t('he', 'schedule.today.empty'))).not.toBeInTheDocument()
+  })
+
+  it('names the holiday on a day the club is closed (#20)', async () => {
+    // The owner's #20: 'a day with no sessions gives no reason; a holiday should say so'.
+    // §5.6 makes `materialize_sessions` skip a closed date, so ראש השנה arrives here as
+    // zero sessions — indistinguishable from a Friday off until the closure is read.
+    render(
+      screenFor({
+        client: stub([], undefined, [
+          {
+            id: 'c1',
+            training_year_id: 'y1',
+            date_from: '2026-11-03',
+            date_to: '2026-11-03',
+            reason: 'ראש השנה',
+            source: 'holiday_preset',
+          },
+        ]),
+      }),
+    )
+    expect(await screen.findByText(t('he', 'schedule.closure.dayClosed'))).toBeInTheDocument()
+    expect(screen.getByText('ראש השנה')).toBeInTheDocument()
+    expect(screen.queryByText(t('he', 'schedule.today.empty'))).not.toBeInTheDocument()
+  })
+
+  it('leaves an ordinary day off alone when no closure covers it (#20)', async () => {
+    // The closure is a fortnight away. A screen that read "closed" off ANY closure would
+    // be a screen that calls every quiet day a holiday.
+    render(
+      screenFor({
+        client: stub([], undefined, [
+          {
+            id: 'c1',
+            training_year_id: 'y1',
+            date_from: '2026-11-17',
+            date_to: '2026-11-18',
+            reason: 'סוכות',
+            source: 'holiday_preset',
+          },
+        ]),
+      }),
+    )
+    expect(await screen.findByText(t('he', 'schedule.today.empty'))).toBeInTheDocument()
+    expect(screen.queryByText(t('he', 'schedule.closure.dayClosed'))).not.toBeInTheDocument()
   })
 
   it('does not claim a training-year gap when a year genuinely covers today', async () => {
