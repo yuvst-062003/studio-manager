@@ -100,9 +100,23 @@ export function StudentFormSheet({
     [healthSchema],
   )
 
+  /** The in-app replacement for `window.confirm`. Its own state rather than a promise the
+   *  close path awaits: React renders the answer, it does not block on one. */
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false)
+
   const requestClose = useCallback(() => {
     // A dirty EDIT has no draft behind it, so discarding it loses the work outright.
-    if (dirty && isEditing && !window.confirm(STUDENT_FORM_COPY.cancel + '?')) return
+    //
+    // **This was `window.confirm()` until 2026-09-07** — a grey iOS system dialog with the
+    // app's own URL printed across the top of it, which is the loudest possible
+    // announcement that the thing you are holding is a web page. It also could not be
+    // styled, could not be translated beyond its message, and put its buttons in the
+    // system's order rather than one where the destructive choice is the quieter of the
+    // two. It is now a panel inside the sheet, drawn below.
+    if (dirty && isEditing) {
+      setConfirmingDiscard(true)
+      return
+    }
     onClose()
     // `STUDENT_FORM_COPY` is recomputed from `locale` every render (task 6), not a stable
     // module-level constant any more -- depend on `locale` itself rather than the object.
@@ -210,6 +224,46 @@ export function StudentFormSheet({
         tabIndex={-1}
         className="relative w-full max-w-[490px] bg-white rounded-t-3xl sm:rounded-2xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden focus:outline-none"
       >
+        {confirmingDiscard ? (
+          // Inside the sheet's own dialog, so `useDialog`'s focus trap and Escape handling
+          // already cover it and there is no second modal layer to get out of sync.
+          <div
+            className="absolute inset-0 z-10 flex items-center justify-center bg-white/95 p-6"
+            data-testid="discard-confirm"
+          >
+            <div className="w-full max-w-xs text-center">
+              <h3 className="text-base font-black text-[#0d2c6c]">
+                {STUDENT_FORM_COPY.discardTitle}
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                {STUDENT_FORM_COPY.discardBody}
+              </p>
+              {/* Keep-editing first and filled; discarding is the quiet one. The system
+                  dialog put them the other way round and gave the destructive choice the
+                  same weight as the safe one. */}
+              <button
+                type="button"
+                data-testid="discard-keep"
+                onClick={() => setConfirmingDiscard(false)}
+                className="mt-5 w-full rounded-xl bg-[#0d2c6c] py-3 text-sm font-black text-white"
+              >
+                {STUDENT_FORM_COPY.discardKeep}
+              </button>
+              <button
+                type="button"
+                data-testid="discard-confirm-button"
+                onClick={() => {
+                  setConfirmingDiscard(false)
+                  onClose()
+                }}
+                className="mt-2 w-full py-2 text-xs font-bold text-rose-600"
+              >
+                {STUDENT_FORM_COPY.discardConfirm}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <div className="w-12 h-1.5 bg-[#dee2f4] rounded-full mx-auto mt-2.5 sm:hidden" />
 
         <div className="flex items-center justify-between px-5 pt-3 pb-3 border-b border-[#e9edff]">

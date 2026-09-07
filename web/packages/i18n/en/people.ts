@@ -558,6 +558,11 @@ export const people: Bundle = {
   'joinWizard.form.addTitle': 'Register a new student',
   'joinWizard.form.editTitle': 'Edit student details',
   'joinWizard.form.cancel': 'Cancel',
+  // Counterpart of he/people.ts's discard block.
+  'joinWizard.form.discardTitle': 'Discard your changes?',
+  'joinWizard.form.discardBody': 'The edits on this card have not been saved, and closing will lose them.',
+  'joinWizard.form.discardKeep': 'Back to editing',
+  'joinWizard.form.discardConfirm': 'Discard changes',
   'joinWizard.form.previous': 'Previous',
   'joinWizard.form.close': 'Close form',
   'joinWizard.form.autosaved': 'Saved automatically',

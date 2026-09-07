@@ -560,6 +560,11 @@ export const people: Bundle = {
   'joinWizard.form.addTitle': 'Регистрация нового ученика',
   'joinWizard.form.editTitle': 'Изменение данных ученика',
   'joinWizard.form.cancel': 'Отмена',
+  // Counterpart of he/people.ts's discard block.
+  'joinWizard.form.discardTitle': 'Отменить изменения?',
+  'joinWizard.form.discardBody': 'Изменения в этой карточке не сохранены, и при закрытии они пропадут.',
+  'joinWizard.form.discardKeep': 'Вернуться к правке',
+  'joinWizard.form.discardConfirm': 'Удалить изменения',
   'joinWizard.form.previous': 'Назад',
   'joinWizard.form.close': 'Закрыть форму',
   'joinWizard.form.autosaved': 'Сохранено автоматически',

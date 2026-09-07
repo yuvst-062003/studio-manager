@@ -664,6 +664,13 @@ export const people: Bundle = {
   'joinWizard.form.addTitle': 'רישום פרטי חניך חדש',
   'joinWizard.form.editTitle': 'עריכת פרטי התלמיד',
   'joinWizard.form.cancel': 'ביטול',
+  // The discard confirmation (2026-09-07). This was `window.confirm()` — a grey iOS
+  // system dialog with the app's URL printed in it, which is the loudest possible
+  // announcement that the thing you are using is a web page.
+  'joinWizard.form.discardTitle': 'לבטל את השינויים?',
+  'joinWizard.form.discardBody': 'השינויים שערכתם בכרטיס הזה לא נשמרו, וסגירה תמחק אותם.',
+  'joinWizard.form.discardKeep': 'חזרה לעריכה',
+  'joinWizard.form.discardConfirm': 'מחיקת השינויים',
   'joinWizard.form.previous': 'הקודם',
   'joinWizard.form.close': 'סגירת טופס',
   'joinWizard.form.autosaved': 'נשמר אוטומטית',
