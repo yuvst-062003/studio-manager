@@ -10,7 +10,7 @@
 // the balance for the old home and is the one place holding `useSession`; a second reader
 // here would be a second `/auth/refresh` on every visit and two answers about what the
 // family owes.
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   formatDayAndMonth,
   formatMonthLabel,
@@ -133,6 +133,63 @@ export function HomeScreen({
   )
 
   const strip = useMemo(() => buildWeekStrip(todayKey, allSessions), [todayKey, allSessions])
+
+  /**
+   * The month calendar's OWN read.
+   *
+   * Owner-reported 2026-09-07: "calendar doesn't show future sessions" — November was an
+   * empty grid while the club had 71 sessions in it. `lessons` is בית's strip data and is
+   * deliberately narrow: `Resolve` fetches one week back and one week forward, which is
+   * everything the strip can show. Feeding the same array to a MONTH grid meant the modal
+   * could only ever mark a fortnight, and no other month at all.
+   *
+   * So the modal reads its own window. `null` until the first answer lands, and the
+   * fortnight is shown meanwhile rather than an empty grid — a calendar that blinks empty
+   * on open reads as "no training this month", which is a different claim entirely.
+   */
+  //: Keyed by the month it answers for, and set ONLY in the promise. Clearing it at the
+  //: top of the effect would be a synchronous set-state in an effect (the rule
+  //: `react-hooks/set-state-in-effect` names, and which this file has tripped before), and
+  //: the key does the same job better: an answer for August is simply not read while
+  //: September is open, so a stale month can never be drawn even for a frame.
+  const [monthData, setMonthData] = useState<{
+    key: string
+    sessions: readonly HomeSession[]
+  } | null>(null)
+  useEffect(() => {
+    if (monthOpen === null || childList === null) return
+    let live = true
+    const key = `${monthOpen.year}-${monthOpen.month}`
+    // The whole grid, trailing days included: `monthGrid` draws the days either side of the
+    // month to fill its first and last rows, and a session on one of those is as real as
+    // any other. A week of slack each way covers them without a second request.
+    const first = new Date(Date.UTC(monthOpen.year, monthOpen.month - 1, 1))
+    const last = new Date(Date.UTC(monthOpen.year, monthOpen.month, 0))
+    const pad = (d: Date, days: number) =>
+      new Date(d.getTime() + days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    void writer
+      .lessonsInRange(pad(first, -7), pad(last, 7))
+      .then((rows) => {
+        if (!live) return
+        setMonthData({
+          key,
+          sessions: mergeSchedule(
+            expandSessions(rows, childList, intents, cancelReasonLabel),
+            expandEvents(events, childList, t(locale, 'schedule.home.statusCancelled')),
+          ),
+        })
+      })
+      // A failed read leaves the fortnight standing rather than emptying the grid.
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [monthOpen, childList, intents, events, writer, cancelReasonLabel, locale])
+
+  const monthSessions =
+    monthOpen !== null && monthData?.key === `${monthOpen.year}-${monthOpen.month}`
+      ? monthData.sessions
+      : null
 
   // The day AND the child filter, in that order. `selectedChildId === null` is "all".
   const visible = useMemo(
@@ -403,8 +460,9 @@ export function HomeScreen({
           locale={locale}
           at={monthOpen}
           monthLabel={formatMonthLabel(monthOpen.year, monthOpen.month, locale)}
-          // EVERY loaded session, not the day's: the grid's whole job is marking the month.
-          sessions={allSessions}
+          // The month's own read once it lands; the strip's fortnight until then, so the
+          // grid never blinks empty and claims a month with no training in it.
+          sessions={monthSessions ?? allSessions}
           todayKey={todayKey}
           selectedDayKey={selectedDayKey}
           childList={childList ?? []}
