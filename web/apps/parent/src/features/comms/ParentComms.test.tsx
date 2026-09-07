@@ -18,6 +18,7 @@ import { t } from '@studio/i18n'
 import { CalendarSync } from './CalendarSync'
 import { EventCalendarButtons, eventIcsUrl } from './EventCalendarButtons'
 import { PushDisabledBanner } from './PushDisabledBanner'
+import { PushSetting } from './PushSetting'
 import { UpdatesScreen } from './redesign/UpdatesScreen'
 import { platformOf, urlBase64ToUint8Array } from './usePushRegistration'
 import type { NotificationOut, ParentCommsClient } from './commsClient'
@@ -103,29 +104,27 @@ afterEach(() => {
  * CSS, not about the inbox's arrangement — both still true of עדכונים — so they were
  * repointed rather than deleted with the screen they happened to be written against.
  */
-function Updates({
-  client,
-  userAgent,
-}: {
-  client: ParentCommsClient
-  userAgent: string
-}) {
-  return (
-    <UpdatesScreen
-      client={client}
-      locale="he"
-      childrenById={{}}
-      childNames={[]}
-      userAgent={userAgent}
-    />
-  )
+function Updates({ client }: { client: ParentCommsClient }) {
+  return <UpdatesScreen client={client} locale="he" childrenById={{}} childNames={[]} />
+}
+
+/**
+ * Push moved to Profile → הגדרות on 2026-09-07, so these render the component that owns it
+ * rather than the feed it used to sit above. Every assertion below is the one that was
+ * written against `UpdatesScreen`: the behaviours did not change, only where a parent meets
+ * them. The one shape that DID change is the invitation — in Settings the question is put
+ * directly instead of behind a button, because walking into Settings is the intent that
+ * button existed to collect.
+ */
+function Push({ client, userAgent }: { client: ParentCommsClient; userAgent: string }) {
+  return <PushSetting client={client} locale="he" userAgent={userAgent} />
 }
 
 describe('asking for push permission', () => {
   it('teaches the install on iOS in a tab instead of offering a button that cannot work', async () => {
     // §12 — in a Safari tab the Push API is ABSENT, not denied. There is nothing to request.
     setDisplayMode('browser')
-    render(<Updates client={makeClient()} userAgent={IPHONE} />)
+    render(<Push client={makeClient()} userAgent={IPHONE} />)
 
     expect(await screen.findByTestId('push-disabled-banner')).toBeInTheDocument()
     expect(screen.getByText(t('he', 'comms.push.iosTabHasNoApi'))).toBeInTheDocument()
@@ -136,9 +135,10 @@ describe('asking for push permission', () => {
     // The other half of the branch. Android Chrome allows Web Push in a normal tab, so the
     // install is not a precondition and gating on it would cost real subscriptions.
     setDisplayMode('browser')
-    render(<Updates client={makeClient()} userAgent={ANDROID} />)
+    render(<Push client={makeClient()} userAgent={ANDROID} />)
+    expect(await screen.findByTestId('push-pre-prompt')).toBeInTheDocument()
     expect(
-      await screen.findByRole('button', { name: t('he', 'comms.push.enable') }),
+      screen.getByRole('button', { name: t('he', 'comms.push.prePrompt.accept') }),
     ).toBeInTheDocument()
   })
 
@@ -148,12 +148,13 @@ describe('asking for push permission', () => {
     // parent has been told what it buys them.
     const requestPermission = vi.fn().mockResolvedValue('denied')
     vi.stubGlobal('Notification', { permission: 'default', requestPermission })
-    render(<Updates client={makeClient()} userAgent={ANDROID} />)
+    render(<Push client={makeClient()} userAgent={ANDROID} />)
 
-    await userEvent.click(await screen.findByRole('button', { name: t('he', 'comms.push.enable') }))
-    expect(screen.getByTestId('push-pre-prompt')).toBeInTheDocument()
+    expect(await screen.findByTestId('push-pre-prompt')).toBeInTheDocument()
     expect(screen.getByText(t('he', 'comms.push.prePrompt.body'))).toBeInTheDocument()
-    // Not yet. The OS dialog opens from the accept button and from nowhere else.
+    // The guarantee §6.5 cares about, and the reason this is not a bare OS prompt: on iOS a
+    // refusal is permanent, so the one chance is spent from the accept button and nowhere
+    // else. Merely rendering the question must never open the dialog.
     expect(requestPermission).not.toHaveBeenCalled()
 
     await userEvent.click(
@@ -165,11 +166,10 @@ describe('asking for push permission', () => {
   it('declining the pre-prompt does not spend the one OS prompt', async () => {
     const requestPermission = vi.fn()
     vi.stubGlobal('Notification', { permission: 'default', requestPermission })
-    render(<Updates client={makeClient()} userAgent={ANDROID} />)
+    render(<Push client={makeClient()} userAgent={ANDROID} />)
 
-    await userEvent.click(await screen.findByRole('button', { name: t('he', 'comms.push.enable') }))
     await userEvent.click(
-      screen.getByRole('button', { name: t('he', 'comms.push.prePrompt.decline') }),
+      await screen.findByRole('button', { name: t('he', 'comms.push.prePrompt.decline') }),
     )
     expect(requestPermission).not.toHaveBeenCalled()
     expect(screen.queryByTestId('push-pre-prompt')).toBeNull()
@@ -180,7 +180,7 @@ describe('asking for push permission', () => {
       permission: 'denied',
       requestPermission: vi.fn(),
     })
-    render(<Updates client={makeClient()} userAgent={ANDROID} />)
+    render(<Push client={makeClient()} userAgent={ANDROID} />)
     expect(await screen.findByTestId('push-disabled-banner')).toBeInTheDocument()
     expect(screen.getByText(t('he', 'comms.pushDisabled.body'))).toBeInTheDocument()
   })
@@ -201,10 +201,9 @@ describe('asking for push permission', () => {
     stubServiceWorker(subscribe)
     const client = makeClient()
 
-    render(<Updates client={client} userAgent={ANDROID} />)
-    await userEvent.click(await screen.findByRole('button', { name: t('he', 'comms.push.enable') }))
+    render(<Push client={client} userAgent={ANDROID} />)
     await userEvent.click(
-      screen.getByRole('button', { name: t('he', 'comms.push.prePrompt.accept') }),
+      await screen.findByRole('button', { name: t('he', 'comms.push.prePrompt.accept') }),
     )
 
     await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1))
@@ -228,10 +227,9 @@ describe('asking for push permission', () => {
     stubServiceWorker(subscribe)
     const client = makeClient({ vapidPublicKey: vi.fn().mockResolvedValue({ public_key: null }) })
 
-    render(<Updates client={client} userAgent={ANDROID} />)
-    await userEvent.click(await screen.findByRole('button', { name: t('he', 'comms.push.enable') }))
+    render(<Push client={client} userAgent={ANDROID} />)
     await userEvent.click(
-      screen.getByRole('button', { name: t('he', 'comms.push.prePrompt.accept') }),
+      await screen.findByRole('button', { name: t('he', 'comms.push.prePrompt.accept') }),
     )
 
     await waitFor(() => expect(screen.getByTestId('push-disabled-banner')).toBeInTheDocument())
@@ -418,7 +416,7 @@ describe('layout', () => {
     const client = makeClient({
       inbox: vi.fn().mockResolvedValue({ items: [note()], next_cursor: null, has_more: false }),
     })
-    const { container } = render(<Updates client={client} userAgent={ANDROID} />)
+    const { container } = render(<Updates client={client} />)
     await screen.findByTestId('updates-row-n1')
     for (const element of container.querySelectorAll<HTMLElement>('[style]')) {
       const style = element.getAttribute('style') ?? ''
@@ -437,29 +435,47 @@ describe('layout', () => {
 describe('the four defects reported on עדכונים (2026-09-07)', () => {
   const ENABLE = t('he', 'comms.push.enable')
 
-  it('stops offering push once the parent has declined, and stays stopped', async () => {
+  it('stops ASKING once the parent has declined, and stays stopped', async () => {
     // **The bug.** `decline` set the state back to `unasked` — the exact state that draws
-    // the offer — so declining returned the parent to the button and it came back on every
-    // visit, forever.
+    // the question — so declining returned the parent to the start and they were asked
+    // again on every visit, forever.
+    //
+    // Restated 2026-09-07 for where this lives now. Settings deliberately keeps a door for
+    // somebody who changes their mind, so "stopped" is no longer "nothing on screen": it is
+    // that the QUESTION is gone and only a button they must press themselves remains.
     const user = userEvent.setup()
-    const { unmount } = render(<Updates client={makeClient()} userAgent={ANDROID} />)
+    const { unmount } = render(<Push client={makeClient()} userAgent={ANDROID} />)
 
-    await user.click(await screen.findByRole('button', { name: ENABLE }))
-    await user.click(screen.getByRole('button', { name: t('he', 'comms.push.prePrompt.decline') }))
-
-    expect(screen.queryByRole('button', { name: ENABLE })).not.toBeInTheDocument()
+    await user.click(
+      await screen.findByRole('button', { name: t('he', 'comms.push.prePrompt.decline') }),
+    )
+    expect(screen.queryByTestId('push-pre-prompt')).not.toBeInTheDocument()
 
     // And on the next visit — a fresh mount, which is what a returning parent is.
     unmount()
-    render(<Updates client={makeClient()} userAgent={ANDROID} />)
-    await waitFor(() => expect(screen.getByTestId('parent-updates')).toBeInTheDocument())
-    expect(screen.queryByRole('button', { name: ENABLE })).not.toBeInTheDocument()
+    render(<Push client={makeClient()} userAgent={ANDROID} />)
+    await waitFor(() => expect(screen.getByTestId('push-setting')).toBeInTheDocument())
+    expect(screen.queryByTestId('push-pre-prompt')).not.toBeInTheDocument()
+    // The door, not a nag: pressing it is the parent's move.
+    expect(screen.getByRole('button', { name: ENABLE })).toBeInTheDocument()
   })
 
-  it('still offers push to a parent who has never answered', async () => {
-    // The other half: the fix must not silence the invitation for everyone.
-    render(<Updates client={makeClient()} userAgent={ANDROID} />)
-    expect(await screen.findByRole('button', { name: ENABLE })).toBeInTheDocument()
+  it('still asks a parent who has never answered', async () => {
+    // The other half: the fix must not silence the question for everyone.
+    render(<Push client={makeClient()} userAgent={ANDROID} />)
+    expect(await screen.findByTestId('push-pre-prompt')).toBeInTheDocument()
+  })
+
+  it('never puts push on עדכונים at all any more', async () => {
+    // The owner's report: the invitation greeted them on every visit to the inbox, and a
+    // refused phone got a permanent red banner about missing cancellation notices on the
+    // very screen they had opened to read notices. Neither belongs in a feed.
+    render(<Updates client={makeClient()} />)
+    await waitFor(() => expect(screen.getByTestId('parent-updates')).toBeInTheDocument())
+    expect(screen.queryByTestId('push-setting')).toBeNull()
+    expect(screen.queryByTestId('push-pre-prompt')).toBeNull()
+    expect(screen.queryByTestId('push-disabled-banner')).toBeNull()
+    expect(screen.queryByRole('button', { name: ENABLE })).toBeNull()
   })
 
   it('does not claim "no updates" while a next page is still unfetched', async () => {
@@ -468,14 +484,14 @@ describe('the four defects reported on עדכונים (2026-09-07)', () => {
     const client = makeClient({
       inbox: vi.fn().mockResolvedValue({ items: [], next_cursor: 'c1', has_more: true }),
     })
-    render(<Updates client={client} userAgent={ANDROID} />)
+    render(<Updates client={client} />)
 
     await waitFor(() => expect(screen.getByTestId('updates-more')).toBeInTheDocument())
     expect(screen.queryByTestId('updates-empty')).not.toBeInTheDocument()
   })
 
   it('says "no updates" once there is genuinely nothing left to fetch', async () => {
-    render(<Updates client={makeClient()} userAgent={ANDROID} />)
+    render(<Updates client={makeClient()} />)
     expect(await screen.findByTestId('updates-empty')).toBeInTheDocument()
   })
 
@@ -489,7 +505,7 @@ describe('the four defects reported on עדכונים (2026-09-07)', () => {
         .mockResolvedValueOnce({ items: [note()], next_cursor: 'c1', has_more: true })
         .mockImplementationOnce(() => new Promise((resolve) => { release = resolve })),
     })
-    render(<Updates client={client} userAgent={ANDROID} />)
+    render(<Updates client={client} />)
 
     await userEvent.click(await screen.findByTestId('updates-load-more'))
 

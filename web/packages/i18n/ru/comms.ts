@@ -76,6 +76,8 @@ export const comms: Bundle = {
   'pushDisabled.iosNeedsInstall':
     'На iPhone добавьте приложение на домашний экран, чтобы получать уведомления',
   'pushEnabled.confirmation': 'Уведомления включены',
+  // The row's own heading in Profile → הגדרות, where this lives now.
+  'push.settingTitle': 'Уведомления',
   'push.enable': 'Включить уведомления',
 
   // -- notification preferences (§5.11) ---------------------------------------------

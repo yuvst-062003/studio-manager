@@ -2,6 +2,7 @@
 // on the old stacked screen — the reorder of 2026-09-06 changed where they live, not what
 // they look like inside.
 import { Award, ChevronLeft, Plus } from 'lucide-react'
+import { PushSetting } from '../../comms/PushSetting'
 import { AccessibilityMenu } from '@studio/ui'
 import { fill } from '@studio/core'
 import { t } from '@studio/i18n'
@@ -333,6 +334,10 @@ export function SettingsSheet({
       />
 
       <div className="rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700 divide-y divide-slate-200 dark:divide-slate-700">
+        {/* התראות. Moved off עדכונים (owner, 2026-09-07): a feed is not the place to be
+            asked a question every visit, nor to be told permanently that your phone refused
+            one. It sits above privacy and נגישות because unlike them it is a preference. */}
+        <PushSetting locale={locale} />
         <a
           href="#/privacy"
           className="flex items-center justify-between px-3.5 py-3 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer"

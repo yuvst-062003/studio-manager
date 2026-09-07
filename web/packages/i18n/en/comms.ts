@@ -72,6 +72,8 @@ export const comms: Bundle = {
   'pushDisabled.iosNeedsInstall':
     'On iPhone, add the app to your home screen to receive notifications',
   'pushEnabled.confirmation': 'Notifications are on',
+  // The row's own heading in Profile → הגדרות, where this lives now.
+  'push.settingTitle': 'Notifications',
   'push.enable': 'Turn on notifications',
 
   // -- notification preferences (§5.11) ---------------------------------------------

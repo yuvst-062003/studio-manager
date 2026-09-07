@@ -96,6 +96,8 @@ export const comms: Bundle = {
   // §6.5 — on iOS there is no way to prompt; Web Push exists only for an installed app.
   'pushDisabled.iosNeedsInstall': 'באייפון יש להוסיף את האפליקציה למסך הבית כדי לקבל התראות',
   'pushEnabled.confirmation': 'התראות פעילות',
+  // The row's own heading in Profile → הגדרות, where this lives now.
+  'push.settingTitle': 'התראות',
   'push.enable': 'הפעלת התראות',
 
   // -- notification preferences (§5.11) ---------------------------------------------
