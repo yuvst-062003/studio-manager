@@ -74,6 +74,7 @@ from app.schemas.billing import (
     UpayIpnRecordOut,
     UpayIpnRecordPage,
 )
+from app.services.attendance.roster import build_roster
 from app.services.audit import AuditService
 from app.services.billing import BillingService, product_images
 from app.services.billing.catalogue import MAX_SIZES, CatalogueService, unpriced_students
@@ -1433,15 +1434,26 @@ def hand_over_product(
             RefusedError("that student has no primary guardian, so nobody owes the charge")
         )
 
+    at = now()
     charge = BillingService(session).create_charge(
         studio_id,
         payer_person_id,
         "manual",
         product.price_agorot,
-        now().date(),
+        at.date(),
         student_id=body.student_id,
+        # Named, 2026-09-07. This was NULL, so an item a coach handed across the mat was
+        # indistinguishable from a manager's ad-hoc charge -- including §5.10's negative
+        # credit -- and never appeared in the family's own "ההזמנות שלי", which filters on
+        # exactly this column. The parent's order has always set it; the coach's did not,
+        # for no reason but that the column arrived after this route did.
+        product_id=product.id,
     )
     charge.proration_note = product.name
+    # Handed over in the same breath as it is charged for: this route IS the act of putting
+    # the item in a child's hands, so a row it creates is never "waiting on a mat". Leaving
+    # it NULL would put every hand-over straight onto the coach's own "bring this" list.
+    charge.handed_over_at = at
     AuditService.record(
         session,
         action="charge.hand_over",
@@ -1453,3 +1465,148 @@ def hand_over_product(
     )
     session.commit()
     return HandOverOut(charge_id=charge.id, product_name=product.name)
+
+
+# -- staff `11a`: what a family has ordered and not yet been given ---------------
+class AwaitingHandoutOut(BaseModel):
+    """One shop order still sitting in the office, as a COACH may see it.
+
+    **No amount, by construction and not by omission** -- invariant 3 inspects this shape
+    because the route is `coach`-tagged. `line_note` is `charge.proration_note`, which the
+    shop wrote as "ג׳ודוגי × 1 · 140": the item, the count and the SIZE, which is the whole
+    reason a coach needs this row (`billing.shop.deliveryNote` promises the family a
+    hand-over "לאחר וידוא מידה" -- after the size is checked). It carries no price, because
+    the shop never put one in it.
+    """
+
+    charge_id: uuid.UUID
+    #: Which child on this roster the row is offered against. A family with two children in
+    #: one class produces the SAME `charge_id` twice, once per child -- see the route.
+    student_id: uuid.UUID
+    product_id: uuid.UUID | None
+    product_name: str
+    #: The shop's own line label -- item, quantity and size. `None` for a row written before
+    #: the shop set one.
+    line_note: str | None
+    ordered_on: date
+
+
+class AwaitingHandoutsOut(BaseModel):
+    items: list[AwaitingHandoutOut]
+
+
+@router.get(
+    "/sessions/{session_id}/awaiting-handout",
+    response_model=AwaitingHandoutsOut,
+    tags=COACH,
+)
+def list_awaiting_handout(
+    _: AnyStaff, session_id: uuid.UUID, session: TenantSessionDep
+) -> AwaitingHandoutsOut:
+    """What this lesson's families have bought in the shop and not yet been handed.
+
+    **Scoped to the SESSION and not to one student**, because both callers ask it that way:
+    `11a`'s hand-over sheet already reads this session's roster, and the coach's own "bring
+    this to training" task is about a lesson. Per-student it would be one request per child
+    on a mat -- twenty for an ordinary class -- to answer a question that is one query.
+
+    **Matched on the PAYER, not the student.** `POST /me/orders/items` writes
+    `student_id=None`: a parent orders from a shop that never asks which of their children
+    it is for, so the only link between an order and a child is the guardian who paid. A
+    family with two children in the same class therefore sees the row against both, and the
+    coach hands it to the one it fits. That is the real act rather than a gap being papered
+    over -- guessing would settle the wrong order and leave the right one open forever.
+
+    Ordered oldest first: the גי that has been waiting three weeks is the one to hand over.
+    """
+    _session_row, roster = build_roster(session, session_id)
+    student_ids = [row.student_id for row in roster]
+    if not student_ids:
+        return AwaitingHandoutsOut(items=[])
+
+    # Guardian pairs first, so a charge found by payer can be attributed back to the child
+    # (or children) on THIS roster that the payer is responsible for.
+    students_by_payer: dict[uuid.UUID, list[uuid.UUID]] = {}
+    for payer_id, student_id in session.execute(
+        select(Guardian.person_id, Guardian.student_id).where(Guardian.student_id.in_(student_ids))
+    ).all():
+        students_by_payer.setdefault(payer_id, []).append(student_id)
+    if not students_by_payer:
+        return AwaitingHandoutsOut(items=[])
+
+    rows = session.execute(
+        select(Charge, Product.name)
+        .join(Product, Product.id == Charge.product_id)
+        .where(
+            Charge.payer_person_id.in_(students_by_payer),
+            Charge.product_id.is_not(None),
+            Charge.handed_over_at.is_(None),
+        )
+        .order_by(Charge.due_date, Charge.id)
+    ).all()
+
+    return AwaitingHandoutsOut(
+        items=[
+            AwaitingHandoutOut(
+                charge_id=charge.id,
+                student_id=student_id,
+                product_id=charge.product_id,
+                product_name=product_name,
+                line_note=charge.proration_note,
+                ordered_on=charge.due_date,
+            )
+            for charge, product_name in rows
+            for student_id in students_by_payer[charge.payer_person_id]
+        ]
+    )
+
+
+@router.post("/charges/{charge_id}/hand-over", response_model=HandOverOut, tags=COACH)
+def mark_handed_over(
+    _: AnyStaff,
+    charge_id: uuid.UUID,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> HandOverOut:
+    """The family already paid for this; the coach is giving it to them.
+
+    The counterpart to `POST /charges/from-product`, and the reason the shop stopped
+    double-billing: that route raises a new charge, this one settles an order that already
+    exists. A coach who took the wrong door before this route existed created a second
+    charge for a גי the family had already bought.
+
+    **Refuses a second hand-over rather than accepting it silently.** Two coaches tapping
+    the same row is the ordinary case (one hands it over, the other has a stale list), and
+    a 409 that names the date it was handed over is what lets the second one say "someone
+    already gave it to them" instead of quietly overwriting the first date.
+    """
+    charge = session.get(Charge, charge_id)
+    if charge is None or charge.product_id is None:
+        # A tuition charge and a nonexistent one answer alike: neither is a shop order, and
+        # distinguishing them would let a coach probe charge ids for what kind they are.
+        raise _not_found("order")
+    if charge.handed_over_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "already_handed_over",
+                "message": "this item was already handed over",
+                "handed_over_at": charge.handed_over_at.isoformat(),
+            },
+        )
+    product = session.get(Product, charge.product_id)
+    charge.handed_over_at = now()
+    AuditService.record(
+        session,
+        action="charge.handed_over",
+        entity_type="charge",
+        entity_id=charge.id,
+        studio_id=require_current_studio_id(),
+        actor_person_id=_actor(request),
+        diff={"product_id": str(charge.product_id)},
+    )
+    session.commit()
+    return HandOverOut(
+        charge_id=charge.id, product_name=product.name if product is not None else ""
+    )

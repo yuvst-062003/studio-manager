@@ -31,6 +31,26 @@ FINANCIAL = re.compile(
     r"(_agorot$|^amount|^price|^balance|charge|payment|invoice|receipt|debt)", re.IGNORECASE
 )
 
+#: An identifier is not a financial field. `charge_id` names a row; it says nothing about
+#: what the row is worth, and a coach has held one since `11a` shipped -- `HandOverOut`
+#: returns it so the client can act on the charge it just created.
+#:
+#: Narrowed 2026-09-07 rather than loosening FINANCIAL itself, which stays deliberately
+#: broad because the leak this gate exists for is a name like `outstanding_charge_agorot`
+#: on a nested summary. The exemption cannot admit one of those: every field it lets
+#: through ends in `_id`, and there is no such thing as an amount that does.
+IDENTIFIER = re.compile(r"_id$", re.IGNORECASE)
+
+#: Every success status, not just 200.
+#:
+#: **This was the hole.** `leaks` read `responses["200"]` alone, and `POST
+#: /charges/from-product` -- coach-tagged since `11a` -- answers **201**. So the one
+#: existing coach route that returns a charge id was never inspected at all, and a coach
+#: route that returned a real balance under 201 would have been just as invisible. Found
+#: 2026-09-07 while adding `POST /charges/{id}/hand-over`, whose 200 the gate DID catch:
+#: two routes doing the same thing, one checked and one not, purely by status code.
+SUCCESS_STATUSES = ("200", "201", "202")
+
 
 def _resolve(schema: dict[str, Any], components: dict[str, Any]) -> dict[str, Any]:
     ref = schema.get("$ref")
@@ -58,7 +78,7 @@ def _financial_properties(
 
     found = []
     for prop, subschema in (resolved.get("properties") or {}).items():
-        if FINANCIAL.search(prop):
+        if FINANCIAL.search(prop) and not IDENTIFIER.search(prop):
             found.append(f"{name}.{prop}")
         branches = [subschema, *(subschema.get("anyOf") or []), *(subschema.get("allOf") or [])]
         items = subschema.get("items")
@@ -78,19 +98,20 @@ def leaks(application: FastAPI) -> list[str]:
         for method, operation in operations.items():
             if COACH_TAG not in (operation.get("tags") or []):
                 continue
-            body = (
-                operation.get("responses", {})
-                .get("200", {})
-                .get("content", {})
-                .get("application/json", {})
-                .get("schema")
-            )
-            if not body:
-                continue
-            found.extend(
-                f"{method.upper()} {path} -> {field}"
-                for field in _financial_properties(body, components)
-            )
+            for code in SUCCESS_STATUSES:
+                body = (
+                    operation.get("responses", {})
+                    .get(code, {})
+                    .get("content", {})
+                    .get("application/json", {})
+                    .get("schema")
+                )
+                if not body:
+                    continue
+                found.extend(
+                    f"{method.upper()} {path} -> {field}"
+                    for field in _financial_properties(body, components)
+                )
     return sorted(set(found))
 
 
@@ -187,6 +208,38 @@ def test_the_detector_reaches_into_a_list_of_rows():
         items: list[Row]
 
     assert leaks(_probe_app(Page, tags=[COACH_TAG])) == ["GET /roster -> Row.amount_agorot"]
+
+
+def test_the_detector_looks_past_200_at_a_created_response():
+    """The hole this file had. A coach route answering 201 was never inspected, so
+    `POST /charges/from-product` -- coach-tagged, returning a created charge -- passed the
+    gate by status code rather than by being clean."""
+
+    class Created(BaseModel):
+        balance_agorot: int
+
+    router = APIRouter(tags=[COACH_TAG])
+
+    @router.post("/hand-over", response_model=Created, status_code=201)
+    def hand_over() -> None: ...  # pragma: no cover -- never called
+
+    probe = FastAPI()
+    probe.include_router(router)
+    assert leaks(probe) == ["POST /hand-over -> Created.balance_agorot"]
+
+
+def test_an_identifier_is_not_a_financial_field():
+    """`charge_id` names a row and reveals nothing about its value. The exemption is on the
+    `_id` suffix alone, so it cannot admit an amount -- there is no such thing as one that
+    ends in `_id`, and the sibling field here proves the detector still catches the money
+    sitting right next to it."""
+
+    class Row(BaseModel):
+        charge_id: str
+        payment_id: str
+        amount_agorot: int
+
+    assert leaks(_probe_app(Row, tags=[COACH_TAG])) == ["GET /roster -> Row.amount_agorot"]
 
 
 def test_a_manager_route_may_return_money():

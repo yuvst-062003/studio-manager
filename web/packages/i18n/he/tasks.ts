@@ -55,6 +55,16 @@ export const tasks: Bundle = {
     'שלום, שמנו לב ש{{name}} לא הגיע/ה לכמה אימונים ברצף. רצינו לוודא שהכול בסדר ולשמוע מכם.',
   'callParent.tick': 'סימון כטופל',
 
+  // -- להביא לאימון (2026-09-07). A sixth kind. The parent app promises a family that a
+  // coach hands their order over at the start of training; nothing told the coach, and
+  // the sheet they eventually opened raised a SECOND charge for it. Derived from the
+  // lesson's own waiting orders, like every other row here, and gone once handed over.
+  'bringItem.scope': 'חנות המועדון',
+  'bringItem.badge': 'להביא',
+  'bringItem.title': '{{name}} — {{item}}',
+  'bringItem.subtitle': 'הוזמן ושולם, ממתין למסירה',
+  'bringItem.alert': 'המשפחה הזמינה את הפריט בחנות המועדון ושילמה עליו. יש להביא אותו לאימון ולמסור — המסירה אינה יוצרת חיוב חדש.',
+  'bringItem.action': 'פתיחת מסירה',
   'cash.scope': 'ניהול כספים',
   'cash.badge': 'ממתין לאישור',
   'cash.title': 'תשלומים במזומן ממתינים לאישור',

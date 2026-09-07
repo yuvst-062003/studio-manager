@@ -75,6 +75,7 @@ import {
   Gift,
   MessageCircle,
   Phone,
+  ShoppingBag,
   Wallet,
 } from 'lucide-react'
 import { EmptyState, MoneyDisplay } from '@studio/ui'
@@ -105,6 +106,11 @@ const KIND_BADGE_TINT: Record<TaskKind, string> = {
   close_session: 'bg-rose-50 text-rose-600 border border-rose-100',
   missing_health_form: 'bg-rose-50 text-rose-700 border border-rose-100',
   call_parent: 'bg-rose-50 text-rose-700 border border-rose-100',
+  // Emerald, its own tone. A גי to bring is the one row here that is not a problem — the
+  // family paid, the item is in the office, and the coach only has to remember it. Giving
+  // it rose would put "somebody may be about to train uninsured" and "pick up a bag on the
+  // way out" in the same colour, which is how a colour stops meaning anything.
+  bring_item: 'bg-emerald-50 text-emerald-700 border border-emerald-100',
   cash_pending: 'bg-amber-50 text-amber-700 border border-amber-100',
   health_review: 'bg-blue-50 text-blue-700 border border-blue-100',
 }
@@ -113,6 +119,7 @@ const KIND_SCOPE_TINT: Record<TaskKind, string> = {
   close_session: 'text-slate-500',
   missing_health_form: 'text-rose-700',
   call_parent: 'text-slate-500',
+  bring_item: 'text-emerald-700',
   cash_pending: 'text-amber-700',
   health_review: 'text-blue-700',
 }
@@ -123,6 +130,7 @@ const KIND_LINK_TINT: Record<TaskKind, string> = {
   close_session: 'border-rose-300 text-rose-700 bg-rose-50 hover:bg-rose-100',
   missing_health_form: 'border-rose-300 text-rose-700 bg-rose-50 hover:bg-rose-100',
   call_parent: 'border-rose-300 text-rose-700 bg-rose-50 hover:bg-rose-100',
+  bring_item: 'border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100',
   cash_pending: 'border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100',
   health_review: 'border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100',
 }
@@ -139,6 +147,8 @@ function AlertIcon({ kind }: { kind: TaskKind }) {
       return <Phone className={`${cls} text-rose-500`} aria-hidden="true" />
     case 'missing_health_form':
       return <FileText className={`${cls} text-slate-500`} aria-hidden="true" />
+    case 'bring_item':
+      return <ShoppingBag className={`${cls} text-emerald-600`} aria-hidden="true" />
     case 'cash_pending':
       return <Wallet className={`${cls} text-amber-600`} aria-hidden="true" />
     case 'health_review':

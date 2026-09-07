@@ -32,6 +32,7 @@ import type { AtRiskPayload } from '../comms'
 import type { SessionRow } from '../schedule/client'
 import type { ContactFamily } from '../contact'
 import type { StaffPromiseRow } from '../billing/promiseClient'
+import type { AwaitingHandout } from '../billing/handoutClient'
 
 export type NotificationOut = components['schemas']['NotificationOut']
 
@@ -47,6 +48,7 @@ export type TaskKind =
   | 'close_session'
   | 'missing_health_form'
   | 'call_parent'
+  | 'bring_item'
   | 'cash_pending'
   | 'health_review'
 
@@ -240,7 +242,13 @@ export function callParentTasks(
         resolveFamilies: () =>
           Promise.resolve(
             payload.contact_person_id
-              ? [{ person_id: payload.contact_person_id, name, phone: payload.contact_phone ?? null }]
+              ? [
+                  {
+                    person_id: payload.contact_person_id,
+                    name,
+                    phone: payload.contact_phone ?? null,
+                  },
+                ]
               : [],
           ),
       },
@@ -250,6 +258,70 @@ export function callParentTasks(
       },
     }
   })
+}
+
+/**
+ * Coach row 4 — "bring this to training", from the lesson's own unfulfilled shop orders.
+ *
+ * **The card that answers a promise the app was already making.** The parent app tells a
+ * family, in `billing.shop.deliveryNote`, that a coach will hand their order over at the
+ * start of training "לאחר וידוא מידה". Nothing told the coach. Worse, the sheet they
+ * eventually opened could not see the order and raised a SECOND charge for the same גי.
+ *
+ * Derived like every other row here and stored nowhere: it comes from
+ * `GET /sessions/{id}/awaiting-handout` for the viewer's OWN sessions today, and it
+ * disappears the moment the item is handed over, because the row it was built from is the
+ * one the hand-over settles. It carries no tick for the same reason `closeSessionTasks`
+ * does not: the app can observe this one for itself.
+ *
+ * `line_note` rather than `product_name` where there is one — "גי · 140" says the size,
+ * and a coach who reads only "גי" cannot verify the thing the family was promised.
+ * Deduplicated on the CHARGE, not the child: a family with two siblings in one class gets
+ * the same order offered against both by the route (deliberately — see its docstring), and
+ * two identical cards on a task list would read as two items to bring. The same dedupe
+ * covers a child on two of the coach's lessons today.
+ *
+ * Takes the session id ALONGSIDE each page rather than off the rows: the route is scoped
+ * to a lesson, so the id is in the URL and putting a copy of it in every row would be a
+ * field the server had to be trusted to fill correctly for the card's link to work.
+ */
+export function bringItemTasks(
+  pages: { sessionId: string; rows: AwaitingHandout[] }[],
+  nameOf: (studentId: string) => string,
+  locale: Locale,
+): TaskCard[] {
+  const seen = new Set<string>()
+  const cards: TaskCard[] = []
+  for (const { sessionId, rows } of pages)
+    for (const row of rows) {
+      if (seen.has(row.charge_id)) continue
+      seen.add(row.charge_id)
+      const name = nameOf(row.student_id)
+      cards.push({
+        id: `bring-item:${row.charge_id}`,
+        taskKind: 'bring_item',
+        // Follow-up, not urgent: a child without their גי trains in what they arrived in.
+        // `closeSessionTasks` is alone in the urgent bucket and should stay alone in it —
+        // an unmarked register is a record that is wrong, which is a different kind of thing.
+        bucket: 'followUp',
+        scope: t(locale, 'tasks.bringItem.scope'),
+        badgeText: t(locale, 'tasks.bringItem.badge'),
+        title: t(locale, 'tasks.bringItem.title')
+          .replace('{{name}}', name)
+          .replace('{{item}}', row.line_note ?? row.product_name),
+        subtitle: t(locale, 'tasks.bringItem.subtitle'),
+        alertText: t(locale, 'tasks.bringItem.alert'),
+        avatarInitials: name ? initialsOf(name) : undefined,
+        primaryAction: {
+          kind: 'link',
+          label: t(locale, 'tasks.bringItem.action'),
+          // The hand-over sheet for the lesson the item is waiting in — `11a` behind
+          // `#/attendance/<id>/handover`, the same route `HandOverSection` is mounted at.
+          href: `#/attendance/${sessionId}/handover`,
+        },
+      })
+    }
+  return cards
 }
 
 /**

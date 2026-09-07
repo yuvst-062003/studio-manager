@@ -41,6 +41,13 @@ export const tasks: Bundle = {
     'Hi, we noticed {{name}} has missed a few sessions in a row. We wanted to check in and make sure everything is okay.',
   'callParent.tick': 'Mark as done',
 
+  // Counterpart of he/tasks.ts's bringItem block.
+  'bringItem.scope': 'Club shop',
+  'bringItem.badge': 'Bring',
+  'bringItem.title': '{{name}} — {{item}}',
+  'bringItem.subtitle': 'Ordered and paid for, waiting to be handed over',
+  'bringItem.alert': 'The family ordered this in the club shop and paid for it. Bring it to training and hand it over — that raises no new charge.',
+  'bringItem.action': 'Open hand-over',
   'cash.scope': 'Billing',
   'cash.badge': 'Awaiting confirmation',
   'cash.title': 'Cash payments waiting to be confirmed',

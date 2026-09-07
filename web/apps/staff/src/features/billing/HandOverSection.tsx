@@ -11,7 +11,7 @@ import type { Locale } from '@studio/i18n'
 import { HandOverSheet } from './HandOverSheet'
 import type { PresentStudent } from './HandOverSheet'
 import { makeHandoutClient } from './handoutClient'
-import type { HandoutOption } from './handoutClient'
+import type { AwaitingHandout, HandoutOption } from './handoutClient'
 import type { StaffAttendanceClient } from '../attendance/client'
 
 const handoutClient = makeHandoutClient(apiFetch)
@@ -30,17 +30,27 @@ export function HandOverSection({
   const [data, setData] = useState<{
     options: HandoutOption[]
     present: PresentStudent[]
+    awaiting: AwaitingHandout[]
   } | null>(null)
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     let live = true
-    void Promise.all([handoutClient.options(), attendanceClient.sessionRoster(sessionId)])
-      .then(([options, body]) => {
+    void Promise.all([
+      handoutClient.options(),
+      attendanceClient.sessionRoster(sessionId),
+      // Best-effort: a club that sells nothing online, or a read that fails, leaves the
+      // waiting-orders section off. The picker underneath is still correct, and failing the
+      // whole sheet because one of its two lists did not load would take away the working
+      // half to report the broken one.
+      handoutClient.awaiting(sessionId).catch(() => [] as AwaitingHandout[]),
+    ])
+      .then(([options, body, awaiting]) => {
         if (!live) return
         setData({
           options,
+          awaiting,
           present: body.roster
             .filter((row) => row.status === 'present')
             .map((row) => ({ id: row.student_id, displayName: row.display_name })),
@@ -70,6 +80,7 @@ export function HandOverSection({
       client={handoutClient}
       locale={locale}
       onHandedOut={() => {}}
+      awaiting={data.awaiting}
       options={data.options}
       presentStudents={data.present}
     />

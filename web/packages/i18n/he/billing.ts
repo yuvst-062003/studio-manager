@@ -367,6 +367,18 @@ export const billing: Bundle = {
   'product.name': 'שם הפריט',
   'product.price': 'מחיר',
   'product.empty': 'לא הוגדרו פריטים',
+  // -- מסירת הזמנה שכבר שולמה (2026-09-07). The shop's two halves used to be
+  // strangers: a parent ordered, a charge was raised, and the coach's sheet -- which
+  // could not see that order -- raised a second one on hand-over. These are the strings
+  // for the settle-an-order path, kept ABOVE the picker so the paid-for route is the
+  // one a coach reads first.
+  'product.awaitingTitle': 'הוזמן ומחכה למסירה',
+  'product.awaitingHint': 'המשפחה כבר שילמה בחנות המועדון. מסירה כאן לא יוצרת חיוב חדש.',
+  'product.awaitingHandOver': 'נמסר',
+  'product.awaitingDone': 'הפריט נמסר',
+  'product.awaitingTakenByOther': 'מישהו אחר כבר מסר את הפריט',
+  'product.awaitingOrderedOn': 'הוזמן ב-{{date}}',
+  'product.newChargeTitle': 'מסירה שיוצרת חיוב חדש',
   'product.handOut': 'מסירת פריט',
   'product.handedOut': 'הפריט נמסר ונוצר חיוב',
   'product.order': 'הזמנת פריטים',

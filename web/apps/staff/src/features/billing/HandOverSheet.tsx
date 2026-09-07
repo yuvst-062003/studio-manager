@@ -25,7 +25,7 @@ import type { CSSProperties } from 'react'
 import { Button, Card, EmptyState } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import type { HandoutClient, HandoutOption } from './handoutClient'
+import type { AwaitingHandout, HandoutClient, HandoutOption } from './handoutClient'
 
 const columnStyle: CSSProperties = {
   display: 'flex',
@@ -42,6 +42,10 @@ export type HandOverSheetProps = {
   options: readonly HandoutOption[]
   /** D-M6-15 — M5's marks for THIS session, passed in rather than queried here. */
   presentStudents: readonly PresentStudent[]
+  /** What this lesson's families have ALREADY bought in the shop and not been given
+   *  (2026-09-07). Empty for a club that sells nothing online, which is why the whole
+   *  section disappears rather than rendering an empty card. */
+  awaiting: readonly AwaitingHandout[]
   onHandedOut: (productName: string) => void
 }
 
@@ -50,12 +54,41 @@ export function HandOverSheet({
   client,
   options,
   presentStudents,
+  awaiting,
   onHandedOut,
 }: HandOverSheetProps) {
   const [productId, setProductId] = useState<string | null>(null)
   const [studentId, setStudentId] = useState<string | null>(presentStudents[0]?.id ?? null)
   const [inFlight, setInFlight] = useState(false)
   const [handedOut, setHandedOut] = useState(false)
+  /** Rows already settled from this sheet, and how. Kept locally rather than by re-fetching:
+   *  the answer is known the moment the request returns, and a coach on a mat should not
+   *  watch a list reload to learn that the tap they just made worked. `false` means somebody
+   *  else got there first (409), which the row says rather than hiding. */
+  const [settled, setSettled] = useState<Record<string, boolean>>({})
+
+  /** Only the students actually in front of the coach. The route answers for the whole
+   *  roster, because "who is on this roster" is a server fact and "who turned up" is a mark
+   *  that may still be changing — narrowing here keeps this sheet's own scope banner
+   *  (D-M6-15) true for both lists rather than only the picker below. */
+  const presentIds = new Set(presentStudents.map((student) => student.id))
+  const waiting = awaiting.filter(
+    (row) => presentIds.has(row.student_id) && settled[row.charge_id] === undefined,
+  )
+  const nameOf = (studentIdToName: string) =>
+    presentStudents.find((student) => student.id === studentIdToName)?.displayName ?? ''
+
+  async function settle(row: AwaitingHandout) {
+    if (inFlight) return
+    setInFlight(true)
+    try {
+      const ours = await client.markHandedOver(row.charge_id)
+      setSettled((current) => ({ ...current, [row.charge_id]: ours }))
+      if (ours) onHandedOut(row.product_name)
+    } finally {
+      setInFlight(false)
+    }
+  }
 
   if (options.length === 0) {
     return (
@@ -80,6 +113,42 @@ export function HandOverSheet({
   return (
     <div style={columnStyle} data-testid="hand-over">
       <h2>{t(locale, 'billing.product.handOut')}</h2>
+
+      {/* The paid-for path FIRST. A coach who reaches the picker below without seeing this
+          raises a second charge for a גי the family already bought — which is the bug this
+          section exists to remove, and putting it underneath would leave the same trap one
+          scroll further down. */}
+      {waiting.length > 0 ? (
+        <Card caption={t(locale, 'billing.product.awaitingTitle')} data-testid="awaiting-handout">
+          <p className="text-xs">{t(locale, 'billing.product.awaitingHint')}</p>
+          {waiting.map((row) => (
+            <div key={`${row.charge_id}:${row.student_id}`} data-testid="awaiting-row">
+              <span data-testid="awaiting-student">{nameOf(row.student_id)}</span>
+              {/* `line_note` carries the size — "גי · 140" — which is the whole reason a
+                  coach needs this row: the family was promised a hand-over לאחר וידוא מידה.
+                  It carries no price; the shop never put one in it. */}
+              <span data-testid="awaiting-item">{row.line_note ?? row.product_name}</span>
+              <Button
+                variant="primary"
+                data-testid="awaiting-confirm"
+                disabled={inFlight}
+                onClick={() => void settle(row)}
+              >
+                {t(locale, 'billing.product.awaitingHandOver')}
+              </Button>
+            </div>
+          ))}
+        </Card>
+      ) : null}
+      {Object.entries(settled).map(([chargeId, ours]) => (
+        <p key={chargeId} data-testid={ours ? 'awaiting-done' : 'awaiting-taken'}>
+          {t(locale, ours ? 'billing.product.awaitingDone' : 'billing.product.awaitingTakenByOther')}
+        </p>
+      ))}
+
+      {/* Named, now that it is no longer the only path. A coach who scrolled past a waiting
+          order needs the difference between the two to be on the screen. */}
+      <h3 data-testid="new-charge-title">{t(locale, 'billing.product.newChargeTitle')}</h3>
 
       <Card caption={t(locale, 'billing.product.forWhom')}>
         {presentStudents.map((student) => (

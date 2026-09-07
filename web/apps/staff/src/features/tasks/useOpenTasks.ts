@@ -21,7 +21,7 @@
 // the badge's fetches re-run on every navigation rather than sitting on whatever they saw
 // at sign-in. `TasksScreen` does not need to pass one — mounting IS its refresh.
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { offlineStore, readRoster, studioDayKey } from '@studio/core'
+import { apiFetch, offlineStore, readRoster, studioDayKey } from '@studio/core'
 import type { RosterRow } from '@studio/core'
 import type { Locale } from '@studio/i18n'
 import type { StaffScheduleClient } from '../schedule/client'
@@ -30,9 +30,12 @@ import type { StaffCommsClient } from '../comms'
 import type { ContactFamily } from '../contact'
 import { makePromiseClient } from '../billing/promiseClient'
 import type { PromiseClient } from '../billing/promiseClient'
+import { makeHandoutClient } from '../billing/handoutClient'
+import type { HandoutClient } from '../billing/handoutClient'
 import { makeTasksClient } from './tasksClient'
 import type { TasksClient } from './tasksClient'
 import {
+  bringItemTasks,
   callParentTasks,
   cashPendingTasks,
   closeSessionTasks,
@@ -60,6 +63,7 @@ export function useOpenTasks({
   commsClient,
   promiseClient: injectedPromiseClient,
   tasksClient: injectedTasksClient,
+  handoutClient: injectedHandoutClient,
   viewerPersonId,
   viewerIsManager,
   today,
@@ -77,6 +81,10 @@ export function useOpenTasks({
    *  one nothing else there uses. */
   promiseClient?: PromiseClient
   tasksClient?: TasksClient
+  /** §11a's coach-scoped shop client, defaulted like `promiseClient` above — nothing else
+   *  in `App.tsx` threads one through, and building it here keeps the seam injectable for
+   *  `TasksScreen.test.tsx` without adding a prop every caller has to pass. */
+  handoutClient?: HandoutClient
   viewerPersonId: string | null
   viewerIsManager: boolean
   /** An ISO instant, not `new Date()` — every derivation here is a pure function of it. */
@@ -88,9 +96,14 @@ export function useOpenTasks({
     [injectedPromiseClient],
   )
   const tasksClient = useMemo(() => injectedTasksClient ?? makeTasksClient(), [injectedTasksClient])
+  const handoutClient = useMemo(
+    () => injectedHandoutClient ?? makeHandoutClient(apiFetch),
+    [injectedHandoutClient],
+  )
 
   const [closeSession, setCloseSession] = useState<TaskCard[]>([])
   const [healthForm, setHealthForm] = useState<TaskCard[]>([])
+  const [bringItem, setBringItem] = useState<TaskCard[]>([])
   const [callParent, setCallParent] = useState<TaskCard[]>([])
   const [cash, setCash] = useState<TaskCard[]>([])
   const [healthReview, setHealthReview] = useState<TaskCard[]>([])
@@ -146,6 +159,30 @@ export function useOpenTasks({
         sessions.forEach((session, index) => {
           rosters[session.id] = loaded[index]
         })
+        // §11a — one request per session on the coach's own day, not one per child. The
+        // names come from the cached roster already loaded above rather than a second
+        // people fetch: the route answers with student ids, and the roster is the only
+        // place this screen has ever read a display name from.
+        const nameByStudent = new Map<string, string>()
+        for (const rows of Object.values(rosters))
+          for (const row of rows ?? []) nameByStudent.set(row.student_id, row.display_name)
+        void Promise.all(
+          sessions.map((session) =>
+            handoutClient
+              .awaiting(session.id)
+              // Best-effort, per session: a club that sells nothing online 404s nothing and
+              // returns nothing, and a failed read must not take the other four kinds of
+              // task off the screen with it.
+              .then((rows) => ({ sessionId: session.id, rows }))
+              .catch(() => ({ sessionId: session.id, rows: [] })),
+          ),
+        ).then((pages) => {
+          if (!live) return
+          setBringItem(
+            bringItemTasks(pages, (studentId) => nameByStudent.get(studentId) ?? '', locale),
+          )
+        })
+
         setHealthForm(
           missingHealthFormTasks(
             sessions,
@@ -168,11 +205,12 @@ export function useOpenTasks({
         if (!live) return
         setCloseSession([])
         setHealthForm([])
+        setBringItem([])
       })
     return () => {
       live = false
     }
-  }, [enabled, viewerPersonId, scheduleClient, peopleClient, today, locale, refreshKey])
+  }, [enabled, viewerPersonId, scheduleClient, peopleClient, handoutClient, today, locale, refreshKey])
 
   // Coach row 3 — the viewer's own at-risk inbox. Not gated on any role: whoever it was
   // addressed to (a coach, a manager, or both) is exactly who §4.4 means to show it to.
@@ -215,11 +253,22 @@ export function useOpenTasks({
   // last fetch produced, without any effect ever calling setState outside a fetch
   // callback.
   const tasks = useMemo(() => {
-    const coachRows = enabled && viewerPersonId ? [...closeSession, ...healthForm] : []
+    const coachRows =
+      enabled && viewerPersonId ? [...closeSession, ...healthForm, ...bringItem] : []
     const callParentRows = enabled ? callParent : []
     const managerRows = enabled && viewerIsManager ? [...cash, ...healthReview] : []
     return [...coachRows, ...callParentRows, ...managerRows]
-  }, [enabled, viewerPersonId, viewerIsManager, closeSession, healthForm, callParent, cash, healthReview])
+  }, [
+    enabled,
+    viewerPersonId,
+    viewerIsManager,
+    closeSession,
+    healthForm,
+    bringItem,
+    callParent,
+    cash,
+    healthReview,
+  ])
 
   return { tasks }
 }

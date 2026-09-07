@@ -24,10 +24,24 @@ const PRESENT = [
   { id: 's2', displayName: 'יוסי' },
 ]
 
+const WAITING = [
+  {
+    charge_id: 'c1',
+    student_id: 's1',
+    product_id: 'p1',
+    product_name: 'גי',
+    // The shop's own line label — item and SIZE, no money. See `AwaitingHandoutOut`.
+    line_note: 'גי · 140',
+    ordered_on: '2026-08-20',
+  },
+]
+
 function stub(overrides: Partial<HandoutClient> = {}): HandoutClient {
   return {
     options: vi.fn().mockResolvedValue(OPTIONS),
     handOut: vi.fn().mockResolvedValue(undefined),
+    awaiting: vi.fn().mockResolvedValue([]),
+    markHandedOver: vi.fn().mockResolvedValue(true),
     ...overrides,
   } as HandoutClient
 }
@@ -38,6 +52,7 @@ function renderSheet(props: Record<string, unknown> = {}) {
       locale={LOCALE}
       client={stub()}
       options={OPTIONS}
+      awaiting={[]}
       presentStudents={PRESENT}
       onHandedOut={vi.fn()}
       {...props}
@@ -227,5 +242,61 @@ describe('the payment-promise queue on the phone', () => {
     await screen.findAllByTestId('payment-promise-row')
     expect(screen.getByText(t(LOCALE, 'billing.promise.manager.saysPaid'))).toBeInTheDocument()
     expect(screen.getByText(t(LOCALE, 'billing.promise.manager.saysWillPay'))).toBeInTheDocument()
+  })
+})
+
+describe('11a — an order the family already paid for', () => {
+  it('settles the order instead of raising a second charge', async () => {
+    // The defect this section exists to remove: a parent orders a גי in the shop, a charge
+    // is raised, and the coach hands it over through the picker below — which knew nothing
+    // about that order and charged the family again.
+    const client = stub()
+    renderSheet({ client, awaiting: WAITING })
+
+    await userEvent.click(screen.getByTestId('awaiting-confirm'))
+
+    expect(client.markHandedOver).toHaveBeenCalledWith('c1')
+    // Never the route that creates money.
+    expect(client.handOut).not.toHaveBeenCalled()
+    expect(await screen.findByTestId('awaiting-done')).toBeInTheDocument()
+  })
+
+  it('shows the size, because the family was promised a hand-over after it is checked', () => {
+    renderSheet({ awaiting: WAITING })
+    expect(screen.getByTestId('awaiting-item')).toHaveTextContent('גי · 140')
+    expect(screen.getByTestId('awaiting-student')).toHaveTextContent('דנה')
+  })
+
+  it('names no price in the waiting list either', () => {
+    const { container } = renderSheet({ awaiting: WAITING })
+    expect(container.textContent).not.toMatch(/₪/)
+    expect(container.querySelector('.studio-money')).toBeNull()
+  })
+
+  it('says so plainly when another coach handed it over first', async () => {
+    // Two coaches and one stale list is the ordinary case, not an error. A red failure for
+    // a thing that went right would teach a coach to distrust the screen.
+    const client = stub({ markHandedOver: vi.fn().mockResolvedValue(false) })
+    renderSheet({ client, awaiting: WAITING })
+
+    await userEvent.click(screen.getByTestId('awaiting-confirm'))
+
+    expect(await screen.findByTestId('awaiting-taken')).toBeInTheDocument()
+    expect(screen.queryByTestId('awaiting-done')).not.toBeInTheDocument()
+  })
+
+  it('offers nothing for a child who has not turned up', () => {
+    // The route answers for the whole roster; this sheet is scoped to who is on the mat
+    // (D-M6-15). `s3` is on neither list here.
+    renderSheet({ awaiting: [{ ...WAITING[0], student_id: 's3' }] })
+    expect(screen.queryByTestId('awaiting-handout')).not.toBeInTheDocument()
+  })
+
+  it('draws no section at all when nothing is waiting', () => {
+    renderSheet({ awaiting: [] })
+    expect(screen.queryByTestId('awaiting-handout')).not.toBeInTheDocument()
+    // The picker is still there — this is the ordinary case for a club that sells nothing
+    // online, and it must not look like a broken screen.
+    expect(screen.getAllByTestId('handout-option').length).toBe(2)
   })
 })

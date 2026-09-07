@@ -949,6 +949,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/charges/{charge_id}/hand-over": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Handed Over
+         * @description The family already paid for this; the coach is giving it to them.
+         *
+         *     The counterpart to `POST /charges/from-product`, and the reason the shop stopped
+         *     double-billing: that route raises a new charge, this one settles an order that already
+         *     exists. A coach who took the wrong door before this route existed created a second
+         *     charge for a גי the family had already bought.
+         *
+         *     **Refuses a second hand-over rather than accepting it silently.** Two coaches tapping
+         *     the same row is the ordinary case (one hands it over, the other has a stale list), and
+         *     a 409 that names the date it was handed over is what lets the second one say "someone
+         *     already gave it to them" instead of quietly overwriting the first date.
+         */
+        post: operations["mark_handed_over_api_v1_charges__charge_id__hand_over_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/classes": {
         parameters: {
             query?: never;
@@ -979,6 +1009,86 @@ export interface paths {
         put?: never;
         /** Create Closure */
         post: operations["create_closure_api_v1_closures_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach-constraints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Constraints
+         * @description Two modes, and only two — §6.1 draws no third. `mine=true` is any staff role,
+         *     scoped to the caller no matter what else is on the query string; `status=pending` is
+         *     the manager queue and needs the role to go with it, checked here rather than in a
+         *     service (`.claude/rules/api.md`: authorization belongs to the router).
+         */
+        get: operations["list_constraints_api_v1_coach_constraints_get"];
+        put?: never;
+        /** Create Constraint */
+        post: operations["create_constraint_api_v1_coach_constraints_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach-constraints/{constraint_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Withdraw Constraint
+         * @description A status change, not a row deletion — §6.1's table says so in as many words. 200
+         *     with the withdrawn row, the same choice `POST /sessions/{id}/cancel` makes, rather than
+         *     204: the coach's own screen updates the row it just showed without a second fetch.
+         */
+        delete: operations["withdraw_constraint_api_v1_coach_constraints__constraint_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach-constraints/{constraint_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Constraint */
+        post: operations["approve_constraint_api_v1_coach_constraints__constraint_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach-constraints/{constraint_id}/refuse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refuse Constraint */
+        post: operations["refuse_constraint_api_v1_coach_constraints__constraint_id__refuse_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4272,6 +4382,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sessions/{session_id}/awaiting-handout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Awaiting Handout
+         * @description What this lesson's families have bought in the shop and not yet been handed.
+         *
+         *     **Scoped to the SESSION and not to one student**, because both callers ask it that way:
+         *     `11a`'s hand-over sheet already reads this session's roster, and the coach's own "bring
+         *     this to training" task is about a lesson. Per-student it would be one request per child
+         *     on a mat -- twenty for an ordinary class -- to answer a question that is one query.
+         *
+         *     **Matched on the PAYER, not the student.** `POST /me/orders/items` writes
+         *     `student_id=None`: a parent orders from a shop that never asks which of their children
+         *     it is for, so the only link between an order and a child is the guardian who paid. A
+         *     family with two children in the same class therefore sees the row against both, and the
+         *     coach hands it to the one it fits. That is the real act rather than a gap being papered
+         *     over -- guessing would settle the wrong order and leave the right one open forever.
+         *
+         *     Ordered oldest first: the גי that has been waiting three weeks is the one to hand over.
+         */
+        get: operations["list_awaiting_handout_api_v1_sessions__session_id__awaiting_handout_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sessions/{session_id}/bookings": {
         parameters: {
             query?: never;
@@ -4419,6 +4563,28 @@ export interface paths {
         };
         /** List Staff */
         get: operations["list_staff_api_v1_staff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/staff/available": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Staff Available
+         * @description Decision 12, verbatim: who is free in `[from, to)`. Manager/owner only — this
+         *     answers "who can I ask to cover", which is the resolution popup's question, not a
+         *     coach's.
+         */
+        get: operations["staff_available_api_v1_staff_available_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5830,6 +5996,45 @@ export interface components {
             recipient_count: number;
         };
         /**
+         * AwaitingHandoutOut
+         * @description One shop order still sitting in the office, as a COACH may see it.
+         *
+         *     **No amount, by construction and not by omission** -- invariant 3 inspects this shape
+         *     because the route is `coach`-tagged. `line_note` is `charge.proration_note`, which the
+         *     shop wrote as "ג׳ודוגי × 1 · 140": the item, the count and the SIZE, which is the whole
+         *     reason a coach needs this row (`billing.shop.deliveryNote` promises the family a
+         *     hand-over "לאחר וידוא מידה" -- after the size is checked). It carries no price, because
+         *     the shop never put one in it.
+         */
+        AwaitingHandoutOut: {
+            /**
+             * Charge Id
+             * Format: uuid
+             */
+            charge_id: string;
+            /** Line Note */
+            line_note: string | null;
+            /**
+             * Ordered On
+             * Format: date
+             */
+            ordered_on: string;
+            /** Product Id */
+            product_id: string | null;
+            /** Product Name */
+            product_name: string;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /** AwaitingHandoutsOut */
+        AwaitingHandoutsOut: {
+            /** Items */
+            items: components["schemas"]["AwaitingHandoutOut"][];
+        };
+        /**
          * BaseSessionOut
          * @description Tuesday and Friday. Included in every plan, never marked, shown so the parent can
          *     see what "always included" actually means for their child.
@@ -6175,6 +6380,12 @@ export interface components {
          *     conflict for the wrong reason. §10.4's staleness banner is computed from it too.
          */
         BootstrapPayload: {
+            /** Event Rosters */
+            event_rosters?: {
+                [key: string]: components["schemas"]["RosterEntry"][];
+            };
+            /** Events */
+            events?: components["schemas"]["EventRosterOut"][];
             /**
              * From Time
              * Format: date-time
@@ -6661,6 +6872,100 @@ export interface components {
             version: number;
         };
         /**
+         * CoachConstraintApprove
+         * @description `POST /coach-constraints/{id}/approve`.
+         *
+         *     **Absence is not `null`**, the same rule `SessionPatch` states for `location_id`:
+         *     omitting `substitute_person_id` leaves the filer's own suggestion (or the empty
+         *     field) exactly as it was, while `substitute_person_id: null` clears it and a real id
+         *     sets it. `model_fields_set` is what lets the service tell "not mentioned" apart from
+         *     "explicitly cleared" — a plain `| None` field cannot.
+         *
+         *     A given, non-null id is validated by the service against §6.1's one rule: staff at
+         *     this studio, and free in the constraint's own window. That is a 422, not a shape this
+         *     schema can express.
+         */
+        CoachConstraintApprove: {
+            /** Substitute Person Id */
+            substitute_person_id?: string | null;
+        };
+        /**
+         * CoachConstraintCreate
+         * @description §6.1 — filing unavailability. `all_day` travels alongside real timestamps rather
+         *     than replacing them, so the server never has to guess which day "all day" means in a
+         *     time zone it is not the one evaluating in.
+         */
+        CoachConstraintCreate: {
+            /**
+             * All Day
+             * @default false
+             */
+            all_day: boolean;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /** Note */
+            note?: string | null;
+            /** Reason */
+            reason: string;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /** Substitute Person Id */
+            substitute_person_id?: string | null;
+        };
+        /** CoachConstraintOut */
+        CoachConstraintOut: {
+            /** All Day */
+            all_day: boolean;
+            /** Decided At */
+            decided_at: string | null;
+            /** Decided By Person Id */
+            decided_by_person_id: string | null;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Note */
+            note: string | null;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /** Status */
+            status: string;
+            /** Substitute Person Id */
+            substitute_person_id: string | null;
+        };
+        /**
+         * CoachConstraintRefuse
+         * @description `POST /coach-constraints/{id}/refuse`. The reason travels to the coach in their
+         *     notification and into the audit log; `coach_constraint` itself carries no column for
+         *     it (only who decided and when) — see that model's own docstring.
+         */
+        CoachConstraintRefuse: {
+            /** Reason */
+            reason: string;
+        };
+        /**
          * ConsentGrantIn
          * @description `version` is the one the CLIENT rendered, not a suggestion.
          *
@@ -6794,6 +7099,18 @@ export interface components {
             has_more: boolean;
             /** Items */
             items: components["schemas"]["ClosureOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+        };
+        /** CursorPage[CoachConstraintOut] */
+        CursorPage_CoachConstraintOut_: {
+            /**
+             * Has More
+             * @default false
+             */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["CoachConstraintOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
         };
@@ -7224,6 +7541,11 @@ export interface components {
         };
         /** EventAttendanceOut */
         EventAttendanceOut: {
+            /**
+             * Event Status
+             * @enum {string}
+             */
+            event_status: "draft" | "published" | "cancelled" | "completed";
             /** Marked */
             marked: number;
         };
@@ -7470,6 +7792,50 @@ export interface components {
              * Format: uuid
              */
             student_id: string;
+        };
+        /**
+         * EventRosterOut
+         * @description One event, cached for offline attendance — §6.5 of the staff app redesign
+         *     (decision 14). `packages/core/src/offline/cache.ts` is what turns this into a
+         *     `CachedSession` tagged `kind: 'event'`, stored in the SAME IndexedDB table `SessionOut`
+         *     already occupies; this shape is only ever the WIRE form.
+         *
+         *     Deliberately NOT `app.schemas.events.EventOut`: that shape carries `fee_agorot`, and
+         *     `/sync/bootstrap` is coach-reachable (`app/routers/sync.py`'s router is tagged
+         *     `coach`) — invariant 3 forbids any coach-reachable response carrying a financial field.
+         *     This is the same narrowing `app/schemas/schedule.py::TrialSlotOut` already applies to
+         *     `SessionOut` for an unauthenticated reader, aimed at a different field for a different
+         *     reader.
+         *
+         *     Deliberately also NOT shaped like `SessionOut` itself: an event has no `group_id`, and
+         *     widening the widest-read shape in the product for one caller's benefit is a worse trade
+         *     than a small parallel type the client converts on the way in.
+         */
+        EventRosterOut: {
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Location Name */
+            location_name: string | null;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "published" | "cancelled" | "completed";
+            /** Title */
+            title: string;
         };
         /** EventTargetOut */
         EventTargetOut: {
@@ -10534,6 +10900,17 @@ export interface components {
          *     blocked: this shape carries the ⚠ and the coach can still mark the student present.
          *     There is deliberately no `blocked` field, because there is deliberately no
          *     `block_attendance_without_health` setting.
+         *
+         *     **This shape also carries an event's registrations** (§6.5 of the staff app redesign,
+         *     decision 14) — `app/services/attendance/bootstrap.py::_event_rosters` builds the SAME
+         *     `RosterEntry` from `EventRegistration` rows rather than a parallel shape, which is what
+         *     "the same shapes" means in §6.5's own approach: `has_absence_report`,
+         *     `has_confirmation` and `absence_reason` have no event equivalent and are simply left at
+         *     their defaults (`False`/`None`) — those CONCEPTS do not exist for an event, which is a
+         *     different thing from not knowing the answer, and a default here is honest rather than a
+         *     guess. `belt_color_hex`/`belt_name` are `None` for an event row for the same reason they
+         *     are `None` on every session row today (`RosterRowRaw`'s own docstring: "W7's `belt_rank`
+         *     fills these. `None` until then") — not a gap unique to events.
          */
         RosterEntry: {
             /** Absence Reason */
@@ -10876,10 +11253,20 @@ export interface components {
              */
             training_year_id: string;
         };
-        /** SessionNoteCreate */
+        /**
+         * SessionNoteCreate
+         * @description §6.2 — `kind` defaults to `summary`, which is what every note was before the
+         *     briefing distinction existed. Who may write `plan` (`owner`, `manager`, `lead_coach`)
+         *     is a role check the endpoint makes, not something this shape can express.
+         */
         SessionNoteCreate: {
             /** Body */
             body: string;
+            /**
+             * Kind
+             * @default summary
+             */
+            kind: string;
         };
         /** SessionNoteOut */
         SessionNoteOut: {
@@ -10900,6 +11287,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Kind */
+            kind: string;
             /**
              * Session Id
              * Format: uuid
@@ -10949,6 +11338,8 @@ export interface components {
             location_id: string | null;
             /** Location Name */
             location_name: string | null;
+            /** Plan */
+            plan?: string | null;
             /** Staff */
             staff?: components["schemas"]["SessionStaffOut"][];
             /**
@@ -11160,6 +11551,30 @@ export interface components {
             status: string;
             /** Value */
             value: number | null;
+        };
+        /** StaffAvailabilityOut */
+        StaffAvailabilityOut: {
+            /** Items */
+            items: components["schemas"]["StaffAvailabilityRow"][];
+        };
+        /**
+         * StaffAvailabilityRow
+         * @description One line of `GET /staff/available`'s answer. Decision 12: no ranking, and the busy
+         *     are not filtered out — `available=False` is a real row the resolution popup still
+         *     shows, greyed, because sometimes you ask the busy person anyway.
+         */
+        StaffAvailabilityRow: {
+            /** Available */
+            available: boolean;
+            /** Display Name */
+            display_name: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Roles */
+            roles: string[];
         };
         /** StaffGroupOut */
         StaffGroupOut: {
@@ -14036,6 +14451,40 @@ export interface operations {
             };
         };
     };
+    mark_handed_over_api_v1_charges__charge_id__hand_over_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                charge_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandOverOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_classes_api_v1_classes_get: {
         parameters: {
             query?: {
@@ -14157,6 +14606,186 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ClosureCreatedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_constraints_api_v1_coach_constraints_get: {
+        parameters: {
+            query?: {
+                mine?: boolean;
+                status?: string | null;
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CursorPage_CoachConstraintOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_constraint_api_v1_coach_constraints_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachConstraintCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachConstraintOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    withdraw_constraint_api_v1_coach_constraints__constraint_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                constraint_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachConstraintOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_constraint_api_v1_coach_constraints__constraint_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                constraint_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachConstraintApprove"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachConstraintOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refuse_constraint_api_v1_coach_constraints__constraint_id__refuse_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                constraint_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachConstraintRefuse"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachConstraintOut"];
                 };
             };
             /** @description Validation Error */
@@ -19125,6 +19754,37 @@ export interface operations {
             };
         };
     };
+    list_awaiting_handout_api_v1_sessions__session_id__awaiting_handout_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AwaitingHandoutsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     session_bookings_api_v1_sessions__session_id__bookings_get: {
         parameters: {
             query?: never;
@@ -19232,6 +19892,7 @@ export interface operations {
     list_notes_api_v1_sessions__session_id__notes_get: {
         parameters: {
             query?: {
+                kind?: ("plan" | "summary") | null;
                 cursor?: string | null;
                 limit?: number;
             };
@@ -19392,6 +20053,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StaffListResponse"];
+                };
+            };
+        };
+    };
+    staff_available_api_v1_staff_available_get: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffAvailabilityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

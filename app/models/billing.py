@@ -277,6 +277,17 @@ class Charge(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
         # The next `alembic revision --autogenerate` would have written exactly that
         # migration and silently dropped the index this row exists for.
         Index("ix_charge_studio_id_product_id", "studio_id", "product_id"),
+        # "What has this family ordered and not yet been given?" -- asked once per student
+        # on `11a`'s hand-over sheet, and by the coach's own task list. Partial on BOTH
+        # terms: tuition is the overwhelming majority of this table and none of it is ever
+        # handed over, so `product_id IS NOT NULL` is what keeps the index proportional to
+        # the orders outstanding rather than to every unpaid month in the club's history.
+        Index(
+            "ix_charge_studio_id_payer_person_id_awaiting_handout",
+            "studio_id",
+            "payer_person_id",
+            postgresql_where=text("product_id IS NOT NULL AND handed_over_at IS NULL"),
+        ),
     )
 
     #: G15 -- the id, never the name. Non-null: a charge nobody owes is not a charge.
@@ -316,6 +327,20 @@ class Charge(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     product_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("product.id", ondelete="RESTRICT")
     )
+    #: When a coach physically put this item in a family's hands. NULL for every charge
+    #: that is not a shop order, and for a shop order still waiting on a mat.
+    #:
+    #: Added 2026-09-07 because the shop's two halves did not know about each other: a
+    #: parent ordered, a charge was raised, and the coach's hand-over sheet -- which could
+    #: not see that order -- raised a SECOND charge for the same גי when they handed it
+    #: across. Nothing on the row said the item had already been paid for, and the two
+    #: charges were indistinguishable from a family who genuinely bought two.
+    #:
+    #: **Not the same question as `status`.** `status` says whether the money arrived;
+    #: this says whether the goods left. A family can owe for a גי they are already
+    #: wearing, and can have paid for one that is still in a box in the office -- both are
+    #: ordinary, and one column cannot answer both.
+    handed_over_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     due_date: Mapped[date] = mapped_column(Date, nullable=False)
     #: **A derived cache.** Maintained only in `recompute_charge_status`.
     status: Mapped[str] = mapped_column(String(12), nullable=False, default="open")

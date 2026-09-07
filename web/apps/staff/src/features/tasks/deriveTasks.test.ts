@@ -7,14 +7,17 @@ import { describe, expect, it, vi } from 'vitest'
 import type { RosterRow } from '@studio/core'
 import type { SessionRow } from '../schedule/client'
 import type { StaffPromiseRow } from '../billing/promiseClient'
+import type { AwaitingHandout } from '../billing/handoutClient'
 import type { NotificationOut } from './tasksClient'
 import {
+  bringItemTasks,
   callParentTasks,
   cashPendingTasks,
   closeSessionTasks,
   healthReviewTasks,
   missingHealthFormTasks,
 } from './deriveTasks'
+import type { TaskCard } from './deriveTasks'
 
 const NOW = '2026-11-03T18:00:00Z'
 
@@ -132,7 +135,12 @@ describe('missingHealthFormTasks — coach row 2', () => {
     const today = session({})
     const tasks = missingHealthFormTasks(
       [today],
-      { s1: [rosterRow({ health_status: 'trial_signed' }), rosterRow({ student_id: 'st2', health_status: 'signed' })] },
+      {
+        s1: [
+          rosterRow({ health_status: 'trial_signed' }),
+          rosterRow({ student_id: 'st2', health_status: 'signed' }),
+        ],
+      },
       () => () => Promise.resolve([]),
       'he',
     )
@@ -184,7 +192,7 @@ describe('callParentTasks — coach row 3, the one with a tick', () => {
   // `features/comms/index.ts`'s own header): the same at-risk notification used to render
   // twice, once as that banner and once as this card, so the owner's call was "tasks tab
   // only" and this row picked up the banner's own behaviour rather than losing it.
-  it('carries the family phone for the card\'s own one-tap dial', () => {
+  it("carries the family phone for the card's own one-tap dial", () => {
     const tasks = callParentTasks([notification()], 'he', vi.fn())
     expect(tasks[0]!.contactPhone).toBe('050-0000000')
   })
@@ -252,7 +260,7 @@ describe('healthReviewTasks — manager row 2', () => {
     }
   }
 
-  it('links to the flagged student\'s own card and reads the name from the body', () => {
+  it("links to the flagged student's own card and reads the name from the body", () => {
     const tasks = healthReviewTasks([notification()], 'he', vi.fn())
     expect(tasks[0]!.title).toBe('עומר שטרן')
     expect(tasks[0]!.primaryAction).toMatchObject({ kind: 'link', href: '#/students/st9' })
@@ -274,5 +282,88 @@ describe('healthReviewTasks — manager row 2', () => {
 
   it('disappears once the inbox no longer contains it', () => {
     expect(healthReviewTasks([], 'he', vi.fn())).toHaveLength(0)
+  })
+})
+
+/** The card these tests are about, asserted to exist rather than reached through `[0]!`.
+ *  A `!` would turn "the derivation produced nothing" into a null-property crash three
+ *  lines later, which reads as a bug in the assertion rather than in the code. */
+function firstOf(cards: TaskCard[]): TaskCard {
+  expect(cards).toHaveLength(1)
+  return cards[0] as TaskCard
+}
+
+describe('bringItemTasks — the shop order the coach was never told about', () => {
+  const NAMES: Record<string, string> = { s1: 'איתי גולן', s2: 'מאיה כהן' }
+  const nameOf = (id: string) => NAMES[id] ?? ''
+  const row = (overrides: Partial<AwaitingHandout> = {}): AwaitingHandout => ({
+    charge_id: 'c1',
+    student_id: 's1',
+    product_id: 'p1',
+    product_name: 'גי',
+    line_note: 'גי · 140',
+    ordered_on: '2026-08-20',
+    ...overrides,
+  })
+
+  it('names the child and the SIZE, because that is what a coach has to bring', () => {
+    const card = firstOf(bringItemTasks([{ sessionId: 'sess1', rows: [row()] }], nameOf, 'he'))
+    expect(card.title).toBe('איתי גולן — גי · 140')
+    expect(card.taskKind).toBe('bring_item')
+  })
+
+  it('falls back to the product name when the shop wrote no line label', () => {
+    const card = firstOf(
+      bringItemTasks([{ sessionId: 'sess1', rows: [row({ line_note: null })] }], nameOf, 'he'),
+    )
+    expect(card.title).toBe('איתי גולן — גי')
+  })
+
+  it('links to the hand-over sheet of the lesson the item is waiting in', () => {
+    const card = firstOf(bringItemTasks([{ sessionId: 'sess7', rows: [row()] }], nameOf, 'he'))
+    expect(card.primaryAction).toMatchObject({
+      kind: 'link',
+      href: '#/attendance/sess7/handover',
+    })
+  })
+
+  it('carries no tick — the app can see for itself when the item is handed over', () => {
+    const card = firstOf(bringItemTasks([{ sessionId: 'sess1', rows: [row()] }], nameOf, 'he'))
+    expect(card.tick).toBeUndefined()
+  })
+
+  it('shows one card for a charge the route offered against two siblings', () => {
+    // The route deliberately offers the same order against every child of the payer on the
+    // roster — the shop never asked which child it was for. Two identical task cards would
+    // read as two items to bring.
+    const cards = bringItemTasks(
+      [{ sessionId: 'sess1', rows: [row(), row({ student_id: 's2' })] }],
+      nameOf,
+      'he',
+    )
+    expect(cards).toHaveLength(1)
+  })
+
+  it('shows one card for a child on two of the coach lessons today', () => {
+    const cards = bringItemTasks(
+      [
+        { sessionId: 'sess1', rows: [row()] },
+        { sessionId: 'sess2', rows: [row()] },
+      ],
+      nameOf,
+      'he',
+    )
+    expect(cards).toHaveLength(1)
+  })
+
+  it('is a follow-up, never urgent', () => {
+    // A child without their גי trains in what they arrived in. `close_session` should stay
+    // alone in the urgent bucket: an unmarked register is a record that is wrong.
+    const card = firstOf(bringItemTasks([{ sessionId: 'sess1', rows: [row()] }], nameOf, 'he'))
+    expect(card.bucket).toBe('followUp')
+  })
+
+  it('returns nothing when nothing is waiting', () => {
+    expect(bringItemTasks([{ sessionId: 'sess1', rows: [] }], nameOf, 'he')).toEqual([])
   })
 })

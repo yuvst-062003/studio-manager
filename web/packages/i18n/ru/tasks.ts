@@ -41,6 +41,13 @@ export const tasks: Bundle = {
     'Здравствуйте, мы заметили, что {{name}} пропустил(а) несколько тренировок подряд. Хотели узнать, всё ли в порядке.',
   'callParent.tick': 'Отметить как выполнено',
 
+  // Counterpart of he/tasks.ts's bringItem block.
+  'bringItem.scope': 'Магазин клуба',
+  'bringItem.badge': 'Принести',
+  'bringItem.title': '{{name}} — {{item}}',
+  'bringItem.subtitle': 'Заказано и оплачено, ожидает выдачи',
+  'bringItem.alert': 'Семья заказала это в магазине клуба и оплатила. Принесите на тренировку и выдайте — новый счёт при этом не создаётся.',
+  'bringItem.action': 'Открыть выдачу',
   'cash.scope': 'Финансы',
   'cash.badge': 'Ожидает подтверждения',
   'cash.title': 'Платежи наличными ожидают подтверждения',
