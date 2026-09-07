@@ -726,6 +726,9 @@ export const people: Bundle = {
   'joinWizard.step3.mandatesCount': 'поручений к оформлению',
   'joinWizard.step3.mandateDone': 'Оформлено',
   'joinWizard.step3.mandateOpen': 'Открыть форму',
+  'joinWizard.step3.awaitingPaymentTitle': 'Оплата не завершена',
+  'joinWizard.step3.awaitingPaymentBody': 'Регистрация сохранена, но оплата ещё не прошла. Можно попробовать снова.',
+  'joinWizard.step3.retryPayment': 'Оплатить снова',
   'joinWizard.step3.mandatesFinish': 'Завершить регистрацию',
   'joinWizard.step3.mandatesFinishWithOpen': 'Завершить — остались поручения к оформлению',
 

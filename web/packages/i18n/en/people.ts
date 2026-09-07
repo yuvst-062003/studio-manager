@@ -724,6 +724,9 @@ export const people: Bundle = {
   'joinWizard.step3.mandatesCount': 'mandates to arrange',
   'joinWizard.step3.mandateDone': 'Arranged',
   'joinWizard.step3.mandateOpen': 'Open the form',
+  'joinWizard.step3.awaitingPaymentTitle': 'Payment was not completed',
+  'joinWizard.step3.awaitingPaymentBody': 'The registration is saved, but nothing has been charged yet. You can try again now.',
+  'joinWizard.step3.retryPayment': 'Pay again',
   'joinWizard.step3.mandatesFinish': 'Finish registration',
   'joinWizard.step3.mandatesFinishWithOpen': 'Finish — mandates still to arrange',
 

@@ -371,6 +371,9 @@ export function step3Copy(locale: Locale) {
     mandatesCount: t(locale, 'people.joinWizard.step3.mandatesCount'),
     mandateDone: t(locale, 'people.joinWizard.step3.mandateDone'),
     mandateOpen: t(locale, 'people.joinWizard.step3.mandateOpen'),
+    awaitingPaymentTitle: t(locale, 'people.joinWizard.step3.awaitingPaymentTitle'),
+    awaitingPaymentBody: t(locale, 'people.joinWizard.step3.awaitingPaymentBody'),
+    retryPayment: t(locale, 'people.joinWizard.step3.retryPayment'),
     mandatesFinish: t(locale, 'people.joinWizard.step3.mandatesFinish'),
     mandatesFinishWithOpen: t(locale, 'people.joinWizard.step3.mandatesFinishWithOpen'),
   } as const

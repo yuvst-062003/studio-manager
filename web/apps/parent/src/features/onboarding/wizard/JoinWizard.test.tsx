@@ -17,7 +17,7 @@ import type { BillingClient, ChargeOut } from '../../billing/billingClient'
 import type { MandateLink } from '../../billing/billingClient'
 import { toWizardGroup, toWizardPlan } from './adapters'
 import { VALIDATION_COPY } from './validation'
-import { step1Copy, step2Copy, step3Copy, step4Copy, studentFormCopy, wizardFlowCopy } from './copy'
+import { paymentFrameCopy, step1Copy, step2Copy, step3Copy, step4Copy, studentFormCopy, wizardFlowCopy } from './copy'
 import { Step1Agreements } from './Step1Agreements'
 import { Step3Payment } from './Step3Payment'
 import type { RegisterResult, SubmitJoinResult } from './submitJoin'
@@ -34,6 +34,7 @@ import type { JoinWizardSource, WizardCatalogue, WizardStudio } from './wizardSo
 const STEP1_COPY = step1Copy('he')
 const STEP2_COPY = step2Copy('he')
 const STEP3_COPY = step3Copy('he')
+const FRAME_COPY = paymentFrameCopy('he')
 const STEP4_COPY = step4Copy('he')
 const STUDENT_FORM_COPY = studentFormCopy('he')
 
@@ -840,6 +841,57 @@ describe('Step3Payment -- the mandates checklist (F2 fix round 1)', () => {
     pricePerMonthAgorot: 30_000,
     features: [],
   }
+
+  it('a parent who closes the card frame WITHOUT paying does not reach the done step', async () => {
+    // Owner-reported 2026-09-07: open the checkout iframe, pay nothing, close it, and the
+    // wizard advanced to step 4 as though the money had arrived.
+    //
+    // `PaymentFrame` distinguishes the two outcomes and always did: `onComplete` fires
+    // only when OUR OWN return page posts a completion ref back, after uPay says yes.
+    // `onClose` is the X in the corner. They were wired to one handler whose comment
+    // called that deliberate — so dismissing the frame counted as having paid.
+    const user = userEvent.setup()
+    const student = emptyStudent('c1', { firstName: 'איתי', lastName: 'לוי', planId: PLAN.id })
+    const result: SubmitJoinResult = {
+      personId: 'person-1',
+      outcomes: [
+        {
+          draftId: 'c1',
+          name: 'איתי לוי',
+          method: 'credit',
+          amountAgorot: 30_000,
+          state: 'card_pending',
+        },
+      ],
+      checkout: { action: 'https://upay.example/checkout', fields: {} },
+      checkoutUnavailable: false,
+      mandates: [],
+    }
+    const onDone = vi.fn()
+
+    render(
+      <Step3Payment
+        locale="he"
+        students={[student]}
+        plans={[PLAN]}
+        methods={{ c1: 'credit' }}
+        onMethodChange={() => {}}
+        onBack={() => {}}
+        onSubmit={async () => result}
+        onDone={onDone}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: STEP3_COPY.continueToPay }))
+    // The footer appends the amount — `submitWithCredit (₪300)` — so match the stem.
+    await user.click(screen.getByRole('button', { name: new RegExp(STEP3_COPY.submitWithCredit) }))
+
+    // The frame is open. Close it with no completion message ever arriving.
+    const frameClose = await screen.findByRole('button', { name: FRAME_COPY.close })
+    await user.click(frameClose)
+
+    expect(onDone).not.toHaveBeenCalled()
+  })
 
   it('an unsigned mandate row shows its open-the-form text visibly, not only as an accessible name', async () => {
     const user = userEvent.setup()

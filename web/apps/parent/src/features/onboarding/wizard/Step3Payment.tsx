@@ -40,7 +40,7 @@ import { RegisterCodeError } from './wizardSources'
 
 type SubView = 'decision' | 'methods'
 type Intent = 'now' | 'arranged'
-type Phase = 'form' | 'working' | 'mandates'
+type Phase = 'form' | 'working' | 'mandates' | 'awaitingPayment'
 type Step3CopyKey = keyof ReturnType<typeof step3Copy>
 
 const METHOD_BUTTONS: readonly { key: PaymentMethod; label: Step3CopyKey; Icon: typeof CreditCard }[] = [
@@ -152,6 +152,7 @@ export function Step3Payment({
 
   const footerLabel = () => {
     if (phase === 'working') return copy.submitting
+    if (phase === 'awaitingPayment') return copy.retryPayment
     if (phase === 'mandates') return allMandatesSigned ? copy.mandatesFinish : copy.mandatesFinishWithOpen
     if (subView === 'decision') return intent === 'now' ? copy.continueToPay : copy.reportArranged
     if (chargeable.length === 0) return copy.submitReviewOnly
@@ -191,6 +192,10 @@ export function Step3Payment({
   }
 
   const onFooter = () => {
+    if (phase === 'awaitingPayment') {
+      reopenCheckout()
+      return
+    }
     if (phase === 'mandates') {
       if (result) onDone(result)
       return
@@ -202,10 +207,13 @@ export function Step3Payment({
     void runSubmit()
   }
 
-  //: `PaymentFrame`'s `onComplete` and `onClose` both do the same thing here: close the
-  //: frame, mark a mandate row done when the frame WAS that mandate's, then move on --
-  //: to the mandates checklist if any remain, or to step 4 otherwise.
-  const closeFrame = () => {
+  //: **Completing and dismissing are NOT the same thing**, and wiring both to one handler
+  //: is what let a family reach step 4 without paying (owner-reported 2026-09-07): open the
+  //: card frame, pay nothing, press the X, and the wizard said done.
+  //:
+  //: `PaymentFrame` already told the two apart. `onComplete` fires only when OUR OWN return
+  //: page posts a completion ref back, which happens after uPay says yes; `onClose` is the X.
+  const completeFrame = () => {
     setFrame(null)
     const finishedMandateId = openMandateDraftId
     setOpenMandateDraftId(null)
@@ -215,6 +223,29 @@ export function Step3Payment({
     if (!result) return
     if (result.mandates.length > 0) setPhase('mandates')
     else onDone(result)
+  }
+
+  //: Dismissed with nothing paid and nothing signed. Two things must NOT happen: the
+  //: mandate must not be ticked, and step 4 must not be reached.
+  //:
+  //: It also must not fall back to the form, because `runSubmit` has already REGISTERED
+  //: this family -- pressing submit a second time would enrol them twice. So the checkout
+  //: is held and can be reopened, which is the one action that is actually still available.
+  const dismissFrame = () => {
+    const wasMandate = openMandateDraftId !== null
+    setFrame(null)
+    setOpenMandateDraftId(null)
+    if (!result) return
+    if (wasMandate || result.mandates.length > 0) {
+      setPhase('mandates')
+      return
+    }
+    setPhase('awaitingPayment')
+  }
+
+  //: Reopens the SAME checkout rather than submitting again, for the reason above.
+  const reopenCheckout = () => {
+    if (result?.checkout) setFrame({ kind: 'checkout', form: result.checkout })
   }
 
   return (
@@ -279,6 +310,23 @@ export function Step3Payment({
             </span>
             <span className="text-amber-800">{copy.reviewBannerBody}</span>
           </div>
+        </div>
+      ) : null}
+
+      {phase === 'awaitingPayment' ? (
+        //: Said out loud rather than left to a silent return to the same screen. A parent
+        //: who dismissed the frame has to be told two things: the registration IS saved
+        //: (so they do not start over), and nothing has been charged (so they do not
+        //: assume it has). `role="status"` because it appears without them acting.
+        <div
+          role="status"
+          data-testid="awaiting-payment"
+          className="mb-3 p-3.5 rounded-xl bg-[var(--pending-tint)] border border-[var(--pending)]"
+        >
+          <p className="text-[14px] font-bold text-[var(--pending)] m-0">{copy.awaitingPaymentTitle}</p>
+          <p className="mt-1 text-[13px] leading-relaxed text-[var(--text-secondary)] m-0">
+            {copy.awaitingPaymentBody}
+          </p>
         </div>
       ) : null}
 
@@ -663,7 +711,7 @@ export function Step3Payment({
       </footer>
 
       {frame ? (
-        <PaymentFrame locale={locale} request={frame} onComplete={closeFrame} onClose={closeFrame} />
+        <PaymentFrame locale={locale} request={frame} onComplete={completeFrame} onClose={dismissFrame} />
       ) : null}
     </div>
   )

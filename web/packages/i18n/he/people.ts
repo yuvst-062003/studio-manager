@@ -840,6 +840,13 @@ export const people: Bundle = {
   'joinWizard.step3.mandatesCount': 'הרשאות להסדרה',
   'joinWizard.step3.mandateDone': 'הוסדר',
   'joinWizard.step3.mandateOpen': 'פתיחת הטופס',
+  // The card frame was dismissed with nothing paid. NOT an error -- a parent may have
+  // changed their mind, or their card was declined -- so it says what is true and offers
+  // the one action still open: reopen the same checkout. Never re-submit, which would
+  // enrol the family a second time.
+  'joinWizard.step3.awaitingPaymentTitle': 'התשלום לא הושלם',
+  'joinWizard.step3.awaitingPaymentBody': 'ההרשמה נשמרה, אבל החיוב עדיין לא בוצע. אפשר לנסות שוב עכשיו.',
+  'joinWizard.step3.retryPayment': 'לתשלום שוב',
   'joinWizard.step3.mandatesFinish': 'סיום הרשמה',
   'joinWizard.step3.mandatesFinishWithOpen': 'סיום — נותרו הרשאות להסדרה',
 
