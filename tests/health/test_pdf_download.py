@@ -8,6 +8,7 @@ names, "downloadable by the guardian and by managers", and a coach is refused.
 from __future__ import annotations
 
 from app.models.health import HealthDeclaration
+from app.services.health import club_terms
 from app.services.health.declarations import build_pdf_sections, build_terms_sections
 from sqlalchemy import select
 from tests.health.test_declarations import ANSWERS, SIGNATURE_B64
@@ -164,7 +165,7 @@ def test_a_hidden_conditional_question_is_not_on_the_page(a_full_template, app_s
     from app.models.health import HealthFormTemplate
 
     schema = app_session.get(HealthFormTemplate, a_full_template).schema
-    sections = build_pdf_sections(schema, {"allergy": False}, "he")
+    sections = build_pdf_sections(schema, {"allergy": False})
     labels = [question for section in sections for question, _ in section.rows]
     assert "פירוט האלרגיה" not in labels
 
@@ -173,27 +174,63 @@ def test_a_revealed_conditional_question_is_on_the_page(a_full_template, app_ses
     from app.models.health import HealthFormTemplate
 
     schema = app_session.get(HealthFormTemplate, a_full_template).schema
-    sections = build_pdf_sections(schema, {"allergy": True, "allergy_details": "בוטנים"}, "he")
+    sections = build_pdf_sections(schema, {"allergy": True, "allergy_details": "בוטנים"})
     rows = {question: answer for section in sections for question, answer in section.rows}
     assert rows["פירוט האלרגיה"] == "בוטנים"
 
 
-def test_booleans_are_rendered_in_the_studios_locale(a_full_template, app_session):
-    """12c finding 4, answered: the *questions* are manager-editable data and are rendered as
-    typed; the *answers* are not data — `True` is not a string anybody typed — so they take the
-    studio's locale."""
+def test_booleans_are_rendered_in_hebrew_whatever_the_studio_is_set_to(
+    a_full_template, app_session
+):
+    """12c finding 4 said the *questions* are manager-editable data rendered as typed, while the
+    *answers* are not data — `True` is not a string anybody typed — so they took the studio's
+    locale.
+
+    **Owner decision, 2026-09-07: the signed document is Hebrew, always.** The answers no longer
+    take a locale because there is no locale to take. See
+    `test_the_signed_document_offers_no_language_to_choose` for why that is a guarantee rather
+    than a default, and where the family's own language still lives.
+    """
     from app.models.health import HealthFormTemplate
 
     schema = app_session.get(HealthFormTemplate, a_full_template).schema
-    hebrew = build_pdf_sections(schema, {"asthma": True}, "he")
-    english = build_pdf_sections(schema, {"asthma": True}, "en")
-    assert dict(hebrew[0].rows)["האם יש אסתמה?"] == "כן"
-    assert dict(english[0].rows)["האם יש אסתמה?"] == "Yes"
+    sections = build_pdf_sections(schema, {"asthma": True})
+    assert dict(sections[0].rows)["האם יש אסתמה?"] == "כן"
 
 
-def test_the_club_terms_exist_in_all_three_locales():
-    """What replaced D11's caveat. Same reasoning as the caveat had: a locale that fell back to
-    Hebrew would put the terms a family is agreeing to in a language they may not read."""
+def test_the_signed_document_offers_no_language_to_choose():
+    """Owner decision, 2026-09-07: the signed declaration is Hebrew, always.
+
+    **This does not mean a family agrees to terms it cannot read.** The screen renders
+    `clubTerms.*` and `declaration.clause.*` from `web/packages/i18n/{he,en,ru}/health.ts`, so a
+    Russian-speaking parent reads the terms in Russian and ticks the box in Russian;
+    `tests/structure/test_full_template.py` guards all three locales there and must keep doing
+    so. What changes is only the archived legal record, which is now Hebrew by construction
+    rather than by a `studio.default_locale` nobody has changed.
+
+    Asserted at the signatures, not at the output: a table that still held `en`/`ru` but was
+    never read would pass a text check and leave the door open.
+    """
+    import inspect
+
+    from app.services.health import club_terms, declarations
+
+    for function in (
+        declarations.build_pdf_sections,
+        declarations.build_terms_sections,
+        declarations.build_registration_sections,
+        declarations.render_and_store_pdf,
+        club_terms.terms_title,
+        club_terms.clause_text,
+        club_terms.payment_terms,
+        club_terms.signature_line,
+    ):
+        assert "locale" not in inspect.signature(function).parameters, (
+            f"{function.__name__} can still be asked for a language other than Hebrew"
+        )
+
+
+def test_the_documents_own_text_is_hebrew_and_not_a_table_of_languages():
     from app.services.health.club_terms import (
         CLAUSE_LIMITED_TEXT,
         CLAUSE_NONE_TEXT,
@@ -202,18 +239,39 @@ def test_the_club_terms_exist_in_all_three_locales():
         TERMS_TITLE,
     )
 
-    tables = (PAYMENT_TERMS, CLAUSE_NONE_TEXT, CLAUSE_LIMITED_TEXT, SIGNATURE_LINE, TERMS_TITLE)
-    for table in tables:
-        assert set(table) == {"he", "en", "ru"}
-    assert all(all(clause.strip() for clause in clauses) for clauses in PAYMENT_TERMS.values())
-    assert all(len(clauses) == 3 for clauses in PAYMENT_TERMS.values())
+    for text in (CLAUSE_NONE_TEXT, CLAUSE_LIMITED_TEXT, SIGNATURE_LINE, TERMS_TITLE):
+        assert isinstance(text, str) and text.strip()
+    assert isinstance(PAYMENT_TERMS, tuple)
+    assert len(PAYMENT_TERMS) == 3
+    assert all(clause.strip() for clause in PAYMENT_TERMS)
+
+
+def test_the_health_clause_is_not_filed_under_the_payment_terms_heading():
+    """Seen on a render: `תקנון ותנאי תשלום` appeared twice in a row, and the FIRST one sat over
+    the sentence where a parent declares their child has no medical limitations.
+
+    That sentence is a health declaration, not a payment term. Filing it under a payment heading
+    mislabels the one clause the document exists to record — on a page a family signs and a club
+    might hand an insurer — and printing the same heading twice makes the second one look like a
+    duplicate of the first.
+    """
+    sections = build_terms_sections({"clause_confirmed": "none"})
+    titles = [section.title for section in sections]
+    assert len(titles) == len(set(titles)), f"the same heading twice: {titles}"
+
+    clause_section = next(
+        section
+        for section in sections
+        if any("אין מגבלות רפואיות" in paragraph for paragraph in section.paragraphs)
+    )
+    assert clause_section.title != club_terms.terms_title()
 
 
 def test_the_payment_terms_reach_the_rendered_sections():
     """The three clauses the club supplied are on the document a family signs, not only on the
     screen where they ticked a box. Terms that exist in the app and not in the signed record
     are terms the club cannot show anyone afterwards."""
-    sections = build_terms_sections({"clause_confirmed": "none"}, "he")
+    sections = build_terms_sections({"clause_confirmed": "none"})
     prose = " ".join(p for section in sections for p in section.paragraphs)
     assert "בריין בילדינג (ע״ר)" in prose
     assert "27" in prose and "10" in prose
@@ -223,10 +281,10 @@ def test_the_confirmed_clause_is_the_one_rendered():
     """Not the one today's answers would imply. The document is re-rendered later, and a manager
     editing a question must not silently change which sentence an old signature sits above."""
     none_text = " ".join(
-        p for s in build_terms_sections({"clause_confirmed": "none"}, "he") for p in s.paragraphs
+        p for s in build_terms_sections({"clause_confirmed": "none"}) for p in s.paragraphs
     )
     limited_text = " ".join(
-        p for s in build_terms_sections({"clause_confirmed": "limited"}, "he") for p in s.paragraphs
+        p for s in build_terms_sections({"clause_confirmed": "limited"}) for p in s.paragraphs
     )
     assert "אין מגבלות רפואיות" in none_text
     assert "למרות המגבלות הרפואיות" in limited_text
@@ -237,7 +295,7 @@ def test_no_disclaimer_string_survives_anywhere_in_the_pipeline():
     """The removal, asserted rather than assumed. D11's caveat was stamped onto every PDF; a
     stray copy left in a fallback would put "this is not a compliance document" back onto the
     club's own legal instrument."""
-    sections = build_terms_sections({"clause_confirmed": "none"}, "he")
+    sections = build_terms_sections({"clause_confirmed": "none"})
     prose = " ".join(p for section in sections for p in section.paragraphs)
     assert "נקודת פתיחה" not in prose
     assert "אינו מסמך עמידה ברגולציה" not in prose
@@ -254,7 +312,7 @@ def test_the_clause_id_never_appears_as_an_answer_on_the_document():
     from app.services.structure.health_templates import FULL_TEMPLATE_SCHEMA
 
     sections = build_pdf_sections(
-        FULL_TEMPLATE_SCHEMA, {"asthma": False, "clause_confirmed": "none"}, "he"
+        FULL_TEMPLATE_SCHEMA, {"asthma": False, "clause_confirmed": "none"}
     )
     rows = [row for section in sections for row in section.rows]
     assert not any(answer == "none" for _, answer in rows)
@@ -262,6 +320,6 @@ def test_the_clause_id_never_appears_as_an_answer_on_the_document():
 
     # And the sentence itself is still on the document, in words.
     prose = " ".join(
-        p for s in build_terms_sections({"clause_confirmed": "none"}, "he") for p in s.paragraphs
+        p for s in build_terms_sections({"clause_confirmed": "none"}) for p in s.paragraphs
     )
     assert "אין מגבלות רפואיות" in prose

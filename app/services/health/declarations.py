@@ -488,20 +488,19 @@ class HealthDeclarationService:
 # ==========================================================================================
 # §5.5's rendered PDF
 # ==========================================================================================
-#: The three locales §9 ships, for the two words a boolean answer becomes.
+#: The two words a boolean answer becomes, and the dash for one nobody answered.
 #:
 #: **12c finding 4, answered.** "Are the questions translated or are they data?" They are
 #: manager-editable rows in `health_form_template.schema`, so they are **data** and are rendered in
 #: whatever language the manager typed them in — a studio that reworded them into Russian has a
 #: Russian questionnaire, and a translation layer would silently overwrite that. The *answers* are
-#: not data: `True` is not a string anybody typed, so it is rendered in the studio's own locale.
-#: This is the whole of i18n in the Python process, and it stays this small on purpose.
-_ANSWER_WORDS: dict[str, tuple[str, str]] = {
-    "he": ("כן", "לא"),
-    "en": ("Yes", "No"),
-    "ru": ("Да", "Нет"),
-}
-_UNANSWERED = {"he": "—", "en": "—", "ru": "—"}
+#: not data: `True` is not a string anybody typed, so the renderer supplies the word.
+#:
+#: These were a `{he, en, ru}` table keyed on `studio.default_locale` until the owner's decision of
+#: 2026-09-07 (see `club_terms`): the signed declaration is the club's archived legal record and is
+#: Hebrew, always. A family still reads the questions and the clause in its own language on screen.
+_YES, _NO = "כן", "לא"
+_UNANSWERED = "—"
 
 # D11's `_DISCLAIMER` used to sit here -- "the bundled questionnaire is a starting point only
 # and is not a compliance document" -- stamped onto every rendered PDF.
@@ -516,23 +515,24 @@ _UNANSWERED = {"he": "—", "en": "—", "ru": "—"}
 # See docs/superpowers/specs/2026-08-30-registration-agreement-design.md §11.
 
 
-def _display_answer(value: Any, locale: str) -> str:
+def _display_answer(value: Any) -> str:
     """One answer, as it appears on the page.
 
-    A boolean becomes the locale's word. Anything else is the parent's own text and is rendered
-    verbatim: it is *their* answer, and paraphrasing a free-text medical note on the document they
-    signed would make the document say something they did not.
+    A boolean becomes a Hebrew word. Anything else is the parent's own text and is rendered
+    verbatim — in whatever script they typed it — because it is *their* answer, and paraphrasing a
+    free-text medical note on the document they signed would make the document say something they
+    did not. That is why the embedded face has to cover more than Hebrew even though every label
+    around it is Hebrew; see `app/services/health/pdf.py`.
     """
-    yes, no = _ANSWER_WORDS.get(locale, _ANSWER_WORDS["he"])
     if value is None or value == "":
-        return _UNANSWERED.get(locale, "—")
+        return _UNANSWERED
     if isinstance(value, bool):
-        return yes if value else no
+        return _YES if value else _NO
     return str(value)
 
 
 def build_pdf_sections(
-    schema: Mapping[str, Any], answers: Mapping[str, Any], locale: str
+    schema: Mapping[str, Any], answers: Mapping[str, Any]
 ) -> list[RenderedSection]:
     """The template's own sections, paired with what was answered.
 
@@ -562,7 +562,7 @@ def build_pdf_sections(
             ):
                 continue
             label = str(question.get("label") or question_id)
-            rows.append((label, _display_answer(answers.get(question_id), locale)))
+            rows.append((label, _display_answer(answers.get(question_id))))
         if rows:
             sections.append(
                 RenderedSection(
@@ -574,59 +574,27 @@ def build_pdf_sections(
 
 #: Labels for the registration block. Unlike the health questions -- which are manager-editable
 #: rows in `health_form_template.schema` and so are rendered in whatever language the manager
-#: typed them in -- these name COLUMNS, not questions. Nobody typed them, so they follow the
-#: studio's locale like the answer words above.
-_REG_LABELS: dict[str, dict[str, str]] = {
-    "he": {
-        "section_student": "פרטי התלמיד/ה",
-        "section_parents": "פרטי ההורים",
-        "section_pickup": "מורשי איסוף",
-        "name": "שם",
-        "birthdate": "תאריך לידה",
-        "national_id": "ת.ז.",
-        "grade": "כיתה/גן",
-        "address": "כתובת",
-        "city": "יישוב",
-        "phone_home": "טלפון בבית",
-        "phone": "טלפון נייד",
-        "email": 'דוא"ל',
-        "aliyah_year": "שנת עליה",
-    },
-    "en": {
-        "section_student": "Student details",
-        "section_parents": "Parent details",
-        "section_pickup": "Authorised for collection",
-        "name": "Name",
-        "birthdate": "Date of birth",
-        "national_id": "ID number",
-        "grade": "Class",
-        "address": "Address",
-        "city": "City",
-        "phone_home": "Home phone",
-        "phone": "Mobile",
-        "email": "Email",
-        "aliyah_year": "Year of immigration",
-    },
-    "ru": {
-        "section_student": "Данные учащегося",
-        "section_parents": "Данные родителей",
-        "section_pickup": "Кому разрешено забирать",
-        "name": "Имя",
-        "birthdate": "Дата рождения",
-        "national_id": "Удостоверение личности",
-        "grade": "Класс",
-        "address": "Адрес",
-        "city": "Город",
-        "phone_home": "Домашний телефон",
-        "phone": "Мобильный",
-        "email": "Эл. почта",
-        "aliyah_year": "Год репатриации",
-    },
+#: typed them in -- these name COLUMNS, not questions. Nobody typed them, so the renderer supplies
+#: them, in Hebrew, for the same reason as `_YES`/`_NO` above.
+_REG_LABELS: dict[str, str] = {
+    "section_student": "פרטי התלמיד/ה",
+    "section_parents": "פרטי ההורים",
+    "section_pickup": "מורשי איסוף",
+    "name": "שם",
+    "birthdate": "תאריך לידה",
+    "national_id": "ת.ז.",
+    "grade": "כיתה/גן",
+    "address": "כתובת",
+    "city": "יישוב",
+    "phone_home": "טלפון בבית",
+    "phone": "טלפון נייד",
+    "email": 'דוא"ל',
+    "aliyah_year": "שנת עליה",
 }
 
 
-def _label(key: str, locale: str) -> str:
-    return _REG_LABELS.get(locale, _REG_LABELS["he"])[key]
+def _label(key: str) -> str:
+    return _REG_LABELS[key]
 
 
 def _decode_national_id(raw: bytes | None) -> str:
@@ -634,7 +602,7 @@ def _decode_national_id(raw: bytes | None) -> str:
     return raw.decode() if raw else ""
 
 
-def _person_rows(person: Person, locale: str, *, keys: tuple[str, ...]) -> list[tuple[str, str]]:
+def _person_rows(person: Person, *, keys: tuple[str, ...]) -> list[tuple[str, str]]:
     """Only the fields that are filled. **A blank row is worse than no row here.**
 
     Half this block is optional -- a second parent, a landline, a student email -- and a page
@@ -652,11 +620,11 @@ def _person_rows(person: Person, locale: str, *, keys: tuple[str, ...]) -> list[
         "email": person.email or "",
         "aliyah_year": str(person.aliyah_year_encrypted or ""),
     }
-    return [(_label(key, locale), available[key]) for key in keys if available.get(key)]
+    return [(_label(key), available[key]) for key in keys if available.get(key)]
 
 
 def build_registration_sections(
-    session: TenantSession, declaration: HealthDeclaration, locale: str
+    session: TenantSession, declaration: HealthDeclaration
 ) -> list[RenderedSection]:
     """The club's `טופס הרשמה` blocks 1-4, read from the columns they live in.
 
@@ -674,7 +642,6 @@ def build_registration_sections(
     sections: list[RenderedSection] = []
     rows = _person_rows(
         child,
-        locale,
         keys=(
             "name",
             "birthdate",
@@ -688,9 +655,9 @@ def build_registration_sections(
     )
     if student.grade:
         # After the birthdate, where the paper form puts it.
-        rows.insert(min(2, len(rows)), (_label("grade", locale), student.grade))
+        rows.insert(min(2, len(rows)), (_label("grade"), student.grade))
     if rows:
-        sections.append(RenderedSection(title=_label("section_student", locale), rows=rows))
+        sections.append(RenderedSection(title=_label("section_student"), rows=rows))
 
     parent_rows: list[tuple[str, str]] = []
     guardians = (
@@ -707,10 +674,10 @@ def build_registration_sections(
         if parent is None:
             continue
         parent_rows.extend(
-            _person_rows(parent, locale, keys=("name", "national_id", "phone", "aliyah_year"))
+            _person_rows(parent, keys=("name", "national_id", "phone", "aliyah_year"))
         )
     if parent_rows:
-        sections.append(RenderedSection(title=_label("section_parents", locale), rows=parent_rows))
+        sections.append(RenderedSection(title=_label("section_parents"), rows=parent_rows))
 
     pickup_rows: list[tuple[str, str]] = []
     for contact in (
@@ -729,12 +696,12 @@ def build_registration_sections(
     if pickup_rows:
         # Omitted entirely when there are none -- an empty "who may collect this child"
         # heading on a signed page invites somebody to write a name on it afterwards.
-        sections.append(RenderedSection(title=_label("section_pickup", locale), rows=pickup_rows))
+        sections.append(RenderedSection(title=_label("section_pickup"), rows=pickup_rows))
 
     return sections
 
 
-def build_terms_sections(answers: Mapping[str, Any], locale: str) -> list[RenderedSection]:
+def build_terms_sections(answers: Mapping[str, Any]) -> list[RenderedSection]:
     """The confirmed health clause and the club's `תנאי תשלום`, as prose.
 
     **The clause that was CONFIRMED, not the one today's answers would imply.** They are the
@@ -747,14 +714,14 @@ def build_terms_sections(answers: Mapping[str, Any], locale: str) -> list[Render
     if isinstance(confirmed, str) and confirmed:
         sections.append(
             RenderedSection(
-                title=club_terms.terms_title(locale),
-                paragraphs=[club_terms.clause_text(confirmed, locale)],
+                title=club_terms.clause_title(),
+                paragraphs=[club_terms.clause_text(confirmed)],
             )
         )
     sections.append(
         RenderedSection(
-            title=club_terms.terms_title(locale),
-            paragraphs=list(club_terms.payment_terms(locale)),
+            title=club_terms.terms_title(),
+            paragraphs=list(club_terms.payment_terms()),
         )
     )
     return sections
@@ -771,7 +738,6 @@ def render_and_store_pdf(
     store: ObjectStore,
     studio_name: str,
     student_name: str,
-    locale: str,
 ) -> str:
     """§5.5 — 'renders a filled, signed PDF which is saved to object storage'.
 
@@ -801,11 +767,11 @@ def render_and_store_pdf(
         sections=[
             # The club's paper page reads: details, health, terms, signature. A manager
             # holding both should be able to read them side by side.
-            *build_registration_sections(session, declaration, locale),
-            *build_pdf_sections(template.schema, answers, locale),
-            *build_terms_sections(answers, locale),
+            *build_registration_sections(session, declaration),
+            *build_pdf_sections(template.schema, answers),
+            *build_terms_sections(answers),
         ],
-        signature_line=club_terms.signature_line(locale, signer=signed_by, studio=studio_name),
+        signature_line=club_terms.signature_line(signer=signed_by, studio=studio_name),
         signature_png=declaration.signature_image_encrypted,
     )
     key = declaration_pdf_key(declaration.studio_id, declaration.id)

@@ -39,14 +39,25 @@ CLUB_TERMS_VERSION = 2
 
 
 # ---------------------------------------------------------------------------------------
-# The text itself, for the PDF.
+# The text itself, for the PDF. **Hebrew only, and that is the point.**
 #
 # **Why a second copy exists at all.** The screen renders `clubTerms.*` from
 # web/packages/i18n/{he,en,ru}/health.ts; the signed PDF is written by a Python process
 # that cannot read a TypeScript module. `_DISCLAIMER` in app/services/health/declarations.py
-# had exactly this shape for exactly this reason, and `tests/health/test_club_terms.py`
-# keeps the two in step -- terms that exist only in the app are terms absent from the
-# document they are about, which is the failure mode that matters here.
+# had exactly this shape for exactly this reason -- terms that exist only in the app are
+# terms absent from the document they are about, which is the failure mode that matters.
+#
+# **Why these are strings and not {he, en, ru} tables** (owner decision, 2026-09-07). The
+# signed declaration is the club's archived legal record and is Hebrew, always. It used to
+# follow `studio.default_locale`, which made the language of a legal document a setting --
+# and one nobody had deliberately chosen: both live studios happen to be `he`, so the other
+# two branches were text that could only ever appear by accident.
+#
+# **A family still reads the terms in its own language.** That happens on screen, from the
+# i18n files above, where a Russian-speaking parent reads the clause in Russian and ticks
+# the box in Russian; tests/structure/test_full_template.py guards all three locales there
+# and must keep doing so. What is Hebrew is the record of what they agreed to, not the
+# thing they agreed to.
 # ---------------------------------------------------------------------------------------
 
 #: The club's `תנאי תשלום`, as supplied. Three clauses, in the order the club wrote them.
@@ -54,119 +65,70 @@ CLUB_TERMS_VERSION = 2
 #: Clause 3 is a **pro-rata re-pricing rule, not a refund rule** -- it changes the rate
 #: applied to months already used. It is recorded here as signed text and nothing in
 #: billing reads it; automating it is explicitly out of scope (design §13).
-PAYMENT_TERMS: dict[str, tuple[str, ...]] = {
-    "he": (
-        "תשלום בצ'קים יתבצע לטובת \"בריין בילדינג (ע״ר)\". תאריך הצ'ק לא יאוחר מה-10 לכל חודש.",
-        "ביטול מנוי יבוצע בכתב עד ה-27 לחודש, ויהיה תקף לגבי חודשים עתידיים בלבד.",
-        "בעת ביטול מנוי שנתי, התעריף החודשי יחושב בהתאם לניצול החודשים בפועל של המנוי "
-        "(לדוגמה: אם המנוי ניצל שלושה חודשים, החישוב יבוצע לפי תעריף מנוי לשלושה חודשים).",
-    ),
-    "en": (
-        'Cheques are made payable to "בריין בילדינג (ע״ר)". '
-        "The cheque date must be no later than the 10th of each month.",
-        "Cancellation must be given in writing by the 27th of the month, and takes effect "
-        "for future months only.",
-        "When an annual membership is cancelled, the monthly rate is recalculated against "
-        "the months actually used (for example: three months used is charged at the "
-        "three-month rate).",
-    ),
-    "ru": (
-        'Оплата чеками производится в пользу "בריין בילדינג (ע״ר)". '
-        "Дата чека — не позднее 10-го числа каждого месяца.",
-        "Отмена абонемента подаётся в письменном виде до 27-го числа месяца и действует "
-        "только в отношении будущих месяцев.",
-        "При отмене годового абонемента месячный тариф пересчитывается по фактически "
-        "использованным месяцам (например: три использованных месяца тарифицируются по "
-        "тарифу трёхмесячного абонемента).",
-    ),
-}
+PAYMENT_TERMS: tuple[str, ...] = (
+    "תשלום בצ'קים יתבצע לטובת \"בריין בילדינג (ע״ר)\". תאריך הצ'ק לא יאוחר מה-10 לכל חודש.",
+    "ביטול מנוי יבוצע בכתב עד ה-27 לחודש, ויהיה תקף לגבי חודשים עתידיים בלבד.",
+    "בעת ביטול מנוי שנתי, התעריף החודשי יחושב בהתאם לניצול החודשים בפועל של המנוי "
+    "(לדוגמה: אם המנוי ניצל שלושה חודשים, החישוב יבוצע לפי תעריף מנוי לשלושה חודשים).",
+)
 
-TERMS_TITLE = {
-    "he": "תקנון ותנאי תשלום",
-    "en": "Club terms and payment terms",
-    "ru": "Правила клуба и условия оплаты",
-}
+#: The heading over the payment terms.
+TERMS_TITLE = "תקנון ותנאי תשלום"
+
+#: The heading over the health clause -- and **not** `TERMS_TITLE`, which is what it used to be.
+#:
+#: Both sections carried the same title, so the document printed `תקנון ותנאי תשלום` twice in a
+#: row: once over the sentence in which a parent declares their child fit to train, and again
+#: over the actual payment terms. That sentence is the clause the whole document exists to
+#: record. Filing it under a payment heading mislabels it on a page a family signs and a club
+#: might hand an insurer, and the repetition makes the second heading read as a stray duplicate.
+CLAUSE_TITLE = "הצהרת כשירות"
 
 #: The club's `טופס הרשמה` block 5, clause 1 -- no limitations.
-CLAUSE_NONE_TEXT = {
-    "he": (
-        "הנני מצהיר/ה כי לרשום מעלה אין מגבלות רפואיות/רגישויות כלשהן והוא מסוגל לעמוד "
-        "במאמץ הדרוש לחוג אליו נרשם. יחד עם זאת, במידה ותהיה מגבלה רפואית כלשהי, הנני "
-        "מתחייב/ת לדווח על כך בהקדם למאמן ו/או מנהל המועדון."
-    ),
-    "en": (
-        "I declare that the person named above has no medical limitations or sensitivities "
-        "of any kind and is able to withstand the effort required by the class they have "
-        "joined. Should any medical limitation arise, I undertake to report it promptly to "
-        "the coach and/or the club manager."
-    ),
-    "ru": (
-        "Настоящим заявляю, что у указанного выше лица нет каких-либо медицинских "
-        "ограничений или повышенной чувствительности и он способен выдерживать нагрузку, "
-        "необходимую для занятий в группе, в которую он записан. При возникновении любого "
-        "медицинского ограничения обязуюсь незамедлительно сообщить об этом тренеру и/или "
-        "руководителю клуба."
-    ),
-}
+CLAUSE_NONE_TEXT = (
+    "הנני מצהיר/ה כי לרשום מעלה אין מגבלות רפואיות/רגישויות כלשהן והוא מסוגל לעמוד "
+    "במאמץ הדרוש לחוג אליו נרשם. יחד עם זאת, במידה ותהיה מגבלה רפואית כלשהי, הנני "
+    "מתחייב/ת לדווח על כך בהקדם למאמן ו/או מנהל המועדון."
+)
 
 #: Clause 2 -- limitations exist, and the child can still train.
-CLAUSE_LIMITED_TEXT = {
-    "he": (
-        "הנני מצהיר/ה כי למרות המגבלות הרפואיות המצוינות לעיל, הרשום מעלה מסוגל לעמוד "
-        "במאמץ הדרוש לחוג אליו נרשם."
-    ),
-    "en": (
-        "I declare that despite the medical limitations noted above, the person named above "
-        "is able to withstand the effort required by the class they have joined."
-    ),
-    "ru": (
-        "Настоящим заявляю, что несмотря на указанные выше медицинские ограничения, "
-        "указанное выше лицо способно выдерживать нагрузку, необходимую для занятий в "
-        "группе, в которую он записан."
-    ),
-}
+CLAUSE_LIMITED_TEXT = (
+    "הנני מצהיר/ה כי למרות המגבלות הרפואיות המצוינות לעיל, הרשום מעלה מסוגל לעמוד "
+    "במאמץ הדרוש לחוג אליו נרשם."
+)
 
 #: Block 6 -- the sentence above the signature. `{studio}` is the club's own name, which is
 #: `GLADIATOR` on the paper form and is not hard-coded here: the same product serves more
 #: than one club, and a second club signing GLADIATOR's regulations is a real document
 #: saying a false thing.
-SIGNATURE_LINE = {
-    "he": (
-        "אני, {signer}, מאשר/ת בזאת שקראתי את הצהרת הבריאות ותקנון של מועדון {studio} "
-        'ומתחייב/ת לפעול עפ"י הנהלים הרשומים בו.'
-    ),
-    "en": (
-        "I, {signer}, hereby confirm that I have read the health declaration and the "
-        "regulations of {studio}, and undertake to act according to the procedures set out "
-        "in them."
-    ),
-    "ru": (
-        "Я, {signer}, настоящим подтверждаю, что ознакомился(-ась) с декларацией о "
-        "состоянии здоровья и правилами клуба {studio} и обязуюсь действовать в "
-        "соответствии с изложенными в них порядками."
-    ),
-}
+SIGNATURE_LINE = (
+    "אני, {signer}, מאשר/ת בזאת שקראתי את הצהרת הבריאות ותקנון של מועדון {studio} "
+    'ומתחייב/ת לפעול עפ"י הנהלים הרשומים בו.'
+)
 
 
-def _pick(table: dict[str, str], locale: str) -> str:
-    return table.get(locale, table["he"])
+def clause_text(clause_id: str) -> str:
+    """The sentence a family actually confirmed, by its id.
 
-
-def clause_text(clause_id: str, locale: str) -> str:
-    """The sentence a family actually confirmed, by its id."""
+    The import is local because `clauses` imports this module for `CLAUSE_QUESTION_ID`; hoisting
+    it to the top makes the pair circular.
+    """
     from app.services.health.clauses import CLAUSE_LIMITED
 
-    table = CLAUSE_LIMITED_TEXT if clause_id == CLAUSE_LIMITED else CLAUSE_NONE_TEXT
-    return _pick(table, locale)
+    return CLAUSE_LIMITED_TEXT if clause_id == CLAUSE_LIMITED else CLAUSE_NONE_TEXT
 
 
-def terms_title(locale: str) -> str:
-    return _pick(TERMS_TITLE, locale)
+def terms_title() -> str:
+    return TERMS_TITLE
 
 
-def payment_terms(locale: str) -> tuple[str, ...]:
-    return PAYMENT_TERMS.get(locale, PAYMENT_TERMS["he"])
+def clause_title() -> str:
+    return CLAUSE_TITLE
 
 
-def signature_line(locale: str, *, signer: str, studio: str) -> str:
-    return _pick(SIGNATURE_LINE, locale).format(signer=signer, studio=studio)
+def payment_terms() -> tuple[str, ...]:
+    return PAYMENT_TERMS
+
+
+def signature_line(*, signer: str, studio: str) -> str:
+    return SIGNATURE_LINE.format(signer=signer, studio=studio)

@@ -246,6 +246,13 @@ def _render_pdf(session: TenantSessionDep, row: HealthDeclaration, store: Object
     The two names are read here rather than inside the service because they are display strings
     from two other verticals' tables, and a health service reaching into `studio` and `person` for
     formatting is a health service with two more reasons to change.
+
+    **`studio.default_locale` is deliberately not passed** (owner decision, 2026-09-07). It used to
+    choose the language of the rendered document, which made the language of the club's archived
+    legal record a setting rather than a decision -- and one nobody had made: every live studio is
+    `he`, so the other two branches were text that could only ever appear by accident. The family
+    still reads the questions and the club's terms in its own language on screen. See
+    `app/services/health/club_terms.py`.
     """
     studio = session.get(Studio, require_current_studio_id())
     student = session.get(Student, row.student_id)
@@ -256,7 +263,6 @@ def _render_pdf(session: TenantSessionDep, row: HealthDeclaration, store: Object
         store=store,
         studio_name=studio.name if studio is not None else "",
         student_name=f"{person.first_name} {person.last_name}".strip() if person else "",
-        locale=(studio.default_locale if studio is not None else None) or "he",
     )
 
 
