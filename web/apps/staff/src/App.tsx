@@ -71,7 +71,12 @@ import { makeStaffCommsClient } from './features/comms'
 // §16's operator view of §11.3 and §11.4. Nothing in either app rendered a `privacy.*`
 // string before this wave, so a complete he/en/ru copy set sat behind no screen and four
 // working endpoints sat behind no caller.
-import { PrivacyOperatorScreen, makeStaffPrivacyClient } from './features/privacy'
+import {
+  PrivacyOperatorScreen,
+  StaffConsentGate,
+  makeStaffConsentClient,
+  makeStaffPrivacyClient,
+} from './features/privacy'
 import { StaffAlerts } from './StaffAlerts'
 import { NetworkStatus } from './NetworkStatus'
 import { StaffShell } from './features/shell/StaffShell'
@@ -178,6 +183,7 @@ export default function App() {
   const attendanceClient = useMemo(() => makeStaffAttendanceClient(apiFetch), [])
   const commsClient = useMemo(() => makeStaffCommsClient(apiFetch), [])
   const privacyClient = useMemo(() => makeStaffPrivacyClient(apiFetch), [])
+  const consentClient = useMemo(() => makeStaffConsentClient(apiFetch), [])
   const constraintsClient = useMemo(() => makeCoachConstraintsClient(apiFetch), [])
   // §6.1 step 6 — "offline prime: today's and tomorrow's sessions + rosters are fetched and
   // written to IndexedDB BEFORE the coach reaches Today", and "the first launch BLOCKS on
@@ -379,6 +385,14 @@ export default function App() {
         // itself, so this closes the one gap that was left: the shell's own chrome
         // (the tab bar, the unguarded install banner) rendering around the refusal.
         <AccessGate session={session} locale={locale}>
+        {/* §6.1 step 5, added 2026-09-07. It wraps the SHELL and not the routed content,
+            for the reason the parent app's own gate states: "no other screen is reachable"
+            includes the tab bar that reaches them, and a bar drawn beside the gate is a bar
+            a fast finger uses before the gate is answered.
+            Outside `AccessGate` would be wrong in the other direction — someone with no
+            role at all would be asked to accept terms for a studio that has already refused
+            them. */}
+        <StaffConsentGate client={consentClient} locale={locale}>
         <StaffShell
           activeTab={activeTab}
           locale={locale}
@@ -656,6 +670,7 @@ export default function App() {
             </>
           )}
         </StaffShell>
+        </StaffConsentGate>
         </AccessGate>
       ) : null}
     </ThemeProvider>

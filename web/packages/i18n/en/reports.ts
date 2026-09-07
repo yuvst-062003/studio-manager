@@ -156,6 +156,11 @@ export const reports: Bundle = {
   'privacy.gate.title': 'Consents',
   'privacy.gate.body':
     'Before you can use the app you must accept the terms of service and the privacy policy. Both are required, and each is stored with the date and the version you accepted.',
+  // Counterpart of he/reports.ts's staffBody.
+  'privacy.gate.staffBody':
+    "As a coach you can see children's and families' details — names, phone numbers and "
+    + 'whether a health declaration is on file. Accepting here is your undertaking to '
+    + 'protect them.',
   'privacy.gate.acceptTerms': 'I have read and accept the terms of service',
   'privacy.gate.acceptPrivacy': 'I have read and accept the privacy policy',
   'privacy.gate.termsSummary':

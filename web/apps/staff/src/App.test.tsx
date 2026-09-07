@@ -239,3 +239,47 @@ describe('where the accessibility button lives', () => {
     expect(screen.queryByTestId('a11y-open')).toBeNull()
   })
 })
+
+describe('§6.1 step 5 — the consent gate is actually MOUNTED', () => {
+  /** The whole point of this block. HB-w6-health-gate-unmounted is in this repo's history
+   *  because a gate can be perfect in its own test file and gate nothing, and
+   *  `StaffConsentGate.test.tsx` renders the component directly — which proves the component
+   *  and says nothing about the shell. These two tests render `<App />`. */
+  const outstanding = (url: string) =>
+    url.includes('/privacy/consents')
+      ? new Response(
+          JSON.stringify({
+            policy_version: 2,
+            policy_version_label: '2',
+            policy_is_draft: false,
+            required: ['terms', 'privacy'],
+            outstanding: ['terms', 'privacy'],
+            records: [],
+          }),
+          { status: 200 },
+        )
+      : null
+
+  it('holds the whole shell — tab bar included — for a coach who has signed nothing', async () => {
+    const base = globalThis.fetch as unknown as (input: RequestInfo | URL) => Promise<Response>
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => outstanding(String(input)) ?? base(input)),
+    )
+    render(<App />)
+
+    await waitFor(() => expect(screen.getByTestId('staff-consent-gate')).toBeInTheDocument())
+    // Not merely hidden. The bar is what reaches every other screen, and a bar drawn beside
+    // the gate is a bar a fast finger uses before the gate has been answered.
+    expect(screen.queryByTestId('tab-bar')).not.toBeInTheDocument()
+  })
+
+  it('does not hold a coach who has already signed both', async () => {
+    // The default stub answers `{items: []}` for every unrecognised URL, which
+    // `readConsentState` reads as "cannot tell" — and the gate stands aside on that, which
+    // is the behaviour every other test in this file has been relying on without saying so.
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('tab-bar')).toBeInTheDocument())
+    expect(screen.queryByTestId('staff-consent-gate')).not.toBeInTheDocument()
+  })
+})

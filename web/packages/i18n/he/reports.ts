@@ -193,6 +193,11 @@ export const reports: Bundle = {
   'privacy.gate.title': 'אישורים',
   'privacy.gate.body':
     'לפני הכניסה לאפליקציה יש לאשר את תנאי השימוש ואת מדיניות הפרטיות. שני האישורים נדרשים, והם נשמרים עם התאריך והגרסה שאישרתם.',
+  // The staff app's own line (2026-09-07). A parent consents to the club holding THEIR
+  // family's data; a coach undertakes to handle other people's children's, which is a
+  // different sentence and needs its own words rather than a reused one.
+  'privacy.gate.staffBody':
+    'כמאמן/ת יש לך גישה לפרטים של ילדים ומשפחות — שמות, טלפונים וסימון הצהרת בריאות. האישור כאן הוא ההתחייבות שלך לשמור עליהם.',
   'privacy.gate.acceptTerms': 'קראתי ואני מאשר/ת את תנאי השימוש',
   'privacy.gate.acceptPrivacy': 'קראתי ואני מאשר/ת את מדיניות הפרטיות',
   'privacy.gate.termsSummary':
