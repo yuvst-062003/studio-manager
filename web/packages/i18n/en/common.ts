@@ -25,6 +25,10 @@ export const common: Bundle = {
   'error.generic': 'Something went wrong. Try again',
   'a11y.button': 'Accessibility menu',
   'a11y.title': 'Accessibility',
+  // Pull-to-refresh. Visually hidden: the spinner says everything a sighted parent
+  // needs and a label under it would be chrome nobody reads twice.
+  'pull.label': 'Pull down to refresh',
+  'pull.refreshing': 'Refreshing…',
   'a11y.textSize': 'Text size',
   'a11y.scale.100': 'Regular size',
   'a11y.scale.112': 'Large',

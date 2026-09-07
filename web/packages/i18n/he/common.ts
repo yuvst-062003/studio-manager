@@ -32,6 +32,10 @@ export const common: Bundle = {
   'error.generic': 'משהו השתבש. נסו שוב',
   'a11y.button': 'תפריט נגישות',
   'a11y.title': 'נגישות',
+  // Pull-to-refresh. Visually hidden: the spinner says everything a sighted parent
+  // needs and a label under it would be chrome nobody reads twice.
+  'pull.label': 'משכו למטה כדי לרענן',
+  'pull.refreshing': 'מרענן…',
   'a11y.textSize': 'גודל טקסט',
   'a11y.scale.100': 'גודל רגיל',
   'a11y.scale.112': 'גדול',

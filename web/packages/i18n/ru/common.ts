@@ -33,6 +33,10 @@ export const common: Bundle = {
   'error.generic': 'Что-то пошло не так. Попробуйте ещё раз',
   'a11y.button': 'Меню доступности',
   'a11y.title': 'Доступность',
+  // Pull-to-refresh. Visually hidden: the spinner says everything a sighted parent
+  // needs and a label under it would be chrome nobody reads twice.
+  'pull.label': 'Потяните вниз, чтобы обновить',
+  'pull.refreshing': 'Обновление…',
   'a11y.textSize': 'Размер текста',
   'a11y.scale.100': 'Обычный размер',
   'a11y.scale.112': 'Крупный',

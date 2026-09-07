@@ -20,6 +20,7 @@
 import type { ReactNode } from 'react'
 import type { Locale } from '@studio/i18n'
 import { ParentTabBar } from './ParentTabBar'
+import { PullToRefresh } from './PullToRefresh'
 import type { ParentTab } from './ParentTabBar'
 
 export function ParentShell({
@@ -44,6 +45,9 @@ export function ParentShell({
   return (
     <>
       {devBar}
+      {/* Above the shell, not inside it: the indicator is `fixed` and must not inherit the
+          wrapper's max-width or its transform context. */}
+      <PullToRefresh locale={locale} />
       <div className="tw-scope bg-slate-100 dark:bg-black min-h-[100dvh] flex justify-center selection:bg-blue-200 transition-colors duration-200">
         <div
           id="app-wrapper"

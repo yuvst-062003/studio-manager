@@ -47,6 +47,18 @@ function lockBackgroundScroll(): () => void {
   }
 }
 
+/**
+ * Whether any dialog currently holds the background scroll.
+ *
+ * Read by `PullToRefresh`: a sheet's own scroll starts at the top too, so without this a
+ * downward drag inside an open dialog would arm a page refresh behind it. Exported from
+ * here rather than sniffed off `document.body.style.overflow`, so the two never disagree
+ * about what "locked" means.
+ */
+export function backgroundScrollLocked(): boolean {
+  return lockDepth > 0
+}
+
 export function useDialog(isOpen: boolean, onClose: () => void) {
   const dialogRef = useRef<HTMLDivElement | null>(null)
   //: Where focus was before the dialog opened, so it can be put back. A dialog that
