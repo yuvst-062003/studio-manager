@@ -51,6 +51,7 @@ const STUDIO: WizardStudio = {
   logoUrl: null,
   groups: [toWizardGroup({ id: 'g1', name: 'קבוצת בוקר', weekdays: [0, 2] })],
   clubTermsVersion: null,
+  belts: [{ id: 'belt-white', name: 'חגורה לבנה' }],
   slug: 'demo-club',
 }
 

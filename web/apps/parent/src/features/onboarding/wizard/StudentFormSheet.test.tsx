@@ -34,6 +34,7 @@ function renderSheet(onClose = vi.fn()) {
       initial={EXISTING}
       groups={[]}
       plans={[]}
+      belts={[{ id: 'belt-white', name: 'חגורה לבנה' }]}
       healthSchema={{ sections: [] } as never}
       onClose={onClose}
       onSave={vi.fn()}
@@ -47,6 +48,46 @@ async function dirtyIt(user: ReturnType<typeof userEvent.setup>) {
   const first = screen.getAllByRole('textbox')[0]!
   await user.type(first, 'x')
 }
+
+describe("the belt picker (bug #10)", () => {
+  function renderWith(belts: { id: string; name: string }[]) {
+    render(
+      <StudentFormSheet
+        locale="he"
+        initial={EXISTING}
+        groups={[]}
+        plans={[]}
+        belts={belts}
+        healthSchema={{ sections: [] } as never}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+      />,
+    )
+  }
+
+  it("offers the club's own ranks, not a list compiled into the app", () => {
+    // The owner's #10. The picker shipped the same eight belts for every club in the
+    // product, so a club that had built its own ladder in `5b` watched families register
+    // against belts it does not award.
+    renderWith([
+      { id: 'r1', name: 'חגורה לבנה' },
+      { id: 'r2', name: 'חגורה לבנה עם פס צהוב' },
+    ])
+    const picker = screen.getByLabelText(COPY.belt)
+    expect([...picker.querySelectorAll('option')].map((o) => o.textContent)).toEqual([
+      COPY.beltPlaceholder,
+      'חגורה לבנה',
+      'חגורה לבנה עם פס צהוב',
+    ])
+  })
+
+  it('asks nothing at all when the club has no ladder', () => {
+    // The field is optional, so an absent one costs a family nothing — while a picker with
+    // no options is a control that cannot be answered, which is the shape #9 was about.
+    renderWith([])
+    expect(screen.queryByLabelText(COPY.belt)).toBeNull()
+  })
+})
 
 describe('discarding an edit', () => {
   it('never calls window.confirm', async () => {

@@ -20,7 +20,7 @@ import { PartSignature } from './parts/PartSignature'
 import { studentFormCopy } from './copy'
 import { clearStudentDraft, saveStudentDraft } from './draft'
 import { emptyStudent } from './types'
-import type { FormPart, StudentDraft, WizardGroup, WizardPlan } from './types'
+import type { FormPart, StudentDraft, WizardBelt, WizardGroup, WizardPlan } from './types'
 import { VALIDATION_COPY, fieldError, partErrors } from './validation'
 import type { FieldKey } from './validation'
 
@@ -44,6 +44,8 @@ export type StudentFormSheetProps = {
   initialPart?: FormPart
   groups: readonly WizardGroup[]
   plans: readonly WizardPlan[]
+  /** Bug #10 — the club's own belt ladder, for part 1's picker. */
+  belts: readonly WizardBelt[]
   healthSchema: TemplateSchema
   /** Applied to a NEW child only, so the family types it once (§5.6). */
   familyDefaults?: Partial<StudentDraft>
@@ -63,6 +65,7 @@ export function StudentFormSheet({
   initialPart = 1,
   groups,
   plans,
+  belts,
   healthSchema,
   familyDefaults,
   checkDuplicate,
@@ -327,6 +330,7 @@ export function StudentFormSheet({
               onChange={change}
               errorFor={errorFor}
               onBlurField={blurField}
+              belts={belts}
             />
           ) : null}
           {part === 2 ? (

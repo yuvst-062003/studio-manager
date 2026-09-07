@@ -807,15 +807,6 @@ export const people: Bundle = {
   'joinWizard.options.grade.highschool': 'Старшие классы',
   'joinWizard.options.grade.post_highschool': 'После школы',
 
-  // BELT_OPTIONS -> joinWizard.options.belt.*
-  'joinWizard.options.belt.white': 'Белый пояс',
-  'joinWizard.options.belt.white_yellow': 'Бело-жёлтый пояс',
-  'joinWizard.options.belt.yellow': 'Жёлтый пояс',
-  'joinWizard.options.belt.orange': 'Оранжевый пояс',
-  'joinWizard.options.belt.green': 'Зелёный пояс',
-  'joinWizard.options.belt.blue': 'Синий пояс',
-  'joinWizard.options.belt.brown': 'Коричневый пояс',
-  'joinWizard.options.belt.black': 'Чёрный пояс',
 
   // HEALTH_FUND_OPTIONS -> joinWizard.options.healthFund.*
   'joinWizard.options.healthFund.clalit': 'Клалит',

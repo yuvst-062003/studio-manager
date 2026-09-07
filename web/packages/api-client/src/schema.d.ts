@@ -1710,7 +1710,7 @@ export interface paths {
          *     process alive", and a database it cannot reach does not make it dead. Letting the
          *     failure propagate would turn every database blip into a page.
          */
-        get: operations["read_health_api_v1_health_get"];
+        get: operations["read_health_api_v1_health_head"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1723,7 +1723,7 @@ export interface paths {
          *     process alive", and a database it cannot reach does not make it dead. Letting the
          *     failure propagate would turn every database blip into a page.
          */
-        head: operations["read_health_api_v1_health_get"];
+        head: operations["read_health_api_v1_health_head"];
         patch?: never;
         trace?: never;
     };
@@ -3557,6 +3557,42 @@ export interface paths {
          *     the narrow one is already as narrow as it goes.
          */
         get: operations["public_studio_api_v1_public_studios__slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/studios/{slug}/belt-ranks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Public Belt Ranks
+         * @description Bug #10 — 'the belt picker should come from the club's belt settings'.
+         *
+         *     The join wizard shipped a hardcoded eight, so a club that had built its own ladder in
+         *     `5b` watched families register against belts it does not award. The wizard runs on
+         *     `/public/*` — doors A and B are open pages with no sign-in at all — so `GET
+         *     /belt-ranks` (signed-in, and keyed on a `class_id` a stranger does not hold) could
+         *     never answer for it.
+         *
+         *     Same posture as `/public/studios/{slug}/groups` beside it, and the same scoping dance
+         *     the module header explains: resolve the studio from the slug on the unscoped session,
+         *     then read through a `TenantSession` under `use_studio`, and never commit.
+         *
+         *     **Every class's ladder, in one list.** A club with a children's ladder and an adults'
+         *     ladder has two, and the wizard asks its belt question in part 1 — before a group, and
+         *     therefore before a class, has been chosen. Ordering by `class_id` first keeps each
+         *     ladder a contiguous run in its own order rather than interleaving two sequences by an
+         *     `order_index` that only means anything inside one class.
+         */
+        get: operations["public_belt_ranks_api_v1_public_studios__slug__belt_ranks_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -10371,6 +10407,39 @@ export interface components {
             /** Secondary Color Hex */
             secondary_color_hex?: string | null;
         };
+        /** PublicBeltRankListResponse */
+        PublicBeltRankListResponse: {
+            /** Items */
+            items: components["schemas"]["PublicBeltRankOut"][];
+        };
+        /**
+         * PublicBeltRankOut
+         * @description One rung of the club's ladder, as the join wizard's picker needs it.
+         *
+         *     Distinct from `PublicBeltOut` (`app/schemas/people.py`), which the landing hero uses:
+         *     that one is a *strip to draw* and carries name and colours and nothing else. A picker
+         *     also needs something to store when a family chooses a rung, which is what `id` is for.
+         *
+         *     Still no `class_id` and no `kyu`. A rank id is a handle on a rung of a ladder printed on
+         *     the club's own wall; a class id is an internal grouping a stranger has no name for, and
+         *     an internal id on an open page is the leak `tests/people/test_public.py` exists to
+         *     catch.
+         */
+        PublicBeltRankOut: {
+            /** Color Hex */
+            color_hex: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Order Index */
+            order_index: number;
+            /** Secondary Color Hex */
+            secondary_color_hex: string | null;
+        };
         /**
          * PublicGroupListResponse
          * @description Not a `CursorPage`: a club has a dozen groups, not a growing list somebody pages
@@ -15929,7 +15998,7 @@ export interface operations {
             };
         };
     };
-    read_health_api_v1_health_get: {
+    read_health_api_v1_health_head: {
         parameters: {
             query?: never;
             header?: never;
@@ -15949,7 +16018,7 @@ export interface operations {
             };
         };
     };
-    read_health_api_v1_health_get: {
+    read_health_api_v1_health_head: {
         parameters: {
             query?: never;
             header?: never;
@@ -18502,6 +18571,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicLandingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    public_belt_ranks_api_v1_public_studios__slug__belt_ranks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicBeltRankListResponse"];
                 };
             };
             /** @description Validation Error */

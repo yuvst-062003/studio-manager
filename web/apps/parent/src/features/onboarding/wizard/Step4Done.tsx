@@ -19,7 +19,7 @@ import { AthleteCardModal } from './AthleteCardModal'
 import { step4Copy } from './copy'
 import type { OutcomeReason, PaymentOutcome } from './submitJoin'
 import { needsManagerReview } from './types'
-import type { StudentDraft, WizardGroup } from './types'
+import type { StudentDraft, WizardBelt, WizardGroup } from './types'
 
 type Step4CopyKey = keyof ReturnType<typeof step4Copy>
 
@@ -141,6 +141,8 @@ export type Step4DoneProps = {
   locale: Locale
   students: readonly StudentDraft[]
   groups: readonly WizardGroup[]
+  /** Bug #10 — passed through to the athlete card, which names the rank. */
+  belts: readonly WizardBelt[]
   /** What became of each child's payment choice. Required so a caller cannot quietly
    *  drop it: a done screen that does not say a promise failed is the screen that tells
    *  a family their payment was arranged when it was not. */
@@ -161,6 +163,7 @@ export function Step4Done({
   locale,
   students,
   groups,
+  belts,
   outcomes,
   registrationRef,
   events,
@@ -420,6 +423,7 @@ export function Step4Done({
           locale={locale}
           student={card}
           groups={groups}
+          belts={belts}
           registrationRef={registrationRef}
           onClose={() => setCard(null)}
         />

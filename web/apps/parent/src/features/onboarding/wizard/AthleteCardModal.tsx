@@ -12,24 +12,29 @@ import type { Locale } from '@studio/i18n'
 import { useDialog } from './useDialog'
 import { athleteCardCopy, beltOptions } from './copy'
 import { needsManagerReview } from './types'
-import type { StudentDraft, WizardGroup } from './types'
+import type { StudentDraft, WizardBelt, WizardGroup } from './types'
 
 export function AthleteCardModal({
   locale,
   student,
   groups,
+  belts,
   registrationRef,
   onClose,
 }: {
   locale: Locale
   student: StudentDraft
   groups: readonly WizardGroup[]
+  /** Bug #10 — the club's own ladder, so the card names the rank the family actually
+   *  picked. An unknown id renders as nothing, which is what a card for a club that has
+   *  since renamed a rung should say rather than a stale label. */
+  belts: readonly WizardBelt[]
   registrationRef?: string
   onClose: () => void
 }) {
   const copy = athleteCardCopy(locale)
   const beltLabel = (id: string) =>
-    beltOptions(locale).find((option) => option.value === id)?.label ?? ''
+    beltOptions(belts).find((option) => option.value === id)?.label ?? ''
   const dialogRef = useDialog(true, onClose)
   const name = `${student.firstName} ${student.lastName}`.trim()
   const initials = [student.firstName, student.lastName]

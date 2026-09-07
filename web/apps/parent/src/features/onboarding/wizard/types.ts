@@ -35,6 +35,17 @@ export type WizardGroup = {
   readonly locationLabel: string
 }
 
+/** One rung of the CLUB's own ladder (bug #10). Mirrors `PublicBeltRankOut`
+ *  (`app/routers/public.py`) minus the colours, which no wizard screen draws.
+ *
+ *  `id` and not a key: the eight-key list this replaced was the same eight for every club
+ *  in the product, so a club that had built its own ladder in `5b` watched families
+ *  register against belts it does not award. */
+export type WizardBelt = {
+  readonly id: string
+  readonly name: string
+}
+
 /** A price plan as the plan card needs it. `pricePerMonthAgorot` and not shekels: money is
  *  stored in agorot everywhere in this product and a float never enters the state. */
 export type WizardPlan = {

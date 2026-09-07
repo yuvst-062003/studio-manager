@@ -30,7 +30,7 @@ import { clearStudentDraft } from './draft'
 import { wizardFlowCopy } from './copy'
 import { submitJoin } from './submitJoin'
 import type { SubmitJoinResult } from './submitJoin'
-import type { PaymentMethod, StudentDraft, WizardGroup, WizardPlan } from './types'
+import type { PaymentMethod, StudentDraft, WizardBelt, WizardGroup, WizardPlan } from './types'
 import type { JoinWizardSource } from './wizardSources'
 
 // **The studio gates the wizard; the catalogue gates step 2.**
@@ -49,6 +49,9 @@ type StudioState =
       logoUrl: string | null
       groups: WizardGroup[]
       clubTermsVersion: number | null
+      /** Bug #10 -- the club's own belt ladder, threaded to the student form's picker and
+       *  to the athlete card. Empty for a club with no ladder, which hides the field. */
+      belts: WizardBelt[]
       /** Task 10 item 3 -- threaded down to step 2's "try a trial lesson first" link. */
       slug: string | null
     }
@@ -278,6 +281,7 @@ export function JoinWizard({
         locale={locale}
         students={students}
         groups={studio.groups}
+        belts={studio.belts}
         outcomes={submitResult?.outcomes ?? []}
         clubLogoUrl={studio.logoUrl}
         onEnterApp={onEnterApp}
@@ -328,6 +332,7 @@ export function JoinWizard({
             students={students}
             onStudentsChange={setStudents}
             groups={studio.groups}
+            belts={studio.belts}
             plans={catalogue.plans}
             healthSchema={catalogue.schema}
             firstStudentDefaults={firstStudentDefaults}

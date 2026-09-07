@@ -7,7 +7,7 @@ import type { PlanOption } from '../familyDraft'
 import { toWizardGroup, toWizardPlan } from './adapters'
 import type { ApiGroup, RegisterPayload } from './adapters'
 import type { RegisterResult } from './submitJoin'
-import type { WizardGroup, WizardPlan } from './types'
+import type { WizardBelt, WizardGroup, WizardPlan } from './types'
 
 export type WizardStudio = {
   studioName: string
@@ -19,6 +19,11 @@ export type WizardStudio = {
    *  (doors C/D) reads `/me/studio`, which carries no version at all, and inventing one
    *  would be worse than showing none. */
   clubTermsVersion: number | null
+  /** Bug #10 — the club's own belt ladder, for the picker in part 1 of the student form.
+   *  Empty for a club that has not built one, and for any door whose slug could not be
+   *  resolved; the picker hides itself rather than offering eight belts the club does not
+   *  award, which is exactly what it did before. */
+  belts: WizardBelt[]
   /** Task 10 item 3 -- the club's own slug, for step 2's "try a trial lesson first"
    *  link (`/t/{slug}`). `tokenSource` (door B) already has it on the join-link read
    *  (`OnboardingInfoOut.slug`); `studioSource` (doors C/D) already reads it off
@@ -46,6 +51,26 @@ type WirePricePlan = {
   name: string
   monthly_amount_agorot: number
   sessions_per_week: number | null
+}
+
+/** Bug #10 — `GET /public/studios/{slug}/belt-ranks`, for whichever door has a slug.
+ *
+ *  Shared by both sources for the reason `toPlanOption` below is: two copies of one seam is
+ *  how door B and doors C/D drifted apart on the price-plan shape and rendered `NaN`.
+ *
+ *  **A failure is an empty ladder, never a thrown wizard.** The belt is an optional field
+ *  on an optional line of the form; a club whose ranks could not be read must still be able
+ *  to take a registration, so this resolves to `[]` and the picker disappears. */
+async function loadBelts(slug: string | null): Promise<WizardBelt[]> {
+  if (!slug) return []
+  try {
+    const response = await apiFetch(`/api/v1/public/studios/${slug}/belt-ranks`)
+    if (!response.ok) return []
+    const body = (await response.json()) as { items: { id: string; name: string }[] }
+    return body.items.map((item) => ({ id: item.id, name: item.name }))
+  } catch {
+    return []
+  }
 }
 
 function toPlanOption(item: WirePricePlan): PlanOption {
@@ -124,6 +149,7 @@ export function tokenSource(token: string, healthClient: HealthClient): JoinWiza
         logoUrl: info.logo_url ? apiUrl(info.logo_url) : null,
         groups: (info.groups ?? []).map(toWizardGroup),
         clubTermsVersion: info.club_terms_version ?? null,
+        belts: await loadBelts(info.slug ?? null),
         slug: info.slug ?? null,
       }
     },
@@ -245,6 +271,7 @@ export function studioSource(healthClient: HealthClient): JoinWizardSource {
         // is unaffected either way, since the server stamps its own constant regardless
         // of what this screen displays.
         clubTermsVersion: null,
+        belts: await loadBelts(slug),
         // Item 3 -- the same `slug` this call already read to build the groups URL,
         // threaded through instead of discarded. Step 2 uses it for the "try a trial
         // lesson first" link.

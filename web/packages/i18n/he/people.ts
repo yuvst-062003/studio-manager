@@ -925,15 +925,6 @@ export const people: Bundle = {
   'joinWizard.options.grade.highschool': 'תיכון',
   'joinWizard.options.grade.post_highschool': 'אחרי תיכון',
 
-  // BELT_OPTIONS -> joinWizard.options.belt.*
-  'joinWizard.options.belt.white': 'חגורה לבנה',
-  'joinWizard.options.belt.white_yellow': 'חגורה לבנה-צהובה',
-  'joinWizard.options.belt.yellow': 'חגורה צהובה',
-  'joinWizard.options.belt.orange': 'חגורה כתומה',
-  'joinWizard.options.belt.green': 'חגורה ירוקה',
-  'joinWizard.options.belt.blue': 'חגורה כחולה',
-  'joinWizard.options.belt.brown': 'חגורה חומה',
-  'joinWizard.options.belt.black': 'חגורה שחורה',
 
   // HEALTH_FUND_OPTIONS -> joinWizard.options.healthFund.*
   'joinWizard.options.healthFund.clalit': 'כללית',

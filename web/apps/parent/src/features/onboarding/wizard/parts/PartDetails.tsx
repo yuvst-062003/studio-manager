@@ -10,7 +10,7 @@ import { SectionBand, SelectField, TextField } from './Field'
 import { OtherParentTabs } from './OtherParentTabs'
 import { gradeOptions, beltOptions, studentFormCopy } from '../copy'
 import { ageFrom, isMinor } from '../types'
-import type { StudentDraft } from '../types'
+import type { StudentDraft, WizardBelt } from '../types'
 import type { FieldKey } from '../validation'
 
 export type PartProps = {
@@ -21,12 +21,24 @@ export type PartProps = {
   onBlurField: (field: FieldKey) => void
 }
 
-export function PartDetails({ locale, student, onChange, errorFor, onBlurField }: PartProps) {
+export type PartDetailsProps = PartProps & {
+  /** Bug #10 — the CLUB's ladder. Empty hides the picker; see below. */
+  belts: readonly WizardBelt[]
+}
+
+export function PartDetails({
+  locale,
+  student,
+  onChange,
+  errorFor,
+  onBlurField,
+  belts,
+}: PartDetailsProps) {
   const minor = isMinor(student.birthDate)
   const age = ageFrom(student.birthDate)
   const copy = studentFormCopy(locale)
   const GRADE_OPTIONS = gradeOptions(locale)
-  const BELT_OPTIONS = beltOptions(locale)
+  const BELT_OPTIONS = beltOptions(belts)
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -94,14 +106,20 @@ export function PartDetails({ locale, student, onChange, errorFor, onBlurField }
             onBlur={() => onBlurField('grade')}
           />
         ) : null}
-        <SelectField
-          label={copy.belt}
-          value={student.beltId}
-          placeholder={copy.beltPlaceholder}
-          options={BELT_OPTIONS}
-          error={null}
-          onChange={(event) => onChange({ beltId: event.target.value })}
-        />
+        {/* Bug #10 — the club's own ranks, and nothing at all when it has none. A picker
+            whose only options were eight belts compiled into the app was worse than no
+            picker: the field is optional, so an empty one costs a family nothing, while a
+            wrong one puts a rank on a registration the club does not award. */}
+        {BELT_OPTIONS.length > 0 ? (
+          <SelectField
+            label={copy.belt}
+            value={student.beltId}
+            placeholder={copy.beltPlaceholder}
+            options={BELT_OPTIONS}
+            error={null}
+            onChange={(event) => onChange({ beltId: event.target.value })}
+          />
+        ) : null}
         {/* §10 — an ACCESS field, not a contact one: it is how an adult member or an older
             child signs in as themselves. Optional, because a young child has no address. */}
         <TextField

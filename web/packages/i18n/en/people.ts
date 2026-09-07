@@ -805,15 +805,6 @@ export const people: Bundle = {
   'joinWizard.options.grade.highschool': 'High school',
   'joinWizard.options.grade.post_highschool': 'After high school',
 
-  // BELT_OPTIONS -> joinWizard.options.belt.*
-  'joinWizard.options.belt.white': 'White belt',
-  'joinWizard.options.belt.white_yellow': 'White-yellow belt',
-  'joinWizard.options.belt.yellow': 'Yellow belt',
-  'joinWizard.options.belt.orange': 'Orange belt',
-  'joinWizard.options.belt.green': 'Green belt',
-  'joinWizard.options.belt.blue': 'Blue belt',
-  'joinWizard.options.belt.brown': 'Brown belt',
-  'joinWizard.options.belt.black': 'Black belt',
 
   // HEALTH_FUND_OPTIONS -> joinWizard.options.healthFund.*
   'joinWizard.options.healthFund.clalit': 'Clalit',

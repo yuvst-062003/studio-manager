@@ -21,7 +21,7 @@ import { StudentFormSheet } from './StudentFormSheet'
 import { gradeOptions, beltOptions, step2Copy } from './copy'
 import { clearStudentDraft, isResumable, loadStudentDraft } from './draft'
 import { ageFrom, isMinor, needsManagerReview } from './types'
-import type { FormPart, StudentDraft, WizardGroup, WizardPlan } from './types'
+import type { FormPart, StudentDraft, WizardBelt, WizardGroup, WizardPlan } from './types'
 
 const labelFrom = (
   options: readonly { value: string; label: string }[],
@@ -36,6 +36,9 @@ export type Step2TraineesProps = {
   students: readonly StudentDraft[]
   onStudentsChange: (students: StudentDraft[]) => void
   groups: readonly WizardGroup[]
+  /** Bug #10 — the club's own belt ladder. Threaded to the form sheet, and read here for
+   *  the chip on each trainee row. */
+  belts: readonly WizardBelt[]
   plans: readonly WizardPlan[]
   healthSchema: TemplateSchema
   /** Seeds the FIRST child this run adds -- door C's manager-supplied stub name. Applied
@@ -59,6 +62,7 @@ export function Step2Trainees({
   onStudentsChange,
   groups,
   plans,
+  belts,
   healthSchema,
   firstStudentDefaults,
   slug,
@@ -67,7 +71,7 @@ export function Step2Trainees({
   onContinue,
 }: Step2TraineesProps) {
   const copy = step2Copy(locale)
-  const BELT_OPTIONS = beltOptions(locale)
+  const BELT_OPTIONS = beltOptions(belts)
   const GRADE_OPTIONS = gradeOptions(locale)
   const [sheet, setSheet] = useState<{ initial: StudentDraft | null; part: FormPart } | null>(null)
   const [draft, setDraft] = useState(() => loadStudentDraft())
@@ -355,6 +359,7 @@ export function Step2Trainees({
           initialPart={sheet.part}
           groups={groups}
           plans={plans}
+          belts={belts}
           healthSchema={healthSchema}
           checkDuplicate={checkDuplicate}
           familyDefaults={

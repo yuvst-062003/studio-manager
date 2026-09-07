@@ -39,7 +39,7 @@ describe('Step4Done -- the payment chip is driven by the outcome (F1, fix round 
     ]
 
     render(
-      <Step4Done locale="he" students={[student]} groups={GROUPS} outcomes={outcomes} onEnterApp={vi.fn()} />,
+      <Step4Done locale="he" students={[student]} groups={GROUPS} belts={[]} outcomes={outcomes} onEnterApp={vi.fn()} />,
     )
 
     // The false claim F1 found: a green tick chip reading this, drawn unconditionally.
@@ -54,7 +54,7 @@ describe('Step4Done -- the payment chip is driven by the outcome (F1, fix round 
     ]
 
     render(
-      <Step4Done locale="he" students={[student]} groups={GROUPS} outcomes={outcomes} onEnterApp={vi.fn()} />,
+      <Step4Done locale="he" students={[student]} groups={GROUPS} belts={[]} outcomes={outcomes} onEnterApp={vi.fn()} />,
     )
 
     expect(screen.queryByText('תשלום אושר')).toBeNull()
@@ -66,7 +66,7 @@ describe('Step4Done -- events render only when supplied (F4, fix round 1)', () =
   it('renders no events card when the `events` prop is absent', () => {
     const student = emptyStudent('c1', { firstName: 'איתי', lastName: 'לוי', groupId: 'g1' })
 
-    render(<Step4Done locale="he" students={[student]} groups={GROUPS} outcomes={[]} onEnterApp={vi.fn()} />)
+    render(<Step4Done locale="he" students={[student]} groups={GROUPS} belts={[]} outcomes={[]} onEnterApp={vi.fn()} />)
 
     expect(screen.queryByText(STEP4_COPY.eventsTitle)).toBeNull()
   })
@@ -78,7 +78,7 @@ describe('Step4Done -- events render only when supplied (F4, fix round 1)', () =
       <Step4Done
         locale="he"
         students={[student]}
-        groups={GROUPS}
+        groups={GROUPS} belts={[]}
         outcomes={[]}
         onEnterApp={vi.fn()}
         events={[

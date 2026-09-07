@@ -320,6 +320,79 @@ def public_health_template(slug: str, session: SessionDep) -> HealthFormTemplate
     return result
 
 
+class PublicBeltRankOut(BaseModel):
+    """One rung of the club's ladder, as the join wizard's picker needs it.
+
+    Distinct from `PublicBeltOut` (`app/schemas/people.py`), which the landing hero uses:
+    that one is a *strip to draw* and carries name and colours and nothing else. A picker
+    also needs something to store when a family chooses a rung, which is what `id` is for.
+
+    Still no `class_id` and no `kyu`. A rank id is a handle on a rung of a ladder printed on
+    the club's own wall; a class id is an internal grouping a stranger has no name for, and
+    an internal id on an open page is the leak `tests/people/test_public.py` exists to
+    catch.
+    """
+
+    id: uuid.UUID
+    name: str
+    color_hex: str
+    secondary_color_hex: str | None
+    order_index: int
+
+
+class PublicBeltRankListResponse(BaseModel):
+    items: list[PublicBeltRankOut]
+
+
+@router.get("/public/studios/{slug}/belt-ranks", response_model=PublicBeltRankListResponse)
+def public_belt_ranks(slug: str, session: SessionDep) -> PublicBeltRankListResponse:
+    """Bug #10 — 'the belt picker should come from the club's belt settings'.
+
+    The join wizard shipped a hardcoded eight, so a club that had built its own ladder in
+    `5b` watched families register against belts it does not award. The wizard runs on
+    `/public/*` — doors A and B are open pages with no sign-in at all — so `GET
+    /belt-ranks` (signed-in, and keyed on a `class_id` a stranger does not hold) could
+    never answer for it.
+
+    Same posture as `/public/studios/{slug}/groups` beside it, and the same scoping dance
+    the module header explains: resolve the studio from the slug on the unscoped session,
+    then read through a `TenantSession` under `use_studio`, and never commit.
+
+    **Every class's ladder, in one list.** A club with a children's ladder and an adults'
+    ladder has two, and the wizard asks its belt question in part 1 — before a group, and
+    therefore before a class, has been chosen. Ordering by `class_id` first keeps each
+    ladder a contiguous run in its own order rather than interleaving two sequences by an
+    `order_index` that only means anything inside one class.
+    """
+    try:
+        studio = LandingService.studio_by_slug(session, slug=slug)
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    with (
+        use_studio(studio.id),
+        TenantSession(bind=get_engine(), expire_on_commit=False) as scoped,
+    ):
+        rows = (
+            scoped.execute(select(BeltRank).order_by(BeltRank.class_id, BeltRank.order_index))
+            .scalars()
+            .all()
+        )
+        items = [
+            PublicBeltRankOut(
+                id=row.id,
+                name=row.name,
+                color_hex=row.color_hex,
+                secondary_color_hex=row.secondary_color_hex,
+                order_index=row.order_index,
+            )
+            for row in rows
+        ]
+        # Never committed — a read must not leave rows behind, same rule every other
+        # scoped read in this module follows.
+        scoped.rollback()
+    return PublicBeltRankListResponse(items=items)
+
+
 @router.get("/public/studios/{slug}/price-plans", response_model=OnboardingPricePlanListOut)
 def public_price_plans(slug: str, session: SessionDep) -> OnboardingPricePlanListOut:
     """§6's parent-readable plan list, resolved from the studio's own slug rather than a

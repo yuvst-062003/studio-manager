@@ -645,3 +645,77 @@ def test_the_public_price_plan_list_needs_no_token(client, studio, app_session):
 def test_the_public_price_plan_list_404s_for_an_unknown_slug(client):
     response = client.get("/api/v1/public/studios/never-existed/price-plans")
     assert response.status_code == 404
+
+
+# -- the club's belts (bug #10) ------------------------------------------------
+
+
+def test_the_belt_ladder_is_readable_without_a_token(client, app_session, studio, a_class):
+    """Bug #10 — 'the belt picker should come from the club's belt settings'.
+
+    The join wizard's picker was a hardcoded list of eight, so a club that had configured
+    its own ladder in `5b` watched families register against belts it does not award. The
+    wizard runs on `/public/*` (doors A–D are open pages, some with no sign-in at all), so
+    `GET /belt-ranks` — signed-in — could never answer for it.
+
+    Same posture as `/public/studios/{slug}/groups` beside it: names and colours are what a
+    club prints on its own wall, and nothing here is a person.
+    """
+    from app.models.belts import BeltRank
+
+    app_session.add_all(
+        [
+            BeltRank(
+                studio_id=studio.id,
+                class_id=a_class,
+                name=name,
+                kyu=None,
+                order_index=index,
+                color_hex=colour,
+            )
+            for index, (name, colour) in enumerate(
+                [("חגורה לבנה", "#ffffff"), ("חגורה צהובה", "#ffd400")]
+            )
+        ]
+    )
+    app_session.commit()
+
+    response = client.get(f"/api/v1/public/studios/{studio.slug}/belt-ranks")
+
+    assert response.status_code == 200, response.text
+    items = response.json()["items"]
+    assert [(row["name"], row["color_hex"]) for row in items] == [
+        ("חגורה לבנה", "#ffffff"),
+        ("חגורה צהובה", "#ffd400"),
+    ]
+
+
+def test_the_public_belt_ladder_is_ordered_by_the_clubs_own_order(
+    client, app_session, studio, a_class
+):
+    """`order_index`, never insertion order or name: the ladder IS a sequence, and a picker
+    that offered שחורה before לבנה would be a picker nobody trusts."""
+    from app.models.belts import BeltRank
+
+    app_session.add_all(
+        [
+            BeltRank(
+                studio_id=studio.id,
+                class_id=a_class,
+                name=name,
+                kyu=None,
+                order_index=index,
+                color_hex="#000000",
+            )
+            for name, index in [("שלישית", 2), ("ראשונה", 0), ("שנייה", 1)]
+        ]
+    )
+    app_session.commit()
+
+    items = client.get(f"/api/v1/public/studios/{studio.slug}/belt-ranks").json()["items"]
+
+    assert [row["name"] for row in items] == ["ראשונה", "שנייה", "שלישית"]
+
+
+def test_an_unknown_slug_has_no_belts_to_offer(client):
+    assert client.get("/api/v1/public/studios/no-such-club/belt-ranks").status_code == 404

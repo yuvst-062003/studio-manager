@@ -10256,6 +10256,64 @@
         "title": "PublicBeltOut",
         "type": "object"
       },
+      "PublicBeltRankListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PublicBeltRankOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PublicBeltRankListResponse",
+        "type": "object"
+      },
+      "PublicBeltRankOut": {
+        "description": "One rung of the club's ladder, as the join wizard's picker needs it.\n\nDistinct from `PublicBeltOut` (`app/schemas/people.py`), which the landing hero uses:\nthat one is a *strip to draw* and carries name and colours and nothing else. A picker\nalso needs something to store when a family chooses a rung, which is what `id` is for.\n\nStill no `class_id` and no `kyu`. A rank id is a handle on a rung of a ladder printed on\nthe club's own wall; a class id is an internal grouping a stranger has no name for, and\nan internal id on an open page is the leak `tests/people/test_public.py` exists to\ncatch.",
+        "properties": {
+          "color_hex": {
+            "title": "Color Hex",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "order_index": {
+            "title": "Order Index",
+            "type": "integer"
+          },
+          "secondary_color_hex": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secondary Color Hex"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "color_hex",
+          "secondary_color_hex",
+          "order_index"
+        ],
+        "title": "PublicBeltRankOut",
+        "type": "object"
+      },
       "PublicGroupListResponse": {
         "description": "Not a `CursorPage`: a club has a dozen groups, not a growing list somebody pages\nthrough, and the landing page renders all of them at once.",
         "properties": {
@@ -21100,7 +21158,7 @@
     "/api/v1/health": {
       "get": {
         "description": "Liveness. Deliberately carries no tenant data and needs no auth.\n\n`revision` is best-effort and never affects `status`: this endpoint answers \"is this\nprocess alive\", and a database it cannot reach does not make it dead. Letting the\nfailure propagate would turn every database blip into a page.",
-        "operationId": "read_health_api_v1_health_get",
+        "operationId": "read_health_api_v1_health_head",
         "responses": {
           "200": {
             "content": {
@@ -21120,7 +21178,7 @@
       },
       "head": {
         "description": "Liveness. Deliberately carries no tenant data and needs no auth.\n\n`revision` is best-effort and never affects `status`: this endpoint answers \"is this\nprocess alive\", and a database it cannot reach does not make it dead. Letting the\nfailure propagate would turn every database blip into a page.",
-        "operationId": "read_health_api_v1_health_get",
+        "operationId": "read_health_api_v1_health_head",
         "responses": {
           "200": {
             "content": {
@@ -25120,6 +25178,49 @@
           }
         },
         "summary": "Public Studio",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/api/v1/public/studios/{slug}/belt-ranks": {
+      "get": {
+        "description": "Bug #10 — 'the belt picker should come from the club's belt settings'.\n\nThe join wizard shipped a hardcoded eight, so a club that had built its own ladder in\n`5b` watched families register against belts it does not award. The wizard runs on\n`/public/*` — doors A and B are open pages with no sign-in at all — so `GET\n/belt-ranks` (signed-in, and keyed on a `class_id` a stranger does not hold) could\nnever answer for it.\n\nSame posture as `/public/studios/{slug}/groups` beside it, and the same scoping dance\nthe module header explains: resolve the studio from the slug on the unscoped session,\nthen read through a `TenantSession` under `use_studio`, and never commit.\n\n**Every class's ladder, in one list.** A club with a children's ladder and an adults'\nladder has two, and the wizard asks its belt question in part 1 — before a group, and\ntherefore before a class, has been chosen. Ordering by `class_id` first keeps each\nladder a contiguous run in its own order rather than interleaving two sequences by an\n`order_index` that only means anything inside one class.",
+        "operationId": "public_belt_ranks_api_v1_public_studios__slug__belt_ranks_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBeltRankListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Public Belt Ranks",
         "tags": [
           "public"
         ]

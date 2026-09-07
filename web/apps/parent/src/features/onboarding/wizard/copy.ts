@@ -22,6 +22,7 @@ import type { Locale } from '@studio/i18n'
 // fault -- a family standing in a dojo doorway on a join link was being told the club was
 // broken. `features/shell/loadFailed.ts` carries the reasoning.
 import { resolveLoadFailedText } from '../../shell/loadFailed'
+import type { WizardBelt } from './types'
 
 export type DocumentKey = 'terms' | 'privacy' | 'payments'
 
@@ -109,17 +110,6 @@ const GRADE_KEYS = [
   'post_highschool',
 ] as const
 
-const BELT_KEYS = [
-  'white',
-  'white_yellow',
-  'yellow',
-  'orange',
-  'green',
-  'blue',
-  'brown',
-  'black',
-] as const
-
 const HEALTH_FUND_KEYS = ['clalit', 'maccabi', 'meuhedet', 'leumit'] as const
 
 export function gradeOptions(locale: Locale) {
@@ -129,11 +119,14 @@ export function gradeOptions(locale: Locale) {
   }))
 }
 
-export function beltOptions(locale: Locale) {
-  return BELT_KEYS.map((value) => ({
-    value,
-    label: t(locale, `people.joinWizard.options.belt.${value}`),
-  }))
+/** Bug #10 — the club's own ladder, not a list of eight compiled into the app.
+ *
+ *  Takes the belts rather than a locale: a rank's name is the manager's own text
+ *  (`belt_rank.name`, typed in `5b`), so there is nothing here to translate. An empty list
+ *  is a club that has not built a ladder yet, and the caller hides the field rather than
+ *  offering a picker with nothing in it. */
+export function beltOptions(belts: readonly WizardBelt[]) {
+  return belts.map((belt) => ({ value: belt.id, label: belt.name }))
 }
 
 export function healthFundOptions(locale: Locale) {
