@@ -4,7 +4,7 @@ import type { Bundle } from '../types'
  * Owned by the SCHEDULE lane (M2). Hebrew is the reference locale — `en` and `ru` mirror
  * these keys and `web/scripts/i18n-parity.mjs schedule` fails on a gap in `en`.
  *
- * Artboards: staff `9a` היום, `9b` בחירת תאריך, `1d`; dashboard `3a` לוח שבועי,
+ * Artboards: staff `9a` היום, `1d`; dashboard `3a` לוח שבועי,
  * `6a` עמוד קבוצה, `4b` קבוצות ומחזורים; parent `12b` לוח הילד.
  *
  * §5.6 shapes two families of string here and both matter:
@@ -80,8 +80,6 @@ export const schedule: Bundle = {
   'view.day': 'יום',
   'view.week': 'שבוע',
   'view.month': 'חודש',
-
-  // -- date picking (staff 9b) --------------------------------------------------
 
   // -- a session block ----------------------------------------------------------
   // -- F3's session popover actions ------------------------------------------------
