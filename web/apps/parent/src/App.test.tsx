@@ -1396,3 +1396,76 @@ describe('where the accessibility button lives', () => {
     expect(screen.queryByTestId('a11y-open')).toBeNull()
   })
 })
+
+// ---------------------------------------------------------------------------------
+// The payment question is asked ONCE, by the wizard, and never again at launch.
+//
+// `PaymentSetup` stood in front of the whole app for any family with an open charge, and
+// its `familyAnswered` was a plain `useState(false)` — never read back from the server. So
+// it did not matter what the family had answered in the wizard, or the day before: every
+// launch re-asked "איך תשלמו?", in the pre-redesign design, before the app would open.
+// Removed 2026-09-07 on the owner's call. The payments screen is where a method is chosen
+// now, and it is reachable from Profile without blocking anything.
+// ---------------------------------------------------------------------------------
+describe('no second payment question in front of the app', () => {
+  const familyOwingMoney = () =>
+    stubAuthed((url) => {
+      if (url.includes('/api/v1/me/students')) {
+        return new Response(
+          JSON.stringify({
+            items: [
+              {
+                id: 'st-1',
+                first_name: 'נועה',
+                last_name: 'לוי',
+                status: 'active',
+                health_status: 'signed',
+                agreement_complete: true,
+              },
+            ],
+          }),
+          { status: 200 },
+        )
+      }
+      // The read that used to give the gate its question.
+      if (url.includes('/api/v1/me/charges')) {
+        return new Response(
+          JSON.stringify({
+            items: [
+              {
+                id: 'ch-1',
+                student_id: 'st-1',
+                amount_agorot: 25_000,
+                status: 'open',
+                period_start: '2026-09-01',
+              },
+            ],
+          }),
+          { status: 200 },
+        )
+      }
+      return null
+    })
+
+  it('a fully signed family with an open charge lands on the app, not on a payment wizard', async () => {
+    vi.stubGlobal('fetch', familyOwingMoney())
+    render(<App />)
+    // Waits for a POSITIVE signal first: `queryBy(...).toBeNull()` on its own passes on the
+    // first tick, while the shell is still deciding and rendering nothing at all.
+    await waitFor(() => expect(screen.getByTestId('tab-bar')).toBeInTheDocument())
+    expect(screen.queryByTestId('payment-setup')).toBeNull()
+  })
+
+  it('asks "איך תשלמו?" nowhere in the shell', async () => {
+    // The string, not the testid — the screen could come back under another name, and the
+    // owner reported this by what they read on the phone, not by what it was called.
+    //
+    // Written as a literal on purpose: `schedule.plan.gate.payHow` was deleted with the
+    // screen, and a guard that a string never appears must not depend on that string still
+    // being defined somewhere.
+    vi.stubGlobal('fetch', familyOwingMoney())
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('tab-bar')).toBeInTheDocument())
+    expect(screen.queryByText('איך תשלמו?')).toBeNull()
+  })
+})

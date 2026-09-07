@@ -94,8 +94,7 @@ import { TrainingPlanSection } from './features/billing/TrainingPlanSection'
 // §6.1's plan step — 300 / 400 / 550 and how the money moves, asked once, right after the
 // health declaration. Every piece of it existed behind `#/plan/<studentId>` and nothing in
 // the first-run sequence reached it, so a family finished signup with no plan at all.
-import { PaymentSetupGate } from './features/billing/PaymentSetup'
-import type { SetupChild, StandingOrderLink } from './features/billing/PaymentSetup'
+import type { MandateLink } from './features/billing/billingClient'
 import { makeParentBillingClient } from './features/billing/PaymentsSection'
 import { ClubShop } from './features/billing/redesign/ClubShop'
 // §6.1 step 6 — the BLOCKING declaration. Mounted here because nothing imported it
@@ -212,12 +211,14 @@ function LandingShell({ slug }: { slug: string }) {
   )
 }
 
+type FamilyChild = { id: string; first_name: string; last_name: string }
+
 /** §5.10's mandate links, read by `submitJoin` AFTER the write -- the children it names
  *  do not exist before it. A missing or failing read must not fail a registration that has
  *  already landed, so this returns `[]` rather than throwing. A plain top-level function
  *  and not a hook: every door `JoinWizard` serves shares this ONE read (`JoinShell` for
  *  door B, `AuthedApp` below for doors C and D) rather than each holding its own copy. */
-async function loadStandingOrderLinks(): Promise<readonly StandingOrderLink[]> {
+async function loadStandingOrderLinks(): Promise<readonly MandateLink[]> {
   try {
     const response = await apiFetch('/api/v1/me/standing-order-links')
     if (!response.ok) return []
@@ -430,30 +431,10 @@ function AuthedApp() {
   // a network blip locking a family out of the cached PWA would punish exactly the
   // parent §6.5 worked hardest to keep.
   const [gatedChildren, setGatedChildren] = useState<readonly GatedStudent[] | null>(null)
-  const [setupChildren, setSetupChildren] = useState<readonly SetupChild[]>([])
-  /** §5.10's mandate links, one per child, for `PaymentSetupGate` below. Read live and
-   *  never cached: a stale link signs a family up at the wrong amount and nobody finds
-   *  out for months. Read once, on mount, through the same shared `loadStandingOrderLinks`
-   *  doors B/C/D's `JoinWizard` mounts use for their own (function-shaped) read -- not a
-   *  third copy of the fetch.
-   *
-   *  Fetched once and never again: task 3a/3b moved doors C and D onto `JoinWizard`, whose
-   *  own `submitJoin` reads this same endpoint itself right after its write and shows the
-   *  result on its OWN done screen -- the bump this effect used to need
-   *  (`SelfServeJoinFlow`'s `onRegistered`) has no caller left. A family who adds a child
-   *  through door D and picks a standing order sees that child's link on the wizard's own
-   *  step 4; this array (and the gate it feeds) simply has not re-read since mount, same
-   *  as before doors C/D existed. */
-  const [mandateLinks, setMandateLinks] = useState<readonly StandingOrderLink[]>([])
-  useEffect(() => {
-    let live = true
-    void loadStandingOrderLinks().then((links) => {
-      if (live) setMandateLinks(links)
-    })
-    return () => {
-      live = false
-    }
-  }, [])
+  /** The family's children, by first name — read once beside the gate's own read and used
+   *  by `UpdatesScreen` to say who a notification is about. Named for the payment-setup
+   *  screen it used to feed until that was removed (2026-09-07). */
+  const [familyChildren, setFamilyChildren] = useState<readonly FamilyChild[]>([])
   const [declarationsSigned, setDeclarationsSigned] = useState(0)
   // Bumped when a trial family joins the club. The child goes `trial` -> `active` while
   // still holding the short health form, so §5.5's gate must fire on the very next
@@ -520,7 +501,7 @@ function AuthedApp() {
         if (!alive) return
         // The payment step needs the parts, not the joined label: it renders a child's
         // own name beside their price and matches their mandate link by id.
-        setSetupChildren(
+        setFamilyChildren(
           data.items.map(({ id, first_name, last_name }) => ({ id, first_name, last_name })),
         )
         setGatedChildren(
@@ -790,20 +771,15 @@ function AuthedApp() {
             students={gatedChildren}
             onSigned={() => setDeclarationsSigned((count) => count + 1)}
           >
-          {/* §6.1's plan step, and it sits HERE for the reason the sequence gives: a family
-              picks what they are paying for after the club is allowed to hold the child's
-              record, never before. Unlike the two gates above it this one renders the app
-              behind it — see `PlanGate`'s header on why nagging beats blocking. */}
-          {/* The join already created the children, their groups, their price and their
-              first charge, so this step asks the one thing left: how the money moves, per
-              child. Then one summary — card in a single checkout, a mandate link each,
-              cash and cheques told to the manager. */}
-          <PaymentSetupGate
-            client={billingClient}
-            locale={locale}
-            standingOrderLinks={mandateLinks}
-            students={setupChildren}
-          >
+          {/* §6.1's plan step used to stand HERE, as `PaymentSetupGate`. Removed on the
+              owner's call (2026-09-07), and the reason is worth keeping: its
+              `familyAnswered` was a plain `useState(false)`, never read back from the
+              server, so it re-asked "איך תשלמו?" on every launch of the app no matter what
+              the family had already answered — in the pre-redesign design, in front of
+              everything else. The wizard's step 3 is where a new family picks a method
+              now, and the payments screen (Profile → תשלומים) is where anyone changes one.
+              Neither blocks the app. `App.test.tsx`'s "no second payment question" guards
+              it. */}
           {session.access.parent && isCalendarRoute(hash) ? (
             <>
               <ScheduleSection
@@ -968,9 +944,9 @@ function AuthedApp() {
               client={commsClient}
               locale={locale}
               childrenById={Object.fromEntries(
-                setupChildren.map((child) => [child.id, child.first_name]),
+                familyChildren.map((child) => [child.id, child.first_name]),
               )}
-              childNames={setupChildren.map((child) => child.first_name)}
+              childNames={familyChildren.map((child) => child.first_name)}
               onReadChange={() => setNotificationsRead((n) => n + 1)}
             />
           ) : onEvents ? (
@@ -996,7 +972,6 @@ function AuthedApp() {
               <Resolve session={session} locale={locale} notificationCount={pendingCount} />
             </>
           )}
-          </PaymentSetupGate>
           </HealthGate>
           </ConsentGate>
           )}

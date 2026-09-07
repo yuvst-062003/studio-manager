@@ -17,7 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { refresh } from '@studio/core'
 import type { Locale } from '@studio/i18n'
 import type { BillingClient } from '../../billing/billingClient'
-import type { StandingOrderLink } from '../../billing/PaymentSetup'
+import type { MandateLink } from '../../billing/billingClient'
 import type { TemplateSchema } from '../../health/healthClient'
 import { Step1Agreements } from './Step1Agreements'
 import { Step2Trainees } from './Step2Trainees'
@@ -111,7 +111,7 @@ export type JoinWizardProps = {
   billingClient: BillingClient
   /** `GET /me/standing-order-links`. Read after the write -- the children it names do
    *  not exist before it. */
-  standingOrderLinks: () => Promise<readonly StandingOrderLink[]>
+  standingOrderLinks: () => Promise<readonly MandateLink[]>
   /** Door C's "one row pre-filled": the manager's stub name, seeded into the FIRST child
    *  the family adds and nowhere else. Undefined on every other door. */
   prefillFirstRowName?: string

@@ -56,6 +56,21 @@ export type PaymentPromiseOut = {
   decided_at: string | null
 }
 
+/**
+ * One child's הוראת קבע mandate link, as `/api/v1/me/standing-order/links` returns them.
+ *
+ * Keyed by `studentId` and not by name: two children can share a first name, and a link
+ * matched to the wrong child signs a mandate at the wrong amount — the exact failure the
+ * per-child link exists to prevent.
+ *
+ * **Named `MandateLink`, not `StandingOrderLink`.** `PaymentsScreen.tsx` already exports a
+ * `StandingOrderLink` of a DIFFERENT shape (`studentName`/`planName`, for rendering), and
+ * for a while both lived in this one folder under one name. This one moved here when
+ * `PaymentSetup.tsx` was deleted, and kept the collision would have been a trap laid
+ * deliberately.
+ */
+export type MandateLink = { studentId: string; amountAgorot: number; url: string }
+
 export type BillingClient = {
   openCharges(payerPersonId: string): Promise<ChargeOut[]>
   promises(): Promise<PaymentPromiseOut[]>

@@ -14,7 +14,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
 import type { BillingClient, ChargeOut } from '../../billing/billingClient'
-import type { StandingOrderLink } from '../../billing/PaymentSetup'
+import type { MandateLink } from '../../billing/billingClient'
 import { toWizardGroup, toWizardPlan } from './adapters'
 import { VALIDATION_COPY } from './validation'
 import { step1Copy, step2Copy, step3Copy, step4Copy, studentFormCopy, wizardFlowCopy } from './copy'
@@ -145,7 +145,7 @@ function billingClientStub(overrides: Partial<BillingClient> = {}): BillingClien
 function renderWizard(
   options: {
     billingClient?: BillingClient
-    standingOrderLinks?: () => Promise<readonly StandingOrderLink[]>
+    standingOrderLinks?: () => Promise<readonly MandateLink[]>
     source?: JoinWizardSource
     startAtStep?: WizardStep
     prefillFirstRowName?: string

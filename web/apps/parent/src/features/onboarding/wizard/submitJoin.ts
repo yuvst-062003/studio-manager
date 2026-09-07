@@ -7,7 +7,7 @@
 // fires inside that write. Credit is two-phase regardless: a card is charged by showing
 // uPay's page to a human. So: register, read back the charges it created, then act.
 import type { BillingClient, ChargeOut, UpayForm } from '../../billing/billingClient'
-import type { StandingOrderLink } from '../../billing/PaymentSetup'
+import type { MandateLink } from '../../billing/billingClient'
 import { DEMO_SIMULATOR } from '../../billing/PaymentsSection'
 import { needsManagerReview } from './types'
 import type { PaymentMethod, StudentDraft, WizardPlan } from './types'
@@ -87,7 +87,7 @@ export type SubmitJoinDeps = {
   billing: Pick<BillingClient, 'openCharges' | 'createPromise' | 'createOrder' | 'orderForm'>
   /** `GET /me/standing-order-links`, read AFTER the write — the children it names did
    *  not exist before it. */
-  standingOrderLinks: () => Promise<readonly StandingOrderLink[]>
+  standingOrderLinks: () => Promise<readonly MandateLink[]>
 }
 
 export type SubmitJoinInput = {

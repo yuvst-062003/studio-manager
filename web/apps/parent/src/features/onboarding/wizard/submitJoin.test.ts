@@ -3,7 +3,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ChargeOut, PaymentOrderOut, PaymentPromiseOut, UpayForm } from '../../billing/billingClient'
 import { DEMO_SIMULATOR } from '../../billing/PaymentsSection'
-import type { StandingOrderLink } from '../../billing/PaymentSetup'
+import type { MandateLink } from '../../billing/billingClient'
 import { emptyStudent } from './types'
 import type { StudentDraft, WizardPlan } from './types'
 import { submitJoin } from './submitJoin'
@@ -61,7 +61,7 @@ function makeDeps(options: {
   createPromise?: ReturnType<typeof vi.fn>
   createOrder?: ReturnType<typeof vi.fn>
   orderForm?: ReturnType<typeof vi.fn>
-  standingOrderLinks?: readonly StandingOrderLink[]
+  standingOrderLinks?: readonly MandateLink[]
 } = {}): SubmitJoinDeps {
   return {
     register: options.registerFails
