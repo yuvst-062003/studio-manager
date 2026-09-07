@@ -70,7 +70,7 @@
 // `studioWallTimeToUtc` rather than a fixed offset (Jerusalem observes daylight time).
 //
 // **Honest about offline.** No proactive network probe before the fetch — every other
-// screen here (`DatePickerScreen`, `StudentsSearch`, `TodayScreen`) tries the read and
+// screen here (`StudentsSearch`, `TodayScreen`) tries the read and
 // lets a failure resolve through `LoadFailed`'s own `offline` flag, and this screen follows
 // the same house rule rather than inventing a second one. The point made in §4.7 — "a
 // month view is a network screen, and it says so when there is no signal rather than
@@ -97,7 +97,7 @@ import {
 } from '@studio/core'
 import { plural, t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { monthBounds, monthGrid } from './DatePickerScreen'
+import { monthBounds, monthGrid } from './monthGrid'
 import { EventCard, SessionCard, TimelineDot } from './TodayScreen'
 import type { Fetcher, SessionRow, StaffScheduleClient } from './client'
 import { mergeTimeline, timelineStates } from './timeline'
@@ -456,7 +456,7 @@ export function CalendarScreen({
    *  plan has not been read yet (the marker stays quiet), `null` once read and empty. */
   const [plans, setPlans] = useState<Record<string, string | null | undefined>>({})
   // S11 — a failed read distinguishes offline from broken (S5's network state), the same
-  // rule `DatePickerScreen`/`StudentsSearch`/`TodayScreen` already follow.
+  // rule `StudentsSearch`/`TodayScreen` already follow.
   const networkMode = useNetworkMode()
 
   const bounds = useMemo(() => monthBounds(year, month), [year, month])

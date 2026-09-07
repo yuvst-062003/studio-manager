@@ -111,7 +111,7 @@ describe('TodayScreen (9a / 1d)', () => {
 
   it('renders a seven-day strip and marks the selected day', async () => {
     render(screenFor())
-    const strip = screen.getByRole('group', { name: t('he', 'schedule.datePicker.title') })
+    const strip = screen.getByRole('group', { name: t('he', 'schedule.today.dayStripLabel') })
     await waitFor(() => expect(within(strip).getAllByRole('button')).toHaveLength(7))
     expect(screen.getByTestId('day-chip-2026-11-03')).toHaveAttribute('aria-current', 'date')
   })

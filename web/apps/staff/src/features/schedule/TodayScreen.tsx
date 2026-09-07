@@ -38,9 +38,10 @@
 //     when there is not — never a blank corner. `openRoster`, this session's one real
 //     action, is the outlined button beside it; a cancelled session has no such action, so
 //     that corner names the cancellation and its reason instead.
-// The calendar icon button the header now carries opens the same `#/schedule/date` this
-// screen always has — `open-date-picker` moved in from `ScheduleSection`'s own header bar,
-// which sat as a separate line above this one; see that file's own note.
+// The header carries ONE calendar button, to §4.7's month grid. It carried a second, to
+// artboard 9b, until both that icon and that screen were deleted on 2026-09-07 — 9b's grid
+// marked days but showed no sessions, and its date RANGE fed one value the month grid gives
+// with a tap.
 //
 // **Third pass, same day (C3): the anatomy pass flattened the states it had just told
 // apart.** The four dot states got their own colour and their own words, but every card
@@ -734,7 +735,7 @@ export function TodayScreen({
 
       <div
         role="group"
-        aria-label={t(locale, 'schedule.datePicker.title')}
+        aria-label={t(locale, 'schedule.today.dayStripLabel')}
         className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1"
       >
         {strip.map((key) => {

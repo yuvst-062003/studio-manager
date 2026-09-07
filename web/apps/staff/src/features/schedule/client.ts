@@ -130,7 +130,7 @@ export function makeStaffScheduleClient(fetcher: Fetcher): StaffScheduleClient {
 }
 
 /** Whether any training year's `[starts_on, ends_on]` covers `dayKey` (`YYYY-MM-DD`).
- *  Lexicographic comparison is exact on ISO dates — the same trick `DatePickerScreen`'s
+ *  Lexicographic comparison is exact on ISO dates — the same trick `monthGrid`'s
  *  `applyRange` already uses. Every declared year counts, not only `active`: a `draft` year
  *  not yet activated is still evidence the gap is a rollover step away, not a dead end. */
 export function yearCovers(years: TrainingYearRow[], dayKey: string): boolean {

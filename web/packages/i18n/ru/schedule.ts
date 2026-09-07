@@ -13,6 +13,8 @@ export const schedule: Bundle = {
   'today.closeSession': 'Закрыть занятие',
   // Counterpart of he/schedule.ts's fromCache.
   'today.fromCache': 'Нет связи — это список, сохранённый на устройстве. Он может быть устаревшим.',
+  // Counterpart of he/schedule.ts's dayStripLabel.
+  'today.dayStripLabel': 'Выбор дня',
   'today.empty': 'Сегодня занятий нет',
   'today.emptyHint': 'Дни занятий задаются в недельном расписании группы',
   'today.noTrainingYear': 'Ни один учебный год не охватывает эту дату',
@@ -52,20 +54,6 @@ export const schedule: Bundle = {
   'view.week': 'Неделя',
   'view.month': 'Месяц',
 
-  'datePicker.title': 'Выбор даты',
-  'datePicker.legend': 'Легенда',
-  'datePicker.legendHasSessions': 'Есть занятия',
-  'datePicker.legendUnmarked': 'Посещаемость не отмечена',
-  'datePicker.thisWeek': 'Эта неделя',
-  'datePicker.nextWeek': 'Следующая неделя',
-  'datePicker.thisMonth': 'Этот месяц',
-  'datePicker.last30': 'Последние 30 дней',
-  'datePicker.jumpToToday': 'Перейти к сегодня',
-  'datePicker.range': 'Диапазон дат',
-  'datePicker.from': 'С',
-  'datePicker.to': 'По',
-  'datePicker.apply': 'Применить',
-  'datePicker.clear': 'Очистить',
 
   // -- F3's session popover actions ------------------------------------------------
   'session.actions': 'Действия с занятием',

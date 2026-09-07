@@ -10,6 +10,8 @@ export const schedule: Bundle = {
   'today.closeSession': 'Close the session',
   // Counterpart of he/schedule.ts's fromCache.
   'today.fromCache': 'No connection — this is the list saved on this device. It may be out of date.',
+  // Counterpart of he/schedule.ts's dayStripLabel.
+  'today.dayStripLabel': 'Pick a day',
   'today.empty': 'No classes today',
   'today.emptyHint': 'Activity days are set in the group’s weekly schedule',
   'today.noTrainingYear': 'No training year covers this date',
@@ -49,20 +51,6 @@ export const schedule: Bundle = {
   'view.week': 'Week',
   'view.month': 'Month',
 
-  'datePicker.title': 'Pick a date',
-  'datePicker.legend': 'Legend',
-  'datePicker.legendHasSessions': 'Has sessions',
-  'datePicker.legendUnmarked': 'Attendance not taken',
-  'datePicker.thisWeek': 'This week',
-  'datePicker.nextWeek': 'Next week',
-  'datePicker.thisMonth': 'This month',
-  'datePicker.last30': 'Last 30 days',
-  'datePicker.jumpToToday': 'Jump to today',
-  'datePicker.range': 'Date range',
-  'datePicker.from': 'From',
-  'datePicker.to': 'To',
-  'datePicker.apply': 'Apply',
-  'datePicker.clear': 'Clear',
 
   // -- F3's session popover actions ------------------------------------------------
   'session.actions': 'Session actions',

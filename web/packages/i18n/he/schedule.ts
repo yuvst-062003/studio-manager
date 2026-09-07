@@ -32,6 +32,10 @@ export const schedule: Bundle = {
   // into IndexedDB and never read back, so the app carried the data for a basement and
   // then showed "could not load" over the top of it in one.
   'today.fromCache': 'אין חיבור — זו הרשימה השמורה במכשיר. ייתכן שהיא לא מעודכנת.',
+  // The day strip's own accessible name. It borrowed `datePicker.title` until 9b was
+  // deleted (2026-09-07) and the rest of that block went with the screen — a strip of
+  // seven days is not a date picker, and the label should say what it labels.
+  'today.dayStripLabel': 'בחירת יום',
   'today.empty': 'אין שיעורים היום',
   'today.emptyHint': 'ימי פעילות נקבעים בלו״ז השבועי של הקבוצה',
   // Register §4.2 — a date outside every declared training year used to render exactly
@@ -78,20 +82,6 @@ export const schedule: Bundle = {
   'view.month': 'חודש',
 
   // -- date picking (staff 9b) --------------------------------------------------
-  'datePicker.title': 'בחירת תאריך',
-  'datePicker.legend': 'מקרא',
-  'datePicker.legendHasSessions': 'יש שיעורים',
-  'datePicker.legendUnmarked': 'נוכחות לא סומנה',
-  'datePicker.thisWeek': 'השבוע',
-  'datePicker.nextWeek': 'שבוע הבא',
-  'datePicker.thisMonth': 'החודש',
-  'datePicker.last30': '30 יום אחרונים',
-  'datePicker.jumpToToday': 'קפיצה להיום',
-  'datePicker.range': 'טווח תאריכים',
-  'datePicker.from': 'מתאריך',
-  'datePicker.to': 'עד תאריך',
-  'datePicker.apply': 'החל',
-  'datePicker.clear': 'נקה',
 
   // -- a session block ----------------------------------------------------------
   // -- F3's session popover actions ------------------------------------------------

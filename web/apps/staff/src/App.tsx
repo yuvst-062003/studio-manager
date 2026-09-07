@@ -648,7 +648,6 @@ export default function App() {
               // card's briefing sheet reads and writes the identical rule decision 16 states.
               attendanceClient={attendanceClient}
               canWritePlan={viewerCanWritePlan}
-              hash={hash}
               today={today}
               viewerPersonId={membership?.person_id}
               viewerIsCoach={viewerIsCoach}

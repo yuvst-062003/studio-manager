@@ -89,13 +89,18 @@ describe('the staff app mounts lane SCHEDULE', () => {
     expect(screen.getByTestId('open-month-calendar')).toBeInTheDocument()
   })
 
-  it('renders 9b at #/schedule/date', async () => {
+  it('falls back to היום on the deleted 9b hash rather than to a blank page', async () => {
+    // 9b was deleted on 2026-09-07 with the duplicate calendar icon that was its only door.
+    // Its hash can still be typed, or sit in someone's history, and what it must NOT do is
+    // render nothing — the same rule the section's router applied before it was removed:
+    // an unknown hash resolves to a screen, because a coach who mistypes a URL on a phone
+    // gets something and not a void.
     globalThis.location.hash = '#/schedule/date'
     vi.stubGlobal('fetch', signedInAs(['manager']))
 
     render(<App />)
 
-    await waitFor(() => expect(screen.getByTestId('jump-to-today')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('staff-today')).toBeInTheDocument())
   })
 
   it('offers the schedule as a tab, so the hash is not the only way in', async () => {
