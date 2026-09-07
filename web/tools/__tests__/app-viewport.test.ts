@@ -6,12 +6,21 @@
 // test environment reproduces. jsdom has no pinch, no viewport scale and no iOS. So this
 // file asserts that each mechanism is CONNECTED, and each behaviour is argued in the file
 // that implements it.
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const WEB = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
+
+/** Every `.tsx` under a directory, tests excluded — a fixture may pin what it likes. */
+function tsxFilesUnder(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = resolve(dir, entry.name)
+    if (entry.isDirectory()) return tsxFilesUnder(full)
+    return entry.name.endsWith('.tsx') && !entry.name.includes('.test.') ? [full] : []
+  })
+}
 const read = (path: string) => readFileSync(resolve(WEB, path), 'utf8')
 
 /** §6.5's two installable phone apps. The dashboard is the manager's desktop tool. */
@@ -113,6 +122,33 @@ describe('nothing is drawn under the home indicator', () => {
     'apps/parent/src/features/onboarding/wizard/Step2Trainees.tsx',
     'apps/parent/src/features/onboarding/wizard/Step3Payment.tsx',
   ]
+
+  /**
+   * Found by SCANNING, not by listing — the list above could only ever guard files
+   * somebody remembered to add to it, and three separate elements were reported clipped
+   * on three different days: the tab bar's own labels, בית's floating button at
+   * `bottom-20`, and the shop's cart bar at `bottom-[64px]`. Each was a number that had
+   * been correct until the bar grew by the home indicator, and each was invisible to
+   * everyone testing on a desktop.
+   *
+   * The rule is one line: anything `fixed` to the bottom must mention the inset. That
+   * covers both shapes — a bar AT `bottom-0` reserving it as padding, and something
+   * floating ABOVE the bar offsetting by it.
+   */
+  it('every fixed bottom-pinned element in the parent app accounts for the inset', () => {
+    const offenders: string[] = []
+    for (const file of tsxFilesUnder(resolve(WEB, 'apps/parent/src'))) {
+      const source = readFileSync(file, 'utf8')
+      for (const match of source.matchAll(/className="([^"]*)"/g)) {
+        const classes = match[1] ?? ''
+        if (!/\bfixed\b/.test(classes)) continue
+        if (!/\bbottom-/.test(classes)) continue
+        if (classes.includes('env(safe-area-inset-bottom')) continue
+        offenders.push(`${file.slice(WEB.length + 1)} — ${classes.slice(0, 90)}`)
+      }
+    }
+    expect(offenders, offenders.join('\n')).toEqual([])
+  })
 
   it.each(BOTTOM_PINNED)('%s reserves the inset', (file) => {
     // The regression this pins actually happened: `AppShell` carried

@@ -94,7 +94,14 @@ export function ShopScreen({
   const sizeMissing = selectedProduct !== null && selectedProduct.sizes.length > 0 && modalSize === null
 
   return (
-    <div data-testid="shop-screen" className="flex flex-col min-h-screen pb-32 bg-[#faf8ff] dark:bg-slate-950">
+    <div
+      data-testid="shop-screen"
+      // `pb-32` (128px) cleared the old 64px bar. The bar now floats at 80px + the home
+      // indicator and is ~64px tall itself, so the clearance has to grow with it or the
+      // last row of products sits underneath. `100dvh` rather than `100vh`: Safari
+      // measures the latter as though its own toolbar were not there.
+      className="flex flex-col min-h-[100dvh] pb-[calc(9rem+env(safe-area-inset-bottom,0px))] bg-[#faf8ff] dark:bg-slate-950"
+    >
       {/* Top Header Section */}
       <header className="px-5 pt-8 pb-3">
         <div className="flex items-start justify-between gap-2">
@@ -232,7 +239,12 @@ export function ShopScreen({
       {cart.length > 0 && (
         <div
           data-testid="shop-cart-bar"
-          className="fixed bottom-[64px] w-full max-w-md px-4 z-30 transition-all duration-300"
+          // `bottom-[64px]` was the tab bar's height on the day it was written. The bar
+          // grew when it took `env(safe-area-inset-bottom)` (2026-09-06), so on a notched
+          // iPhone this sat ~36px BEHIND it and the checkout button was unreachable — the
+          // owner's screenshot. Same expression as בית's floating button, so the two rise
+          // and fall with the bar together.
+          className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] w-full max-w-md px-4 z-30 transition-all duration-300"
         >
           <div className="bg-[#05163E] text-white rounded-2xl p-3 shadow-2xl flex items-center justify-between border border-blue-900/60 backdrop-blur-md">
             <div className="flex items-center gap-3 ps-1">
