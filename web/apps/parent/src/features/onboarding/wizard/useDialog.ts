@@ -9,6 +9,44 @@ import { useEffect, useRef } from 'react'
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
 
+// -- the background scroll lock, counted rather than snapshotted --------------------
+//
+// **Reported from staging 2026-09-07: "on the home I can't scroll down or up".**
+//
+// Each dialog used to save `body.style.overflow` on the way in and write it back on the
+// way out. That is correct for one dialog and wrong for two, and `ShopScreen` runs two of
+// these hooks in one component — the product customiser and the cart. Open the customiser
+// (saves ''), open the cart (saves 'hidden'), then close the CUSTOMISER first: it restores
+// '' underneath an open cart, and when the cart finally closes it writes back the 'hidden'
+// it captured — onto a page with no dialog on it. The lock is an inline style and this is
+// a single-page app, so nothing ever cleared it: the parent left the shop and בית would
+// not move for the rest of the session.
+//
+// A depth count has no ordering to get wrong. The first dialog in locks and the last one
+// out unlocks, whichever they happen to be — and the value restored is the one from before
+// ANY dialog opened, captured once.
+let lockDepth = 0
+let overflowBeforeAnyDialog = ''
+
+/** Locks background scrolling and returns the release. Calling the release twice is a
+ *  no-op: React runs an effect cleanup exactly once, but a hook that could double-release
+ *  would drive the count negative and unlock while a dialog is still open. */
+function lockBackgroundScroll(): () => void {
+  if (lockDepth === 0) {
+    overflowBeforeAnyDialog = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+  }
+  lockDepth += 1
+
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    lockDepth -= 1
+    if (lockDepth === 0) document.body.style.overflow = overflowBeforeAnyDialog
+  }
+}
+
 export function useDialog(isOpen: boolean, onClose: () => void) {
   const dialogRef = useRef<HTMLDivElement | null>(null)
   //: Where focus was before the dialog opened, so it can be put back. A dialog that
@@ -37,8 +75,7 @@ export function useDialog(isOpen: boolean, onClose: () => void) {
 
     restoreTo.current = document.activeElement as HTMLElement | null
 
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const releaseScroll = lockBackgroundScroll()
 
     //: Focus the dialog itself rather than its first control: the reader should hear the
     //: title before the close button, and `tabIndex={-1}` on the panel makes that possible
@@ -79,7 +116,7 @@ export function useDialog(isOpen: boolean, onClose: () => void) {
     document.addEventListener('keydown', onKeyDown, true)
     return () => {
       document.removeEventListener('keydown', onKeyDown, true)
-      document.body.style.overflow = previousOverflow
+      releaseScroll()
       restoreTo.current?.focus?.()
     }
   }, [isOpen])

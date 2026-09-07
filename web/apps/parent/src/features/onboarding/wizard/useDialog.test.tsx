@@ -12,7 +12,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useDialog } from './useDialog'
 
 describe('useDialog', () => {
@@ -74,5 +74,69 @@ describe('useDialog', () => {
 
     expect(firstHandler).not.toHaveBeenCalled()
     expect(secondHandler).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ---------------------------------------------------------------------------------
+// Two dialogs open at once, closed in the wrong order — reported from staging
+// 2026-09-07 as "on the home I can't scroll down or up".
+//
+// `ShopScreen` runs TWO of these hooks in one component (the product customiser and the
+// cart), and each one saved its own snapshot of `body.overflow` and restored it on the way
+// out. Close them in the order they were opened rather than the reverse and the snapshots
+// are stale: the first to close restores '' while the second is still open, and the second
+// then restores the 'hidden' IT had captured — onto a page with no dialog on it at all.
+//
+// The lock is an inline style on <body> and this is a single-page app, so nothing ever
+// clears it. The parent leaves the shop, goes back to בית, and the page will not move.
+// ---------------------------------------------------------------------------------
+describe('the scroll lock, with more than one dialog', () => {
+  function Dialog({ open }: { open: boolean }) {
+    useDialog(open, () => {})
+    return null
+  }
+  /** Both hooks in one component, as ShopScreen has them. */
+  function Shop({ customiser, cart }: { customiser: boolean; cart: boolean }) {
+    return (
+      <>
+        <Dialog open={customiser} />
+        <Dialog open={cart} />
+      </>
+    )
+  }
+
+  afterEach(() => {
+    document.body.style.overflow = ''
+  })
+
+  it('holds the lock while either dialog is open', () => {
+    const { rerender } = render(<Shop customiser={false} cart={false} />)
+    expect(document.body.style.overflow).toBe('')
+
+    rerender(<Shop customiser cart={false} />)
+    expect(document.body.style.overflow).toBe('hidden')
+
+    rerender(<Shop customiser cart />)
+    expect(document.body.style.overflow).toBe('hidden')
+
+    // The customiser closes first — the cart is still open, so the page must stay locked.
+    rerender(<Shop customiser={false} cart />)
+    expect(document.body.style.overflow).toBe('hidden')
+  })
+
+  it('releases it when the LAST one closes, whatever order they closed in', () => {
+    const { rerender } = render(<Shop customiser cart={false} />)
+    rerender(<Shop customiser cart />)
+    rerender(<Shop customiser={false} cart />)
+    rerender(<Shop customiser={false} cart={false} />)
+    // The bug: 'hidden', on a page showing no dialog, for the rest of the session.
+    expect(document.body.style.overflow).toBe('')
+  })
+
+  it('releases it when the dialogs UNMOUNT out of order too', () => {
+    const { rerender } = render(<Shop customiser cart />)
+    expect(document.body.style.overflow).toBe('hidden')
+    rerender(<></>)
+    expect(document.body.style.overflow).toBe('')
   })
 })
