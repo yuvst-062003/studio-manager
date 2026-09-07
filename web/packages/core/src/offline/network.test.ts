@@ -23,6 +23,10 @@ const slow = (elapsedMs = 8000): Probe => ({ ok: true, status: 200, elapsedMs, t
 const timedOut = (): Probe => ({ ok: false, elapsedMs: SLOW_TIMEOUT_MS, timedOut: true })
 const noRoute = (): Probe => ({ ok: false, elapsedMs: 30, timedOut: false })
 const serverError = (): Probe => ({ ok: false, status: 503, elapsedMs: 120, timedOut: false })
+/** The one that shipped the bug: `HEAD /api/v1/health` answered 405, because FastAPI —
+ *  unlike bare Starlette — does not add HEAD to a `@router.get` route. */
+const methodNotAllowed = (): Probe => ({ ok: false, status: 405, elapsedMs: 40, timedOut: false })
+const notFound = (): Probe => ({ ok: false, status: 404, elapsedMs: 40, timedOut: false })
 
 const modeAfter = (start: NetState, ...probes: Probe[]): string =>
   probes.reduce<NetState>((state, probe) => reduce(state, probe), start).mode
@@ -230,5 +234,43 @@ describe('the monitor', () => {
       expect(monitor.isOfflinePath(mode)).toBe(true)
     }
     expect(monitor.isOfflinePath('online')).toBe(false)
+  })
+})
+
+describe('a 4xx is the server ANSWERING, which is the opposite of offline', () => {
+  // **The bug this block exists for.** The ping is `HEAD /api/v1/health`; FastAPI answers
+  // 405 there, because unlike bare Starlette it does not add HEAD to a `@router.get` route.
+  // `reduce` treated every non-5xx failure as `offline`, so the staff app declared itself
+  // offline every fifteen seconds, forever, on a perfect connection — and a banner that is
+  // always on is a banner nobody reads when it finally means something.
+  //
+  // The rule the machine was missing: a STATUS CODE coming back is proof the request
+  // crossed the network and a server replied. Only silence means offline.
+  it('does not call a 405 offline', () => {
+    expect(modeAfter(at('online', 2), methodNotAllowed())).toBe('online')
+  })
+
+  it('does not call a 404 offline either — a wrong URL is not a dead network', () => {
+    expect(modeAfter(at('online', 2), notFound())).toBe('online')
+  })
+
+  it('still recovers from offline on two 4xx answers, because they prove the route', () => {
+    expect(modeAfter(at('offline'), methodNotAllowed(), methodNotAllowed())).toBe('online')
+  })
+
+  it('keeps calling a 5xx api-down, which is a different thing a coach is told', () => {
+    expect(modeAfter(at('online', 2), serverError())).toBe('api-down')
+  })
+
+  it('keeps calling silence offline — that is the case the mode is for', () => {
+    expect(modeAfter(at('online', 2), noRoute())).toBe('offline')
+    expect(modeAfter(at('online', 2), timedOut())).toBe('offline')
+  })
+
+  it('is still slow when the answer is a slow 4xx', () => {
+    // The network carried it, and it took eight seconds. Both facts are true at once.
+    expect(
+      modeAfter(at('online', 2), { ok: false, status: 405, elapsedMs: 8000, timedOut: false }),
+    ).toBe('slow')
   })
 })

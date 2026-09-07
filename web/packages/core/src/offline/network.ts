@@ -80,18 +80,33 @@ export function isOfflinePath(mode: NetworkMode): boolean {
  * object graph.
  */
 export function reduce(state: NetState, probe: Probe): NetState {
-  if (!probe.ok) {
-    // A 5xx is the API, not the network. §10.1 gives it its own row precisely so the app
-    // says `השרת אינו זמין, ננסה שוב` instead of claiming a phone with four bars is
-    // offline — and a coach told the wrong thing once stops reading the indicator.
-    //
-    // A TIMEOUT is not an api-down signal even if the server is what is slow: from the
-    // device's side, six seconds with no answer is indistinguishable from no route, and
-    // §10.1 sends both down the offline path.
-    const isServerFault = !probe.timedOut && probe.status !== undefined && probe.status >= 500
-    return { mode: isServerFault ? 'api-down' : 'offline', consecutiveSuccesses: 0 }
+  // **A status code coming back is proof the request crossed the network**, whatever the
+  // number is. Only silence — no answer, or six seconds of waiting — means offline.
+  //
+  // This used to read `if (!probe.ok)` and send every non-5xx failure to `offline`, and it
+  // shipped a bug that made the staff app say `לא מקוון` forever on a perfect connection:
+  // the ping is `HEAD /api/v1/health`, and FastAPI answers 405 there because — unlike bare
+  // Starlette — it does not add HEAD to a `@router.get` route. Every probe, every fifteen
+  // seconds, for the life of the app. A banner that is always on is a banner nobody reads
+  // on the day it finally means something.
+  //
+  // A TIMEOUT is not an api-down signal even if the server is what is slow: from the
+  // device's side, six seconds with no answer is indistinguishable from no route, and
+  // §10.1 sends both down the offline path.
+  if (probe.timedOut || probe.status === undefined) {
+    return { mode: 'offline', consecutiveSuccesses: 0 }
   }
 
+  // A 5xx is the API, not the network. §10.1 gives it its own row precisely so the app says
+  // `השרת אינו זמין, ננסה שוב` instead of claiming a phone with four bars is offline — and
+  // a coach told the wrong thing once stops reading the indicator.
+  if (probe.status >= 500) {
+    return { mode: 'api-down', consecutiveSuccesses: 0 }
+  }
+
+  // Everything else answered. A 2xx is the network working; a 4xx is the network working
+  // and OUR request being wrong, which is a bug to fix in the app and never a thing to
+  // report to a coach as a dead connection.
   const successes = state.consecutiveSuccesses + 1
 
   if (probe.elapsedMs >= SLOW_THRESHOLD_MS) {

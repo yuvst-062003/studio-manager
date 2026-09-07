@@ -36,7 +36,14 @@ def _read_revision() -> str | None:
     return None if row is None else str(row[0])
 
 
-@router.get("/health", response_model=HealthResponse)
+# **GET and HEAD**, and the HEAD is not decoration: `packages/core/src/offline/useOffline.ts`
+# probes this route with `HEAD` every fifteen seconds to decide whether the app is online.
+# FastAPI does not add HEAD to a `@router.get` route the way bare Starlette does, so this
+# answered 405 -- and the client counted that as "offline", which is why the staff app
+# showed `לא מקוון` forever on a working connection. `api_route` is the only way to say
+# both verbs for one handler; Starlette returns the response with the body stripped for the
+# HEAD, which is exactly what a probe wants.
+@router.api_route("/health", methods=["GET", "HEAD"], response_model=HealthResponse)
 def read_health() -> HealthResponse:
     """Liveness. Deliberately carries no tenant data and needs no auth.
 

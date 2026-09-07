@@ -15,6 +15,24 @@ def test_health_is_versioned_under_api_v1():
     assert client.get("/api/v1/health").status_code == 200
 
 
+def test_health_answers_head_because_that_is_what_the_apps_ping_with():
+    """The offline banner's probe is `HEAD /api/v1/health` (packages/core useOffline.ts).
+
+    FastAPI does not add HEAD to a `@router.get` route the way bare Starlette does, so this
+    answered **405** -- and the client read any non-5xx failure as `offline`, so the staff
+    app declared itself offline every fifteen seconds forever on a working connection.
+
+    The client half is fixed too (a status code means the network carried the request), and
+    either fix alone would have stopped the false banner. Both are here because the ping
+    should also stop being wrong: HEAD is the right verb for a liveness probe, and a body
+    nobody reads is bytes on a coach's mobile data every fifteen seconds.
+    """
+    response = client.head("/api/v1/health")
+    assert response.status_code == 200
+    # HEAD carries no body, by definition -- that is the point of using it.
+    assert response.content == b""
+
+
 def test_health_reports_status_and_env():
     body = client.get("/api/v1/health").json()
     assert body["status"] == "ok"
