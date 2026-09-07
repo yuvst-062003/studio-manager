@@ -216,12 +216,21 @@ def cancel_session(
     _: ManagerOrLeadCoach,
     session_id: uuid.UUID,
     body: SessionCancelIn,
+    request: Request,
     session: TenantSessionDep,
     idempotency_key: IdempotencyKey = None,
 ) -> SessionOut:
     service = ScheduleService(session)
     try:
-        row = service.cancel_session(session_id, reason=body.reason, at=now())
+        # The actor, so the notifier can leave them out of their own cancellation -- see
+        # `_notify_cancellation`, which now reaches the session's coaches as well as the
+        # families.
+        row = service.cancel_session(
+            session_id,
+            reason=body.reason,
+            at=now(),
+            actor_person_id=_person_id(request),
+        )
     except NotFoundError as exc:
         raise _not_found() from exc
     session.commit()

@@ -957,22 +957,46 @@ class ScheduleService:
         self.session.flush()
         return row
 
-    def cancel_session(self, session_id: uuid.UUID, *, reason: str, at: datetime) -> Session:
+    def cancel_session(
+        self,
+        session_id: uuid.UUID,
+        *,
+        reason: str,
+        at: datetime,
+        actor_person_id: uuid.UUID | None = None,
+    ) -> Session:
         row = self.get_session(session_id)
         row.status = "cancelled"
         row.cancel_reason = reason
         row.is_manually_edited = True
         row.updated_at = at
         self.session.flush()
-        self._notify_cancellation(row)
+        self._notify_cancellation(row, actor_person_id=actor_person_id)
         return row
 
-    def _notify_cancellation(self, row: Session) -> None:
+    def _notify_cancellation(
+        self, row: Session, *, actor_person_id: uuid.UUID | None = None
+    ) -> None:
         """§2.2 of the 2026-09-02 findings register: the producer §5.11's own worked
         example argues the `*/15` comms-notify cron exists for -- 'ביטול שיעור, היום
         17:00' -- and which never existed. Every guardian of every student still enrolled
         in this session's group, deduplicated so a family with two children in the same
         class hears it once rather than twice.
+
+        **And the session's own staff (2026-09-07).** This list was guardians alone, so a
+        manager cancelled Tuesday, thirty families heard, and the coach who was going to
+        stand on the mat found out by driving to a locked hall. They are not a secondary
+        audience: they are the one recipient the cancellation obliges to be somewhere else.
+
+        Their message is not the parents' message. A coach is told the REASON -- it decides
+        whether they wait, go home, or find another hall -- and a parent deliberately is
+        not, because `cancel_reason` is free text a manager typed for the club's own record
+        and §5.11 never promised to publish it.
+
+        **The person who cancelled is excluded**, the same rule
+        `app/services/attendance/service.py::log_injury` already follows: a manager who also
+        teaches the session is on `SessionStaff`, and notifying them would be the app telling
+        someone what they had just done.
 
         The router hands this service a TenantSession (TenantSessionDep); the class
         annotation is the broader OrmSession because every other method needs no more.
@@ -993,6 +1017,17 @@ class ScheduleService:
                 .where(Enrollment.group_id == row.group_id, Enrollment.ended_on.is_(None))
             ).scalars()
         )
+        staff_ids = (
+            set(
+                self.session.execute(
+                    select(SessionStaff.person_id).where(SessionStaff.session_id == row.id)
+                ).scalars()
+            )
+            - guardian_ids
+            - {actor_person_id}
+        )
+
+        payload = {"session_id": str(row.id), "group_id": str(row.group_id)}
         notifier = NotificationService(cast(TenantSession, self.session))
         for guardian_person_id in sorted(guardian_ids, key=str):
             notifier.enqueue(
@@ -1000,7 +1035,16 @@ class ScheduleService:
                 kind="session.cancelled",
                 title="ביטול שיעור",
                 body=body,
-                payload={"session_id": str(row.id), "group_id": str(row.group_id)},
+                payload=payload,
+            )
+        staff_body = f"{body}. הסיבה: {reason}" if (reason := row.cancel_reason) else body
+        for staff_person_id in sorted(staff_ids, key=str):
+            notifier.enqueue(
+                person_id=staff_person_id,
+                kind="session.cancelled",
+                title="האימון שלך בוטל",
+                body=staff_body,
+                payload=payload,
             )
 
     def delete_session(self, session_id: uuid.UUID) -> None:

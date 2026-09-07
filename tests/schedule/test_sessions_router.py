@@ -445,6 +445,91 @@ def test_cancelling_a_session_notifies_the_enrolled_guardians(
     assert notes[0].payload["session_id"] == str(a_session.id)
 
 
+def test_cancelling_a_session_tells_the_coach_who_was_going_to_teach_it(
+    client, app_session, studio, as_manager, as_assistant_coach, a_session
+):
+    """The families were told and the coach was not.
+
+    `_notify_cancellation` built its recipient list from `Guardian` alone, so a manager
+    cancelled Tuesday, thirty families heard about it, and the person who was going to
+    stand on the mat found out by turning up to a locked hall. The coach is not a
+    secondary audience here -- they are the one recipient who has to physically be
+    somewhere else.
+    """
+    from app.models.comms import Notification
+    from app.models.schedule import SessionStaff
+
+    app_session.add(
+        SessionStaff(
+            studio_id=studio.id,
+            session_id=a_session.id,
+            person_id=as_assistant_coach.person_id,
+            role="assistant_coach",
+        )
+    )
+    app_session.commit()
+
+    response = client.post(
+        f"{API}/sessions/{a_session.id}/cancel",
+        headers=as_manager.headers,
+        json={"reason": "אין חשמל באולם"},
+    )
+    assert response.status_code == 200, response.text
+
+    app_session.expire_all()
+    notes = list(
+        app_session.execute(
+            select(Notification).where(
+                Notification.person_id == as_assistant_coach.person_id,
+                Notification.kind == "session.cancelled",
+            )
+        ).scalars()
+    )
+    assert len(notes) == 1
+    assert notes[0].payload["session_id"] == str(a_session.id)
+
+
+def test_the_manager_who_cancelled_is_not_told_about_their_own_cancellation(
+    client, app_session, studio, as_manager, a_session
+):
+    """The same rule `attendance.log_injury` already follows: whoever performed the act
+    knows they performed it, and a notification back at them is the app telling someone
+    what they just did. A manager who also teaches the session is on `SessionStaff` and
+    would otherwise be notified BY their own tap."""
+    from app.models.comms import Notification
+    from app.models.schedule import SessionStaff
+
+    app_session.add(
+        SessionStaff(
+            studio_id=studio.id,
+            session_id=a_session.id,
+            person_id=as_manager.person_id,
+            role="lead_coach",
+        )
+    )
+    app_session.commit()
+
+    assert (
+        client.post(
+            f"{API}/sessions/{a_session.id}/cancel",
+            headers=as_manager.headers,
+            json={"reason": "אין חשמל באולם"},
+        ).status_code
+        == 200
+    )
+
+    app_session.expire_all()
+    assert (
+        app_session.execute(
+            select(Notification).where(
+                Notification.person_id == as_manager.person_id,
+                Notification.kind == "session.cancelled",
+            )
+        ).first()
+        is None
+    )
+
+
 def test_an_assistant_coach_may_read_a_session_but_not_move_it(
     client, as_assistant_coach, a_session
 ):
