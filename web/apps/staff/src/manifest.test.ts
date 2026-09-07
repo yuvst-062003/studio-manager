@@ -7,10 +7,13 @@ describe('staff manifest (§6.5 — the install is the product, not boilerplate)
     expect(manifest.display).toBe('standalone')
   })
 
-  it('carries the brand, with a short_name that fits under a home-screen icon', () => {
+  it('carries the brand in short_name too, not just in name', () => {
+    // Owner-reported 2026-09-07: installed, the home screen read a bare 'Coach', which
+    // names no club at all. The brand has to come FIRST, because that is the half that
+    // survives the home screen's truncation.
     expect(manifest.name).toBe('Gladiator Coach')
-    expect(manifest.short_name).toBe('Coach')
-    expect(manifest.short_name.length).toBeLessThanOrEqual(12)
+    expect(manifest.short_name).toBe('Gladiator Coach')
+    expect(manifest.short_name.startsWith('Gladiator')).toBe(true)
   })
 
   it('uses relative start_url and scope so the domain is not baked in', () => {

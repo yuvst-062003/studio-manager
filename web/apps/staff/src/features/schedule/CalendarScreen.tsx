@@ -79,7 +79,6 @@
 // `common.loadFailed.offline` copy already says exactly the honest thing.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Calendar as CalendarIcon,
   ChevronLeft,
   ChevronRight,
   Shield,
@@ -665,9 +664,6 @@ export function CalendarScreen({
             <Shield aria-hidden="true" className="h-3.5 w-3.5 text-[var(--danger)]" />
             <span>{t(locale, 'schedule.staffCalendar.fileConstraint')}</span>
           </a>
-          <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-[var(--emphasis)] bg-[var(--emphasis-tint)] text-[var(--emphasis)] shadow-xs">
-            <CalendarIcon aria-hidden="true" className="h-4 w-4" />
-          </div>
         </div>
       </header>
 

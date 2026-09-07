@@ -651,6 +651,7 @@ export default function App() {
               today={today}
               viewerPersonId={membership?.person_id}
               viewerIsCoach={viewerIsCoach}
+              viewerIsManager={viewerIsManager}
             />
           ) : session.access.staff &&
             !viewerIsManager &&

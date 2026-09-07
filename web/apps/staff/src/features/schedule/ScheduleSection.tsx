@@ -37,6 +37,7 @@ export function ScheduleSection({
   coaches = [],
   viewerPersonId,
   viewerIsCoach = false,
+  viewerIsManager = false,
   canWritePlan = false,
 }: {
   locale: Locale
@@ -55,6 +56,8 @@ export function ScheduleSection({
   coaches?: CoachOption[]
   viewerPersonId?: string
   viewerIsCoach?: boolean
+  /** owner/manager only — gates 9a's coach filter. See `TodayScreen`'s note. */
+  viewerIsManager?: boolean
   /** §6.2, decision 16 — the same trio `RosterScreen`'s own prop of the same name gates. */
   canWritePlan?: boolean
 }) {
@@ -69,6 +72,7 @@ export function ScheduleSection({
       coaches={coaches}
       viewerPersonId={viewerPersonId}
       viewerIsCoach={viewerIsCoach}
+      viewerIsManager={viewerIsManager}
       canWritePlan={canWritePlan}
     />
   )

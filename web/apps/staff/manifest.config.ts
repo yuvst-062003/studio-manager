@@ -17,14 +17,18 @@ const icons: ManifestIcon[] = [
 // translated. `dir: 'rtl'` and `lang: 'he'` below still hold: they govern the
 // DESCRIPTION, which is Hebrew, and the install dialog that renders it.
 //
-// short_name is what sits under the home-screen icon, and §6.1 says a coach who is
-// also a parent installs BOTH apps. Two labels reading 'Gladiator' would be
-// indistinguishable there, so only the parent app — the one most people install —
-// carries the bare brand.
+// short_name is what sits under the home-screen icon. It read 'Coach' until the owner
+// pointed out (2026-09-07) that a lone 'Coach' on a phone says nothing about WHICH club
+// — it could be any team's app, and the club's own name was the thing missing.
+//
+// The original reasoning still holds and is why this is not simply 'Gladiator': §6.1 says
+// a coach who is also a parent installs BOTH apps, and two icons both labelled 'Gladiator'
+// would be indistinguishable. 'Gladiator Coach' keeps the brand first, so the two truncate
+// to 'Gladiator' and 'Gladiator C…' — both obviously the club, still telling apart.
 export const manifest: AppManifest = {
   id: '/?app=staff',
   name: 'Gladiator Coach',
-  short_name: 'Coach',
+  short_name: 'Gladiator Coach',
   description: 'ניהול נוכחות, קבוצות ותלמידים',
   start_url: '/',
   scope: '/',

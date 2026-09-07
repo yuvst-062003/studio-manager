@@ -358,6 +358,7 @@ export function TodayScreen({
   coaches = [],
   viewerPersonId,
   viewerIsCoach = false,
+  viewerIsManager = false,
   canWritePlan = false,
 }: {
   locale: Locale
@@ -389,6 +390,13 @@ export function TodayScreen({
    * serves both, which is what "מסנן מאמן במקום פיצול מסכים" means.
    */
   viewerIsCoach?: boolean
+  /**
+   * `owner`/`manager` only — NOT the `canWritePlan` trio, which includes a lead coach.
+   * Owner-reported 2026-09-07: the coach filter is a manager's tool for reading somebody
+   * else's day, so a coach was being offered a control whose only useful setting is the
+   * one they already start on.
+   */
+  viewerIsManager?: boolean
   /** §6.2, decision 16 — `owner`/`manager`/`lead_coach`, the exact trio `RosterScreen`'s own
    *  prop of the same name already gates the identical rule on. Defaults to false: a caller
    *  that has not wired this yet gets an assistant coach's view of the marker — read-only,
@@ -774,21 +782,33 @@ export function TodayScreen({
         })}
       </div>
 
-      <label style={filterStyle}>
-        {t(locale, 'schedule.today.filterByCoach')}
-        <select
-          data-testid="coach-filter"
-          value={coachFilter}
-          onChange={(event) => setCoachFilter(event.target.value)}
-        >
-          <option value="">{t(locale, 'schedule.today.allCoaches')}</option>
-          {coaches.map((coach) => (
-            <option key={coach.person_id} value={coach.person_id}>
-              {coach.display_name}
-            </option>
-          ))}
-        </select>
-      </label>
+      {/* Two conditions, both owner-stated (2026-09-07), and each removes a control that
+          could only ever do nothing:
+
+          A COACH is already filtered to themselves — `coachFilter` defaults to their own
+          person id above — so the only other setting is "somebody else's day", which is
+          not theirs to read. §3.2 puts that at owner/manager.
+
+          ONE COACH means the club has nobody to switch between, so the select would offer
+          "all coaches" and the single coach: two labels for one identical list. That is
+          true for a manager too, which is why it is `&&` and not an either/or. */}
+      {viewerIsManager && coaches.length > 1 ? (
+        <label style={filterStyle}>
+          {t(locale, 'schedule.today.filterByCoach')}
+          <select
+            data-testid="coach-filter"
+            value={coachFilter}
+            onChange={(event) => setCoachFilter(event.target.value)}
+          >
+            <option value="">{t(locale, 'schedule.today.allCoaches')}</option>
+            {coaches.map((coach) => (
+              <option key={coach.person_id} value={coach.person_id}>
+                {coach.display_name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
 
       {/* Said out loud. A coach reading a cached list has to know it may be stale — the
           alternative is a screen that looks live and is not, which is worse than the

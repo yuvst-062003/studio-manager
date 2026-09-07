@@ -138,9 +138,10 @@ describe('TodayScreen (9a / 1d)', () => {
   })
 
   it('filters by coach instead of splitting the screen', async () => {
-    // 9a's headline: מסנן מאמן במקום פיצול מסכים.
+    // 9a's headline: מסנן מאמן במקום פיצול מסכים. `viewerIsManager` is explicit now — the
+    // control belongs to a manager reading somebody else's day (see the two tests below).
     const client = stub()
-    render(screenFor({ client }))
+    render(screenFor({ client, viewerIsManager: true }))
     await waitFor(() => expect(client.listSessions).toHaveBeenCalled())
 
     await userEvent.selectOptions(screen.getByTestId('coach-filter'), 'p2')
@@ -151,9 +152,28 @@ describe('TodayScreen (9a / 1d)', () => {
     )
   })
 
+  it('never offers the coach filter to a coach', async () => {
+    // Owner-reported 2026-09-07. `coachFilter` already defaults to the signed-in coach's
+    // own person id, so the only OTHER thing this control could do is show somebody
+    // else's day — which §3.2 puts at owner/manager. Offering it to a coach is offering a
+    // control whose every other setting is refused.
+    render(screenFor({ viewerIsCoach: true, viewerPersonId: 'p1' }))
+    await screen.findByTestId('day-chip-2026-11-03')
+    expect(screen.queryByTestId('coach-filter')).toBeNull()
+  })
+
+  it('never offers the coach filter when the club has one coach', async () => {
+    // With a single coach the select offers "כל המאמנים" and that one name: two labels
+    // for one identical list. True for a manager too, which is why this is not an
+    // either/or with the rule above.
+    render(screenFor({ viewerIsManager: true, coaches: [COACHES[0]] }))
+    await screen.findByTestId('day-chip-2026-11-03')
+    expect(screen.queryByTestId('coach-filter')).toBeNull()
+  })
+
   it('clearing the filter asks for every coach again', async () => {
     const client = stub()
-    render(screenFor({ client }))
+    render(screenFor({ client, viewerIsManager: true }))
     await userEvent.selectOptions(screen.getByTestId('coach-filter'), 'p2')
     await waitFor(() => expect(client.listSessions).toHaveBeenCalledTimes(2))
     await userEvent.selectOptions(screen.getByTestId('coach-filter'), '')
@@ -282,7 +302,9 @@ describe('TodayScreen (9a / 1d)', () => {
   })
 
   it('gives every control an accessible name', async () => {
-    render(screenFor())
+    // As a MANAGER, so the coach filter is on screen: it is the only combobox here, and a
+    // render without it would leave `getAllByRole('combobox')` with nothing to check.
+    render(screenFor({ viewerIsManager: true }))
     await screen.findByTestId('session-row')
     for (const control of [
       ...screen.getAllByRole('button'),
