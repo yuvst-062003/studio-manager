@@ -19,6 +19,24 @@ import { studentFormCopy } from '../copy'
 import { needsManagerReview } from '../types'
 import type { StudentDraft } from '../types'
 
+/**
+ * Template questions the WIZARD asks itself, and which must therefore not be drawn here
+ * as well (owner-reported 2026-09-07: "הערות בריאות מיוחדות is repeated twice and the
+ * emergency number and קופת חולים is asked twice").
+ *
+ * They are not merely duplicated on screen — `adapters.ts` OVERWRITES the template's
+ * answer with the wizard's own field when it builds the payload, so whatever a parent
+ * typed into these three here was thrown away at submit. Asking twice and keeping the
+ * second answer is the worst of both.
+ *
+ * The wizard's own controls are kept rather than these because they are the better and
+ * the validated ones: `healthFund` is a select of the four funds rather than free text,
+ * `emergencyPhone` is checked for a real number, and step 5 lists both as required.
+ * `questionIds` in `StudentFormSheet` deliberately excludes text questions from
+ * validation, so leaving these to the template would drop their required check entirely.
+ */
+const WIZARD_OWNED_QUESTIONS = new Set(['health_fund', 'emergency_contact', 'special_notes'])
+
 export function PartHealth({
   locale,
   schema,
@@ -141,8 +159,9 @@ export function PartHealth({
       </div>
 
       {schema.sections.map((section, index) => {
-        const questions = section.questions.filter((question) =>
-          isVisible(question, student.healthAnswers),
+        const questions = section.questions.filter(
+          (question) =>
+            isVisible(question, student.healthAnswers) && !WIZARD_OWNED_QUESTIONS.has(question.id),
         )
         if (questions.length === 0) return null
         return (

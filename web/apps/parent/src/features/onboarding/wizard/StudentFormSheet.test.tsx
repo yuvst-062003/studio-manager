@@ -10,6 +10,8 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { StudentFormSheet } from './StudentFormSheet'
+import { PartHealth } from './parts/PartHealth'
+import type { TemplateSchema } from '../../health/healthClient'
 import { studentFormCopy } from './copy'
 import { emptyStudent } from './types'
 
@@ -110,5 +112,52 @@ describe('discarding an edit', () => {
     const panel = await screen.findByTestId('discard-confirm')
     const buttons = [...panel.querySelectorAll('button')].map((b) => b.textContent)
     expect(buttons).toEqual([COPY.discardKeep, COPY.discardConfirm])
+  })
+})
+
+describe('the three questions the wizard asks itself (owner-reported 2026-09-07)', () => {
+  it('does not draw health_fund, emergency_contact or special_notes from the template', () => {
+    // They were asked twice — once by the template here, once by the wizard's own better
+    // controls in step 5 — and `adapters.ts` then OVERWROTE the template's answer with the
+    // wizard's, so the first answer was collected and discarded.
+    const schema: TemplateSchema = {
+      sections: [
+        {
+          id: 'other',
+          title: 'נוסף',
+          questions: [
+            { id: 'other', type: 'boolean', label: 'משהו נוסף?', flag: true },
+            { id: 'health_fund', type: 'text', label: 'קופת חולים', required: true },
+            { id: 'emergency_contact', type: 'phone', label: 'טלפון לשעת חירום', required: true },
+          ],
+        },
+        {
+          id: 'declaration',
+          title: 'הצהרה',
+          questions: [
+            { id: 'special_notes', type: 'text', label: 'הערות בריאות מיוחדות', required: false },
+          ],
+        },
+      ],
+    }
+
+    render(
+      <PartHealth
+        locale="he"
+        schema={schema}
+        student={emptyStudent('c1')}
+        onChange={() => {}}
+        presetError={null}
+        answersError={null}
+        clauseError={null}
+      />,
+    )
+
+    expect(screen.queryByLabelText('קופת חולים')).toBeNull()
+    expect(screen.queryByLabelText('טלפון לשעת חירום')).toBeNull()
+    expect(screen.queryByLabelText('הערות בריאות מיוחדות')).toBeNull()
+    // The section's OTHER question still renders — the filter is per question, not
+    // per section, or a club adding a real question beside these would lose it.
+    expect(screen.getByText('משהו נוסף?')).toBeInTheDocument()
   })
 })
