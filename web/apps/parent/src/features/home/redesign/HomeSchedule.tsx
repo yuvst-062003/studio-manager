@@ -387,7 +387,12 @@ export function HomeSchedule({
           (inset-inline-start) and `end-*` resolves to the LEFT (inset-inline-end) — so
           `start-4` would flip the button to the opposite corner from the prototype. `end-4`
           is the one that lands it on the same physical left edge. */}
-      <div className="fixed bottom-20 end-4 z-30">
+      {/* `bottom-20` was 80px, measured from the viewport bottom — and the tab bar is 66px
+          in a browser but ~100px on a notched iPhone once `env(safe-area-inset-bottom)` is
+          added to it (2026-09-06). So this button sat ~20px BEHIND the bar and read as
+          missing. The clearance now grows with the bar instead of being a number that was
+          true on the day it was written. */}
+      <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] end-4 z-30">
         <button
           type="button"
           onClick={onReportAbsenceRange}

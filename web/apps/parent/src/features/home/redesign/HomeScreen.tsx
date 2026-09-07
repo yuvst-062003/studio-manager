@@ -349,9 +349,6 @@ export function HomeScreen({
         childList={childList ?? []}
         selectedChildId={selectedChildId}
         onSelectChild={setSelectedChildId}
-        onReportAbsence={() => {
-          globalThis.location.hash = '#/absence'
-        }}
         onOpenNotifications={() => {
           // The prototype opens a coach-notifications modal. This product has one inbox and
           // it is a whole tab (§4), so the bell goes there rather than to a second, emptier

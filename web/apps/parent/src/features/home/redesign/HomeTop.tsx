@@ -1,4 +1,4 @@
-import { Bell, Plus } from 'lucide-react'
+import { Bell } from 'lucide-react'
 
 import { fill } from '@studio/core'
 import { t } from '@studio/i18n'
@@ -12,7 +12,6 @@ export function HomeTop({
   childList,
   selectedChildId,
   onSelectChild,
-  onReportAbsence,
   onOpenNotifications,
 }: {
   /** The club's name. Replaces the prototype's hardcoded "מועדון ג׳ודו גלדיאטור". */
@@ -26,7 +25,6 @@ export function HomeTop({
   /** null means "all children" — the prototype's 'all' sentinel. */
   selectedChildId: string | null
   onSelectChild: (id: string | null) => void
-  onReportAbsence: () => void
   onOpenNotifications: () => void
 }) {
   const greeting = familyName ? fill(t(locale, 'schedule.home.greetingFamily'), { name: familyName }) : t(locale, 'schedule.home.greeting')
@@ -48,17 +46,15 @@ export function HomeTop({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Report Absence Button */}
-          <button
-            type="button"
-            data-testid="home-report-absence"
-            onClick={onReportAbsence}
-            className="flex items-center gap-1.5 bg-[#0A1938] hover:bg-[#152a55] text-white text-xs font-bold px-3 py-2 rounded-2xl shadow-xs active:scale-95 transition-all cursor-pointer"
-            title={t(locale, 'schedule.home.reportAbsence')}
-          >
-            <Plus className="w-4 h-4 text-emerald-400" />
-            <span>{t(locale, 'schedule.home.reportAbsence')}</span>
-          </button>
+          {/* No absence button here (owner, 2026-09-07). There were TWO reading
+              "דיווח היעדרות" on this screen and they did different things: this one opened
+              `#/absence` — one child, one session, picked from scratch — while the floating
+              one opens the range sheet that was built to replace it, because a fortnight
+              away was thirty trips through the single-session form. Two buttons with the
+              same words and different behaviour is worse than either alone, and the single
+              case is already better served by `נעדר/ת?` on the lesson card itself, where
+              the lesson is in front of you. `#/absence` stays reachable from the calendar
+              (`ChildCalendar`'s `calendar-absence`). */}
 
           {/* A way into עדכונים, and NOT a second unread indicator (owner, 2026-09-07).
               The red count and the ringing-bell state were removed: the tab bar already
