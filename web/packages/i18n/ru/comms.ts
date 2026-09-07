@@ -162,6 +162,9 @@ export const comms: Bundle = {
   'updates.personalHeading': 'Ваша семья',
   'updates.personalNote': 'По детям',
   'updates.isNew': 'Новое',
+  // Per row, beside the חדש pill it clears. See MarkReadButton for why the row
+  // needed its own affordance at all.
+  'updates.markRead': 'Отметить прочитанным',
   'updates.markAllRead': 'Отметить всё прочитанным',
   'updates.settled': 'Готово',
   'updates.emptyTitle': 'Новых обновлений нет',

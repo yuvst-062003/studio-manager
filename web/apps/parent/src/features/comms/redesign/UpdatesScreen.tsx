@@ -116,23 +116,28 @@ export function UpdatesScreen({
   // Reading is a side effect of ACTING, not of scrolling past. A feed that marked everything
   // read on render would clear the tab badge for a parent who never looked at a single row,
   // and the badge is the only thing that brings them back.
+  // `onReadChange` re-reads the shell's badge from the server, so it has to run AFTER the
+  // write lands — not on the next line while the POST is still in flight, which is what it
+  // did until 2026-09-07. The refresh raced the write and could read the old count straight
+  // back, so a parent who marked something read watched the badge stay where it was. The
+  // row itself still updates immediately; only the server round trip is awaited.
   const markRead = useCallback(
-    (id: string) => {
+    async (id: string) => {
       setRows((current) =>
         (current ?? []).map((row) =>
           row.id === id ? { ...row, read_at: new Date().toISOString() } : row,
         ),
       )
-      void client.markRead(id).catch(() => undefined)
+      await client.markRead(id).catch(() => undefined)
       onReadChange?.()
     },
     [client, onReadChange],
   )
 
-  const markAllRead = useCallback(() => {
+  const markAllRead = useCallback(async () => {
     const now = new Date().toISOString()
     setRows((current) => (current ?? []).map((row) => (row.read_at ? row : { ...row, read_at: now })))
-    void client.markAllRead().catch(() => undefined)
+    await client.markAllRead().catch(() => undefined)
     onReadChange?.()
   }, [client, onReadChange])
 
@@ -159,8 +164,8 @@ export function UpdatesScreen({
         hasMore={hasMore}
         loadingMore={loadingMore}
         onLoadMore={loadMore}
-        onOpen={markRead}
-        onMarkAllRead={markAllRead}
+        onOpen={(id) => void markRead(id)}
+        onMarkAllRead={() => void markAllRead()}
         dateLabel={(createdAt) => formatDateInStudioZone(createdAt, locale)}
       />
     </section>

@@ -526,3 +526,76 @@ describe('the four defects reported on עדכונים (2026-09-07)', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 })
+
+// ---------------------------------------------------------------------------------
+// "I have a new message, I enter the notification, and the icon still shows 1"
+// (owner, 2026-09-07).
+//
+// Two causes, and they compounded. `onOpen` hung off the action LINK, so a plain
+// announcement had nothing pressable on it at all. And when something WAS marked read,
+// `onReadChange` — which makes the shell re-read the badge from the server — ran on the
+// next line while the POST was still in flight, so the refresh could read the old count
+// straight back.
+// ---------------------------------------------------------------------------------
+describe('clearing an unread notice', () => {
+  const announcement = (id: string) => ({
+    id,
+    kind: 'announcement.published',
+    title: `הודעה ${id}`,
+    body: 'גוף ההודעה',
+    payload: {},
+    created_at: '2026-09-01T06:00:00Z',
+    read_at: null,
+  })
+
+  it('gives an announcement something to press — it has no action link to hide behind', async () => {
+    render(<Updates client={makeClient({ inbox: vi.fn().mockResolvedValue({ items: [announcement('n1')], next_cursor: null, has_more: false }) })} />)
+    expect(await screen.findByTestId('updates-mark-read-n1')).toBeInTheDocument()
+  })
+
+  it('marks it read on the server when pressed', async () => {
+    const markRead = vi.fn().mockResolvedValue({})
+    render(<Updates client={makeClient({ inbox: vi.fn().mockResolvedValue({ items: [announcement('n1')], next_cursor: null, has_more: false }), markRead })} />)
+    await userEvent.click(await screen.findByTestId('updates-mark-read-n1'))
+    expect(markRead).toHaveBeenCalledWith('n1')
+  })
+
+  it('tells the shell to re-read the badge only AFTER the write has landed', async () => {
+    // The race. `onReadChange` fires the badge re-fetch; running it while the POST is in
+    // flight lets the server answer with the count it had a moment ago, and the parent
+    // watches the number stay exactly where it was.
+    const order: string[] = []
+    let settle: () => void = () => {}
+    const markRead = vi.fn(
+      (id: string) =>
+        new Promise<NotificationOut>((resolve) => {
+          settle = () => {
+            order.push('write settled')
+            resolve({ ...announcement(id), read_at: '2026-09-07T00:00:00Z' })
+          }
+        }),
+    )
+    const onReadChange = vi.fn(() => order.push('badge refreshed'))
+    render(
+      <UpdatesScreen
+        client={makeClient({ inbox: vi.fn().mockResolvedValue({ items: [announcement('n1')], next_cursor: null, has_more: false }), markRead })}
+        locale="he"
+        childrenById={{}}
+        childNames={[]}
+        onReadChange={onReadChange}
+      />,
+    )
+    await userEvent.click(await screen.findByTestId('updates-mark-read-n1'))
+    expect(onReadChange, 'the badge was refreshed before the write landed').not.toHaveBeenCalled()
+
+    settle()
+    await waitFor(() => expect(onReadChange).toHaveBeenCalled())
+    expect(order).toEqual(['write settled', 'badge refreshed'])
+  })
+
+  it('drops the pill once the notice is read, so the row says what it is', async () => {
+    render(<Updates client={makeClient({ inbox: vi.fn().mockResolvedValue({ items: [announcement('n1')], next_cursor: null, has_more: false }) })} />)
+    await userEvent.click(await screen.findByTestId('updates-mark-read-n1'))
+    await waitFor(() => expect(screen.queryByTestId('updates-mark-read-n1')).toBeNull())
+  })
+})

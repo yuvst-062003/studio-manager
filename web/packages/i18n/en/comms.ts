@@ -157,6 +157,9 @@ export const comms: Bundle = {
   'updates.personalHeading': 'Your family',
   'updates.personalNote': 'Per child',
   'updates.isNew': 'New',
+  // Per row, beside the חדש pill it clears. See MarkReadButton for why the row
+  // needed its own affordance at all.
+  'updates.markRead': 'Mark as read',
   'updates.markAllRead': 'Mark all as read',
   'updates.settled': 'Done',
   'updates.emptyTitle': 'No new updates',

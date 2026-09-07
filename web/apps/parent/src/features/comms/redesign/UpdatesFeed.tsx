@@ -100,6 +100,46 @@ function styleForKind(kind: string): KindStyle {
 
 /** Shared by both the urgent chip (font-medium) and the personal chip (font-semibold) — the
  *  caller passes its own base classes and this only ever overrides the color. */
+/**
+ * "סימון כנקרא", beside the pill it clears.
+ *
+ * **The bug this fixes (owner, 2026-09-07): "I enter the notification and the icon still
+ * shows 1".** `onOpen` was wired to one thing only — the action LINK on a row — so a plain
+ * announcement had no pressable element at all, and the only way to clear one was the 11px
+ * `סמן הכל כנקרא` under the filter strip. Meanwhile the badge counts an action row by
+ * whether it is still OUTSTANDING, never by whether it was read. The two halves were
+ * inverted: the rows a parent COULD mark read were the ones where reading does not clear
+ * the badge, and the rows where reading would clear it had nothing to press.
+ *
+ * A real `<button>` rather than a click handler on the `<article>`: the row already holds
+ * an `<a>` on its action branch, a keyboard user gets this for free, and — the actual
+ * point — a parent can SEE that there is something to press.
+ *
+ * Shown while `isNew`, which is `!read_at && !outstanding` — exactly the rows where
+ * reading changes something. An outstanding demand is never `isNew`, so this can never
+ * offer to retire one nobody satisfied.
+ */
+function MarkReadButton({
+  onClick,
+  locale,
+  testId,
+}: {
+  onClick: () => void
+  locale: Locale
+  testId: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-testid={testId}
+      className="text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 underline underline-offset-2 transition-colors cursor-pointer"
+    >
+      {t(locale, 'comms.updates.markRead')}
+    </button>
+  )
+}
+
 function isNewPill(baseClassName: string, locale: Locale) {
   return (
     <span className={`bg-[#feecee] text-[#cf1322] ${baseClassName}`}>
@@ -379,6 +419,13 @@ export function UpdatesFeed({
                               </span>
                             )}
                             {row.isNew && isNewPill('px-2 py-0.5 rounded text-xs font-medium', locale)}
+                            {row.isNew ? (
+                              <MarkReadButton
+                                locale={locale}
+                                onClick={() => onOpen(row.id)}
+                                testId={`updates-mark-read-${row.id}`}
+                              />
+                            ) : null}
                             <h3 className="text-base font-bold text-slate-900 dark:text-slate-50 leading-snug">{row.title}</h3>
                           </div>
                           <p className={`text-xs font-semibold ${settled ? 'text-emerald-700' : style.status}`}>
@@ -441,6 +488,13 @@ export function UpdatesFeed({
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-base font-bold text-slate-900 dark:text-slate-50 leading-tight">{row.title}</h3>
                       {row.isNew && isNewPill('px-2 py-0.5 rounded text-xs font-medium', locale)}
+                      {row.isNew ? (
+                        <MarkReadButton
+                          locale={locale}
+                          onClick={() => onOpen(row.id)}
+                          testId={`updates-mark-read-${row.id}`}
+                        />
+                      ) : null}
                     </div>
                     <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{row.body}</p>
                     {row.action !== null && row.action.href !== null ? (
@@ -503,6 +557,13 @@ export function UpdatesFeed({
                               </span>
                             )}
                             {row.isNew && isNewPill('px-2 py-0.5 rounded text-xs font-semibold', locale)}
+                            {row.isNew ? (
+                              <MarkReadButton
+                                locale={locale}
+                                onClick={() => onOpen(row.id)}
+                                testId={`updates-mark-read-${row.id}`}
+                              />
+                            ) : null}
                             <h3 className="text-sm font-bold text-slate-900 dark:text-slate-50 leading-tight">{row.title}</h3>
                           </div>
                           <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">{row.body}</p>

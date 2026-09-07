@@ -212,6 +212,9 @@ export const comms: Bundle = {
   'updates.isNew': 'חדש',
   // Not in the prototype. A notice that asks for nothing can never be settled by doing it,
   // so this is the only thing that clears its mark.
+  // Per row, beside the חדש pill it clears. See MarkReadButton for why the row
+  // needed its own affordance at all.
+  'updates.markRead': 'סימון כנקרא',
   'updates.markAllRead': 'סימון הכול כנקרא',
   'updates.settled': 'טופל',
   // -- the empty feed, and the states the prototype has no server to produce --
