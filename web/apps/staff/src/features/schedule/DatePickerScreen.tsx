@@ -41,7 +41,9 @@ export function monthGrid(year: number, month: number): string[] {
   return cells
 }
 
-function monthBounds(year: number, month: number): { from: string; to: string } {
+/** Exported for the month calendar (§4.7, checkpoint C11) — one leap-year-safe place to
+ *  turn a `(year, month)` into the `from`/`to` pair `listSessions` takes. */
+export function monthBounds(year: number, month: number): { from: string; to: string } {
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
   return { from: dayKey(year, month, 1), to: dayKey(year, month, daysInMonth) }
 }

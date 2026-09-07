@@ -36,6 +36,10 @@ import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { ScheduleSection } from './features/schedule/ScheduleSection'
 import { makeScheduleClient } from './features/schedule/client'
+// §5/C12 of the staff app redesign — the manager's side of §6.1's coach unavailability:
+// an alert-centre card and the resolution popup it opens (decisions 10, 11, 12).
+import { registerCoachConstraintAlerts } from './features/schedule/register'
+import { makeCoachConstraintClient } from './features/schedule/coachConstraintsClient'
 import { ManagerHome, makeHomeClient } from './features/home'
 import './features/home/home.css'
 import './features/rollover/rollover.css'
@@ -127,6 +131,10 @@ registerItemsWizardStep(makeDashboardBillingClient(apiFetch))
 // called by nothing, so the at-risk card had never once rendered on the dashboard.
 // The S1 slot-wiring guard now fails the build on any register* export no app calls.
 registerCommsAlerts(makeDashboardCommsClient(apiFetch))
+// C12 — the coach-unavailability queue behind its own alert-centre card. The endpoints
+// (`app/routers/coach_constraints.py`) landed in C10; nothing on the dashboard called them
+// until this line, which is what made the queue and its resolution popup reachable.
+registerCoachConstraintAlerts(makeCoachConstraintClient(apiFetch), makeScheduleClient(apiFetch))
 // §19.4 — the dev tool leaves the production bundle with the bar itself. Unconditional,
 // this shipped `RunJobTool` — a button that POSTs the real `/billing-runs` — into every
 // production dashboard bundle. Nothing rendered it, because `@studio/ui/dev-bar` had

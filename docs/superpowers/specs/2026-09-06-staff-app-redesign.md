@@ -68,7 +68,7 @@ Decisions I took myself, because they do not change what gets built:
 
 ---
 
-## 2. Three bugs found on the way, all in scope
+## 2. Seven bugs found on the way, all pre-existing
 
 None was known when this port was proposed. All three sit directly under it.
 
@@ -99,6 +99,36 @@ nobody.
 
 Decision 13 resolves this by **removing the switch**, not by filling it. §6.4 has the mechanics,
 which are more delicate than they sound.
+
+
+### Three more, found while building rather than before it
+
+**2.4 — `StaffStudentCard` was mounted nowhere**, and it is the only implementation of moving
+a student between groups — while the account screen told a lead coach that permission was *not*
+locked for them. The app promised a capability with no screen behind it. Mounted at C4.
+
+**2.5 — the reachability guard counted a mention in a comment as proof of use.**
+`unreachable-screens.test.ts` blanked module paths and re-export lines before searching, but not
+comments, so a component named only in prose passed. Fixed at C4, and it immediately found a
+second orphan — `PaymentStrip` in the parent app, left behind when its replacement shipped.
+
+**2.6 — the i18n parity script does not detect duplicate keys.** Two agents wrote
+`he/schedule.ts` at once and produced twelve duplicated keys; `scripts/i18n-parity.mjs` reported
+the file **clean**. Only TypeScript caught it, because a duplicate in an object literal is a
+compile error. In a file the compiler is more forgiving about, a translation could be silently
+shadowed — the last value wins and the first is discarded — with parity still green. **Not yet
+fixed**; recorded here because the check exists precisely to catch this class of thing.
+
+The collision itself was a scheduling error of mine: §10 says the i18n registries serialise, and I
+ran two checkpoints that both needed that file in parallel.
+
+**2.7 — seven backend tests were time bombs.** `tests/people/test_public.py`,
+`test_registrations.py` and `test_students_router.py` hardcode `2026-09-06` as a Sunday, while the
+code they exercise observes the calendar *forward from today*. They passed for as long as the real
+date sat before that, and failed the moment it passed — during this session. None of the three used
+`X-Dev-Now`, the seam §19.5 built so tests can pin time. Fixed by pinning the clock; no assertion
+was changed, and the fix was proved by freezing the clock to 2050 and watching the pre-fix code
+fail there.
 
 ---
 

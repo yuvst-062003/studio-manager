@@ -38,6 +38,7 @@ import type { ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import {
   Accessibility,
+  CalendarDays,
   CalendarX,
   Edit3,
   ChevronLeft,
@@ -408,6 +409,17 @@ export function AccountScreen({
             hue="blue"
             title={t(locale, 'common.install.title')}
             subtitle={t(locale, 'common.install.why')}
+          />
+          {/* §4.7 (checkpoint C11) — the month calendar. Every staff role, not
+              manager-gated: reading it is open to any coach (decision 7), and the
+              editing decisions 8/9 gate are inside the screen itself, per session,
+              not at this door. */}
+          <Row
+            href="#/calendar"
+            icon={CalendarDays}
+            hue="indigo"
+            title={t(locale, 'schedule.staffCalendar.account.title')}
+            subtitle={t(locale, 'schedule.staffCalendar.account.subtitle')}
           />
           {/* §4.8 / §6.1 (checkpoint C10) — filing, withdrawing and reading a coach's own
               unavailability. Every staff role, not manager-gated: it is the coach filing

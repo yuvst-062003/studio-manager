@@ -118,6 +118,12 @@ export const events: Bundle = {
 
   'addToCalendar': 'הוסף ליומן',
   'attendance.take': 'סימון נוכחות באירוע',
+  // §5.8/§3.2 — an event's mark is networked, never queued (there is no `event.attendance`
+  // offline-queue kind — that changes the sync protocol and is separate work). The control
+  // is disabled rather than optimistic while offline, and says why.
+  'attendance.requiresConnection': 'סימון נוכחות באירוע דורש חיבור לאינטרנט',
+  'attendance.requiresConnectionHint': 'הסימון לא יישמר במצב לא מקוון — לאירועים אין תור סנכרון. נסו שוב כשיש חיבור',
+  'attendance.markFailed': 'הסימון נכשל. נסו שוב',
 
   // -- belt exams (§5.9 — an exam is an event; staff 9d, dashboard 4d, 6b) ---------
   'exam.title': 'מבחן חגורה',

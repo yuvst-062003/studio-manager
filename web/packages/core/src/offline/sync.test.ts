@@ -378,3 +378,154 @@ describe('the flusher', () => {
     expect(await listConflicts(store)).toEqual([])
   })
 })
+
+describe('§6.5 of the staff app redesign — event attendance queues and flushes too', () => {
+  // `session_id` holds the EVENT's id on one of these ops — see `PendingOp`'s own comment
+  // in `types.ts`. `student_id` is always set; an event mark has no bulk shape.
+  const eventOp = (overrides: Partial<PendingOp> = {}): PendingOp =>
+    op({
+      client_mark_id: 'event-mark-1',
+      kind: 'event.attendance',
+      session_id: 'event-1',
+      student_id: 'student-1',
+      payload: { attended: true },
+      ...overrides,
+    })
+
+  const eventAccepted = (event_status: string, marked = 1) =>
+    json({ marked, event_status })
+
+  it('flushes a queued event mark to the events endpoint, with the right body', async () => {
+    // §6.5 item 3 — "the flusher... routes an event group to POST /events/{id}/attendance."
+    const store = memoryStore()
+    await queued(store, eventOp())
+    const post = vi.fn().mockResolvedValue(eventAccepted('published'))
+
+    const result = await flush({ store, post, refresh: async () => true, currentPersonId: () => ME })
+
+    expect(post).toHaveBeenCalledWith('/api/v1/events/event-1/attendance', {
+      marks: [{ student_id: 'student-1', attended: true }],
+    })
+    expect(result.flushed).toBe(1)
+    expect(await pendingCount(store)).toBe(0)
+  })
+
+  it('groups an event s marks into one request rather than one per tap', async () => {
+    const store = memoryStore()
+    await queued(
+      store,
+      eventOp({ client_mark_id: 'a', student_id: 'student-1', payload: { attended: true } }),
+      eventOp({ client_mark_id: 'b', student_id: 'student-2', payload: { attended: false } }),
+    )
+    const post = vi.fn().mockResolvedValue(eventAccepted('published', 2))
+
+    await flush({ store, post, refresh: async () => true, currentPersonId: () => ME })
+
+    expect(post).toHaveBeenCalledOnce()
+    const body = post.mock.calls[0]?.[1] as { marks: unknown[] }
+    expect(body.marks).toHaveLength(2)
+  })
+
+  it('sends a session s marks and an event s marks to their own endpoints, and does not cross', async () => {
+    // The riskiest seam here: a coach with both a session register and an event register
+    // queued at once must never have one group's marks land at the other's endpoint.
+    const store = memoryStore()
+    await queued(
+      store,
+      op({ client_mark_id: 'session-mark', session_id: 'session-1' }),
+      eventOp({ client_mark_id: 'event-mark', session_id: 'event-1' }),
+    )
+    const post = vi.fn().mockImplementation((path: string) =>
+      path.includes('/events/') ? eventAccepted('published') : accepted(),
+    )
+
+    const result = await flush({ store, post, refresh: async () => true, currentPersonId: () => ME })
+
+    const paths = post.mock.calls.map((call) => call[0])
+    expect(paths).toContain('/api/v1/attendance/batch')
+    expect(paths).toContain('/api/v1/events/event-1/attendance')
+    // Each request carries only its OWN op — the assertion that actually catches crossing.
+    const eventCall = post.mock.calls.find((call) => (call[0] as string).includes('/events/'))
+    expect(eventCall?.[1]).toEqual({ marks: [{ student_id: 'student-1', attended: true }] })
+    const sessionCall = post.mock.calls.find((call) => call[0] === '/api/v1/attendance/batch')
+    expect((sessionCall?.[1] as { marks: unknown[] }).marks).toHaveLength(1)
+    expect(result.flushed).toBe(2)
+    expect(await pendingCount(store)).toBe(0)
+  })
+
+  it('raises a conflict card when the write lands on a cancelled event, and still keeps the mark', async () => {
+    // §6.5 item 5 — "a cancelled event... surface[s] as the existing conflict cards. No new
+    // card shape." `event_status` on the LIVE response is what tells the client, since
+    // nothing on the server refuses this write (§5.8 — "the roster survives").
+    const store = memoryStore()
+    await queued(store, eventOp())
+    const post = vi.fn().mockResolvedValue(eventAccepted('cancelled'))
+
+    const result = await flush({ store, post, refresh: async () => true, currentPersonId: () => ME })
+
+    expect(result.flushed).toBe(1)
+    expect(await pendingCount(store)).toBe(0)
+    expect(result.conflicts.map((card) => card.kind)).toEqual(['session_cancelled'])
+    expect(result.conflicts[0]?.session_id).toBe('event-1')
+  })
+
+  it('raises a conflict card for a mark that matched no registration, without losing the rest', async () => {
+    // §6.5's second conflict — "a child no longer registered". `marked` below the number of
+    // marks sent is the only signal available; it cannot say which student.
+    const store = memoryStore()
+    await queued(
+      store,
+      eventOp({ client_mark_id: 'a', student_id: 'student-1' }),
+      eventOp({ client_mark_id: 'b', student_id: 'student-2' }),
+    )
+    const post = vi.fn().mockResolvedValue(eventAccepted('published', 1))
+
+    const result = await flush({ store, post, refresh: async () => true, currentPersonId: () => ME })
+
+    expect(result.flushed).toBe(2)
+    expect(result.conflicts.map((card) => card.kind)).toEqual(['student_unenrolled'])
+    expect(result.conflicts[0]?.count).toBe(1)
+  })
+
+  it('partitions an event mark from a different signed-in person, exactly as a session mark is', async () => {
+    // The shared-club-phone case, §10.3 item 4 — decision 14 says event ops must obey it
+    // too, and partitioning happens before routing even looks at `kind`, so this is really
+    // a test that nothing about the event path bypasses it.
+    const store = memoryStore()
+    await queued(store, eventOp({ person_id: SOMEONE_ELSE }))
+    const post = vi.fn()
+
+    const result = await flush({ store, post, refresh: async () => true, currentPersonId: () => ME })
+
+    expect(post).not.toHaveBeenCalled()
+    expect(await pendingCount(store)).toBe(1)
+    expect(result.conflicts.map((card) => card.kind)).toEqual(['different_person'])
+  })
+
+  it('leaves an event mark queued when the network fails, exactly like a session mark', async () => {
+    const store = memoryStore()
+    await queued(store, eventOp())
+    const post = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+
+    const result = await flush({ store, post, refresh: async () => true, currentPersonId: () => ME })
+
+    expect(result.flushed).toBe(0)
+    expect(await pendingCount(store)).toBe(1)
+  })
+
+  it('refreshes and retries an event mark exactly as a session mark does', async () => {
+    const store = memoryStore()
+    await queued(store, eventOp())
+    const post = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(eventAccepted('published'))
+    const refresh = vi.fn().mockResolvedValue(true)
+
+    const result = await flush({ store, post, refresh, currentPersonId: () => ME })
+
+    expect(refresh).toHaveBeenCalledOnce()
+    expect(result.flushed).toBe(1)
+    expect(await pendingCount(store)).toBe(0)
+  })
+})

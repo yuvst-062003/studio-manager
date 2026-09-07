@@ -10,7 +10,7 @@ import {
 } from './cache'
 import { enqueue, pendingCount } from './pendingOps'
 import { memoryStore } from './store'
-import type { BootstrapPayload, PendingOp, RosterRow } from './types'
+import type { BootstrapPayload, CachedEvent, PendingOp, RosterRow } from './types'
 
 const roster = (studentId: string): RosterRow => ({
   student_id: studentId,
@@ -52,6 +52,15 @@ const op = (id: string): PendingOp => ({
   queued_at: '2026-11-01T17:00:00.000Z',
   person_id: 'person-1',
   attempts: 0,
+})
+
+const event = (id: string, startsAt: string, status: CachedEvent['status'] = 'published'): CachedEvent => ({
+  id,
+  title: 'אליפות החורף',
+  starts_at: startsAt,
+  ends_at: startsAt,
+  location_name: 'היכל הספורט',
+  status,
 })
 
 describe('§10.6 — the cache budget', () => {
@@ -182,5 +191,102 @@ describe('§10.6 — the cache budget', () => {
     // §6.1's first launch reads this to decide whether it must block. `null` is what makes
     // "never primed" distinguishable from "primed a long time ago".
     expect(await watermark(memoryStore())).toBeNull()
+  })
+})
+
+describe('§6.5 of the staff app redesign — events ride in the existing tables', () => {
+  it('writes an event into the SAME sessions table, tagged kind: event', async () => {
+    // §6.5 item 1: "CachedSession gains kind: 'session' | 'event'." Written by `writeWindow`
+    // from `BootstrapPayload.events`, not from `sessions` — this is the ONE conversion point
+    // decision 14 relies on for "ride in the existing tables" to be true rather than merely
+    // documented.
+    const store = memoryStore()
+    await writeWindow(store, {
+      server_time: '2026-11-03T12:00:00.000Z',
+      from_time: '2026-11-03T00:00:00.000Z',
+      to_time: '2026-11-05T00:00:00.000Z',
+      sessions: [],
+      rosters: {},
+      events: [event('event-1', '2026-11-03T17:00:00.000Z')],
+      event_rosters: { 'event-1': [roster('student-event-1')] },
+    })
+    const cached = await readSession(store, 'event-1')
+    expect(cached?.kind).toBe('event')
+    expect(cached?.group_name).toBe('אליפות החורף')
+    expect(await readRoster(store, 'event-1')).toHaveLength(1)
+  })
+
+  it('carries a cancelled event s status through, unmapped', async () => {
+    // `sync.ts` never reads a cached event's status (§6.5's conflict card is read off the
+    // live response instead, precisely so a stale cache cannot delay it) — but the cache
+    // itself must not silently normalise `cancelled` away, since nothing else on this row
+    // says whether the event still stands.
+    const store = memoryStore()
+    await writeWindow(store, {
+      server_time: '2026-11-03T12:00:00.000Z',
+      from_time: '2026-11-03T00:00:00.000Z',
+      to_time: '2026-11-05T00:00:00.000Z',
+      sessions: [],
+      rosters: {},
+      events: [event('event-1', '2026-11-03T17:00:00.000Z', 'cancelled')],
+      event_rosters: {},
+    })
+    expect((await readSession(store, 'event-1'))?.status).toBe('cancelled')
+  })
+
+  it('EXEMPTS pending_ops from eviction with an event in the cache', async () => {
+    // The same guarantee `cache.test.ts` already pins for a session (§10.6), re-asserted
+    // with an event: `evict()` was not touched to make events work, and this is what
+    // proves that was safe rather than merely convenient — it walks `EVICTABLE`, which
+    // never named `pending_ops` before an event could reach this table and does not now.
+    const store = memoryStore()
+    await writeWindow(store, {
+      server_time: '2026-11-01T12:00:00.000Z',
+      from_time: '2026-11-01T00:00:00.000Z',
+      to_time: '2026-11-02T00:00:00.000Z',
+      sessions: [],
+      rosters: {},
+      events: [event('gone-event', '2026-11-01T17:00:00.000Z')],
+      event_rosters: {},
+    })
+    await enqueue(store, {
+      client_mark_id: 'op-1',
+      kind: 'event.attendance',
+      session_id: 'gone-event',
+      student_id: 'student-1',
+      payload: { attended: true },
+      device_marked_at: '2026-11-01T17:00:00.000Z',
+      queued_at: '2026-11-01T17:00:00.000Z',
+      person_id: 'person-1',
+      attempts: 0,
+    })
+
+    await evict(store, '2026-11-10T00:00:00.000Z')
+
+    expect(await readSession(store, 'gone-event')).toBeUndefined()
+    expect(await pendingCount(store)).toBe(1)
+  })
+
+  it('evicts an old event exactly as it would an old session', async () => {
+    // §10.6's window and eviction order apply uniformly — an event outside the two-day
+    // window is stale cache, same as a session, and `evict()` needed no event-specific
+    // branch to get this right.
+    const store = memoryStore()
+    await writeWindow(store, {
+      server_time: '2026-11-04T20:00:00.000Z',
+      from_time: '2026-11-03T00:00:00.000Z',
+      to_time: '2026-11-05T00:00:00.000Z',
+      sessions: [],
+      rosters: {},
+      events: [
+        event('old-event', '2026-11-01T17:00:00.000Z'),
+        event('today-event', '2026-11-03T17:00:00.000Z'),
+      ],
+      event_rosters: {},
+    })
+    const result = await evict(store, '2026-11-04T20:00:00.000Z')
+    expect(result.evicted).toEqual(['old-event'])
+    expect(await readSession(store, 'old-event')).toBeUndefined()
+    expect(await readSession(store, 'today-event')).toBeDefined()
   })
 })

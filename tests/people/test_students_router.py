@@ -23,6 +23,19 @@ from tests.people.conftest import Caller, FakeSchedule, make_session
 SUNDAY = datetime(2026, 9, 6, 14, 0, tzinfo=UTC)
 WEDNESDAY = datetime(2026, 9, 9, 14, 0, tzinfo=UTC)
 
+#: `twice_weekly` anchors its fixture sessions to the FIXED calendar dates above, but
+#: `training_weekdays` (app/services/people/group_days.py), which C12's
+#: `attends_weekdays` validation reads through, observes the materialized calendar only
+#: 4 weeks forward from "today" -- `app.core.clock.now()`, this repo's only clock
+#: (app/core/clock.py). Once the real "today" walks past 2026-09-06 the Sunday session
+#: falls outside that window, the group stops appearing to train on Sunday, and a
+#: request narrowing attendance to Sunday is wrongly refused -- which is exactly what
+#: happened when the real calendar reached 2026-09-07. Pinning the server's clock with
+#: `X-Dev-Now` (app/core/clock.py's `DevClockMiddleware`, the same seam §19.5 built for
+#: this) to a date safely before both fixture sessions keeps that request's outcome the
+#: same on any real-world date. Do NOT delete this and let it fall back to the real clock.
+DEV_NOW_HEADERS = {"X-Dev-Now": datetime(2026, 9, 1, 0, 0, tzinfo=UTC).isoformat()}
+
 
 @pytest.fixture
 def twice_weekly(monkeypatch, studio, a_group, a_training_year):
@@ -73,8 +86,11 @@ def _payload() -> dict:
     }
 
 
-def _create(client, caller: Caller, payload: dict | None = None) -> dict:
-    response = client.post("/api/v1/students", json=payload or _payload(), headers=caller.headers)
+def _create(
+    client, caller: Caller, payload: dict | None = None, *, extra_headers: dict | None = None
+) -> dict:
+    headers = {**caller.headers, **(extra_headers or {})}
+    response = client.post("/api/v1/students", json=payload or _payload(), headers=headers)
     assert response.status_code == 201, response.text
     return response.json()
 
@@ -119,7 +135,7 @@ def test_the_manager_may_narrow_which_days_the_child_comes(
     """C12 -- 'EVERY enrolment form collects attends_weekdays.' A group training Sunday and
     Wednesday, a child who only comes on Sunday."""
     payload = _payload() | {"group_id": str(a_group), "attends_weekdays": [0]}
-    body = _create(client, as_manager, payload)
+    body = _create(client, as_manager, payload, extra_headers=DEV_NOW_HEADERS)
     enrollment = app_session.execute(
         select(Enrollment).where(Enrollment.student_id == uuid.UUID(body["student"]["id"]))
     ).scalar_one()

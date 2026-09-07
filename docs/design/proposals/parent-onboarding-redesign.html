@@ -1,0 +1,1636 @@
+<title>Five Steps, Asked Once</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:ital,wght@0,300..700;1,400&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+:root {
+  --ground: #F6F7F3;
+  --surface: #FFFFFF;
+  --surface-2: #EEF1EA;
+  --band: #ECEFE7;
+  --ink: #171E19;
+  --muted: #5C6A60;
+  --faint: #8A968C;
+  --border: #DCE2D9;
+  --border-strong: #C3CCBF;
+  --accent: #2E6B4C;
+  --accent-soft: #E2EEE6;
+  --warn: #9A5A18;
+  --warn-soft: #F6EBDD;
+  --shadow: 0 1px 2px rgba(23,30,25,.05), 0 8px 24px -12px rgba(23,30,25,.18);
+
+  --measure: 66ch;
+  --sans: 'Rubik', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --serif: 'IBM Plex Serif', Georgia, 'Times New Roman', serif;
+  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #11150F;
+    --surface: #191E19;
+    --surface-2: #202720;
+    --band: #151A15;
+    --ink: #E7ECE4;
+    --muted: #9BA89C;
+    --faint: #77836F;
+    --border: #2A322B;
+    --border-strong: #3A443B;
+    --accent: #71C298;
+    --accent-soft: #1C2C23;
+    --warn: #D6A163;
+    --warn-soft: #2A2115;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #11150F;
+  --surface: #191E19;
+  --surface-2: #202720;
+  --band: #151A15;
+  --ink: #E7ECE4;
+  --muted: #9BA89C;
+  --faint: #77836F;
+  --border: #2A322B;
+  --border-strong: #3A443B;
+  --accent: #71C298;
+  --accent-soft: #1C2C23;
+  --warn: #D6A163;
+  --warn-soft: #2A2115;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 100%; overflow-x: hidden; }
+.col {
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+
+/* ---------- masthead ---------- */
+.masthead { padding: 72px 0 40px; }
+.eyebrow {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 18px;
+}
+h1 {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: clamp(34px, 6vw, 50px);
+  line-height: 1.08;
+  letter-spacing: -.02em;
+  text-wrap: balance;
+  margin: 0 0 22px;
+}
+.standfirst { font-size: 20px; line-height: 1.55; color: var(--muted); margin: 0 0 28px; }
+.standfirst strong { color: var(--ink); font-weight: 600; }
+.meta {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--faint);
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+}
+
+/* ---------- prose ---------- */
+h2 {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 28px;
+  line-height: 1.2;
+  letter-spacing: -.015em;
+  text-wrap: balance;
+  margin: 0 0 14px;
+}
+h3 {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: -.005em;
+  margin: 34px 0 10px;
+}
+p { margin: 0 0 18px; }
+a { color: var(--accent); text-underline-offset: 3px; }
+strong { font-weight: 600; }
+code, .k {
+  font-family: var(--mono);
+  font-size: .86em;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+section { padding: 44px 0; }
+.step-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 6px;
+}
+.step-num {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--surface);
+  background: var(--accent);
+  border-radius: 3px;
+  padding: 3px 8px;
+  flex: none;
+}
+.step-kicker {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 0 0 8px;
+}
+
+/* ---------- callouts ---------- */
+.note {
+  border-inline-start: 3px solid var(--border-strong);
+  background: var(--surface);
+  padding: 16px 20px;
+  margin: 0 0 20px;
+  font-size: 16px;
+}
+.note.today { border-inline-start-color: var(--warn); background: var(--warn-soft); }
+.note.today .lbl { color: var(--warn); }
+.note.win { border-inline-start-color: var(--accent); background: var(--accent-soft); }
+.note.win .lbl { color: var(--accent); }
+.note .lbl {
+  display: block;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  color: var(--faint);
+}
+.note p:last-child { margin-bottom: 0; }
+
+/* ---------- decision list ---------- */
+dl.rules { margin: 0; }
+dl.rules > div {
+  display: grid;
+  grid-template-columns: minmax(0, 13ch) minmax(0, 1fr);
+  gap: 4px 20px;
+  padding: 13px 0;
+  border-top: 1px solid var(--border);
+}
+dl.rules > div:last-child { border-bottom: 1px solid var(--border); }
+dl.rules dt {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent);
+  line-height: 1.5;
+  padding-top: 2px;
+}
+dl.rules dd { margin: 0; font-size: 16px; }
+@media (max-width: 560px) {
+  dl.rules > div { grid-template-columns: 1fr; gap: 2px; }
+}
+
+/* ---------- the spine rail ---------- */
+.spine {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 26px 22px 20px;
+  margin: 6px 0 26px;
+  overflow-x: auto;
+}
+.spine-track { display: flex; align-items: flex-start; gap: 0; min-width: 520px; }
+.spine-node { flex: 1 1 0; text-align: center; position: relative; }
+.spine-node::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 7px;
+  inset-inline-start: 50%;
+  inline-size: 100%;
+  block-size: 2px;
+  background: var(--border-strong);
+}
+.spine-node:last-child::before { display: none; }
+.spine-dot {
+  inline-size: 16px; block-size: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin: 0 auto 10px;
+  position: relative;
+  z-index: 1;
+  border: 3px solid var(--surface);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.spine-n {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--faint);
+  display: block;
+  margin-bottom: 2px;
+}
+.spine-l {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  display: block;
+}
+.spine-s {
+  font-family: var(--sans);
+  font-size: 11.5px;
+  color: var(--muted);
+  display: block;
+  margin-top: 3px;
+}
+.spine-node.pre .spine-dot { background: var(--surface); box-shadow: 0 0 0 2px var(--border-strong); }
+.spine-node.pre .spine-l { color: var(--muted); font-weight: 400; }
+.spine-node.pre::before { background: repeating-linear-gradient(90deg, var(--border-strong) 0 4px, transparent 4px 8px); }
+
+/* ---------- mockup band ---------- */
+.band {
+  background: var(--band);
+  border-block: 1px solid var(--border);
+  padding: 40px 0 34px;
+  margin: 30px 0;
+}
+.band-scroll { overflow-x: auto; padding-inline: 24px; }
+.band-row {
+  display: flex;
+  gap: 26px;
+  justify-content: center;
+  align-items: flex-start;
+  min-width: min-content;
+  margin-inline: auto;
+  width: fit-content;
+}
+.shot { flex: none; width: 300px; }
+.shot-cap {
+  font-family: var(--sans);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+  margin-top: 12px;
+  padding-inline: 2px;
+}
+.shot-cap b { color: var(--ink); font-weight: 500; }
+
+/* ---------- the phone ---------- */
+.phone {
+  direction: rtl;
+  font-family: var(--sans);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.ph-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 15px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.ph-back { color: var(--muted); font-size: 15px; flex: none; }
+.ph-title { font-weight: 500; font-size: 14px; flex: 1 1 auto; }
+.ph-count { font-family: var(--mono); font-size: 10.5px; color: var(--faint); flex: none; direction: rtl; }
+.ph-rail { display: flex; gap: 4px; padding: 10px 15px 0; }
+.ph-seg { block-size: 3px; border-radius: 2px; background: var(--border-strong); flex: 1 1 0; }
+.ph-seg.on { background: var(--accent); }
+.ph-body { padding: 14px 15px 16px; display: flex; flex-direction: column; gap: 11px; }
+.ph-h { font-size: 16px; font-weight: 500; line-height: 1.3; margin: 0; }
+.ph-sub { font-size: 12.5px; color: var(--muted); margin: -4px 0 0; }
+
+.ph-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+}
+.ph-card.tint { background: var(--surface-2); }
+.ph-card-h { display: flex; align-items: center; gap: 8px; }
+.ph-card-t { font-size: 13.5px; font-weight: 500; flex: 1 1 auto; }
+.ph-ver {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  padding: 1px 7px;
+  flex: none;
+}
+.ph-lines { font-size: 12px; color: var(--muted); line-height: 1.55; }
+.ph-link { font-size: 12.5px; color: var(--accent); font-weight: 500; }
+
+.ph-box {
+  inline-size: 17px; block-size: 17px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 4px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  color: var(--surface);
+}
+.ph-box.on { background: var(--accent); border-color: var(--accent); }
+.ph-radio {
+  inline-size: 16px; block-size: 16px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 50%;
+  flex: none;
+  position: relative;
+}
+.ph-radio.on { border-color: var(--accent); border-width: 5px; }
+
+.ph-fld { display: flex; flex-direction: column; gap: 3px; }
+.ph-lab { font-size: 11px; color: var(--muted); }
+.ph-in {
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  padding: 7px 9px;
+  min-block-size: 30px;
+  font-size: 12.5px;
+  color: var(--faint);
+  background: var(--ground);
+}
+.ph-in.filled { color: var(--ink); background: var(--surface); }
+.ph-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ph-grid3 { display: grid; grid-template-columns: 1.1fr 1fr .8fr; gap: 7px; align-items: end; }
+
+.ph-btn {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 9px;
+  padding: 11px;
+  text-align: center;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+:root[data-theme="dark"] .ph-btn { color: #10160F; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ph-btn { color: #10160F; }
+}
+.ph-btn.ghost {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--ink);
+}
+.ph-row { display: flex; align-items: center; gap: 9px; }
+.ph-row.top { align-items: flex-start; }
+.ph-note { font-size: 11.5px; color: var(--faint); }
+.ph-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 20px;
+  padding: 3px 10px;
+}
+.ph-div { block-size: 1px; background: var(--border); margin: 2px 0; }
+.ph-mini {
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  color: var(--faint);
+  font-weight: 500;
+}
+.ph-pad {
+  border: 1px dashed var(--border-strong);
+  border-radius: 9px;
+  block-size: 62px;
+  display: grid;
+  place-items: center;
+  font-size: 11.5px;
+  color: var(--faint);
+  background: var(--ground);
+}
+.ph-tick { color: var(--accent); font-size: 13px; flex: none; }
+.ph-money { font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.ph-people { display: flex; gap: 5px; }
+.ph-pill {
+  font-size: 10.5px;
+  border-radius: 20px;
+  padding: 2px 8px;
+  border: 1px solid var(--border-strong);
+  color: var(--muted);
+}
+.ph-pill.done { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+.ph-pill.now { background: var(--accent); border-color: transparent; color: #fff; }
+:root[data-theme="dark"] .ph-pill.now { color: #10160F; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ph-pill.now { color: #10160F; }
+}
+
+/* ---------- duplication marks ---------- */
+.ph-in.dup { border-color: var(--warn); background: var(--warn-soft); color: var(--warn); }
+.ph-lab .again { font-family: var(--mono); font-size: 9.5px; color: var(--warn); margin-inline-start: 5px; }
+.ph-card.warned { border-color: var(--warn); }
+.tally {
+  background: var(--warn-soft);
+  border: 1px solid var(--warn);
+  border-radius: 10px;
+  padding: 18px 20px;
+  margin: 24px 0;
+}
+.tally h4 {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--warn);
+  margin: 0 0 12px;
+}
+.tally dl { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px 16px; margin: 0; font-size: 15.5px; }
+.tally dt { margin: 0; }
+.tally dd { margin: 0; font-family: var(--mono); font-size: 14px; font-variant-numeric: tabular-nums; color: var(--warn); text-align: end; white-space: nowrap; }
+.tally .sum { border-top: 1px solid var(--warn); padding-top: 10px; margin-top: 4px; grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 16px; font-weight: 600; }
+.tally .sum span:last-child { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--warn); }
+
+/* ---------- the three families ---------- */
+.cases { display: flex; flex-direction: column; gap: 18px; margin: 26px 0 8px; }
+.case {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 22px 18px;
+}
+.case-h { display: flex; align-items: baseline; gap: 11px; margin-bottom: 4px; }
+.case-n {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--surface);
+  background: var(--ink);
+  border-radius: 3px;
+  padding: 2px 7px;
+  flex: none;
+}
+:root[data-theme="dark"] .case-n { color: var(--ground); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .case-n { color: var(--ground); }
+}
+.case-t { font-family: var(--sans); font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+.case-lede { font-size: 15.5px; color: var(--muted); margin: 0 0 14px; }
+.case-q {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.85;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 11px 13px;
+  margin-bottom: 14px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.case-q b { color: var(--accent); font-weight: 500; }
+.case-q i { color: var(--faint); font-style: normal; }
+.case-steps { margin: 0; padding: 0; list-style: none; }
+.case-steps li {
+  display: grid;
+  grid-template-columns: minmax(0, 15ch) minmax(0, 1fr);
+  gap: 3px 18px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  font-size: 15.5px;
+}
+.case-steps .s {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  direction: rtl;
+  text-align: start;
+  padding-top: 2px;
+}
+.case-steps .s em { font-style: normal; color: var(--faint); font-family: var(--mono); font-size: 11px; display: block; direction: ltr; }
+.case-steps .off { color: var(--warn); }
+@media (max-width: 560px) {
+  .case-steps li { grid-template-columns: 1fr; gap: 2px; }
+  .case-steps .s em { display: inline; margin-inline-start: 6px; }
+}
+
+/* ---------- table ---------- */
+.tablewrap { overflow-x: auto; margin: 20px 0 26px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 14.5px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+thead th {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--faint);
+  background: var(--surface-2);
+  white-space: nowrap;
+}
+tbody tr:last-child td { border-bottom: none; }
+td.f { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
+.tag {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 4px;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+.tag.moves { background: var(--warn-soft); color: var(--warn); }
+.tag.stays { background: var(--surface-2); color: var(--muted); }
+.tag.new { background: var(--accent-soft); color: var(--accent); }
+
+ol.findings { padding-inline-start: 0; list-style: none; counter-reset: f; margin: 0; }
+ol.findings li {
+  counter-increment: f;
+  border-top: 1px solid var(--border);
+  padding: 16px 0 16px 44px;
+  position: relative;
+}
+ol.findings li:last-child { border-bottom: 1px solid var(--border); }
+ol.findings li::before {
+  content: counter(f);
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block-start: 18px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--surface);
+  background: var(--warn);
+  border-radius: 3px;
+  padding: 2px 7px;
+}
+ol.findings b { font-family: var(--sans); font-size: 15px; display: block; margin-bottom: 3px; }
+
+footer {
+  border-top: 1px solid var(--border);
+  margin-top: 40px;
+  padding: 30px 0 70px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--faint);
+}
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+<header class="masthead">
+  <div class="col">
+    <p class="eyebrow">Parent app · onboarding · redesign</p>
+    <h1>Five steps, asked once</h1>
+    <p class="standfirst">Today a family joins through <strong>two separate forms that do not know each other exists</strong>, and the second one runs again for every child. A parent with two children fills in 41 boxes, 14 of them twice. They read four phone-heights of legal prose, meet the health declaration once per child with no sense of where they are, and agree to the club's regulations somewhere in the middle. This is the arrangement that replaces it: <strong>one wizard, five named steps, and every fact asked exactly once at the level it belongs to.</strong></p>
+    <div class="meta">
+      <span>Studio Manager</span>
+      <span>Hebrew · RTL · 390×844</span>
+      <span>Design only — nothing built</span>
+      <span>1 Sep 2026</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="col">
+    <p class="step-kicker">The spine</p>
+    <h2>One flow, and the end never moves</h2>
+    <p>The five processes stop being five gates that each reappear on their own and become one wizard with a visible sequence. The count of steps is <strong>always five</strong>, whatever the size of the family — a family with one child and a family with four both see <span class="k">שלב 3 מתוך 5</span>. Only the counter <em>inside</em> step 4 knows how many children there are.</p>
+    <p>Before the count there is only the link and a sign-in. The club posts <strong>one studio-level URL</strong> into its WhatsApp groups, so it has no idea who is opening it — no name, no children, nothing pre-filled. The first screen shows the studio's name and asks the parent to sign in, and that is all it does.</p>
+    <p><strong>Step 3 is where the family is created.</strong> There is no separate join form before the wizard — that merge is the single largest change in this document, and the section below explains why.</p>
+  </div>
+
+  <div class="col">
+    <div class="spine">
+      <div class="spine-track">
+        <div class="spine-node pre"><span class="spine-dot"></span><span class="spine-n">—</span><span class="spine-l">כניסה</span><span class="spine-s">The link · sign in</span></div>
+        <div class="spine-node"><span class="spine-dot"></span><span class="spine-n">01</span><span class="spine-l">הסכמה</span><span class="spine-s">Two documents</span></div>
+        <div class="spine-node"><span class="spine-dot"></span><span class="spine-n">02</span><span class="spine-l">תקנון</span><span class="spine-s">Club terms</span></div>
+        <div class="spine-node"><span class="spine-dot"></span><span class="spine-n">03</span><span class="spine-l">הפרטים שלכם</span><span class="spine-s">Your details</span></div>
+        <div class="spine-node"><span class="spine-dot"></span><span class="spine-n">04</span><span class="spine-l">הצהרות בריאות</span><span class="spine-s">Per student</span></div>
+        <div class="spine-node"><span class="spine-dot"></span><span class="spine-n">05</span><span class="spine-l">תשלום</span><span class="spine-s">Per student, one summary</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <h3>Why the reading comes first</h3>
+    <p>Steps 1 and 2 are the only two steps that ask a parent to <em>agree</em> to something rather than <em>tell</em> us something. Putting them together at the front means a family who walks away has typed nothing, and a family who continues never meets a legal document again. It also removes the specific complaint about the club's regulations — they no longer arrive in the middle of a sequence a parent is already tired of.</p>
+
+    <h3>Two shapes, one wizard</h3>
+    <p>An adult student is their own guardian — and in this data model that is not a special case bolted on, it is the model working as designed. <code>student.person_id</code> is <code>UNIQUE</code>, so a student <em>is</em> a person; the docstring says outright that §3.3 "allows an adult student who is also their own guardian." For them, step 3's row and step 4's subject are <strong>the same database row</strong>. Nothing is asked twice because there is nothing to duplicate.</p>
+
+    <dl class="rules">
+      <div><dt>What triggers it</dt><dd>The <code>guardian</code> link, not age. If the only row pointing at the student is the student's own person, they get the adult shape. A nineteen-year-old whose mother is still the guardian and the payer keeps the parent shape — because someone else really is answering for them.</dd></div>
+      <div><dt>What drops</dt><dd>Three blocks lose their meaning and are not rendered: the parents block, the pickup list, and <code>student.grade</code>.</dd></div>
+      <div><dt>What flips</dt><dd>Step 3's heading becomes <span class="k">הפרטים שלך</span>. Step 4's questions and the declaration clause are written in the first person.</dd></div>
+      <div><dt>Both at once</dt><dd>A parent who trains and whose children train appears once as the signer in step 3 and again as the first subject in step 4's queue: <span class="k">אני · 1 מתוך 4</span>, then the children. Their ת.ז. is already on file from step 3, so nothing is retyped.</dd></div>
+    </dl>
+
+    <h3>Leaving and coming back</h3>
+    <p>Each step writes as the parent moves off it, so closing the phone at step 4 loses nothing. Back is available throughout; returning to a recorded agreement and changing it writes a <strong>fresh record with a fresh timestamp</strong> rather than editing the old one, which is what keeps the consent ledger append-only.</p>
+    <p>The five-step spine belongs to a family arriving for the first time. When a single thing changes later — a republished privacy policy, a fourth child enrolled mid-year — the parent meets <strong>just that thing</strong>, with no wizard chrome. A progress bar over one task is noise that makes a small ask look large.</p>
+  </div>
+</section>
+
+<!-- ============ WHAT HAPPENS TODAY ============ -->
+<section>
+  <div class="col">
+    <h2>What a parent fills in today</h2>
+    <p>Michal opens the club's link from a WhatsApp group. She has two children. Before any redesign, here is every box she types into — because the shape of the problem is not visible until you count them.</p>
+    <p>There are <strong>two separate forms</strong>. The first lives at <code>/join/&lt;token&gt;</code> and creates her family. The second is the registration gate that fires afterwards, once per child. Neither knows the other exists.</p>
+  </div>
+
+  <div class="band">
+    <div class="band-scroll"><div class="band-row">
+
+      <div class="shot">
+        <div class="phone">
+          <div class="ph-bar"><span class="ph-title">מכבי ג׳ודו רעננה</span></div>
+          <div class="ph-body">
+            <span class="ph-chip" style="background:var(--warn-soft);color:var(--warn)">טופס 1 · /join</span>
+            <div class="ph-card">
+              <div class="ph-card-h"><span class="ph-card-t">פרטי ההורה</span></div>
+              <div class="ph-grid2">
+                <div class="ph-fld"><span class="ph-lab">שם פרטי</span><div class="ph-in filled">מיכל</div></div>
+                <div class="ph-fld"><span class="ph-lab">שם משפחה</span><div class="ph-in filled">כהן</div></div>
+              </div>
+              <div class="ph-fld"><span class="ph-lab">טלפון</span><div class="ph-in filled">054-8123456</div></div>
+              <p class="ph-note">דוא"ל: michal@example.com · מהחשבון</p>
+            </div>
+
+            <div class="ph-card">
+              <div class="ph-card-h"><span class="ph-card-t">ילד/ה 1</span></div>
+              <div class="ph-row"><span class="ph-box"></span><span style="font-size:12px">אני נרשמת גם</span></div>
+              <div class="ph-grid2">
+                <div class="ph-fld"><span class="ph-lab">שם פרטי</span><div class="ph-in filled">דנה</div></div>
+                <div class="ph-fld"><span class="ph-lab">שם משפחה</span><div class="ph-in filled">כהן</div></div>
+              </div>
+              <div class="ph-fld"><span class="ph-lab">תאריך לידה</span><div class="ph-in filled">14.03.2016</div></div>
+              <div class="ph-fld"><span class="ph-lab">קבוצות</span><div class="ph-in filled">ילדים א׳ · ראשון, שלישי</div></div>
+            </div>
+
+            <div class="ph-card">
+              <div class="ph-card-h"><span class="ph-card-t">ילד/ה 2</span></div>
+              <p class="ph-note">יוסי · כהן · תאריך לידה · קבוצות</p>
+            </div>
+
+            <div class="ph-btn">שליחה</div>
+            <p class="ph-note">דנה ויוסי נוצרים כאן — לפני שאושר משהו.</p>
+          </div>
+        </div>
+        <p class="shot-cap"><b>Form 1 — 11 boxes.</b> Creates the person and student rows. It sits <em>outside</em> every gate, so this runs before any consent exists.</p>
+      </div>
+
+      <div class="shot">
+        <div class="phone">
+          <div class="ph-bar"><span class="ph-title">פרטי הרשמה</span><span class="ph-count">עבור דנה</span></div>
+          <div class="ph-body">
+            <span class="ph-chip" style="background:var(--warn-soft);color:var(--warn)">טופס 2 · מופיע שוב לכל ילד</span>
+            <div class="ph-card warned">
+              <div class="ph-card-h"><span class="ph-card-t">פרטי התלמיד/ה</span></div>
+              <div class="ph-grid2">
+                <div class="ph-fld"><span class="ph-lab">ת.ז.</span><div class="ph-in filled">218374619</div></div>
+                <div class="ph-fld"><span class="ph-lab">כיתה/גן</span><div class="ph-in filled">ד׳</div></div>
+              </div>
+              <div class="ph-fld"><span class="ph-lab">כתובת</span><div class="ph-in dup">הרצל 12</div></div>
+              <div class="ph-fld"><span class="ph-lab">יישוב</span><div class="ph-in dup">רעננה</div></div>
+              <div class="ph-fld"><span class="ph-lab">טלפון בבית</span><div class="ph-in dup">09-7412233</div></div>
+              <div class="ph-fld"><span class="ph-lab">טלפון נייד<span class="again">כבר בטופס 1</span></span><div class="ph-in dup">054-8123456</div></div>
+              <div class="ph-fld"><span class="ph-lab">דוא"ל</span><div class="ph-in dup">michal@example.com</div></div>
+              <p class="ph-note">חמישה מהשדות האלה אינם של דנה — הם של מיכל.</p>
+            </div>
+
+            <div class="ph-card warned">
+              <div class="ph-card-h"><span class="ph-card-t">פרטי ההורים</span></div>
+              <div class="ph-fld"><span class="ph-lab">ת.ז. שלה</span><div class="ph-in dup">039472815</div></div>
+              <div class="ph-fld"><span class="ph-lab">שנת עליה</span><div class="ph-in dup">—</div></div>
+              <div class="ph-fld"><span class="ph-lab">הורה נוסף · שם האם</span><div class="ph-in dup">דוד</div></div>
+              <div class="ph-fld"><span class="ph-lab">שם האב</span><div class="ph-in dup">כהן</div></div>
+              <p class="ph-note">שני השדות האלה הם השם הפרטי ושם המשפחה של אדם אחד.</p>
+            </div>
+
+            <div class="ph-card warned">
+              <div class="ph-card-h"><span class="ph-card-t">מורשי איסוף</span></div>
+              <div class="ph-fld"><span class="ph-lab">שם · טלפון</span><div class="ph-in dup">רותי לוי · 052-4471190</div></div>
+            </div>
+          </div>
+        </div>
+        <p class="shot-cap"><b>Form 2 — 15 boxes, for Dana.</b> Only two of them are actually about Dana. Everything marked is a fact about Michal or her household.</p>
+      </div>
+
+      <div class="shot">
+        <div class="phone">
+          <div class="ph-bar"><span class="ph-title">פרטי הרשמה</span><span class="ph-count">עבור יוסי</span></div>
+          <div class="ph-body">
+            <span class="ph-chip" style="background:var(--warn-soft);color:var(--warn)">אותם 15 שדות, שוב</span>
+            <div class="ph-card warned">
+              <div class="ph-card-h"><span class="ph-card-t">פרטי התלמיד/ה</span></div>
+              <div class="ph-grid2">
+                <div class="ph-fld"><span class="ph-lab">ת.ז.</span><div class="ph-in filled">218374627</div></div>
+                <div class="ph-fld"><span class="ph-lab">כיתה/גן</span><div class="ph-in filled">ב׳</div></div>
+              </div>
+              <div class="ph-fld"><span class="ph-lab">כתובת<span class="again">שוב</span></span><div class="ph-in dup">הרצל 12</div></div>
+              <div class="ph-fld"><span class="ph-lab">יישוב<span class="again">שוב</span></span><div class="ph-in dup">רעננה</div></div>
+              <div class="ph-fld"><span class="ph-lab">טלפון בבית<span class="again">שוב</span></span><div class="ph-in dup">09-7412233</div></div>
+              <div class="ph-fld"><span class="ph-lab">טלפון נייד<span class="again">שוב</span></span><div class="ph-in dup">054-8123456</div></div>
+              <div class="ph-fld"><span class="ph-lab">דוא"ל<span class="again">שוב</span></span><div class="ph-in dup">michal@example.com</div></div>
+            </div>
+            <div class="ph-card warned">
+              <div class="ph-card-h"><span class="ph-card-t">פרטי ההורים</span></div>
+              <p class="ph-note">ת.ז. · שנת עליה · שם האם · שם האב · ת.ז. · נייד — <span style="color:var(--warn)">כולם שוב</span></p>
+            </div>
+            <div class="ph-card warned">
+              <div class="ph-card-h"><span class="ph-card-t">מורשי איסוף</span></div>
+              <p class="ph-note"><span style="color:var(--warn)">שוב</span></p>
+            </div>
+            <p class="ph-note">שלושה ילדים? שלוש פעמים.</p>
+          </div>
+        </div>
+        <p class="shot-cap"><b>And again for Yossi.</b> Thirteen of these fifteen boxes hold values she has already typed on the previous screen. This is the whole complaint, drawn.</p>
+      </div>
+
+    </div></div>
+  </div>
+
+  <div class="col">
+    <div class="tally">
+      <h4>Michal, two children, no redesign</h4>
+      <dl>
+        <dt>Form 1 — her details and both children</dt><dd>11</dd>
+        <dt>Form 2 — for Dana</dt><dd>15</dd>
+        <dt>Form 2 — for Yossi, thirteen of them repeats</dt><dd>15</dd>
+        <div class="sum"><span>Boxes filled in</span><span>41</span></div>
+        <div class="sum"><span>After the merge below</span><span>23</span></div>
+      </dl>
+    </div>
+
+    <h3>And if she ticks &ldquo;I train too&rdquo;</h3>
+    <p>The checkbox already exists — <code>selfStudent</code>, on each child row of form 1. Ticking it copies her own name into that row and makes her a student. Which means form 2 then runs <strong>for her</strong>, and asks:</p>
+    <ul>
+      <li>her <span dir="rtl">כיתה/גן</span> — a school class, <strong>required</strong>, of an adult. She cannot get past it.</li>
+      <li>her address, city and phones — for a third time.</li>
+      <li>and, under a card headed <span dir="rtl">פרטי ההורים</span>, <strong>who her mother and father are.</strong></li>
+    </ul>
+    <p>That is the case you named, and it is the sharpest version of the whole problem: the second form was written as though every student were a child of the person filling it in.</p>
+
+    <div class="note today">
+      <span class="lbl">And the ordering</span>
+      <p>Form 1 renders in <code>JoinShell</code>, which sits <strong>outside</strong> <code>AuthedApp</code> and therefore outside <code>ConsentGate</code>. Names, birthdates and phone numbers of minors are written before a privacy policy has been agreed to. The gate nesting a few lines below argues the opposite, in writing: <em>"the privacy policy is what permits the club to collect a medical record about a child at all, so asking for the record first and the permission afterwards has the consent doing no work."</em> The same sentence covers a child's name.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ THE ENTRY ============ -->
+<section>
+  <div class="col">
+    <div class="step-head"><span class="step-num" style="background:var(--muted)">—</span><h2>Before step 1 — the link and the sign-in</h2></div>
+    <p class="step-kicker">Not a step · no counter · nothing known yet</p>
+
+    <p>The club posts <strong>one studio-level URL</strong> into its WhatsApp groups. It is not a per-family invitation: the club does not know who taps it, and nothing is pre-filled. So the first screen can only do two things — say which club this is, and ask the parent to sign in.</p>
+
+    <div class="note win">
+      <span class="lbl">Not a second sign-in</span>
+      <p>This <strong>is</strong> the parent sign-in, with a different redirect. <code>SignIn</code> already takes <code>app</code> and <code>returnPath</code>, and the join route already passes <code>/join/&lt;token&gt;</code> — so the club link lands on the same screen everyone else uses and comes back to the wizard instead of the home screen. Exactly one thing differs: <strong>the studio's name above it</strong>, because a parent who tapped a link in a WhatsApp group needs to know which club this is before they sign in. Nothing else about the screen changes.</p>
+      <p>The staff app has its own <code>ManagerSignIn</code> face, and that stays its own — different app, different audience. A second <em>parent</em> face would be a third copy of the same providers and the same <code>startUrl</code> to keep in step, and the first time a provider is added, one of them gets forgotten.</p>
+    </div>
+
+    <div class="note today">
+      <span class="lbl">Corrected</span>
+      <p>An earlier draft of this document opened with a welcome screen listing the children "the club already added", and a line reading <span dir="rtl">5 שלבים · כעשר דקות</span>. Both were wrong. The first came from a canvas describing the <em>invitation</em> path — where a manager invites one named guardian to one named student — and the canvas spec itself said that reading "should be confirmed". It was not. The ten minutes was invented outright; the canvas carries <span dir="rtl">שתי דקות</span> for three steps and nothing measured either number. <strong>No duration appears on any screen in this design.</strong></p>
+    </div>
+  </div>
+
+  <div class="band">
+    <div class="band-scroll"><div class="band-row">
+
+      <div class="shot">
+        <div class="phone">
+          <div class="ph-body" style="padding:34px 18px 26px;gap:18px">
+            <p class="ph-h" style="text-align:center;line-height:1.3">מכבי ג׳ודו רעננה</p>
+            <p class="ph-sub" style="text-align:center">הצטרפות למועדון</p>
+            <div class="ph-card">
+              <div class="ph-btn ghost">המשך עם Google</div>
+              <div class="ph-btn ghost">המשך עם Apple</div>
+            </div>
+            <p class="ph-note" style="text-align:center;line-height:1.6">הכניסה יוצרת חשבון. עדיין לא נשמר שום מידע על ילדים.</p>
+          </div>
+        </div>
+        <p class="shot-cap"><b>The shared parent sign-in, with the studio name above it.</b> A studio-wide link has no recipient, so there is no name to greet and no children to list — and nothing to say <span dir="rtl">זה לא אני</span> about. Only <code>returnPath</code> differs from an ordinary sign-in.</p>
+      </div>
+
+      <div class="shot">
+        <div class="phone">
+          <div class="ph-bar"><span class="ph-title">הקישור אינו בתוקף</span></div>
+          <div class="ph-body" style="padding-block:26px">
+            <p class="ph-sub">ייתכן שהקישור בוטל או הוחלף. בקשו מהמועדון קישור עדכני.</p>
+            <div class="ph-btn ghost">סגירה</div>
+          </div>
+        </div>
+        <p class="shot-cap"><b>The one other state.</b> Expired, revoked and never-existed read identically — the server's rule, repeated by the screen. Unchanged from today.</p>
+      </div>
+
+    </div></div>
+  </div>
+</section>
+
+<!-- ============ STEP 1 ============ -->
+<section>
+  <div class="col">
+    <div class="step-head"><span class="step-num">01</span><h2>Consent — the two documents</h2></div>
+    <p class="step-kicker">Terms of use · Privacy policy</p>
+
+    <div class="note today">
+      <span class="lbl">Today</span>
+      <p>Both documents printed in full, one after the other, with the two agreement boxes and the way forward at the very bottom of roughly four phone-heights. Almost nobody reaches them having read anything.</p>
+    </div>
+
+    <p>Each document collapses to a card: its name, its version, three plain lines of what it actually says, and a way to read the whole thing. The full text opens as a sheet <em>over</em> this screen — closing it returns here with the ticks exactly as they were, so reading never costs a parent their place.</p>
+    <p><strong>The two ticks stay two.</strong> That is not decoration: two consents means two versions stamped separately, so a parent who agreed to an older wording of only the privacy policy is re-asked for the privacy policy alone.</p>
+  </div>
+
+  <div class="band">
+    <div class="band-scroll"><div class="band-row">
+
+      <div class="shot">
+        <div class="phone">
+          <div class="ph-bar"><span class="ph-back">›</span><span class="ph-title">הסכמה</span><span class="ph-count">שלב 1 מתוך 5</span></div>
+          <div class="ph-rail"><span class="ph-seg on"></span><span class="ph-seg"></span><span class="ph-seg"></span><span class="ph-seg"></span><span class="ph-seg"></span></div>
+          <div class="ph-body">
+            <p class="ph-h">לפני שנתחיל</p>
+            <p class="ph-sub">כדי שנוכל לשמור מידע על הילדים שלכם, אנחנו צריכים את ההסכמה שלכם לשני מסמכים.</p>
+
+            <div class="ph-card">
+              <div class="ph-card-h"><span class="ph-box on">✓</span><span class="ph-card-t">תנאי שימוש</span><span class="ph-ver">גרסה 3</span></div>
+              <p class="ph-lines">מה מותר למועדון לעשות באפליקציה, מה באחריותכם, ומה אפשר לבקש מאיתנו בכל רגע.</p>
+              <span class="ph-link">קריאת המסמך המלא ›</span>
+            </div>
+
+            <div class="ph-card">
+              <div class="ph-card-h"><span class="ph-box on">✓</span><span class="ph-card-t">מדיניות פרטיות</span><span class="ph-ver">גרסה 2</span></div>
+              <p class="ph-lines">איזה מידע נשמר, מי במועדון רואה אותו, כמה זמן הוא נשמר וכיצד מוחקים אותו.</p>
+              <span class="ph-link">קריאת המסמך המלא ›</span>
+            </div>
+
+            <div class="ph-btn">אני מאשר/ת</div>
+          </div>
+        </div>
+        <p class="shot-cap"><b>The screen a parent meets first.</b> No account, no name, no progress through a wizard yet — only two documents and whether they agree.</p>
+      </div>
+
+      <div class="shot">
+        <div class="phone">
+          <div class="ph-bar"><span class="ph-back">✕</span><span class="ph-title">מדיניות פרטיות</span><span class="ph-count">גרסה 2</span></div>
+          <div class="ph-body">
+            <p class="ph-lines" style="line-height:1.7">
+              המועדון אוסף ושומר מידע על התלמידים ועל האחראים עליהם לצורך ניהול ההרשמה, הנוכחות, החיובים והצהרות הבריאות.<br><br>
+              1. המידע הנשמר. שם, תאריך לידה, מספר ת.ז., כתובת, פרטי קשר, וכן הצהרת הבריאות שמילאתם. הצהרת בריאות היא מידע רפואי ונשמרת מוצפנת.<br><br>
+              2. מי רואה. מאמן רואה סימון בלבד — האם קיימת מגבלה — ולעולם לא את תוכן ההצהרה. מנהל בלבד רשאי לפתוח הצהרה מלאה, וכל פתיחה כזו נרשמת.<br><br>
+              3. מחיקה. אפשר לבקש מחיקה בכל עת…
+            </p>
+            <div class="ph-btn ghost">חזרה</div>
+          </div>
+        </div>
+        <p class="shot-cap"><b>The full text, on demand.</b> Opens over the consent screen, closes back to it. The ticks are untouched — reading is never a detour that loses your place.</p>
+      </div>
+
+    </div></div>
+  </div>
+
+  <div class="col">
+    <dl class="rules">
+      <div><dt>Records</dt><dd>Two consents, each stamped with the version agreed to. A version bump on one document re-asks for that document only.</dd></div>
+      <div><dt>Never</dt><dd>The agree button is not gated on scrolling. The club's decision is that a parent may agree without reading both, and the summaries exist so that choice is informed rather than blind.</dd></div>
+      <div><dt>Returning</dt><dd>An existing family whose policy was republished sees one card and one button — not step 1 of 5.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<!-- ============ STEP 2 ============ -->
+<section>
+  <div class="col">
+    <div class="step-head"><span class="step-num">02</span><h2>Club terms — asked once</h2></div>
+    <p class="step-kicker">תקנון ותנאי תשלום</p>
+
+    <div class="note today">
+      <span class="lbl">Today</span>
+      <p>A wall of text with the agreement at the bottom, arriving as step 3 of a per-child sequence — so it is both late and, structurally, asked per child.</p>
+    </div>
+
+    <p>Same treatment as step 1, and deliberately so: a parent has just learned how a document behaves on this screen, and the second one behaves identically. The difference is a single line that does real work — <strong>a chip saying this is asked once, for the whole family.</strong> The complaint was not only that it was long; it was that it appeared to be part of a per-child loop it was never meant to belong to.</p>
+    <p>Two documents live behind one agreement here, because the club treats them as one: the regulations and the payment terms. The card summarises both and links to each separately.</p>
+  </div>
+
+  <div class="band">
+    <div class="band-scroll"><div class="band-row">
+
+      <div class="shot">
+        <div class="phone">
+          <div class="ph-bar"><span class="ph-back">›</span><span class="ph-title">תקנון ותנאי תשלום</span><span class="ph-count">שלב 2 מתוך 5</span></div>
+          <div class="ph-rail"><span class="ph-seg on"></span><span class="ph-seg on"></span><span class="ph-seg"></span><span class="ph-seg"></span><span class="ph-seg"></span></div>
+          <div class="ph-body">
+            <span class="ph-chip">✓ פעם אחת, עבור כל המשפחה</span>
+            <p class="ph-h">התקנון של המועדון</p>
+
+            <div class="ph-card">
+              <div class="ph-card-h"><span class="ph-card-t">מה כתוב בו</span><span class="ph-ver">גרסה 4</span></div>
+              <p class="ph-lines">
+                · נוכחות, היעדרות והשלמת אימונים<br>
+                · עזיבה באמצע השנה והודעה מראש<br>
+                · מועד התשלום החודשי<br>
+                · ביטול מנוי, החזרים וחישוב יחסי
+              </p>
+              <div class="ph-div"></div>
+              <span class="ph-link">קריאת התקנון ›</span>
+              <span class="ph-link">קריאת תנאי התשלום ›</span>
+            </div>
+
+            <div class="ph-card tint">
+              <div class="ph-row top"><span class="ph-box on">✓</span><span style="font-size:12.5px">קראתי את התקנון ותנאי התשלום ואני מאשר/ת אותם</span></div>
+            </div>
+
+            <div class="ph-btn">המשך</div>
+          </div>
+        </div>
+        <p class="shot-cap"><b>The chip is the design.</b> <span dir="rtl">פעם אחת, עבור כל המשפחה</span> — the one thing a parent could not tell before, said before they read anything.</p>
+      </div>
+
+      <div class="shot">
+        <div class="phone">
+          <div class="ph-bar"><span class="ph-back">✕</span><span class="ph-title">תנאי תשלום</span><span class="ph-count">גרסה 4</span></div>
+          <div class="ph-body">
+            <p class="ph-lines" style="line-height:1.75">
+              תשלום בצ׳קים יתבצע לטובת "עמותת מכבי נתניה סיף ואגרוף". תאריך הצ׳ק לא יאוחר מה-10 לכל חודש.<br><br>
+              ביטול מנוי יבוצע בכתב עד ה-27 לחודש, ויהיה תקף לגבי חודשים עתידיים בלבד.<br><br>
+              בעת ביטול מנוי שנתי, התעריף החודשי יחושב בהתאם לניצול החודשים בפועל של המנוי (לדוגמה: אם המנוי ניצל שלושה חודשים, החישוב יבוצע לפי תעריף מנוי לשלושה חודשים).
+            </p>
+            <div class="ph-btn ghost">חזרה</div>
+          </div>
+        </div>
+        <p class="shot-cap"><b>The club's real payment terms</b>, from <code>clubTerms.payment.*</code>. Reachable, and the preamble to step 5 — which is the other reason this step sits here and not at the end.</p>
+      </div>
+
+    </div></div>
+  </div>
+
+  <div class="col">
+    <dl class="rules">
+      <div><dt>Records</dt><dd>One consent against <code>CLUB_TERMS_CONSENT_TYPE</code>, on the signing person — <strong>not on the student</strong>. It is already stored that way; the change is that the screen now says so.</dd></div>
+      <div><dt>Second child</dt><dd>Never re-asked. A family adding a fourth child mid-year does not see this step at all.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<!-- ============ STEP 3 ============ -->
+<section>
+  <div class="col">
+    <div class="step-head"><span class="step-num">03</span><h2>The family — created once, on one screen</h2></div>
+    <p class="step-kicker">You · the second parent · pickup · the students</p>
+
+    <p><strong>This step is the join form.</strong> It is not a screen that follows it. The two forms shown above become one, and everything a family types happens here — which is what makes "asked once" true rather than aspirational.</p>
+
+    <p>The screen is organised by <em>whose fact it is</em>, and that single ordering rule removes every duplication at once. Your address is on your card because it is your address. Dana's ת.ז. is on Dana's row because it is Dana's. Nothing about you appears inside a card headed with a child's name, and nothing about a child appears twice.</p>
+
+    <h3>You are never asked about yourself twice</h3>
+    <p>Your name arrives from the sign-in — Google or Apple already verified it, so it is shown, not typed. Your email is the verified one on the identity, read-only, because a typed email is unverified and can be wrong.</p>
+    <p>Then <strong>one tap settles the parents question</strong>: <span dir="rtl">אני: האם · האב · קרוב אחר</span>. The club's paper form distinguishes <span dir="rtl">שם האם</span> from <span dir="rtl">שם האב</span>, and that tap is what fills the right slot. Your name and your ת.ז. are already on the card above it, so the mandatory "at least one parent" rule you asked for is <strong>satisfied by construction</strong> — it holds, and it costs nothing. The second parent's card is optional and labelled by whichever one you are not.</p>
+    <p><span dir="rtl">קרוב אחר</span> is the one case where both slots open: a grandmother or a legal guardian is not a parent, so neither parent is on file and the club genuinely needs both names.</p>
+
+    <h3>&ldquo;I train too&rdquo; is a row with one field</h3>
+    <p>The checkbox exists today as <code>selfStudent</code> and it is kept. What changes is what it costs: your name is known, your ת.ז. is on the card above, and you have no school class. <strong>So the row asks for a group and nothing else.</strong></p>
+    <p>And on this link it <em>enrols</em> rather than queues. The onboarding-link spec names itself a deliberate, scoped exception to "enrolment is always a manager decision" — for a family that already trains at the club, "the database is catching up to reality, not making a decision". The price follows automatically from the group's weekly volume through <code>plan_for_volume</code>, exactly as it does for a child, and the first prorated charge is raised in the same transaction.</p>
+  </div>
+
+  <div class="band">
+    <div class="band-scroll"><div class="band-row">
+
+      <div class="shot">
+        <div class="phone">
+          <div class="ph-bar"><span class="ph-back">›</span><span class="ph-title">המשפחה שלכם</span><span class="ph-count">שלב 3 מתוך 5</span></div>
+          <div class="ph-rail"><span class="ph-seg on"></span><span class="ph-seg on"></span><span class="ph-seg on"></span><span class="ph-seg"></span><span class="ph-seg"></span></div>
+          <div class="ph-body">
+            <div class="ph-card">
+              <div class="ph-card-h"><span class="ph-card-t">הפרטים שלכם</span></div>
+              <div class="ph-row"><span class="ph-tick">✓</span><span style="font-size:13px;font-weight:500">מיכל כהן</span><span class="ph-note" style="margin-inline-start:auto">מהכניסה</span></div>
+              <div class="ph-fld">
+                <span class="ph-lab">אני</span>
+                <div class="ph-row"><span class="ph-radio on"></span><span style="font-size:12.5px">האם</span><span class="ph-radio" style="margin-inline-start:14px"></span><span style="font-size:12.5px">האב</span><span class="ph-radio" style="margin-inline-start:14px"></span><span style="font-size:12.5px">קרוב אחר</span></div>
+              </div>
+              <div class="ph-fld"><span class="ph-lab">ת.ז.</span><div class="ph-in filled">039472815</div></div>
+              <div class="ph-fld"><span class="ph-lab">כתובת</span><div class="ph-in filled">הרצל 12</div></div>
+              <div class="ph-grid2">
+                <div class="ph-fld"><span class="ph-lab">יישוב</span><div class="ph-in filled">רעננה</div></div>
+                <div class="ph-fld"><span class="ph-lab">טלפון נייד</span><div class="ph-in filled">054-8123456</div></div>
+              </div>
+              <div class="ph-grid2">
+                <div class="ph-fld"><span class="ph-lab">טלפון בבית</span><div class="ph-in">לא חובה</div></div>
+                <div class="ph-fld"><span class="ph-lab">שנת עליה</span><div class="ph-in">לא חובה</div></div>
+              </div>
+              <div class="ph-row"><span class="ph-tick">✓</span><span class="ph-note">michal@example.com · מאומת</span></div>
+            </div>
+
+            <div class="ph-card">
+              <div class="ph-card-h"><span class="ph-card-t">האב</span><span class="ph-ver">לא חובה</span></div>
+              <div class="ph-grid2">
+                <div class="ph-fld"><span class="ph-lab">שם מלא</span><div class="ph-in filled">דוד כהן</div></div>
+                <div class="ph-fld"><span class="ph-lab">ת.ז.</span><div class="ph-in filled">026183947</div></div>
+              </div>
+              <div class="ph-fld"><span class="ph-lab">טלפון נייד</span><div class="ph-in">לא חובה</div></div>
+              <p class="ph-note">אתם רשומות כאם. די בהורה אחד.</p>
+            </div>
+
+            <div class="ph-card">
+              <div class="ph-card-h"><span class="ph-card-t">מורשי איסוף</span></div>
+              <p class="ph-note">אנשים נוספים (חוץ מההורים) שרשאים לאסוף מהחוג</p>
+              <div class="ph-grid2">
+                <div class="ph-fld"><span class="ph-lab">שם</span><div class="ph-in filled">רותי לוי</div></div>
+                <div class="ph-fld"><span class="ph-lab">טלפון נייד</span><div class="ph-in filled">052-4471190</div></div>
+              </div>
+              <span class="ph-link">+ הוספת מורשה איסוף</span>
+              <p class="ph-note">תקף לכל הילדים.</p>
+            </div>
+
+            <div class="ph-card tint">
+              <div class="ph-card-h"><span class="ph-card-t">התלמידים שלכם</span></div>
+              <div class="ph-grid2">
+                <div class="ph-fld"><span class="ph-lab">שם מלא</span><div class="ph-in filled">דנה כהן</div></div>
+                <div class="ph-fld"><span class="ph-lab">תאריך לידה</span><div class="ph-in filled">14.03.2016</div></div>
+              </div>
+              <div class="ph-fld"><span class="ph-lab">קבוצות</span><div class="ph-in filled">ילדים א׳ · ראשון, שלישי</div></div>
+              <div class="ph-grid2">
+                <div class="ph-fld"><span class="ph-lab">ת.ז.</span><div class="ph-in filled">218374619</div></div>
+                <div class="ph-fld"><span class="ph-lab">כיתה/גן</span><div class="ph-in filled">ד׳</div></div>
+              </div>
+              <div class="ph-div"></div>
+              <div class="ph-row"><span style="font-size:12.5px;font-weight:500;flex:1">יוסי כהן</span><span class="ph-note">ב׳ · ילדים ב׳</span><span class="ph-link">✎</span></div>
+              <div class="ph-div"></div>
+              <span class="ph-link">+ הוספת ילד</span>
+              <div class="ph-div"></div>
+              <div class="ph-row"><span class="ph-box on">✓</span><span style="font-size:12.5px;font-weight:500">אני מתאמנת גם</span></div>
+              <div class="ph-fld" style="padding-inline-start:26px">
+                <span class="ph-lab">קבוצה</span>
+                <div class="ph-row"><span class="ph-radio on"></span><span style="font-size:12px">בוגרים · שלישי 20:00</span></div>
+                <p class="ph-note">שם, ת.ז. וכתובת — כבר למעלה.</p>
+              </div>
+            </div>
+
+            <div class="ph-btn">המשך</div>
+          </div>
+        </div>
+        <p class="shot-cap"><b>One screen, 23 boxes, nothing twice.</b> Compare it to the 41 above. Every card is headed by whose facts it holds — which is the entire mechanism.</p>
+      </div>
+
+      <div class="shot">
+        <div class="phone">
+          <div class="ph-bar"><span class="ph-back">›</span><span class="ph-title">התלמידים שלכם</span><span class="ph-count">שלב 3 מתוך 5</span></div>
+          <div class="ph-body">
+            <p class="ph-h" style="font-size:14px">אותה שורה, פתוחה</p>
+            <div class="ph-card">
+              <div class="ph-row"><span class="ph-box on">✓</span><span style="font-size:12.5px;font-weight:500">אני מתאמנת גם</span></div>
+              <div class="ph-div"></div>
+              <div class="ph-row"><span class="ph-tick">✓</span><span style="font-size:12px;flex:1">שם</span><span class="ph-note">מיכל כהן</span></div>
+              <div class="ph-row"><span class="ph-tick">✓</span><span style="font-size:12px;flex:1">ת.ז.</span><span class="ph-note">מהכרטיס למעלה</span></div>
+              <div class="ph-row"><span class="ph-tick">✓</span><span style="font-size:12px;flex:1">כתובת וטלפון</span><span class="ph-note">מהכרטיס למעלה</span></div>
+              <div class="ph-row"><span style="color:var(--faint);flex:none">—</span><span style="font-size:12px;flex:1">כיתה/גן</span><span class="ph-note">לא רלוונטי</span></div>
+              <div class="ph-div"></div>
+              <div class="ph-fld">
+                <span class="ph-lab">קבוצה · השדה היחיד</span>
+                <div class="ph-row"><span class="ph-radio on"></span><span style="font-size:12px">בוגרים · שלישי 20:00</span></div>
+                <div class="ph-row"><span class="ph-radio"></span><span style="font-size:12px">בוגרים · חמישי 20:00</span></div>
+              </div>
+            </div>
+            <div class="ph-card tint">
+              <p class="ph-note" style="line-height:1.65">המחיר נגזר מהיקף האימונים של הקבוצה, כמו לכל תלמיד. החיוב הראשון נוצר יחסית לימים שנותרו בחודש.</p>
+            </div>
+          </div>
+        </div>
+        <p class="shot-cap"><b>The self-student row, unpacked.</b> Five facts already known, one school class that does not apply, and exactly one question. Priced from the group like any student.</p>
+      </div>
+
+      <div class="shot">
+        <div class="phone">
+          <div class="ph-bar"><span class="ph-back">›</span><span class="ph-title">הפרטים שלך</span><span class="ph-count">שלב 3 מתוך 5</span></div>
+          <div class="ph-rail"><span class="ph-seg on"></span><span class="ph-seg on"></span><span class="ph-seg on"></span><span class="ph-seg"></span><span class="ph-seg"></span></div>
+          <div class="ph-body">
+            <span class="ph-chip">✓ נרשם לעצמו</span>
+            <div class="ph-card">
+              <div class="ph-card-h"><span class="ph-card-t">הפרטים שלך</span></div>
+              <div class="ph-row"><span class="ph-tick">✓</span><span style="font-size:13px;font-weight:500">יובל שטולין</span><span class="ph-note" style="margin-inline-start:auto">מהכניסה</span></div>
+              <div class="ph-fld"><span class="ph-lab">ת.ז.</span><div class="ph-in filled">031947285</div></div>
+              <div class="ph-fld"><span class="ph-lab">כתובת</span><div class="ph-in filled">ביאליק 4</div></div>
+              <div class="ph-grid2">
+                <div class="ph-fld"><span class="ph-lab">יישוב</span><div class="ph-in filled">נתניה</div></div>
+                <div class="ph-fld"><span class="ph-lab">טלפון נייד</span><div class="ph-in filled">050-3319847</div></div>
+              </div>
+              <div class="ph-fld"><span class="ph-lab">שנת עליה</span><div class="ph-in">לא חובה</div></div>
+            </div>
+
+            <div class="ph-card tint">
+              <div class="ph-card-h"><span class="ph-card-t">הקבוצה שלך</span></div>
+              <div class="ph-row"><span class="ph-radio on"></span><span style="font-size:12px">בוגרים · שלישי 20:00</span></div>
+              <span class="ph-link">+ הוספת ילד</span>
+            </div>
+
+            <div class="ph-card tint">
+              <p class="ph-note" style="line-height:1.65">פרטי הורים, מורשי איסוף וכיתה אינם נדרשים כשאין ילדים ברשימה.</p>
+            </div>
+
+            <div class="ph-btn">המשך</div>
+          </div>
+        </div>
+        <p class="shot-cap"><b>An adult enrolling only themselves.</b> Three cards become two. The parents block, pickup and <span dir="rtl">כיתה</span> are not hidden silently — the screen says why, because a field that vanishes without explanation reads as a bug.</p>
+      </div>
+
+    </div></div>
+  </div>
+
+  <div class="col">
+    <dl class="rules">
+      <div><dt>From sign-in</dt><dd>Name and email. Never typed, and the email is read-only because the verified one already exists on the identity that just signed in.</dd></div>
+      <div><dt>Required</dt><dd>Which parent you are, your ת.ז., address and city. Per student: full name, birthdate, at least one group, ת.ז. and <span dir="rtl">כיתה/גן</span>.</dd></div>
+      <div><dt>Optional</dt><dd>Home phone, year of immigration, the second parent entirely, pickup contacts.</dd></div>
+      <div><dt>At least one parent</dt><dd>Met by your own card whenever you are the mother or the father. Only <span dir="rtl">קרוב אחר</span> makes the parents block mandatory, and then it asks for both.</dd></div>
+      <div><dt>Pickup</dt><dd>One list, written against every child. Storage stays per student so a manager can revoke one child's permission without touching their siblings.</dd></div>
+      <div><dt>Validation</dt><dd>Every ת.ז. is checked under the thumb and again on the server. A mistyped ID looks exactly like a real one, and learning about it in a 422 after signing is a dead end.</dd></div>
+      <div><dt>Adult alone</dt><dd>No children in the list means no parents block, no pickup list and no <span dir="rtl">כיתה/גן</span> — none of the three has a subject.</dd></div>
+      <div><dt>Writes</dt><dd>One transaction, as today: the parent, the students, the enrolments, the price from <code>plan_for_volume</code>, and the first prorated charge. What moves is only <em>when</em> it runs — after consent, not before.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<!-- ============ STEP 4 ============ -->
+<section>
+  <div class="col">
+    <div class="step-head"><span class="step-num">04</span><h2>Health — one declaration per child, and you always know which</h2></div>
+    <p class="step-kicker">Fourteen questions · three groups · one signature each</p>
+
+    <div class="note today">
+      <span class="lbl">Today</span>
+      <p>One long scroll per child. The gate picks the first student who owes a declaration, renders the form, and reappears for the next one — so a family with three children meets it three times <em>with no sense of being in a sequence at all</em>.</p>
+    </div>
+
+    <p>The loop becomes visible. The header carries the child's name and their position, and a row of pills shows the whole queue at a glance: who is done, who is now, who is left. Nothing about the counter changes the five-step spine above it.</p>
+
+    <h3>The healthy child, in one tap</h3>
+    <p>The screen opens on a single question that answers all fourteen. Say yes and every question is marked <span dir="rtl">לא</span> and shown back as a list the parent can open and change — a declaration, not a skipped form. Say <span dir="rtl">יש משהו</span> and the three groups open, each keeping its own <span dir="rtl">אין</span> shortcut for the sections that are clear.</p>
+
+    <div class="note">
+      <span class="lbl">Not negotiable</span>
+      <p>The clause a parent confirms is <strong>derived from the answers and never chosen</strong>. <code>clause.none</code> and <code>clause.limited</code> are alternatives, not options — a family that reported asthma is shown the limited clause and cannot reach the other one. The signature sits under whichever clause the answers produced.</p>
+    </div>
+
+    <p>Each child's declaration carries <strong>its own signature</strong>. A parent signs three times, and that is the right trade: nothing about the third child's record then depends on a stroke drawn while looking at the first child's answers, and each declaration stays a self-contained document with its own clause and its own PDF.</p>
+  </div>
+
+  <div class="band">
+    <div class="band-scroll"><div class="band-row">
+
+      <div class="shot">
+        <div class="phone">
+          <div class="ph-bar"><span class="ph-back">›</span><span class="ph-title">הצהרת בריאות</span><span class="ph-count">שלב 4 מתוך 5</span></div>
+          <div class="ph-rail"><span class="ph-seg on"></span><span class="ph-seg on"></span><span class="ph-seg on"></span><span class="ph-seg on"></span><span class="ph-seg"></span></div>
+          <div class="ph-body">
+            <div class="ph-row">
+              <span class="ph-people"><span class="ph-pill now">דנה</span><span class="ph-pill">יוסי</span><span class="ph-pill">נעה</span></span>
+              <span class="ph-count" style="margin-inline-start:auto">1 מתוך 3</span>
+            </div>
+            <p class="ph-h">עבור דנה</p>
+            <p class="ph-sub">נדרשת לפני תחילת האימונים</p>
+
+            <div class="ph-card">
+              <p style="font-size:13.5px;margin:0;font-weight:500">האם לדנה אין מגבלות רפואיות ידועות, והיא מסוגלת לעמוד במאמץ הנדרש?</p>
+              <div class="ph-btn">כן, אין בעיות בריאות ידועות</div>
+              <div class="ph-btn ghost">יש משהו שצריך לדעת</div>
+            </div>
+
+            <p class="ph-note">בחירה ב"כן" תסמן "לא" בכל 14 השאלות. אפשר לפתוח ולשנות כל אחת מהן.</p>
+          </div>
+        </div>
+        <p class="shot-cap"><b>The opening question.</b> The pills answer "how many are left" without a sentence. <code>markAllHealthy</code> is promoted from a per-section shortcut to the top of the form.</p>
+      </div>
+
+      <div class="shot">
+        <div class="phone">
+          <div class="ph-bar"><span class="ph-back">›</span><span class="ph-title">הצהרת בריאות</span><span class="ph-count">שלב 4 מתוך 5</span></div>
+          <div class="ph-rail"><span class="ph-seg on"></span><span class="ph-seg on"></span><span class="ph-seg on"></span><span class="ph-seg on"></span><span class="ph-seg"></span></div>
+          <div class="ph-body">
+            <div class="ph-row">
+              <span class="ph-people"><span class="ph-pill now">דנה</span><span class="ph-pill">יוסי</span><span class="ph-pill">נעה</span></span>
+              <span class="ph-count" style="margin-inline-start:auto">1 מתוך 3</span>
+            </div>
+
+            <div class="ph-card tint">
+              <div class="ph-row"><span class="ph-tick">✓</span><span style="font-size:12.5px;font-weight:500">14 שאלות סומנו "לא"</span><span class="ph-link" style="margin-inline-start:auto">פתיחה</span></div>
+              <p class="ph-note">רקע רפואי · לב ומאמץ · אורתופדיה</p>
+            </div>
+
+            <div class="ph-grid2">
+              <div class="ph-fld"><span class="ph-lab">קופת חולים</span><div class="ph-in filled">מכבי</div></div>
+              <div class="ph-fld"><span class="ph-lab">טלפון חירום</span><div class="ph-in filled">054-8123456</div></div>
+            </div>
+
+            <div class="ph-card">
+              <p class="ph-lines" style="color:var(--ink);font-size:11.5px;line-height:1.6">הנני מצהיר/ה כי לרשום מעלה אין מגבלות רפואיות/רגישויות כלשהן והוא מסוגל לעמוד במאמץ הדרוש לחוג אליו נרשם. יחד עם זאת, במידה ותהיה מגבלה רפואית כלשהי, הנני מתחייב/ת לדווח על כך בהקדם למאמן ו/או מנהל המועדון.</p>
+              <div class="ph-row top"><span class="ph-box on">✓</span><span style="font-size:12px">אני מאשר/ת את ההצהרה שלמעלה</span></div>
+            </div>
+
+            <span class="ph-mini">חתימה</span>
+            <div class="ph-pad">חתמו באצבע במסגרת</div>
+            <span class="ph-link">או הקלידו את שמכם המלא</span>
+
+            <div class="ph-btn">חתימה ומעבר ליוסי</div>
+          </div>
+        </div>
+        <p class="shot-cap"><b>After the one tap.</b> The read-back is openable, the clause is <code>clause.none</code> — derived, not picked — and the button names the next child rather than saying "submit".</p>
+      </div>
+
+      <div class="shot">
+        <div class="phone">
+          <div class="ph-bar"><span class="ph-back">›</span><span class="ph-title">הצהרת בריאות</span><span class="ph-count">שלב 4 מתוך 5</span></div>
+          <div class="ph-rail"><span class="ph-seg on"></span><span class="ph-seg on"></span><span class="ph-seg on"></span><span class="ph-seg on"></span><span class="ph-seg"></span></div>
+          <div class="ph-body">
+            <div class="ph-row">
+              <span class="ph-people"><span class="ph-pill done">דנה ✓</span><span class="ph-pill now">יוסי</span><span class="ph-pill">נעה</span></span>
+              <span class="ph-count" style="margin-inline-start:auto">2 מתוך 3</span>
+            </div>
+            <p class="ph-h">עבור יוסי</p>
+
+            <div class="ph-card">
+              <div class="ph-card-h"><span class="ph-card-t">רקע רפואי</span><span class="ph-link">אין</span></div>
+              <div class="ph-row"><span style="font-size:12px;flex:1">מחלה כרונית או טיפול תרופתי קבוע</span><span class="ph-pill">לא</span><span class="ph-pill now">כן</span></div>
+              <div class="ph-fld"><span class="ph-lab">פירוט</span><div class="ph-in filled">אסתמה — משאף לפני מאמץ</div></div>
+              <div class="ph-row"><span style="font-size:12px;flex:1">אלרגיה מסכנת חיים</span><span class="ph-pill now">לא</span><span class="ph-pill">כן</span></div>
+            </div>
+
+            <div class="ph-card">
+              <div class="ph-card-h"><span class="ph-card-t">לב ומאמץ</span><span class="ph-link">אין</span></div>
+              <p class="ph-note">4 שאלות · סומנו "לא"</p>
+            </div>
+
+            <div class="ph-card tint">
+              <p class="ph-lines" style="color:var(--ink);font-size:11.5px;line-height:1.6">הנני מצהיר/ה כי למרות המגבלות הרפואיות המצוינות לעיל, הרשום מעלה מסוגל לעמוד במאמץ הדרוש לחוג אליו נרשם.</p>
+              <div class="ph-row top"><span class="ph-box on">✓</span><span style="font-size:12px">אני מאשר/ת את ההצהרה שלמעלה</span></div>
+            </div>
+          </div>
+        </div>
+        <p class="shot-cap"><b>The other branch.</b> Yossi's asthma forces <code>clause.limited</code>; the "no limitations" clause is not reachable from this state. Groups that are clear still collapse behind <span dir="rtl">אין</span>.</p>
+      </div>
+
+    </div></div>
+  </div>
+
+  <div class="col">
+    <dl class="rules">
+      <div><dt>Order</dt><dd>When the signer is also a student they come first — <span class="k">אני · 1 מתוך 4</span> — with the questions and the clause in the first person, and their ת.ז. already on file from step 3.</dd></div>
+      <div><dt>Re-gating</dt><dd>Publishing a new template version re-gates every family, because a signature against v3's wording is not a signature against v4's. That rule already exists in <code>_signed_against_current_questions</code> and is unchanged.</dd></div>
+      <div><dt>Never</dt><dd>Nothing here is logged, and the read-back is never rendered as prose for a coach. Coaches see derived boolean flags; that boundary does not move.</dd></div>
+      <div><dt>Validity</dt><dd>The screen must not promise an annual renewal. <code>declaration.noExpiry</code> is the truth — declarations do not expire.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<!-- ============ STEP 5 ============ -->
+<section>
+  <div class="col">
+    <div class="step-head"><span class="step-num">05</span><h2>Payment — four ways, and none of them a failure</h2></div>
+    <p class="step-kicker">Card · standing order · cash · cheques</p>
+
+    <div class="note today">
+      <span class="lbl">Today</span>
+      <p>A plain list of choices per child, then a summary — and it is the last thing standing between a parent and the app they were invited to.</p>
+    </div>
+
+    <p>The club already knows which children are enrolled, what each costs and what the first charge is. This step asks one question — <strong>how would you like to pay?</strong> — once, and applies the answer to every child. The summary that follows is where a family that wants to split methods does so, one row at a time.</p>
+
+    <div class="note win">
+      <span class="lbl">The three-child case</span>
+      <p>The common case — the same method for everyone — costs <strong>one tap</strong> instead of three. Splitting is still one tap per child, on a screen that already shows what each child costs.</p>
+    </div>
+
+    <h3>Two of the four mean "pay in person"</h3>
+    <p>Standing order, cash and cheques all end with the parent handing something over or arranging it with the manager. Each option carries a line saying what actually happens next, <em>before</em> it is picked — so nobody chooses cash and then discovers it means finding the coach with an envelope.</p>
+    <p>And all four end the same way: a confirmed arrangement naming the amount, the person and the moment. <span dir="rtl">מסרו 660 ₪ למאמן באימון הראשון</span> is a completed decision rendered with the same weight as a paid card — not a card payment that failed to happen.</p>
+  </div>
+
+  <div class="band">
+    <div class="band-scroll"><div class="band-row">
+
+      <div class="shot">
+        <div class="phone">
+          <div class="ph-bar"><span class="ph-back">›</span><span class="ph-title">אופן התשלום</span><span class="ph-count">שלב 5 מתוך 5</span></div>
+          <div class="ph-rail"><span class="ph-seg on"></span><span class="ph-seg on"></span><span class="ph-seg on"></span><span class="ph-seg on"></span><span class="ph-seg on"></span></div>
+          <div class="ph-body">
+            <p class="ph-h">איך תרצו לשלם?</p>
+            <p class="ph-sub">הבחירה תחול על שלושת הילדים. אפשר לשנות לכל ילד בנפרד במסך הבא.</p>
+
+            <div class="ph-card">
+              <div class="ph-row top"><span class="ph-radio on"></span><div><div style="font-size:13px;font-weight:500">כרטיס אשראי</div><p class="ph-note">תשלום עכשיו במסך הבא. אפשר לפרוס למספר חודשים ולמספר תשלומים.</p></div></div>
+            </div>
+            <div class="ph-card">
+              <div class="ph-row top"><span class="ph-radio"></span><div><div style="font-size:13px;font-weight:500">הוראת קבע</div><p class="ph-note">המועדון ישלח קישור להקמת ההוראה. התשלום נרשם על ידי המועדון לאחר קבלתו.</p></div></div>
+            </div>
+            <div class="ph-card">
+              <div class="ph-row top"><span class="ph-radio"></span><div><div style="font-size:13px;font-weight:500">מזומן</div><p class="ph-note">שלמו למאמן בתחילת החודש. המנהל יסמן את החיוב כשולם עם קבלת הכסף.</p></div></div>
+            </div>
+            <div class="ph-card">
+              <div class="ph-row top"><span class="ph-radio"></span><div><div style="font-size:13px;font-weight:500">צ׳קים</div><p class="ph-note">מסרו את הצ׳קים למאמן, לפקודת העמותה. תאריך לא יאוחר מה-10 לחודש.</p></div></div>
+            </div>
+
+            <div class="ph-btn">המשך לסיכום</div>
+          </div>
+        </div>
+        <p class="shot-cap"><b>One question, four equal answers.</b> Each carries its consequence in the same typographic weight — nothing here signals that three of the four are a lesser outcome.</p>
+      </div>
+
+      <div class="shot">
+        <div class="phone">
+          <div class="ph-bar"><span class="ph-back">›</span><span class="ph-title">סיכום</span><span class="ph-count">שלב 5 מתוך 5</span></div>
+          <div class="ph-rail"><span class="ph-seg on"></span><span class="ph-seg on"></span><span class="ph-seg on"></span><span class="ph-seg on"></span><span class="ph-seg on"></span></div>
+          <div class="ph-body">
+            <div class="ph-card">
+              <div class="ph-row"><span style="font-size:13px;font-weight:500;flex:1">דנה</span><span class="ph-money">240 ₪ לחודש</span></div>
+              <div class="ph-row"><span class="ph-pill done">כרטיס אשראי</span><span class="ph-link" style="margin-inline-start:auto">שינוי</span></div>
+              <div class="ph-div"></div>
+              <div class="ph-row"><span style="font-size:13px;font-weight:500;flex:1">יוסי</span><span class="ph-money">240 ₪ לחודש</span></div>
+              <div class="ph-row"><span class="ph-pill done">כרטיס אשראי</span><span class="ph-link" style="margin-inline-start:auto">שינוי</span></div>
+              <div class="ph-div"></div>
+              <div class="ph-row"><span style="font-size:13px;font-weight:500;flex:1">נעה</span><span class="ph-money">180 ₪ לחודש</span></div>
+              <div class="ph-row"><span class="ph-pill">מזומן</span><span class="ph-link" style="margin-inline-start:auto">שינוי</span></div>
+              <div class="ph-div"></div>
+              <div class="ph-row"><span style="font-size:13px;font-weight:500;flex:1">אני</span><span class="ph-money">280 ₪ לחודש</span></div>
+              <div class="ph-row"><span class="ph-pill done">כרטיס אשראי</span><span class="ph-link" style="margin-inline-start:auto">שינוי</span></div>
+            </div>
+
+            <div class="ph-card tint">
+              <div class="ph-row"><span style="font-size:12.5px;flex:1">לחיוב בכרטיס עכשיו</span><span class="ph-money">760 ₪</span></div>
+              <div class="ph-row"><span style="font-size:12.5px;flex:1">למסירה למאמן</span><span class="ph-money">180 ₪</span></div>
+            </div>
+
+            <div class="ph-btn">אישור ומעבר לתשלום</div>
+          </div>
+        </div>
+        <p class="shot-cap"><b>The summary splits the total honestly</b> — what the card takes now, and what is handed over in person. Two numbers, not one total with a caveat. Michal's own row is priced from her group like any other, because on this link the enrolment really did happen.</p>
+      </div>
+
+      <div class="shot">
+        <div class="phone">
+          <div class="ph-bar"><span class="ph-title" style="text-align:center">הכל מוכן</span></div>
+          <div class="ph-body" style="padding-block:26px;gap:14px">
+            <div style="text-align:center;font-size:30px;color:var(--accent)">✓</div>
+            <p class="ph-h" style="text-align:center">נרשמתם. נתראה באימון.</p>
+
+            <div class="ph-card">
+              <div class="ph-row"><span class="ph-tick">✓</span><span style="font-size:12.5px;flex:1">דנה, יוסי ואת — שולם בכרטיס</span><span class="ph-money">760 ₪</span></div>
+              <div class="ph-div"></div>
+              <div class="ph-row top"><span class="ph-tick">✓</span><div><div style="font-size:12.5px">נעה — מזומן למאמן</div><p class="ph-note">מסרו 180 ₪ למאמן באימון הראשון, ביום ראשון ב-17:00.</p></div></div>
+            </div>
+
+            <div class="ph-btn">כניסה לאפליקציה</div>
+          </div>
+        </div>
+        <p class="shot-cap"><b>The done state, identical in weight for both.</b> A cash arrangement gets a tick and a named moment — the same visual reward as a completed card payment.</p>
+      </div>
+
+    </div></div>
+  </div>
+
+  <div class="col">
+    <dl class="rules">
+      <div><dt>Never</dt><dd>No automated recurring billing. <span dir="rtl">הוראת קבע</span> cannot be created programmatically by the provider — the club sets it up by link and marks it paid by hand, and the copy says so.</dd></div>
+      <div><dt>Money</dt><dd>Agorot, integers, throughout. The remainder rides the first instalment.</dd></div>
+      <div><dt>Wording</dt><dd>Cash and cheque copy comes from <code>cash.instructions</code> and <code>cheque.instructions</code>, which already exist and already say the right thing.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<!-- ============ THREE FAMILIES ============ -->
+<section>
+  <div class="col">
+    <h2>Three families, one flow</h2>
+    <p>The shape is decided <strong>per student, not per person</strong>. There is no adult flow and no parent flow — there is one flow that asks each question at the level the question belongs to. Everything below follows from a single query and a single test.</p>
+
+    <div class="case-q">queue = <b>SELECT</b> student_id <b>FROM</b> guardian <b>WHERE</b> person_id = me<br><i>then, for each student in the queue:</i> student.person_id == my person_id ? <b>me</b> : <b>a child</b></div>
+
+    <p>For a family arriving on the link the queue is simply the student list they just wrote on step 3 — the checkbox puts the signer in it, each <span dir="rtl">+ הוספת ילד</span> adds a child. For a family already on file it is the query above. Same queue either way, so steps 4 and 5 never need to know which kind of family they are serving.</p>
+
+    <p>A parent's name and ת.ז. is a fact recorded <em>about a child</em>, so the club knows who answers for a minor. Pickup permission is about collecting a child from training. <code>student.grade</code> is a school class. None of the three has a subject when the only student is the adult signing.</p>
+  </div>
+
+  <div class="col">
+    <div class="cases">
+
+      <div class="case">
+        <div class="case-h"><span class="case-n">A</span><span class="case-t">The person is the student</span></div>
+        <p class="case-lede">An adult enrolling themselves. No children involved.</p>
+        <div class="case-q">guardian: (<b>me</b> → <b>me</b>)<br>queue: [ me ] &nbsp;<i>· one subject, and it is the signer</i></div>
+        <ol class="case-steps">
+          <li><span class="s">הסכמה<em>step 1</em></span><span>Two documents, two ticks. Identical for everyone — consent is about a person, never about who trains.</span></li>
+          <li><span class="s">תקנון<em>step 2</em></span><span>One agreement, mine.</span></li>
+          <li><span class="s">הפרטים שלך<em>step 3</em></span><span>My ת.ז., address, city, phones, email, year of immigration. <span class="off">Parents block, pickup and כיתה/גן are not rendered</span> — and there are no student rows either, because my ת.ז. is in the card directly above.</span></li>
+          <li><span class="s">הצהרת בריאות<em>step 4</em></span><span>One declaration. No pills and no counter — one subject is not a queue. Questions and clause in the first person. My signature.</span></li>
+          <li><span class="s">תשלום<em>step 5</em></span><span>One method, one row, one price. No "applies to all three children" line, because there is one.</span></li>
+        </ol>
+      </div>
+
+      <div class="case">
+        <div class="case-h"><span class="case-n">B</span><span class="case-t">The guardian trains, and so do their children</span></div>
+        <p class="case-lede">A parent on the mat alongside two of their own. This is the case that proves the per-student rule — the flow is <em>not</em> the adult shape, because the children are still children.</p>
+        <div class="case-q">guardian: (<b>me</b> → <b>me</b>), (<b>me</b> → דנה), (<b>me</b> → יוסי)<br>queue: [ me, דנה, יוסי ] &nbsp;<i>· three subjects, one of them the signer</i></div>
+        <ol class="case-steps">
+          <li><span class="s">הסכמה · תקנון<em>steps 1–2</em></span><span>Identical again.</span></li>
+          <li><span class="s">הפרטים שלכם<em>step 3</em></span><span>My details as before — <strong>and the parents block and the pickup list come back</strong>, because Dana and Yossi are minors and those facts are theirs. My slot in the parents block is pre-filled and marked <span dir="rtl">(אתם)</span>. Two student rows carry ת.ז. and כיתה; <strong>my own row shows <span dir="rtl">✓ לפי הפרטים שלמעלה</span></strong> with no boxes — my ת.ז. is already typed and I have no school class.</span></li>
+          <li><span class="s">הצהרות בריאות<em>step 4</em></span><span>A queue of three, <strong>me first</strong>: <span dir="rtl">אני · 1 מתוך 3</span>, then Dana, then Yossi. My card is first person, theirs third. Three declarations, three signatures, three PDFs — being the signer excuses nobody from their own.</span></li>
+          <li><span class="s">תשלום<em>step 5</em></span><span>One method question, then a summary of three rows — my tuition beside my children's.</span></li>
+        </ol>
+      </div>
+
+      <div class="case">
+        <div class="case-h"><span class="case-n">C</span><span class="case-t">Only the children are in the club</span></div>
+        <p class="case-lede">The ordinary case, and the one the whole redesign was aimed at.</p>
+        <div class="case-q">guardian: (<b>me</b> → דנה), (<b>me</b> → יוסי), (<b>me</b> → נעה)<br>queue: [ דנה, יוסי, נעה ] &nbsp;<i>· no student row exists for me at all</i></div>
+        <ol class="case-steps">
+          <li><span class="s">הסכמה · תקנון<em>steps 1–2</em></span><span>Identical.</span></li>
+          <li><span class="s">הפרטים שלכם<em>step 3</em></span><span>Everything: my details, the parents block with my slot pre-filled and at least one parent required, the pickup list, then three student rows of two boxes each. This is the entire typing burden of the flow, and it happens once.</span></li>
+          <li><span class="s">הצהרות בריאות<em>step 4</em></span><span><span dir="rtl">דנה 1 מתוך 3</span>, <span dir="rtl">יוסי 2 מתוך 3</span>, <span dir="rtl">נעה 3 מתוך 3</span>. All third person. <strong>I never appear in this queue</strong> — I am not on the mat, so I owe no declaration.</span></li>
+          <li><span class="s">תשלום<em>step 5</em></span><span>One method, three rows, one summary.</span></li>
+        </ol>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="col">
+    <h3>The rule underneath all three</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Question</th><th>Asked about</th><th>Appears in</th></tr></thead>
+        <tbody>
+          <tr><td>Terms of use · privacy policy · club terms</td><td>the signing <strong>person</strong></td><td class="f">A · B · C</td></tr>
+          <tr><td>Address, city, phones, email, ת.ז., <span dir="rtl">שנת עליה</span></td><td>the signing <strong>person</strong></td><td class="f">A · B · C</td></tr>
+          <tr><td>Mother / father — name + ת.ז.</td><td>each <strong>child</strong></td><td class="f">B · C</td></tr>
+          <tr><td>Pickup contacts</td><td>each <strong>child</strong></td><td class="f">B · C</td></tr>
+          <tr><td><span dir="rtl">כיתה/גן</span></td><td>each <strong>child</strong></td><td class="f">B · C — children's rows only</td></tr>
+          <tr><td>14 questions, clause, signature</td><td>each <strong>student</strong></td><td class="f">A · B · C — once per subject</td></tr>
+          <tr><td>Payment method</td><td>each <strong>student</strong></td><td class="f">A · B · C — once per subject</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>Case A is not a separate path — it is case C with an empty child list and one subject who happens to be the signer. Case B is not a separate path either — it is case C with one extra subject at the front of the queue. <strong>There is one flow, and it branches on a per-subject test rather than on a person-level mode.</strong></p>
+
+    <div class="note win">
+      <span class="lbl">C turns into B mid-wizard</span>
+      <p>The <span dir="rtl">אני מתאמנת גם</span> checkbox on step 3 is exactly the move from case C to case B, made by the parent, halfway through. Tick it and the queue grows from three to four with the signer at the front — <span dir="rtl">אני · 1 מתוך 4</span> — and step 5 gains a fourth priced row. The wizard does not reload or change shape; the queue was always computed per subject, and one more subject joined it. This is also why the checkbox belongs on step 3 and nowhere else: it is the only screen where the queue is still being written.</p>
+    </div>
+
+    <div class="note win">
+      <span class="lbl">The second parent</span>
+      <p>When David signs in after Michal, consent is a fact about <em>him</em> and has never been recorded — so he agrees to all three documents himself. Step 3 he finds already filled and step 4 already satisfied, so he sees no wizard beyond the two agreement screens. Same "just the changed thing" rule as a republished policy.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ INVENTORY ============ -->
+<section>
+  <div class="col">
+    <h2>Nothing is dropped</h2>
+    <p>Every field the club collects today, and where it goes. The <span class="tag moves">moves</span> rows are the whole of the data change: five columns that are currently written onto <em>each child's</em> person row, and belong on the signing guardian's.</p>
+  </div>
+
+  <div class="col">
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Field</th><th>Stored on</th><th>Step</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>Your first + last name</td><td class="f">person</td><td>3 · your card</td><td><span class="tag new">from sign-in, not typed</span></td></tr>
+          <tr><td>Which parent you are</td><td class="f">guardian.relation</td><td>3 · your card</td><td><span class="tag new">new · one tap</span></td></tr>
+          <tr><td>Your ת.ז.</td><td class="f">person.national_id</td><td>3 · your card</td><td><span class="tag stays">stays</span></td></tr>
+          <tr><td>Address</td><td class="f">person.address</td><td>3 · your card</td><td><span class="tag moves">moves to guardian</span></td></tr>
+          <tr><td>City</td><td class="f">person.city</td><td>3 · your card</td><td><span class="tag moves">moves to guardian</span></td></tr>
+          <tr><td>Home phone</td><td class="f">person.phone_home</td><td>3 · your card</td><td><span class="tag moves">moves to guardian</span></td></tr>
+          <tr><td>Mobile</td><td class="f">person.phone</td><td>3 · your card</td><td><span class="tag moves">merged — asked in both forms today</span></td></tr>
+          <tr><td>Email</td><td class="f">person.email</td><td>3 · your card</td><td><span class="tag new">read-only, verified</span></td></tr>
+          <tr><td>Year of immigration</td><td class="f">person.aliyah_year</td><td>3 · your card</td><td><span class="tag stays">stays</span></td></tr>
+          <tr><td>Second parent — name + ת.ז. + mobile</td><td class="f">person + guardian</td><td>3 · second parent</td><td><span class="tag new">two people, not one record</span></td></tr>
+          <tr><td>Pickup contacts</td><td class="f">student_pickup_contact</td><td>3 · pickup</td><td><span class="tag new">asked once, written per child</span></td></tr>
+          <tr><td>Child’s first + last name</td><td class="f">person</td><td>3 · student row</td><td><span class="tag moves">from form 1</span></td></tr>
+          <tr><td>Child’s birthdate</td><td class="f">person.birthdate</td><td>3 · student row</td><td><span class="tag moves">from form 1</span></td></tr>
+          <tr><td>Groups</td><td class="f">enrollment</td><td>3 · student row</td><td><span class="tag moves">from form 1 — sets the price</span></td></tr>
+          <tr><td>Child’s ת.ז.</td><td class="f">person.national_id</td><td>3 · student row</td><td><span class="tag stays">stays</span></td></tr>
+          <tr><td><span dir="rtl">כיתה/גן</span></td><td class="f">student.grade</td><td>3 · student row</td><td><span class="tag new">children only — optional for an adult</span></td></tr>
+          <tr><td>&ldquo;I train too&rdquo; + group</td><td class="f">student + enrollment</td><td>3 · student list</td><td><span class="tag stays">exists as <code>selfStudent</code></span></td></tr>
+          <tr><td>14 yes/no answers</td><td class="f">health_declaration</td><td>4</td><td><span class="tag stays">stays</span></td></tr>
+          <tr><td>Free-text notes</td><td class="f">health_declaration</td><td>4</td><td><span class="tag stays">stays</span></td></tr>
+          <tr><td>Health fund</td><td class="f">health_declaration</td><td>4</td><td><span class="tag stays">stays</span></td></tr>
+          <tr><td>Emergency phone</td><td class="f">health_declaration</td><td>4</td><td><span class="tag stays">stays</span></td></tr>
+          <tr><td>Signature</td><td class="f">signature_image_encrypted</td><td>4 · per student</td><td><span class="tag stays">stays</span></td></tr>
+          <tr><td>Terms of use consent</td><td class="f">consent (person)</td><td>1</td><td><span class="tag moves">now before any record</span></td></tr>
+          <tr><td>Privacy policy consent</td><td class="f">consent (person)</td><td>1</td><td><span class="tag moves">now before any record</span></td></tr>
+          <tr><td>Club terms consent</td><td class="f">consent (person)</td><td>2</td><td><span class="tag moves">now before any record</span></td></tr>
+          <tr><td>Payment method</td><td class="f">per student</td><td>5</td><td><span class="tag stays">stays</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>What the move actually costs</h3>
+    <p>Those five columns already exist on <code>person</code>. Nothing new is added and no table is created — the change is <em>which</em> person row the registration service writes them to. <code>save_registration</code> currently does <code>child_person.address = …</code>; it should do <code>signer_person.address = …</code>, alongside the ת.ז. and immigration year it already writes there.</p>
+    <p>Nothing in the merge invents a field either. Every row above is collected today, by one form or the other; what changes is that they are collected <strong>on one screen, in one transaction, after consent</strong> rather than across two components on either side of a gate.</p>
+    <p>The argument is not mine. <code>person.aliyah_year_encrypted</code> already carries it, in writing: <em>"On the parent, not the student, because that is whose fact it is: a two-child family would otherwise store it twice with nothing keeping the copies in agreement."</em> Address, city and the three contact columns are the same fact about the same person, and they are stored twice today.</p>
+    <p>There is deliberately <strong>no household or family table</strong>, and this design does not ask for one. <code>app/models/people.py</code> says one "must never" be added, because after a separation there is no good answer to which household a child belongs to. "The household, asked once" is really "the signing person's own row, asked once" — which survives the separated-parent case intact, since each guardian carries their own address and each sees the flow from their own row.</p>
+  </div>
+</section>
+
+<!-- ============ FINDINGS ============ -->
+<section>
+  <div class="col">
+    <h2>What this surfaces</h2>
+    <p>Six things found while reading the current implementation. The first two are structural; the third blocks a real user today.</p>
+
+    <ol class="findings">
+      <li>
+        <b>One family is typed into two forms that do not know each other.</b>
+        <code>JoinFlow</code> collects the parent's name and phone and every child's name, birthdate and groups. <code>RegistrationStep</code> then collects the address, city, phones, email, both parents and the pickup list — <strong>once per child</strong>. Thirteen of its fifteen fields are not about the child they are shown under. This is the mechanism behind "the form that repeats", and merging the two is the only fix that removes it rather than hiding it.
+      </li>
+      <li>
+        <b>Children are created before any consent exists.</b>
+        <code>JoinShell</code> renders the join form outside <code>AuthedApp</code>, so outside <code>ConsentGate</code>. Names, birthdates and phone numbers of minors are written first and the privacy policy is agreed to afterwards. The gate nesting in the same file argues the opposite for the health record, in so many words: consent asked after collection "has the consent doing no work".
+      </li>
+      <li>
+        <b>A self-enrolled adult is asked for their school class and their parents.</b>
+        <code>selfStudent</code> already ships. Tick it and the registration gate fires for you as a student — demanding <code>grade</code>, which is in <code>REQUIRED_REGISTRATION_FIELDS</code> and which an adult cannot answer, and rendering a card headed <span dir="rtl">פרטי ההורים</span> asking who your mother and father are. The gate is unpassable and the question is absurd. This is reachable today.
+      </li>
+      <li>
+        <b>Five household columns are stored once per child.</b>
+        Three children means three addresses with nothing keeping them in agreement, so a family that moves house updates one and stays wrong twice. <code>person.aliyah_year_encrypted</code> already carries the argument against this, in writing, for its own column.
+      </li>
+      <li>
+        <b>The two parent-name fields are one person.</b>
+        <span dir="rtl">הורה נוסף · שם האם</span> and <span dir="rtl">שם האב</span> write into a single other-parent record's <code>first_name</code> and <code>last_name</code>. A family cannot record both parents, and the labels promise something the storage does not do.
+      </li>
+      <li>
+        <b>The canvas promises an annual renewal that does not exist.</b>
+        The first-registration artboard reads <span dir="rtl">ההצהרה תקפה לשנה. נזכיר לכם לחדש.</span> while <code>declaration.noExpiry</code> says declarations never expire. Flagged in the <code>12j</code> spec; repeated because this redesign touches that screen.
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============ MIGRATION ============ -->
+<section>
+  <div class="col">
+    <h2>Moving the five columns</h2>
+    <p>The address, city, home phone, mobile and email currently sitting on each child's row have to be seeded onto the guardian's. Most families agree with themselves and the copy is silent. The rule is for the ones that do not.</p>
+
+    <dl class="rules">
+      <div><dt>The rule</dt><dd><strong>The most recently updated child's copy wins.</strong> Siblings disagree almost always because one record was updated and the other was not, so the newest copy is right nearly every time.</dd></div>
+      <div><dt>Nobody blocked</dt><dd>No family is sent back to step 3 and no column is left empty. A parent who did nothing wrong does not meet a gate because of a duplication we created.</dd></div>
+      <div><dt>Nothing silent</dt><dd>Every family whose copies disagreed lands on a short manager list — <em>addresses to check</em> — naming the family and which column differed. The manager is the only person who holds the knowledge to settle it.</dd></div>
+      <div><dt>Both parents</dt><dd>Each guardian is seeded from their own children's copies and keeps <strong>their own</strong> address afterwards. Separated parents at two addresses end up correct by construction — which is the case a household table could never have handled, and the reason there is not one.</dd></div>
+    </dl>
+
+    <div class="note">
+      <span class="lbl">One-time</span>
+      <p>After the migration, the child rows' copies of these five columns stop being written to and are the migration's business alone. Whether they are cleared or left in place as a fallback is a call for whoever writes it — but nothing should read them again.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="col">
+    Design only. Nothing built, no code changed. Hebrew strings are the product's own — <code>he/health.ts</code>, <code>he/billing.ts</code> — except where a screen is new and the key does not exist yet.
+  </div>
+</footer>
+
+</div>

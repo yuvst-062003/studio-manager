@@ -53,6 +53,7 @@ from app.schemas.events import (
     EventPage,
     EventRegistrationOut,
     EventRegistrationPage,
+    EventStatus,
     EventType,
     EventUpdateIn,
 )
@@ -310,6 +311,15 @@ class EventAttendanceIn(BaseModel):
 
 class EventAttendanceOut(BaseModel):
     marked: int
+    #: §6.5 of the staff app redesign (decision 14) -- the event's status AT THE MOMENT this
+    #: write landed. `mark_attendance` never refuses to write against a cancelled event
+    #: (`RsvpService.mark_attendance` checks nothing about status -- "the roster survives" a
+    #: cancellation, per this endpoint's own docstring), so nothing else on this response
+    #: tells a caller whether it just marked attendance on one. The offline flusher
+    #: (`packages/core/src/offline/sync.ts::sendEventBatch`) reads this to raise the SAME
+    #: `session_cancelled` conflict card a session's batch endpoint raises server-side --
+    #: reused rather than a new shape, per §6.5's "no new card shape".
+    event_status: EventStatus
 
 
 class RegistrationAnswerOut(BaseModel):
@@ -541,14 +551,18 @@ def record_event_attendance(
     """§5.8 -- "attendance is taken on an event with the same UI as a session". §3.2 gives
     every staff role "Take/edit attendance", including an assistant coach."""
     try:
-        EventService.read(session, event_id)
+        event = EventService.read(session, event_id)
     except EventNotFoundError as exc:
         raise _not_found() from exc
     marked = RsvpService.mark_attendance(
         session, event_id, {mark.student_id: mark.attended for mark in body.marks}
     )
     session.commit()
-    return EventAttendanceOut(marked=marked)
+    # `event.status` as it stood at write time, not re-read after commit -- nothing between
+    # the read above and here can change it, and re-reading would be a second query for a
+    # value already in hand. §6.5's offline flusher is the reader that matters: see
+    # `EventAttendanceOut.event_status`'s own docstring.
+    return EventAttendanceOut(marked=marked, event_status=event.status)
 
 
 @router.get("/me/events", response_model=ParentEventPage)

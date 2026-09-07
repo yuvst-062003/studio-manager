@@ -47,6 +47,10 @@ function scheduleStub(sessions: SessionRow[]): StaffScheduleClient {
   return {
     listSessions: vi.fn(async () => sessions),
     listTrainingYears: vi.fn(async () => []),
+    // §4.7's calendar (checkpoint C11) — the tasks tab never calls either; present only
+    // so this stub satisfies the interface's shape.
+    patchSession: vi.fn(async () => sessions[0]!),
+    cancelSession: vi.fn(async () => sessions[0]!),
   }
 }
 

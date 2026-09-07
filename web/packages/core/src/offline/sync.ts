@@ -37,8 +37,16 @@ const BATCH_PATH = '/api/v1/attendance/batch'
 const bulkPath = (sessionId: string): string =>
   `/api/v1/sessions/${sessionId}/attendance/bulk-present`
 
+/** §6.5 — `POST /events/{id}/attendance`, decision 14's queued write. `sessionId` here is
+ *  the EVENT's id (see `PendingOp.session_id`'s own comment in `types.ts`). */
+const eventAttendancePath = (eventId: string): string => `/api/v1/events/${eventId}/attendance`
+
 /** §5.7's two request shapes. `attendance.bulk` is the only kind that is not a mark. */
 const isBulk = (op: PendingOp): boolean => op.kind === 'attendance.bulk'
+
+/** §6.5's third shape, routed to a different endpoint entirely and answered with a
+ *  different response — see `sendEventBatch` below. */
+const isEventAttendance = (op: PendingOp): boolean => op.kind === 'event.attendance'
 
 /** What the server's `BatchResult` looks like on the wire. Mirrors
  *  `app/services/attendance/schemas.py`. */
@@ -52,6 +60,24 @@ type BatchResponse = {
     student_ids: string[]
     count: number
   }[]
+}
+
+/**
+ * `EventAttendanceOut`, mirrored from `app/schemas/events.py`.
+ *
+ * Nothing like `BatchResponse`'s `conflicts` array exists here — `record_event_attendance`
+ * never checks the event's status before writing (§5.8: "the roster survives" a
+ * cancellation, so a late mark on a cancelled event still has somewhere to land), and
+ * `RsvpService.mark_attendance` silently skips a `student_id` with no registration rather
+ * than erroring. `event_status` is what lets this module detect the first case without the
+ * server doing it FOR the client, the way `session_status_seen` lets the session batch
+ * endpoint do it; `marked` less than the number of marks sent is how it detects the second.
+ * Both become the SAME two existing conflict kinds sessions already raise — see
+ * `sendEventBatch` — because §6.5 is explicit that there is no new card shape.
+ */
+type EventAttendanceResponse = {
+  marked: number
+  event_status: 'draft' | 'published' | 'cancelled' | 'completed'
 }
 
 export type FlushResult = {
@@ -112,10 +138,21 @@ export async function flush(deps: FlushDeps): Promise<FlushResult> {
   // Grouped by session AND by shape. A coach who taps "everyone" and then corrects one
   // row leaves both kinds queued for the same session, and they are two different requests
   // to two different endpoints — grouping on the session alone put them in one.
-  for (const [sessionId, ops] of groupBySession(mine)) {
-    for (const batch of [ops.filter(isBulk), ops.filter((op) => !isBulk(op))]) {
+  //
+  // §6.5 adds a THIRD shape, and it is pulled out first rather than folded into the loop
+  // below: it goes to a different endpoint, answers with a different response, and is never
+  // mixed with a bulk or a mark in one request — an event has no bulk-present endpoint and
+  // never will (decision 14 only queues per-student marks).
+  for (const [targetId, ops] of groupBySession(mine)) {
+    const eventOps = ops.filter(isEventAttendance)
+    if (eventOps.length > 0) await sendEventBatch(targetId, eventOps)
+
+    for (const batch of [
+      ops.filter(isBulk),
+      ops.filter((op) => !isBulk(op) && !isEventAttendance(op)),
+    ]) {
       if (batch.length === 0) continue
-      await sendBatch(sessionId, batch)
+      await sendBatch(targetId, batch)
     }
   }
 
@@ -184,6 +221,92 @@ export async function flush(deps: FlushDeps): Promise<FlushResult> {
           kind: conflict.kind,
           session_id: conflict.session_id,
           count: conflict.count,
+        }),
+      )
+    }
+  }
+
+  /**
+   * §6.5's queued write, one request per event — the same "one per target, not one per tap"
+   * reasoning `sendBatch` gives for sessions.
+   *
+   * No `Idempotency-Key` header, and that is a considered omission rather than a gap: a
+   * replayed batch tells `RsvpService.mark_attendance` to set `attended` to the same value
+   * again, which is a no-op by construction — there is no counter here for a duplicate
+   * delivery to double, the way there would be for a payment. Decision 14's "idempotency
+   * stays `client_mark_id`" is honoured at the DEVICE, exactly as it already is for a
+   * session: `pendingOps.enqueue` keys every op on it, so three taps on one row still leave
+   * one op in the queue by the time a flush ever runs.
+   */
+  async function sendEventBatch(eventId: string, ops: PendingOp[]): Promise<void> {
+    const send = (): Promise<Response> =>
+      deps.post(eventAttendancePath(eventId), {
+        marks: ops.map((op) => ({
+          student_id: op.student_id,
+          attended: (op.payload as { attended: boolean }).attended,
+        })),
+      })
+
+    let response: Response
+    try {
+      response = await send()
+      if (response.status === 401 && !refreshed) {
+        refreshed = true
+        if (!(await deps.refresh())) {
+          await noteAttempts(deps.store, ops)
+          return
+        }
+        response = await send()
+      }
+    } catch {
+      await noteAttempts(deps.store, ops)
+      return
+    }
+
+    if (!response.ok) {
+      await noteAttempts(deps.store, ops)
+      return
+    }
+
+    const body = (await response.json()) as EventAttendanceResponse
+    // The server took the batch — same rule `sendBatch` follows for a cancelled SESSION
+    // (§10.5: "the marks are accepted and stored... a human decides"). §5.8 makes the same
+    // choice for an event explicitly ("the roster survives" a cancellation), so the marks
+    // are not held back merely because the event turned out to be cancelled underneath them.
+    await markSynced(
+      deps.store,
+      ops.map((op) => op.client_mark_id),
+    )
+    flushed += ops.length
+
+    // §6.5's first conflict — reused rather than invented, per its own "no new card shape".
+    // `record_event_attendance` never refuses to write against a cancelled event (unlike a
+    // session's batch endpoint, nothing on the SERVER rejects this) — so `event_status` is
+    // what tells the client the write it just made landed against a cancelled event. Read
+    // from the LIVE response rather than the local cache: the cache can be a foreground
+    // resume behind the server, and the response is the one fact here that cannot be stale.
+    if (body.event_status === 'cancelled') {
+      cards.push(
+        await raise(deps.store, {
+          kind: 'session_cancelled',
+          session_id: eventId,
+          count: ops.length,
+        }),
+      )
+    }
+
+    // §6.5's second conflict — "a child no longer registered". `mark_attendance` silently
+    // skips a `student_id` with no matching registration rather than erroring, so `marked`
+    // coming back lower than the number of marks sent is the only signal this client gets;
+    // it cannot say WHICH student, but `ConflictCard` never carries that for a session's
+    // `student_unenrolled` card either — only a count.
+    const missing = ops.length - body.marked
+    if (missing > 0) {
+      cards.push(
+        await raise(deps.store, {
+          kind: 'student_unenrolled',
+          session_id: eventId,
+          count: missing,
         }),
       )
     }

@@ -64,6 +64,10 @@ function stub(
   return {
     listSessions: vi.fn(async () => sessions),
     listTrainingYears: vi.fn(async () => trainingYears),
+    // §4.7's calendar (checkpoint C11) — this screen (9a/1d) never calls either; present
+    // only so this stub satisfies the interface's shape.
+    patchSession: vi.fn(async () => TODAY_SESSION),
+    cancelSession: vi.fn(async () => TODAY_SESSION),
   }
 }
 

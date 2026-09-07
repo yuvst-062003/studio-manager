@@ -115,12 +115,14 @@ import {
   AlertCircle,
   Ban,
   Calendar as CalendarIcon,
+  CalendarDays,
   CheckCircle2,
   ChevronLeft,
   ClipboardList,
   Clock,
   MapPin,
   MessageCircle,
+  Settings2,
   Trophy,
   User,
   Users,
@@ -295,7 +297,11 @@ function withMonoNumerals(text: string): ReactNode {
  * something, that meaning is also written out as text (SC 1.4.1 — never colour alone),
  * either on this label or on the badge the card itself renders beside it.
  */
-function TimelineDot({ state, time, locale }: { state: DotState; time: string; locale: Locale }) {
+// Exported — the month calendar (§4.7, checkpoint C11) draws its own day's agenda with
+// this exact dot, `SessionCard` and `EventCard`, rather than a second card built to look
+// the same: "the same card anatomy as the schedule tab" is a claim only true while there is
+// one component being pointed at twice, not two that started identical and can drift.
+export function TimelineDot({ state, time, locale }: { state: DotState; time: string; locale: Locale }) {
   const labelKey =
     state === 'pendingClose'
       ? 'schedule.session.state.pendingClose'
@@ -611,6 +617,18 @@ export function TodayScreen({
             className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-xs border border-blue-100 active:scale-95 transition-all shrink-0"
           >
             <CalendarIcon className="w-5 h-5" aria-hidden="true" />
+          </a>
+          {/* §4.7 (checkpoint C11) — the month calendar, a separate door from the day
+              picker just above: that one opens 9b (pick a single day or a range within
+              roughly a week either side); this one opens the FULL month grid, the one
+              screen that can show a coach what is happening beyond tomorrow. */}
+          <a
+            href="#/calendar"
+            data-testid="open-month-calendar"
+            aria-label={t(locale, 'schedule.staffCalendar.openButton')}
+            className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-xs border border-indigo-100 active:scale-95 transition-all shrink-0"
+          >
+            <CalendarDays className="w-5 h-5" aria-hidden="true" />
           </a>
           <button
             type="button"
@@ -1007,7 +1025,8 @@ function SessionBriefingControl({
   )
 }
 
-function SessionCard({
+// Exported (§4.7, checkpoint C11) — see `TimelineDot`'s own note just above for why.
+export function SessionCard({
   session,
   state,
   locale,
@@ -1017,6 +1036,7 @@ function SessionCard({
   canWritePlan,
   saveBriefing,
   chaseFamilies,
+  onEdit,
 }: {
   session: SessionRow
   state: DotState
@@ -1036,6 +1056,14 @@ function SessionCard({
    *  nothing but the body it collected, never the session id. */
   saveBriefing: (sessionId: string) => (body: string) => Promise<void>
   chaseFamilies: (studentIds: string[]) => () => Promise<ContactFamily[]>
+  /**
+   * §4.7's edit sheet (checkpoint C11) — `undefined` on every call site in THIS file, so
+   * the schedule tab renders exactly as it did before this prop existed. The month
+   * calendar is the one caller that passes it, which is what turns this card from a
+   * read-and-open-attendance surface into one a manager or lead coach can also act on
+   * without a second card built to look the same (see this file's export note above).
+   */
+  onEdit?: () => void
 }) {
   const counts = confirmationCounts(roster)
   const notAnsweredIds = (roster ?? [])
@@ -1103,7 +1131,23 @@ function SessionCard({
   return (
     <article className={`bg-white rounded-3xl p-4 ${CARD_FRAME[state]}`}>
       <div className="flex items-center justify-between gap-2 mb-2">
-        <SessionStateChip status={session.status} state={state} locale={locale} />
+        <div className="flex items-center gap-1.5 min-w-0">
+          <SessionStateChip status={session.status} state={state} locale={locale} />
+          {/* §4.7's edit sheet (checkpoint C11) — the ONLY caller passing `onEdit` is the
+              month calendar; every schedule-tab card renders exactly as it did before this
+              button existed. */}
+          {onEdit ? (
+            <button
+              type="button"
+              data-testid="session-edit-open"
+              aria-label={t(locale, 'schedule.session.actions')}
+              onClick={onEdit}
+              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-all hover:bg-slate-200 active:scale-95"
+            >
+              <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
         {/* 1d — `45 דק׳`, derived: two instants are already on the wire. */}
         <div className="flex flex-col items-end gap-0.5">
           <span className="text-xs font-bold font-mono text-slate-400">
@@ -1308,7 +1352,8 @@ function SessionCard({
  * `timelineStates`'s own rule) — the amber only marks the leading chip, which is about
  * what kind of thing this is, not when.
  */
-function EventCard({ event, state, locale }: { event: EventOut; state: DotState; locale: Locale }) {
+// Exported (§4.7, checkpoint C11) — see `TimelineDot`'s own note above for why.
+export function EventCard({ event, state, locale }: { event: EventOut; state: DotState; locale: Locale }) {
   const total = event.rsvp_yes_count + event.rsvp_no_count + event.rsvp_pending_count
   return (
     <article className={`bg-white rounded-3xl p-4 ${CARD_FRAME[state]}`}>

@@ -17,7 +17,14 @@
 // unbounded cache is what puts the device under the storage pressure that §6.5 says can
 // evict the one store that must not be.
 import { STUDIO_TIMEZONE } from '../datetime'
-import type { BootstrapPayload, CachedSession, OfflineStore, RosterRow, TableName } from './types'
+import type {
+  BootstrapPayload,
+  CachedEvent,
+  CachedSession,
+  OfflineStore,
+  RosterRow,
+  TableName,
+} from './types'
 
 /** §10.6 — "two days of sessions". Today and tomorrow, which is §6.1's priming window. */
 export const CACHE_WINDOW_DAYS = 2
@@ -61,10 +68,68 @@ export async function writeWindow(store: OfflineStore, payload: BootstrapPayload
     const roster = payload.rosters[session.id]
     if (roster !== undefined) await store.put<RosterRow[]>(_rosters, session.id, roster)
   }
+  // §6.5 — events ride in the SAME two tables as sessions, tagged `kind: 'event'`. This is
+  // the one place that conversion happens: everything below this point (`evict`,
+  // `cachedSessions`, `readSession`, `readRoster`) is written against `CachedSession` and
+  // never needs to know an event was ever a different shape on the wire.
+  for (const event of payload.events ?? []) {
+    const asSession = eventToCachedSession(event)
+    await store.put<CachedSession>(_sessions, sessionKey(asSession), asSession)
+    const roster = payload.event_rosters?.[event.id]
+    if (roster !== undefined) await store.put<RosterRow[]>(_rosters, event.id, roster)
+  }
   // §10.6 — "stored in IndexedDB with a `synced_at` watermark." The SERVER's clock, not the
   // device's: §10.4's staleness banner and §10.5's skew detection both compare against it,
   // and a device an hour out would compute both wrong.
   await store.put<string>(_meta, WATERMARK_KEY, payload.server_time)
+}
+
+/**
+ * §6.5 — the ONE place an event becomes a `CachedSession`. Never called from `sync.ts` or
+ * from a screen: those read `CachedSession.kind` off whatever `readSession`/`cachedSessions`
+ * already returned, which is what makes "ride in the existing tables" true rather than
+ * merely documented.
+ *
+ * `group_id`/`group_name` have no natural event equivalent — an event belongs to no group —
+ * so `group_id` carries the event's own id (never dereferenced as a real group anywhere; it
+ * exists only so this remains a complete `CachedSession` rather than one with an optional
+ * field nobody else on this type has) and `group_name` carries the event's title, which is
+ * exactly what a coach's eye reads off a session card in its place (decision 4 — events
+ * appear inline in the schedule list, marked as events, not as a session with a blank name).
+ */
+function eventToCachedSession(event: CachedEvent): CachedSession {
+  return {
+    id: event.id,
+    group_id: event.id,
+    group_name: event.title,
+    starts_at: event.starts_at,
+    ends_at: event.ends_at,
+    location_name: event.location_name,
+    status: eventStatusAsSessionStatus(event.status),
+    attendance_taken: false,
+    kind: 'event',
+  }
+}
+
+/**
+ * `CachedSession.status` is a session's three words, and widening that shared union so an
+ * event's fourth (`published`) fits would touch every switch over it in three apps for one
+ * caller's benefit. Mapped instead, onto what each word actually means to a generic reader:
+ *
+ *   * `cancelled` → `cancelled`, unchanged — the one mapping `sync.ts`'s conflict detection
+ *     actually depends on (§6.5's "a cancelled event comes back as a conflict card").
+ *   * `completed` → `completed`, unchanged — the event has been held.
+ *   * `published` → `scheduled` — a published, not-yet-cancelled event reads to any generic
+ *     consumer of `status` exactly the way a scheduled session does: it is going to happen
+ *     (or is happening) and nobody has called it off.
+ *   * `draft` → `scheduled` too, though this arm is unreached in practice: `build_bootstrap`
+ *     only ever sends events that already have a roster to cache, and a draft has none yet
+ *     (publishing is what materialises it). Mapped rather than left to throw, because a
+ *     server that ever changed that would fail this function loudly in exactly the wrong
+ *     place — inside a cache write a coach's next tap depends on.
+ */
+function eventStatusAsSessionStatus(status: CachedEvent['status']): CachedSession['status'] {
+  return status === 'cancelled' || status === 'completed' ? status : 'scheduled'
 }
 
 export async function watermark(store: OfflineStore): Promise<string | null> {

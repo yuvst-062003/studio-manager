@@ -22,6 +22,18 @@ from tests.people.conftest import FakeSchedule, make_session
 
 SUNDAY = datetime(2026, 9, 6, 14, 0, tzinfo=UTC)
 
+#: `trains_sundays` anchors the fixture session to the FIXED calendar date above, but
+#: `training_weekdays` (app/services/people/group_days.py) observes the materialized
+#: calendar only 4 weeks forward from "today" -- `app.core.clock.now()`, this repo's
+#: only clock (app/core/clock.py). Once the real "today" walks past 2026-09-06 the
+#: Sunday session falls outside that window, the group stops appearing to train on any
+#: day, and `_add`'s enrollment is refused -- which is exactly what happened when the
+#: real calendar reached 2026-09-07. Pinning the server's clock with `X-Dev-Now`
+#: (app/core/clock.py's `DevClockMiddleware`, the same seam §19.5 built for this) to a
+#: date safely before the fixture session keeps `_add`'s outcome the same on any
+#: real-world date. Do NOT delete this and let `_add` fall back to the real clock.
+DEV_NOW_HEADERS = {"X-Dev-Now": datetime(2026, 9, 1, 0, 0, tzinfo=UTC).isoformat()}
+
 
 @pytest.fixture
 def trains_sundays(monkeypatch, studio, a_group, a_second_group, a_training_year):
@@ -129,7 +141,11 @@ def _add(client, guardian_caller, group_ids, **over) -> dict:
         "group_ids": [str(g) for g in group_ids],
         **over,
     }
-    return client.post("/api/v1/me/students", json=payload, headers=guardian_caller.headers)
+    return client.post(
+        "/api/v1/me/students",
+        json=payload,
+        headers={**guardian_caller.headers, **DEV_NOW_HEADERS},
+    )
 
 
 def test_a_parent_adding_a_child_enrols_them(

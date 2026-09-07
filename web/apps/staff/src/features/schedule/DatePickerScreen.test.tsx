@@ -34,6 +34,10 @@ function stub(sessions: SessionRow[] = [SESSION]): StaffScheduleClient {
     listTrainingYears: vi.fn(async () => [
       { starts_on: '2026-09-01', ends_on: '2027-08-20', status: 'active' },
     ]),
+    // §4.7's calendar (checkpoint C11) — this screen (9b) never calls either; present
+    // only so this stub satisfies the interface's shape.
+    patchSession: vi.fn(async () => SESSION),
+    cancelSession: vi.fn(async () => SESSION),
   }
 }
 

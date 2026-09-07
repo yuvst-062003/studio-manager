@@ -93,6 +93,9 @@ export const events: Bundle = {
 
   'addToCalendar': 'Add to calendar',
   'attendance.take': 'Take attendance for this event',
+  'attendance.requiresConnection': 'Taking attendance for an event requires an internet connection',
+  'attendance.requiresConnectionHint': 'The mark will not be saved while offline — events have no sync queue. Try again once you are connected',
+  'attendance.markFailed': 'Marking failed. Try again',
 
   // -- belt exams (§5.9; staff 9d, dashboard 4d, 6b) -------------------------------
   'exam.title': 'Belt exam',

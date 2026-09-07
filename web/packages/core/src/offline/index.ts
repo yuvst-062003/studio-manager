@@ -60,6 +60,7 @@ export {
 export { queueMark } from './queueMark'
 export type {
   BootstrapPayload,
+  CachedEvent,
   CachedSession,
   ConflictCard,
   ConflictKind,

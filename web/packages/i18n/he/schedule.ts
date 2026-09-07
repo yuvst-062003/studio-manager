@@ -249,6 +249,10 @@ export const schedule: Bundle = {
   'session.cancelReason.scheduleChange': 'שינוי בלו״ז השבועי',
   'session.cancelReason.closure': 'המועדון סגור',
   'session.editTime': 'שינוי שעה',
+  // §4.7 של עיצוב אפליקציית הצוות מחדש — גיליון העריכה של הלוח החודשי (נקודת ביקורת C11,
+  // החלטות 8/9). מאמן/ת עוזר/ת מקבל/ת את אותו הגיליון בלי אף אחת מהפקדים שמתחתיו — זה
+  // המשפט שמסביר למה, במקום כפתור שפשוט חסר בלי הסבר.
+  'session.editRestricted': 'רק מנהלים ומאמנים בכירים יכולים לערוך שיעור זה. הפרטים כאן לצפייה בלבד.',
   'session.save': 'שמירה',
   'session.saved': 'השיעור עודכן',
   'session.adHocStart': 'שעת התחלה',
@@ -815,4 +819,73 @@ export const schedule: Bundle = {
   // The account tab's own link (`features/account/AccountScreen.tsx`).
   'constraint.account.title': 'אילוצים וזמינות',
   'constraint.account.subtitle': 'הגשת ימי היעדרות למאמנים',
+
+  // -- §4.7 של עיצוב אפליקציית הצוות מחדש — הלוח החודשי, `#/calendar` (נקודת ביקורת C11) --
+  //
+  // החלטה 7: לאפליקציית הטלפון יש תצוגה חודשית כי זהו המסך היחיד שיכול להראות למאמן/ת את
+  // השיעורים והאירועים העתידיים שלו/ה — לא הרצועה של שבעה ימים ולא המטמון הלא־מקוון מגיעים
+  // מעבר למחר. `staffCalendar.*` הוא קידומת נפרדת מ־`calendar.*` למעלה, שהוא הלוח החודשי
+  // של ילד באפליקציית ההורים (12b) — מסך אחר, קהל אחר, והתנגשות שמות כאן הייתה הופכת שני
+  // מושגים למפתח אחד.
+  'staffCalendar.title': 'הלוח החודשי',
+  'staffCalendar.subtitle': 'כל השיעורים והאירועים של החודש, במבט אחד',
+  'staffCalendar.back': 'חזרה ללוח הזמנים',
+  'staffCalendar.openButton': 'פתיחת הלוח החודשי',
+  // כפתור הכותרת שפותח את `#/constraints` — אותו מסך שכבר מקושר מלשונית החשבון
+  // (`constraint.account.*` למעלה); זהו קישור שני, לא תחליף. מנוסח כמו בפרוטוטייפ.
+  'staffCalendar.fileConstraint': 'הגש אילוץ',
+  // -- מקרא הלוח, מתחת לרשת הימים — תיאור, לא קישוט (SC 1.4.1: לכל תג יש תווית לצידו,
+  // הצבע עצמו אינו נושא המשמעות לבדו). מתאר את הסימונים שהמסך הזה מצייר בפועל
+  // (תג מונה, נקודת אילוץ, טבעת "היום") — לא את רשימת הפרוטוטייפ אם הן נבדלות.
+  'staffCalendar.legend.label': 'מקרא סימוני הלוח',
+  'staffCalendar.legend.count': 'שיעורים ואירועים מתוכננים',
+  'staffCalendar.legend.constraint': 'אילוץ מאמן רשום',
+  // שורת הסינון שהפרוטוטייפ מצייר עבורה חמישה צ׳יפים, ורק שניים מהם באמת מסננים משהו
+  // (התיקון של §4.7 עצמו). ההבחנה האמיתית מתחת לפני השטח היא איזו קבוצה מתאמנת, ולכן זו
+  // התווית היחידה שהמסך האמיתי צריך; 'הכל' הוא `week.filter.all`, לשימוש חוזר ולא כפילות.
+  'staffCalendar.filterLegend': 'סינון לפי קבוצה',
+  // השם הנגיש של תא יום (SC 1.4.1 — צבע לבדו אינו נושא משמעות, כך שהנקודה על יום עם אילוץ
+  // אינה הדבר היחיד שאומר זאת; `dayConstraint` למטה מתווסף לאותו שם).
+  'staffCalendar.dayItemCount': '{{count}} פעילויות ביום זה',
+  'staffCalendar.dayItemCount.one': 'פעילות אחת ביום זה',
+  'staffCalendar.dayEmpty': 'אין פעילויות ביום זה',
+  // `{{reason}}` מגיע כבר מתורגם דרך `constraint.reason.<code>` — לעולם לא קוד גולמי
+  // מהשרת שמוקרא בקורא מסך.
+  'staffCalendar.dayConstraint': 'יש אילוץ מאמן: {{reason}}',
+  // הקישור של לשונית החשבון (`features/account/AccountScreen.tsx`), באותה הצורה ש־
+  // `constraint.account.*` למעלה כבר קבע עבור אותה לשונית.
+  'staffCalendar.account.title': 'לוח חודשי',
+  'staffCalendar.account.subtitle': 'כל השיעורים והאירועים של החודש',
+
+  // -- §5/C12 of the staff app redesign — the DASHBOARD's side: the alert-centre card and
+  // the resolution popup it opens. Decision 10: approve or refuse the constraint itself.
+  // Decision 11: an alert opening a popup with replacements and actions. Decision 12: the
+  // substitute picker shows everyone with a flag, never filtered or ranked — `unavailableTag`
+  // is appended to a busy row's own label rather than disabling it, exactly so it stays
+  // selectable ("sometimes you ask the busy person anyway").
+  'constraint.manager.alertTitle': 'אילוצי מאמנים ממתינים לתשובה',
+  'constraint.manager.pendingCount': '{{count}} אילוצים ממתינים לתשובתכם',
+  'constraint.manager.pendingCount.one': 'אילוץ אחד ממתין לתשובתכם',
+  'constraint.manager.open': 'פתיחה',
+  'constraint.manager.openFor': 'פתיחת האילוץ של {{name}}',
+  'constraint.manager.dialogTitle': 'טיפול באילוץ',
+  'constraint.manager.filedBy': 'הוגש על ידי {{name}}',
+  'constraint.manager.window': 'טווח האילוץ',
+  'constraint.manager.reason': 'סיבה',
+  'constraint.manager.note': 'הערת המאמן/ת',
+  'constraint.manager.affectedSessions': 'שיעורים בטווח הזה',
+  'constraint.manager.noAffectedSessions': 'אין שיעורים בטווח הזה עבור המאמן/ת',
+  'constraint.manager.sessionsLoadFailed': 'לא הצלחנו לטעון את השיעורים בטווח הזה',
+  'constraint.manager.currentCoach': 'מאמן/ת משובץ/ת: {{name}}',
+  'constraint.manager.noCurrentCoach': 'לא שובץ מאמן/ת לשיעור',
+  'constraint.manager.replaceCoachLegend': 'בחירת מחליף/ה לשיעור הזה',
+  'constraint.manager.unavailableTag': 'לא זמין/ה בטווח הזה',
+  'constraint.manager.noStaff': 'לא נמצא צוות לבדיקה',
+  'constraint.manager.decisionTitle': 'החלטת ההנהלה על האילוץ',
+  'constraint.manager.substituteLegend': 'מחליף/ה לרישום באילוץ (רשות)',
+  'constraint.manager.approve': 'אישור האילוץ',
+  'constraint.manager.refuse': 'דחיית האילוץ',
+  'constraint.manager.refuseReasonLabel': 'סיבת הדחייה למאמן/ת',
+  'constraint.manager.decidedApproved': 'האילוץ אושר. המאמן/ת קיבל/ה הודעה.',
+  'constraint.manager.decidedRefused': 'האילוץ נדחה. המאמן/ת קיבל/ה הודעה.',
 }

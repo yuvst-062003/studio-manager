@@ -25,6 +25,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 from app.schemas._pagination import CursorPage
+from app.schemas.events import EventStatus
 from app.schemas.health import DerivedFlags, HealthStatus, _flags_are_booleans
 from app.schemas.schedule import SessionOut
 
@@ -137,6 +138,17 @@ class RosterEntry(BaseModel):
     blocked: this shape carries the ⚠ and the coach can still mark the student present.
     There is deliberately no `blocked` field, because there is deliberately no
     `block_attendance_without_health` setting.
+
+    **This shape also carries an event's registrations** (§6.5 of the staff app redesign,
+    decision 14) — `app/services/attendance/bootstrap.py::_event_rosters` builds the SAME
+    `RosterEntry` from `EventRegistration` rows rather than a parallel shape, which is what
+    "the same shapes" means in §6.5's own approach: `has_absence_report`,
+    `has_confirmation` and `absence_reason` have no event equivalent and are simply left at
+    their defaults (`False`/`None`) — those CONCEPTS do not exist for an event, which is a
+    different thing from not knowing the answer, and a default here is honest rather than a
+    guess. `belt_color_hex`/`belt_name` are `None` for an event row for the same reason they
+    are `None` on every session row today (`RosterRowRaw`'s own docstring: "W7's `belt_rank`
+    fills these. `None` until then") — not a gap unique to events.
     """
 
     student_id: uuid.UUID
@@ -171,6 +183,32 @@ class SessionRosterOut(BaseModel):
     roster: list[RosterEntry] = Field(default_factory=list)
 
 
+class EventRosterOut(BaseModel):
+    """One event, cached for offline attendance — §6.5 of the staff app redesign
+    (decision 14). `packages/core/src/offline/cache.ts` is what turns this into a
+    `CachedSession` tagged `kind: 'event'`, stored in the SAME IndexedDB table `SessionOut`
+    already occupies; this shape is only ever the WIRE form.
+
+    Deliberately NOT `app.schemas.events.EventOut`: that shape carries `fee_agorot`, and
+    `/sync/bootstrap` is coach-reachable (`app/routers/sync.py`'s router is tagged
+    `coach`) — invariant 3 forbids any coach-reachable response carrying a financial field.
+    This is the same narrowing `app/schemas/schedule.py::TrialSlotOut` already applies to
+    `SessionOut` for an unauthenticated reader, aimed at a different field for a different
+    reader.
+
+    Deliberately also NOT shaped like `SessionOut` itself: an event has no `group_id`, and
+    widening the widest-read shape in the product for one caller's benefit is a worse trade
+    than a small parallel type the client converts on the way in.
+    """
+
+    id: uuid.UUID
+    title: str
+    starts_at: datetime
+    ends_at: datetime
+    location_name: str | None
+    status: EventStatus
+
+
 class BootstrapPayload(BaseModel):
     """`GET /sync/bootstrap?from&to` — §6.1's offline priming payload.
 
@@ -190,6 +228,15 @@ class BootstrapPayload(BaseModel):
     sessions: list[SessionOut] = Field(default_factory=list)
     #: Keyed by session id. One roster per session in the window.
     rosters: dict[uuid.UUID, list[RosterEntry]] = Field(default_factory=dict)
+    #: §6.5 of the staff app redesign (decision 14) — events "alongside sessions", not
+    #: merged into `sessions` (which would need a `group_id` on every event -- see
+    #: `EventRosterOut`'s own docstring). Populated only for a staff caller:
+    #: `build_bootstrap`'s `include_events` mirrors the `include_plans` gate §6.2 already
+    #: uses for the identical reason -- this is staff-facing content, and `/sync/bootstrap`
+    #: also answers guardians (§10.2's narrower, read-only cache).
+    events: list[EventRosterOut] = Field(default_factory=list)
+    #: Keyed by event id, exactly as `rosters` is keyed by session id.
+    event_rosters: dict[uuid.UUID, list[RosterEntry]] = Field(default_factory=dict)
 
 
 class InjuryReportIn(BaseModel):

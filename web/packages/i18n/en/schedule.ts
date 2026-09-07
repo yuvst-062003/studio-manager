@@ -196,6 +196,10 @@ export const schedule: Bundle = {
   'session.cancelReason.scheduleChange': 'Weekly schedule changed',
   'session.cancelReason.closure': 'The club is closed',
   'session.editTime': 'Change the time',
+  // §4.7 of the staff app redesign — the month calendar's edit sheet (checkpoint C11,
+  // decisions 8/9). An assistant coach gets the same sheet with none of the controls
+  // below it — this is the sentence that says why, rather than a silently missing button.
+  'session.editRestricted': 'Only managers and lead coaches can edit this session. These details are view-only.',
   'session.save': 'Save',
   'session.saved': 'Session updated',
   'session.adHocStart': 'Start time',
@@ -698,4 +702,71 @@ export const schedule: Bundle = {
   'constraint.status.withdrawn': 'You withdrew this',
   'constraint.account.title': 'Unavailability',
   'constraint.account.subtitle': 'File days you cannot coach',
+
+  // -- §5/C12 of the staff app redesign — the DASHBOARD's side ---------------------------
+  'constraint.manager.alertTitle': 'Coach unavailability awaiting a reply',
+  'constraint.manager.pendingCount': '{{count}} requests are waiting for your answer',
+  'constraint.manager.pendingCount.one': 'One request is waiting for your answer',
+  'constraint.manager.open': 'Open',
+  'constraint.manager.openFor': "Open {{name}}'s request",
+  'constraint.manager.dialogTitle': 'Handle this request',
+  'constraint.manager.filedBy': 'Filed by {{name}}',
+  'constraint.manager.window': 'Unavailable window',
+  'constraint.manager.reason': 'Reason',
+  'constraint.manager.note': "Coach's note",
+  'constraint.manager.affectedSessions': 'Sessions in this window',
+  'constraint.manager.noAffectedSessions': 'No sessions of theirs fall in this window',
+  'constraint.manager.sessionsLoadFailed': "We couldn't load the sessions in this window",
+  'constraint.manager.currentCoach': 'Currently assigned: {{name}}',
+  'constraint.manager.noCurrentCoach': 'No coach assigned',
+  'constraint.manager.replaceCoachLegend': 'Choose a replacement for this session',
+  'constraint.manager.unavailableTag': 'not available in this window',
+  'constraint.manager.noStaff': 'No staff to check',
+  'constraint.manager.decisionTitle': "The club's decision",
+  'constraint.manager.substituteLegend': 'Substitute to record on the request (optional)',
+  'constraint.manager.approve': 'Approve',
+  'constraint.manager.refuse': 'Decline',
+  'constraint.manager.refuseReasonLabel': 'Reason for the coach',
+  'constraint.manager.decidedApproved': 'Approved. The coach has been told.',
+  'constraint.manager.decidedRefused': 'Declined. The coach has been told.',
+
+  // -- §4.7 of the staff app redesign — the month calendar, `#/calendar` (checkpoint C11) --
+  //
+  // Decision 7: the phone gets a month view because it is the one screen that can show a
+  // coach their FUTURE sessions and events — neither the seven-day strip nor the offline
+  // cache reach past tomorrow. `staffCalendar.*` is a distinct prefix from `calendar.*`
+  // above, which is the PARENT app's per-child attendance calendar (12b) — a different
+  // screen, a different audience, and a name collision here would be two concepts sharing
+  // one key.
+  'staffCalendar.title': 'Month calendar',
+  'staffCalendar.subtitle': 'Every session and event this month, at a glance',
+  'staffCalendar.back': 'Back to schedule',
+  'staffCalendar.openButton': 'Open the month calendar',
+  // The header action that opens `#/constraints` — a second link to the route the
+  // account tab already links (`constraint.account.*` above), not a replacement.
+  'staffCalendar.fileConstraint': 'File unavailability',
+  // -- The legend beneath the day grid — description, not decoration (SC 1.4.1: every
+  // swatch has its own label beside it). Names the markers THIS screen actually draws
+  // (a count badge, a constraint dot, the today ring), not the prototype's own list.
+  'staffCalendar.legend.label': 'Calendar legend',
+  'staffCalendar.legend.count': 'Sessions and events scheduled',
+  'staffCalendar.legend.constraint': 'Coach unavailability filed',
+  // The filter row the prototype draws five chips for, of which two actually filter
+  // anything (§4.7's own correction). The real distinction underneath is which GROUP is
+  // training, so this is the one legend the real screen needs; 'All' is `week.filter.all`,
+  // reused rather than duplicated.
+  'staffCalendar.filterLegend': 'Filter by group',
+  // A day cell's own accessible name (SC 1.4.1 — colour never carries meaning alone, so a
+  // constraint day's count-dot is not the only thing saying so; `dayConstraint` below is
+  // appended to the same name).
+  'staffCalendar.dayItemCount': '{{count}} sessions and events this day',
+  'staffCalendar.dayItemCount.one': 'One session or event this day',
+  'staffCalendar.dayEmpty': 'Nothing scheduled this day',
+  // `{{reason}}` arrives already resolved through `constraint.reason.<code>` — never a raw
+  // server code read out to a screen reader.
+  'staffCalendar.dayConstraint': 'Coach unavailability: {{reason}}',
+  // The account tab's own link (`features/account/AccountScreen.tsx`), matching the shape
+  // `constraint.account.*` above already established for the same tab.
+  'staffCalendar.account.title': 'Month calendar',
+  'staffCalendar.account.subtitle': 'Every session and event this month',
 }

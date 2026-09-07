@@ -118,4 +118,8 @@ def bootstrap(
         # a guardian on this same endpoint gets `plan: None` on every session rather than a
         # coach's briefing riding along with the read-only cache §10.2 grants them.
         include_plans=bool(roles & STAFF_ROLES),
+        # §6.5 of the staff app redesign (decision 14) — the identical gate, for the
+        # identical reason: an event's cached roster is staff content, and this endpoint
+        # also answers guardians through §10.2's narrower read-only cache.
+        include_events=bool(roles & STAFF_ROLES),
     )

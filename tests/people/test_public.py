@@ -19,6 +19,19 @@ from tests.people.conftest import FakeSchedule, make_session
 SUNDAY = datetime(2026, 9, 6, 14, 0, tzinfo=UTC)
 WEDNESDAY = datetime(2026, 9, 9, 14, 0, tzinfo=UTC)
 
+#: `training_weekdays`/`training_durations_min`/`trial_slots` (app/services/people/
+#: group_days.py, app/services/people/landing.py) observe the materialized calendar
+#: forward from "today" -- `app.core.clock.now()`, this repo's only clock
+#: (app/core/clock.py). SUNDAY and WEDNESDAY above are FIXED calendar dates, so once the
+#: real "today" walks past 2026-09-06 the Sunday fixture session falls outside that
+#: observation window and silently drops out of the answer -- which is exactly what
+#: happened when the real calendar reached 2026-09-07. Pinning the server's clock with
+#: `X-Dev-Now` (app/core/clock.py's `DevClockMiddleware`, the same seam §19.5 built for
+#: this) to a date safely before both fixture sessions keeps these tests' answers the
+#: same on any real-world date. Do NOT delete this and let these requests fall back to
+#: the real clock -- that is the bug this fixes.
+DEV_NOW_HEADERS = {"X-Dev-Now": datetime(2026, 9, 1, 0, 0, tzinfo=UTC).isoformat()}
+
 
 @pytest.fixture
 def with_slots(monkeypatch, studio, a_group, a_training_year):
@@ -149,7 +162,9 @@ def test_a_group_carries_its_age_range_so_the_page_can_filter_by_the_childs_age(
 
 def test_a_group_carries_the_days_it_trains(client, studio, a_group, with_slots):
     """Parent `13a` shows 'מתאמנים בימים' beside each group, observed through the seam."""
-    groups = client.get(f"/api/v1/public/studios/{studio.slug}/groups").json()["items"]
+    groups = client.get(
+        f"/api/v1/public/studios/{studio.slug}/groups", headers=DEV_NOW_HEADERS
+    ).json()["items"]
     group = next(g for g in groups if uuid.UUID(g["id"]) == a_group)
     assert group["training_weekdays"] == [0, 3]
 
@@ -219,7 +234,9 @@ def test_a_group_with_two_lesson_lengths_reports_both(
     ]
     monkeypatch.setattr(public_router, "schedule_reader", lambda _session: fake)
 
-    groups = client.get(f"/api/v1/public/studios/{studio.slug}/groups").json()["items"]
+    groups = client.get(
+        f"/api/v1/public/studios/{studio.slug}/groups", headers=DEV_NOW_HEADERS
+    ).json()["items"]
     group = next(g for g in groups if uuid.UUID(g["id"]) == a_group)
     assert group["training_durations_min"] == [60, 90]
 
@@ -429,7 +446,9 @@ def test_a_club_with_no_logo_reports_none_rather_than_a_broken_link(client, stud
 
 def test_trial_slots_come_through_the_schedule_seam(client, a_group, with_slots):
     """L5 -- the picker is a pure reader."""
-    body = client.get(f"/api/v1/public/groups/{a_group}/trial-slots").json()
+    body = client.get(
+        f"/api/v1/public/groups/{a_group}/trial-slots", headers=DEV_NOW_HEADERS
+    ).json()
     assert [slot["starts_at"][:10] for slot in body["items"]] == ["2026-09-06", "2026-09-09"]
 
 
@@ -452,7 +471,9 @@ def test_a_cancelled_session_is_offered_but_not_bookable(
     ]
     monkeypatch.setattr(public_router, "schedule_reader", lambda _session: fake)
 
-    slot = client.get(f"/api/v1/public/groups/{a_group}/trial-slots").json()["items"][0]
+    slot = client.get(
+        f"/api/v1/public/groups/{a_group}/trial-slots", headers=DEV_NOW_HEADERS
+    ).json()["items"][0]
     assert slot["is_bookable"] is False
 
 

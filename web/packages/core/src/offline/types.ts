@@ -20,12 +20,22 @@
 export type NetworkMode = 'online' | 'slow' | 'intermittent' | 'offline' | 'api-down'
 
 /** What a lane can queue. §10.2: attendance, session notes and student notes, and nothing
- *  else — "Payments, absence pre-reports, RSVP" are `Never offline` on the same table. */
+ *  else — "Payments, absence pre-reports, RSVP" are `Never offline` on the same table.
+ *
+ *  `event.attendance` — §6.5 of the staff app redesign (decision 14), added 2026-09-07.
+ *  An event's mark used to be a live POST with no queue behind it at all (`EventRosterScreen`
+ *  disabled its control while offline and said why). It rides the SAME queue as a session's
+ *  marks, keyed the same way (`session_id` on the op holds the EVENT's id — see `PendingOp`
+ *  below), because an event already has everything a cached session has and a second queue
+ *  table would put §10.6's `pending_ops` exemption and its eviction rule back in play for no
+ *  reason. `sync.ts`'s flusher tells the two kinds apart by `op.kind` and routes accordingly;
+ *  nothing else in this file needs to know an event exists. */
 export type PendingOpKind =
   | 'attendance.mark'
   | 'attendance.bulk'
   | 'note.session'
   | 'note.student'
+  | 'event.attendance'
 
 /**
  * One queued mutation. §10.6: "Every local mutation writes to a `pending_ops` store with a
@@ -47,6 +57,11 @@ export type PendingOp = {
    *  when it will next reach a network. The server is idempotent on it (§10.5). */
   client_mark_id: string
   kind: PendingOpKind
+  /** The session's id — or, for `kind: 'event.attendance'`, the EVENT's id. One field for
+   *  both rather than a second one, because `sync.ts`'s `groupBySession` and the flusher's
+   *  one-request-per-target batching apply identically to either; only the routing at the
+   *  very end (which endpoint, which response shape) differs, and that is decided by `kind`,
+   *  never by which table the id happens to belong to. */
   session_id: string
   student_id: string | null
   /** The request body this op becomes on flush. Opaque here on purpose — the queue is not
@@ -118,7 +133,16 @@ export type RosterRow = {
   plan_name?: string | null
 }
 
-/** Mirrors `app/schemas/schedule.py::SessionOut`, narrowed to what the roster draws. */
+/** Mirrors `app/schemas/schedule.py::SessionOut`, narrowed to what the roster draws.
+ *
+ *  `kind` — §6.5 of the staff app redesign (decision 14), added 2026-09-07. `'session'` when
+ *  omitted, the same way `plan`, `plan_name` and `has_confirmation` were added before it:
+ *  every existing producer of this shape (every real session, from `writeWindow`'s own
+ *  `payload.sessions`) still type-checks unchanged and still means what it always meant.
+ *  `'event'` marks a row synthesised from `BootstrapPayload.events` — see `cache.ts`'s
+ *  `writeWindow`. Read `row.kind === 'event'` rather than `!== 'session'` when it matters,
+ *  so a third kind added later fails a type check here instead of silently behaving like a
+ *  session. */
 export type CachedSession = {
   id: string
   group_id: string
@@ -135,15 +159,48 @@ export type CachedSession = {
    *  attendance screen and the schedule tab's card both read this straight off the cache,
    *  never a fetch, which is the whole point of it riding down with its session. */
   plan?: string | null
+  kind?: 'session' | 'event'
 }
 
-/** `GET /sync/bootstrap`'s body. §6.1's first launch blocks on this. */
+/**
+ * One event, exactly as `GET /sync/bootstrap` sends it —
+ * `app/schemas/attendance.py::EventRosterOut`.
+ *
+ * Deliberately NOT the events feature's own `EventOut` (`apps/staff/src/features/events`):
+ * that shape carries `fee_agorot`, and `/sync/bootstrap` is coach-reachable, so invariant 3
+ * forbids it from ever carrying a financial field. It is also deliberately NOT shaped like
+ * `CachedSession` on the wire — an event has no `group_id` to put there — because forcing it
+ * to be would mean widening `SessionOut` itself, the widest-read shape in the product, for a
+ * field only an event has. Instead this rides "alongside" `sessions` (§6.5's own word) as its
+ * own small list, and `cache.ts`'s `writeWindow` is the one place that turns it into a
+ * `CachedSession` before it ever reaches IndexedDB — see `eventToCachedSession` there.
+ */
+export type CachedEvent = {
+  id: string
+  title: string
+  starts_at: string
+  ends_at: string
+  location_name: string | null
+  status: 'draft' | 'published' | 'cancelled' | 'completed'
+}
+
+/** `GET /sync/bootstrap`'s body. §6.1's first launch blocks on this.
+ *
+ *  `events` / `event_rosters` — §6.5 of the staff app redesign, added 2026-09-07, both
+ *  OPTIONAL for the same reason `CachedSession.kind` is: every test fixture and every other
+ *  caller that built a `BootstrapPayload` literal before events existed (`cache.test.ts`,
+ *  `priming.test.ts`, `RosterScreen.test.tsx`…) still type-checks unchanged, and
+ *  `writeWindow` treats an absent list exactly like an empty one. Only a staff caller's
+ *  bootstrap ever populates them — `app/services/attendance/bootstrap.py`'s `include_events`
+ *  mirrors the same `include_plans` gate §6.2 already uses for the same reason. */
 export type BootstrapPayload = {
   server_time: string
   from_time: string
   to_time: string
   sessions: CachedSession[]
   rosters: Record<string, RosterRow[]>
+  events?: CachedEvent[]
+  event_rosters?: Record<string, RosterRow[]>
 }
 
 /**

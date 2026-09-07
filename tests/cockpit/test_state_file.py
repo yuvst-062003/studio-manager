@@ -20,7 +20,10 @@ def test_every_wave_in_the_milestone_plan_is_present():
     # W9E is the 2026-09-03 dashboard-screens redesign, opened after this literal was
     # last written — which is the whole reason the literal is here rather than a length
     # check: a wave added to state.yaml has to be acknowledged by a person.
-    assert ids == ["W0", "W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8C", "W9D", "W9E"]
+    # W9S is the 2026-09-06 staff-app redesign — five tabs ported from the AI Studio
+    # prototype, thirteen checkpoints. Acknowledged here, which is what this literal asks
+    # for; it caught the wave arriving in state.yaml before anyone had said so out loud.
+    assert ids == ["W0", "W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8C", "W9D", "W9E", "W9S"]
 
 
 def test_the_parallel_waves_name_their_two_lanes():

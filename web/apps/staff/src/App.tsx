@@ -42,6 +42,7 @@ import { Resolve } from './features/identity/Resolve'
 import { PaymentPromisesSection } from './features/billing/PaymentPromisesSection'
 import { JoinLinkSection } from './features/people/JoinLinkSection'
 import { ScheduleSection } from './features/schedule/ScheduleSection'
+import { CalendarScreen } from './features/schedule/CalendarScreen'
 import { makeStaffScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
 import { StudentsSearch, makeStaffPeopleClient } from './features/people'
@@ -274,6 +275,10 @@ export default function App() {
   // §4.8 / §6.1 (checkpoint C10) — filing, withdrawing and reading a coach's own
   // unavailability. Reached from the account tab's own row, not a tab of its own.
   const onConstraints = hash === '#/constraints'
+  // §4.7 (checkpoint C11) — the month calendar. Every staff role may open it (decision 7);
+  // who may edit FROM it is a question the screen asks itself, the same `viewerCanWritePlan`
+  // trio §6.2 already computes, not a second gate at this door.
+  const onCalendar = hash === '#/calendar'
   // §5.7's register, opened from a session. The id is in the hash so the back button works
   // and a link survives a reload — the same shape both W2 lanes settled on, and the reason
   // NAV's `/attendance` entry became a hash below. A second segment picks the in-session
@@ -469,6 +474,22 @@ export default function App() {
             // filing it is this screen's, and `#/account` links here for exactly that
             // reason.
             <CoachConstraintsScreen locale={locale} client={constraintsClient} today={today} />
+          ) : session.access.staff && onCalendar ? (
+            // §4.7 (checkpoint C11) — the month grid. Every staff role reads it (decision
+            // 7); `canEdit` is the same owner/manager/lead_coach trio §6.2 already computes
+            // as `viewerCanWritePlan`, passed straight through rather than re-derived, so
+            // the calendar's edit sheet asks the identical question `PATCH /sessions`
+            // itself asks. `fetcher` is `apiFetch` — the edit sheet's own best-effort
+            // `/api/v1/staff` read, same shape the dashboard's `SessionPopover` already uses.
+            <CalendarScreen
+              locale={locale}
+              client={scheduleClient}
+              eventsClient={eventsClient}
+              constraintsClient={constraintsClient}
+              fetcher={apiFetch}
+              today={today}
+              canEdit={viewerCanWritePlan}
+            />
           ) : onInstall ? (
             // Needs no access guard: installing the app is every signed-in person's
             // business, and the screen shows nothing from any studio.
@@ -588,7 +609,12 @@ export default function App() {
               }}
             />
           ) : session.access.staff && rosterEventId ? (
-            <EventRosterScreen client={eventsClient} eventId={rosterEventId} locale={locale} />
+            <EventRosterScreen
+              client={eventsClient}
+              eventId={rosterEventId}
+              locale={locale}
+              personId={membership?.person_id ?? null}
+            />
           ) : session.access.staff && examEventId ? (
             <ExamResultsScreen client={eventsClient} eventId={examEventId} locale={locale} />
           ) : session.access.staff && onEvents ? (

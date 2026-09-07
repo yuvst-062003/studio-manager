@@ -1,5 +1,14 @@
-// The staff app's view of the schedule API. **Read-only** — the staff app never puts a
-// schedule; §3.2 makes that a manager's action on the dashboard.
+// The staff app's view of the schedule API. **Mostly read-only** — the staff app does not
+// PUT a schedule; §3.2 makes drawing one a manager's action on the dashboard.
+//
+// **Checkpoint C11 (§4.7, decisions 8/9) adds two writes**, both reached from the month
+// calendar's edit sheet rather than anywhere on the day-to-day schedule tab: changing a
+// session's coach or moving it (`patchSession`), and cancelling it (`cancelSession`). Gated
+// the same way the endpoint already gates itself — `PATCH /sessions/{id}` and
+// `POST /sessions/{id}/cancel` are `owner`/`manager`/`lead_coach` server-side
+// (`app/routers/sessions.py::ManagerOrLeadCoach`) — rather than a second client-side rule
+// invented beside an identical existing one. An `assistant_coach` calling either still gets
+// a 403; the sheet simply never offers them the button that would.
 //
 // The types below duplicate `apps/dashboard/src/features/schedule/client.ts`, and that is
 // deliberate rather than lazy. `web/packages/core` is not this lane's to extend, and a
@@ -48,6 +57,14 @@ export interface TrainingYearRow {
   status: string
 }
 
+/** `SessionPatch` on the wire (`app/schemas/schedule.py`) — every field optional and
+ *  absence is not `null`; times move as a pair (§4.7's move form always sends both). */
+export interface SessionPatchInput {
+  starts_at?: string
+  ends_at?: string
+  staff?: { person_id: string; role: 'lead_coach' | 'assistant_coach'; is_substitute: boolean }[]
+}
+
 export interface StaffScheduleClient {
   listSessions(query: {
     from: string
@@ -63,6 +80,11 @@ export interface StaffScheduleClient {
    * year exists here at all" (§4.2's silent-skip failure mode) — see {@link yearCovers}.
    */
   listTrainingYears(): Promise<TrainingYearRow[]>
+  /** §4.7's calendar — change the coach or move the session. Mirrors the dashboard's own
+   *  `ScheduleClient.patchSession`, same endpoint and shape. */
+  patchSession(sessionId: string, body: SessionPatchInput): Promise<SessionRow>
+  /** §4.7's calendar — cancel, with a reason the column's own check constraint requires. */
+  cancelSession(sessionId: string, reason: string): Promise<SessionRow>
 }
 
 const API = '/api/v1'
@@ -85,6 +107,24 @@ export function makeStaffScheduleClient(fetcher: Fetcher): StaffScheduleClient {
       if (!response.ok) throw new Error(String(response.status))
       const body = (await response.json()) as { items: TrainingYearRow[] }
       return body.items
+    },
+    async patchSession(sessionId, body) {
+      const response = await fetcher(`${API}/sessions/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!response.ok) throw new Error(String(response.status))
+      return (await response.json()) as SessionRow
+    },
+    async cancelSession(sessionId, reason) {
+      const response = await fetcher(`${API}/sessions/${sessionId}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      })
+      if (!response.ok) throw new Error(String(response.status))
+      return (await response.json()) as SessionRow
     },
   }
 }

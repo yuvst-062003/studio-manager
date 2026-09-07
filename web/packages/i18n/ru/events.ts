@@ -97,6 +97,9 @@ export const events: Bundle = {
 
   'addToCalendar': 'Добавить в календарь',
   'attendance.take': 'Отметить посещаемость на мероприятии',
+  'attendance.requiresConnection': 'Отметка посещаемости на мероприятии требует подключения к интернету',
+  'attendance.requiresConnectionHint': 'Без подключения отметка не сохранится — для мероприятий нет очереди синхронизации. Попробуйте снова, когда появится связь',
+  'attendance.markFailed': 'Не удалось отметить. Попробуйте снова',
 
   // -- belt exams (§5.9; staff 9d, dashboard 4d, 6b) -------------------------------
   'exam.title': 'Экзамен на пояс',

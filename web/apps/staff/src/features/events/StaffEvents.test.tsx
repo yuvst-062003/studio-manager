@@ -13,9 +13,17 @@
 // **9i finding 7 is a KEEPER.** Its three RSVP renderings are state-appropriate rather
 // than inconsistent, unlike 12h's three. Written down as a test so nobody later "unifies"
 // them into one bar that reads as 0% before anyone has been asked.
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  listPending,
+  memoryStore,
+  queueChanged,
+  setForcedMode,
+  setOfflineStore,
+} from '@studio/core'
+import type { OfflineStore } from '@studio/core'
 import { t } from '@studio/i18n'
 import { ExamResultsScreen } from './ExamResultsScreen'
 import { StaffEventsScreen } from './StaffEventsScreen'
@@ -393,5 +401,189 @@ describe('9i — the participants list', () => {
     render(<EventRosterScreen client={client} eventId="e1" locale="he" />)
     const row = await screen.findByTestId('event-roster-row')
     expect(row).not.toHaveTextContent(t('he', 'events.consent.signed'))
+  })
+
+  // The gap this wave closed: the endpoint's own docstring already claimed "attendance is
+  // taken on an event with the same UI as a session" and "every staff role", and this
+  // screen offered no way to mark anyone.
+  //
+  // **Checkpoint 13 (2026-09-07) — §6.5, decision 14** made the mark itself queue and flush
+  // exactly like a session's, replacing the online-only write these tests covered one wave
+  // earlier. `markAttendance` is gone from `StaffEventsClient` entirely (see `client.ts`'s
+  // own header note), so these tests assert against `pending_ops` — the same seam
+  // `RosterScreen.test.tsx` asserts a session's mark against — rather than against a mock
+  // client method that no longer exists.
+  describe('marking attendance on an event register', () => {
+    let store: OfflineStore
+
+    beforeEach(() => {
+      store = memoryStore()
+      setOfflineStore(store)
+    })
+
+    afterEach(() => {
+      setForcedMode(null)
+      setOfflineStore(null)
+    })
+
+    function makeRosterClient(over: Partial<StaffEventsClient> = {}) {
+      return makeClient({
+        registrations: vi
+          .fn()
+          .mockResolvedValue({ items: ROWS, next_cursor: null, has_more: false }),
+        ...over,
+      })
+    }
+
+    it('queues a mark rather than calling the API', async () => {
+      // §10.3 item 1, applied to an event: "the local write is not an API call." The
+      // control has ONE path now, same as `RosterScreen`.
+      const { EventRosterScreen } = await import('./EventRosterScreen')
+      const client = makeRosterClient()
+      render(<EventRosterScreen client={client} eventId="e1" locale="he" />)
+      const row = (await screen.findAllByTestId('event-roster-row'))[1]!
+      await userEvent.click(within(row).getByRole('button', { name: /רון לוי/ }))
+
+      await waitFor(async () => expect(await listPending(store)).toHaveLength(1))
+      const [op] = await listPending(store)
+      expect(op?.kind).toBe('event.attendance')
+      expect(op?.session_id).toBe('e1')
+      expect(op?.student_id).toBe('st2')
+      expect(op?.payload).toEqual({ attended: true })
+    })
+
+    it('toggles present → absent on a second tap, leaving ONE queued op', async () => {
+      // §10.5's idempotency starts on the device — the same rule `RosterScreen.test.tsx`
+      // pins for a session: a coach cycling a row twice leaves one op carrying the final
+      // answer, not two the server has to reconcile.
+      const { EventRosterScreen } = await import('./EventRosterScreen')
+      const client = makeRosterClient()
+      render(<EventRosterScreen client={client} eventId="e1" locale="he" />)
+      const row = (await screen.findAllByTestId('event-roster-row'))[0]!
+      await userEvent.click(within(row).getByRole('button', { name: /דנה כהן/ }))
+      await waitFor(() =>
+        expect(within(row).getByRole('button', { name: /דנה כהן/ })).toHaveAccessibleName(
+          new RegExp(t('he', 'attendance.roster.present')),
+        ),
+      )
+      await userEvent.click(within(row).getByRole('button', { name: /דנה כהן/ }))
+
+      await waitFor(async () => expect(await listPending(store)).toHaveLength(1))
+      const [op] = await listPending(store)
+      expect(op?.payload).toEqual({ attended: false })
+    })
+
+    it('updates the counter optimistically, before any network round trip', async () => {
+      const { EventRosterScreen } = await import('./EventRosterScreen')
+      const client = makeRosterClient()
+      render(<EventRosterScreen client={client} eventId="e1" locale="he" />)
+      const row = (await screen.findAllByTestId('event-roster-row'))[0]!
+      expect(await screen.findByTestId('event-roster-live-count')).toHaveTextContent('0/2')
+      await userEvent.click(within(row).getByRole('button', { name: /דנה כהן/ }))
+      await waitFor(() =>
+        expect(screen.getByTestId('event-roster-live-count')).toHaveTextContent('1/2'),
+      )
+    })
+
+    it('queues a mark while the network is offline, with no error', async () => {
+      // The guard this screen shipped with one wave earlier — disable the control, say a
+      // connection is required — is gone: the queue is real now, so refusing the tap would
+      // be `RosterScreen`'s exact mistake in reverse.
+      setForcedMode('offline')
+      const { EventRosterScreen } = await import('./EventRosterScreen')
+      const client = makeRosterClient()
+      render(<EventRosterScreen client={client} eventId="e1" locale="he" />)
+      const row = (await screen.findAllByTestId('event-roster-row'))[0]!
+      expect(
+        screen.queryByText(t('he', 'events.attendance.requiresConnection')),
+      ).not.toBeInTheDocument()
+      const button = within(row).getByRole('button', { name: /דנה כהן/ })
+      expect(button).toBeEnabled()
+      await userEvent.click(button)
+      await waitFor(async () => expect(await listPending(store)).toHaveLength(1))
+    })
+
+    it('lets an assistant coach mark — §3.2 gives every staff role attendance', async () => {
+      // No role prop exists on this screen at all, unlike `RosterScreen`'s `canWritePlan`:
+      // nothing here can gate the control to a manager by accident.
+      const { EventRosterScreen } = await import('./EventRosterScreen')
+      const client = makeRosterClient()
+      render(<EventRosterScreen client={client} eventId="e1" locale="he" />)
+      const row = (await screen.findAllByTestId('event-roster-row'))[0]!
+      const button = within(row).getByRole('button', { name: /דנה כהן/ })
+      expect(button).toBeEnabled()
+      await userEvent.click(button)
+      await waitFor(async () => expect(await listPending(store)).toHaveLength(1))
+    })
+
+    it('falls back to the cached roster when the live read fails', async () => {
+      // §6.5 item — an event's roster reads cache-first, exactly like a session's. Written
+      // through `writeWindow` rather than `enqueue`, so this also proves events land in the
+      // SAME table `readRoster` already knows how to serve back.
+      const { writeWindow } = await import('@studio/core')
+      await writeWindow(store, {
+        server_time: '2026-11-12T09:00:00.000Z',
+        from_time: '2026-11-12T00:00:00.000Z',
+        to_time: '2026-11-13T00:00:00.000Z',
+        sessions: [],
+        rosters: {},
+        events: [
+          {
+            id: 'e1',
+            title: 'מבחן סתיו',
+            starts_at: '2026-11-26T15:00:00.000Z',
+            ends_at: '2026-11-26T17:00:00.000Z',
+            location_name: 'אולם א׳',
+            status: 'published',
+          },
+        ],
+        event_rosters: {
+          e1: [
+            {
+              student_id: 'st9',
+              display_name: 'נועה כספי',
+              belt_color_hex: null,
+              belt_name: null,
+              health_status: 'missing',
+              derived_flags: {},
+              status: 'unmarked',
+              source: null,
+              has_absence_report: false,
+              absence_reason: null,
+            },
+          ],
+        },
+      })
+      const { EventRosterScreen } = await import('./EventRosterScreen')
+      const client = makeClient({
+        read: vi.fn().mockRejectedValue(new TypeError('Failed to fetch')),
+        registrations: vi.fn().mockRejectedValue(new TypeError('Failed to fetch')),
+      })
+      render(<EventRosterScreen client={client} eventId="e1" locale="he" />)
+      expect(await screen.findByText('נועה כספי')).toBeInTheDocument()
+      // The cache carries no RSVP — rendering one would be a claim this device cannot check.
+      expect(screen.queryByText(t('he', 'events.rsvp.pending'))).not.toBeInTheDocument()
+    })
+
+    it('replaces the roster with the blocking stale-queue warning, exactly as a session does', async () => {
+      const { enqueue } = await import('@studio/core')
+      await enqueue(store, {
+        client_mark_id: 'old-event-mark',
+        kind: 'event.attendance',
+        session_id: 'e1',
+        student_id: 'st1',
+        payload: { attended: true },
+        device_marked_at: '2026-11-01T17:00:00.000Z',
+        queued_at: '2026-11-01T17:00:00.000Z',
+        person_id: 'person-1',
+        attempts: 0,
+      })
+      queueChanged()
+      const { EventRosterScreen } = await import('./EventRosterScreen')
+      const client = makeRosterClient()
+      render(<EventRosterScreen client={client} eventId="e1" locale="he" clock={() => '2026-11-05T09:00:00.000Z'} />)
+      expect(await screen.findByTestId('event-roster-stale-block')).toBeInTheDocument()
+      expect(screen.queryByTestId('event-roster')).not.toBeInTheDocument()
+    })
   })
 })

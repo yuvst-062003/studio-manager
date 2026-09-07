@@ -4,6 +4,15 @@
 // only at lead_coach, "Record belt exam results" at the same line, and NO money at all. The
 // methods a coach cannot use are not here — a client is a statement about what this app
 // does, and one carrying a charge call would be a statement this app should never make.
+//
+// **`markAttendance` is not here.** §6.5 of the staff app redesign (decision 14, checkpoint
+// 13): an event's mark now goes through `pending_ops` exactly like a session's, for the
+// identical reason `features/attendance/client.ts`'s own header comment gives for why THAT
+// client has no such method — "an invitation to call it from a tap handler, and that is the
+// exact branch that works in the office and fails in a basement." The only caller left is
+// the queue's own flush (`packages/core/src/offline/sync.ts::sendEventBatch`), which talks
+// to `POST /events/{id}/attendance` through the generic `post` its `FlushDeps` carries, not
+// through this typed client at all.
 import type { components } from '@studio/api-client'
 
 export type EventOut = components['schemas']['EventOut']
@@ -56,18 +65,6 @@ export function makeStaffEventsClient(fetcher: Fetcher) {
           method: 'POST',
           headers: JSON_HEADERS,
           body: JSON.stringify({ results }),
-        }),
-      ),
-
-    markAttendance: async (
-      eventId: string,
-      marks: { student_id: string; attended: boolean }[],
-    ): Promise<{ marked: number }> =>
-      json(
-        await fetcher(`/api/v1/events/${eventId}/attendance`, {
-          method: 'POST',
-          headers: JSON_HEADERS,
-          body: JSON.stringify({ marks }),
         }),
       ),
   }
