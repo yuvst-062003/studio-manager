@@ -28,7 +28,8 @@ from __future__ import annotations
 import json
 import logging
 import traceback
-from collections.abc import Iterator
+import uuid
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import lru_cache
@@ -118,6 +119,46 @@ def _where(exc: BaseException) -> str | None:
         return None
     last = frames[-1]
     return f"{last.filename}:{last.lineno}"
+
+
+def for_each_studio(
+    studio_ids: Sequence[uuid.UUID],
+    body: Callable[[uuid.UUID], None],
+) -> int:
+    """Run `body` once per studio, and let one studio's failure cost only that studio.
+
+    F2 of the 2026-09-08 scaling audit. Every worker in `app/workers/` shares one shape —
+    select the active studios, loop, open a `TenantSession` for each — and none of them
+    wrapped the loop body. `record_run` re-raises by design, so the process exited non-zero
+    and every studio AFTER the failing one was never processed at all. The five daily jobs
+    get no retry before the next firing, which is twenty-four hours later.
+
+    **The damage scales with customer count while the signal does not.** At a hundred
+    studios, a failure at studio thirty-seven leaves sixty-three clubs unbilled, unchased
+    and unnotified, and the operator sees exactly one red row saying `billing-run failed`.
+    Returning the count is half the fix: the caller puts it in the heartbeat's `detail`, so
+    a partial run cannot report as a clean one.
+
+    **Never raises, even when every studio fails.** Raising would lose the count along with
+    whatever did succeed, and the count is the only thing that tells an operator whether
+    this is one bad row or a broken deploy. A worker that wants to fail loudly on a total
+    failure can compare the number against what it passed in.
+
+    **The studio id is the only thing logged.** It identifies a tenant rather than a person
+    (§11.7), and it is what somebody needs to find the offending row. `exc_info` sends the
+    traceback down the scrubbed path instead of into the message.
+    """
+    failed = 0
+    for studio_id in studio_ids:
+        try:
+            body(studio_id)
+        except Exception:
+            failed += 1
+            logging.getLogger(__name__).exception(
+                "per-studio pass failed; continuing",
+                extra={"studio_id": str(studio_id)},
+            )
+    return failed
 
 
 @contextmanager

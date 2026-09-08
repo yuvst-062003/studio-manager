@@ -19,7 +19,24 @@ from app.core.config import settings
 
 @lru_cache(maxsize=1)
 def get_engine() -> Engine:
-    return create_engine(settings.DATABASE_URL, pool_pre_ping=True, future=True)
+    """The one engine, with a pool sized on purpose (F3, scaling audit 2026-09-08).
+
+    Every argument here was previously a SQLAlchemy default, and the defaults are for a
+    script rather than for a web process: 5 + 10 connections, a thirty-second wait, and no
+    recycling at all. See `app/core/config.py` for what each is and why.
+
+    `pool_pre_ping` stays: recycling bounds how long a connection may be idle, while
+    pre-ping is what catches one the network dropped inside that window.
+    """
+    return create_engine(
+        settings.DATABASE_URL,
+        pool_pre_ping=True,
+        pool_size=settings.DB_POOL_SIZE,
+        max_overflow=settings.DB_MAX_OVERFLOW,
+        pool_timeout=settings.DB_POOL_TIMEOUT,
+        pool_recycle=settings.DB_POOL_RECYCLE,
+        future=True,
+    )
 
 
 def get_session() -> Iterator[Session]:

@@ -50,7 +50,7 @@ from sqlalchemy.orm import Session
 
 from app.core.clock import now
 from app.core.db import get_engine
-from app.core.jobs import record_run
+from app.core.jobs import for_each_studio, record_run
 from app.core.logging import configure_logging
 from app.core.tenancy import TenantSession, use_studio
 from app.models.health import HealthDeclaration
@@ -240,23 +240,30 @@ def _run_job() -> dict[str, int]:
             ).all()
         )
 
-    for studio_id, slug in studios:
-        tally.studios.append(slug)
+    by_id: dict[uuid.UUID, str] = {studio_id: slug for studio_id, slug in studios}
+
+    def one(studio_id: uuid.UUID) -> None:
+        tally.studios.append(by_id[studio_id])
         with (
             use_studio(studio_id),
             TenantSession(bind=get_engine(), expire_on_commit=False) as scoped,
         ):
             studio = scoped.get(Studio, studio_id)
             if studio is None:
-                continue
+                return
             run_for_studio(scoped, studio, at=at, tally=tally)
             scoped.commit()
+
+    # F2 -- see app/core/jobs.py::for_each_studio.
+    studios_failed = for_each_studio([studio_id for studio_id, _ in studios], one)
 
     # Counts only, `extra=` and never an f-string. §5.5's ladder is about children, and a log
     # line naming one would be a name in an aggregator the scrubber cannot un-see (G7).
     # The same dict is the heartbeat's detail, which leaves the building in an alert email.
     counts = {
         "studios": len(tally.studios),
+        # F2 -- a partial run must not report as a clean one.
+        "studios_failed": studios_failed,
         "reminders": tally.reminders,
         "renewals": tally.renewals,
         "undeliverable": tally.undeliverable,

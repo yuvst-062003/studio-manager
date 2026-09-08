@@ -21,6 +21,36 @@ class Settings(BaseSettings):
     # actually runs as.
     APP_DB_ROLE: str = "studio_app"
 
+    # -- the connection pool (F3, scaling audit 2026-09-08) --------------------------
+    #
+    # `create_engine` was called with `pool_pre_ping` and nothing else, so SQLAlchemy's
+    # defaults applied: 5 + 10 = **15 connections per process**, and a bare `uvicorn` in
+    # the Dockerfile meant one process. 290 of the ~295 route handlers are sync `def`, so
+    # FastAPI runs them in Starlette's forty-thread pool -- forty threads contending for
+    # fifteen connections, with request sixteen waiting thirty seconds and then answering
+    # HTTP 500. A concurrency ceiling, arriving with users rather than with rows.
+    #
+    # Settings rather than literals so an environment on a smaller database plan can come
+    # down without a code change, and so `tests/config/test_connection_pool.py` can assert
+    # the ceiling stays under the plan's own limit.
+    DB_POOL_SIZE: int = 10
+    DB_MAX_OVERFLOW: int = 10
+    #: Seconds a request waits for a connection before failing. Shorter than SQLAlchemy's
+    #: 30: a request that has queued for ten seconds has already lost the user, and failing
+    #: fast frees the thread for somebody the pool can actually serve.
+    DB_POOL_TIMEOUT: int = 10
+    #: Railway drops idle connections. Without recycling, `pool_pre_ping` discovers each
+    #: dead one on the request that needed it -- one failed round trip at a time. Under
+    #: Railway's idle window, so this fires first.
+    DB_POOL_RECYCLE: int = 1800
+    #: Uvicorn workers. The Dockerfile reads this, so the pool arithmetic below and the
+    #: process count cannot drift apart.
+    WEB_CONCURRENCY: int = 2
+    #: What the database plan actually accepts. The guard rail for the two above: an engine
+    #: allowed more connections than the database will give fails later, harder, and with a
+    #: message about the database rather than about the setting that caused it.
+    DB_MAX_CONNECTIONS: int = 100
+
     # SPEC §11.1 -- keys live in Railway secrets, never in the database. Versioned so
     # rotation does not mean re-encrypting everything: a blob records the version it
     # was wrapped under and stays readable after the active version moves on.

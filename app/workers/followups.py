@@ -56,7 +56,7 @@ from app.core.clock import now
 from app.core.config import settings
 from app.core.cors import app_origin
 from app.core.db import get_engine
-from app.core.jobs import record_run
+from app.core.jobs import for_each_studio, record_run
 from app.core.logging import configure_logging
 from app.core.tenancy import TenantSession, use_studio
 from app.models.people import Student, TrialBooking
@@ -368,8 +368,10 @@ def _run_job() -> dict[str, int]:
             ).all()
         )
 
-    for studio_id, slug in studio_ids:
-        tally.studios.append(slug)
+    by_id: dict[uuid.UUID, str] = {studio_id: slug for studio_id, slug in studio_ids}
+
+    def one(studio_id: uuid.UUID) -> None:
+        tally.studios.append(by_id[studio_id])
         with (
             use_studio(studio_id),
             TenantSession(bind=get_engine(), expire_on_commit=False) as scoped,
@@ -377,12 +379,17 @@ def _run_job() -> dict[str, int]:
             run_for_studio(scoped, at=at, tally=tally)
             scoped.commit()
 
+    # F2 -- see app/core/jobs.py::for_each_studio.
+    studios_failed = for_each_studio([studio_id for studio_id, _ in studio_ids], one)
+
     # Counts only. §5.4a's ladder is about children, and a log line naming one would
     # be a name in an aggregator the scrubber cannot un-see (§11.7, G7). The same dict
     # becomes the heartbeat's detail, which is read on screen and mailed when red --
     # `len(tally.studios)` and not the slugs, for that reason.
     counts = {
         "studios": len(tally.studios),
+        # F2 -- a partial run must not report as a clean one.
+        "studios_failed": studios_failed,
         "reminders": tally.reminders,
         "follow_ups": tally.follow_ups,
         "marked_lost": tally.marked_lost,

@@ -40,4 +40,11 @@ COPY scripts/bootstrap-owner.py scripts/verify-db-roles.py ./scripts/
 ENV PORT=8000
 EXPOSE 8000
 
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+# F3 (scaling audit 2026-09-08) -- more than one process. A bare uvicorn is a single
+# event loop, and 290 of the ~295 route handlers are sync `def`, so they run in Starlette's
+# forty-thread pool against ONE connection pool. `WEB_CONCURRENCY` is a setting rather than
+# a literal because `app/core/config.py` does the pool arithmetic against it, and
+# `tests/config/test_connection_pool.py` asserts `(pool_size + overflow) x workers` stays
+# under the database plan's connection limit. Defaulted here so an image built without the
+# variable still starts, with the same number the settings default to.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --workers ${WEB_CONCURRENCY:-2}"]

@@ -49,7 +49,7 @@ from sqlalchemy.orm import Session
 
 from app.core.clock import now
 from app.core.db import get_engine
-from app.core.jobs import record_run
+from app.core.jobs import for_each_studio, record_run
 from app.core.logging import configure_logging
 from app.core.tenancy import TenantSession, use_studio
 from app.models.comms import Announcement, Notification, NotificationDelivery, PushToken
@@ -264,11 +264,18 @@ def _run_job(argv: list[str] | None = None) -> dict[str, int | str]:
             ).all()
         )
 
-    for studio_id, slug in studios:
-        tally.studios.append(slug)
+    by_id: dict[uuid.UUID, str] = {studio_id: slug for studio_id, slug in studios}
+
+    def one(studio_id: uuid.UUID) -> None:
+        tally.studios.append(by_id[studio_id])
         _run_one(studio_id, at=at, tally=tally, sender=sender)
 
+    # F2 -- see app/core/jobs.py::for_each_studio.
+    studios_failed = for_each_studio([studio_id for studio_id, _ in studios], one)
+
     counts = _tally_counts(tally, sender)
+    # F2 -- a partial run must not report as a clean one.
+    counts["studios_failed"] = studios_failed
     logger.info("notify complete", extra=counts)
     if tally.push_failed:
         # Not a failure of the run: the announcements still published and the inbox rows are

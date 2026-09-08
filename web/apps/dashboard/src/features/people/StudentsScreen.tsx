@@ -86,7 +86,14 @@ export function StudentsScreen({
       try {
         do {
           const params = new URLSearchParams({ status: 'open', limit: '200' })
-          if (cursor) params.set('cursor', cursor)
+          // **`after`, which is what `list_charges` declares.** This sent `cursor` and
+          // FastAPI discards an undeclared query parameter in silence — no 422, no warning
+          // — so the marker never reached the server, `next_cursor` came back unchanged,
+          // and the loop below re-requested page one for as long as the tab stayed open.
+          // Invisible under 201 open charges, which is one club's first month of billing
+          // 200 students. See the F1 test beside this file; without its bound it reproduced
+          // the defect by exhausting Node's heap.
+          if (cursor) params.set('after', cursor)
           const response = await apiFetch(`/api/v1/charges?${params.toString()}`)
           if (!response.ok) throw new Error(String(response.status))
           const body = (await response.json()) as {

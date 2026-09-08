@@ -43,7 +43,7 @@ from sqlalchemy.orm import Session
 
 from app.core.clock import now
 from app.core.db import get_engine
-from app.core.jobs import record_run
+from app.core.jobs import for_each_studio, record_run
 from app.core.logging import configure_logging
 from app.core.tenancy import TenantSession, use_studio
 from app.models.billing import Charge
@@ -373,7 +373,7 @@ def _run_job() -> dict[str, int]:
     with Session(get_engine(), expire_on_commit=False) as unscoped:
         studios = _active_studios(unscoped)
 
-    for studio_id, _slug in studios:
+    def one(studio_id: uuid.UUID) -> None:
         tally.studios += 1
         with (
             use_studio(studio_id),
@@ -382,12 +382,17 @@ def _run_job() -> dict[str, int]:
             run_daily(scoped, at=at, studio_id=studio_id, tally=tally)
             scoped.commit()
 
+    # F2 -- one club's bad row costs that club and nothing else. Before this, a failure at
+    # studio 37 of 100 left 63 clubs unbilled and the operator saw one red row.
+    studios_failed = for_each_studio([studio_id for studio_id, _ in studios], one)
+
     # Counts only. A log line naming a family, an amount or a card would be a copy in
     # an aggregator that no later redaction can reach (§11.7) -- and the same dict is the
     # heartbeat's detail, which an operator reads on screen and receives by email when a
     # check goes red, so the rule binds harder here than it does on a log.
     counts = {
         "studios": tally.studios,
+        "studios_failed": studios_failed,
         "charges_created": tally.charges_created,
         "reminders": tally.reminders,
         "manager_tasks": tally.manager_tasks,

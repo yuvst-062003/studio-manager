@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import uuid
 from dataclasses import dataclass, field
 
 from sqlalchemy import select
@@ -40,7 +41,7 @@ from sqlalchemy.orm import Session
 
 from app.core.clock import now
 from app.core.db import get_engine
-from app.core.jobs import record_run
+from app.core.jobs import for_each_studio, record_run
 from app.core.logging import configure_logging
 from app.core.tenancy import TenantSession, use_studio
 from app.models.studio import Studio
@@ -73,8 +74,10 @@ def _run_job() -> dict[str, int]:
             unscoped.execute(select(Studio.id, Studio.slug).where(Studio.status == "active")).all()
         )
 
-    for studio_id, slug in studios:
-        tally.studios.append(slug)
+    by_id: dict[uuid.UUID, str] = {studio_id: slug for studio_id, slug in studios}
+
+    def one(studio_id: uuid.UUID) -> None:
+        tally.studios.append(by_id[studio_id])
         with (
             use_studio(studio_id),
             TenantSession(bind=get_engine(), expire_on_commit=False) as scoped,
@@ -82,7 +85,14 @@ def _run_job() -> dict[str, int]:
             tally.applied += PlanChangeService(scoped).apply_due(on=today, at=at)
             scoped.commit()
 
-    counts = {"studios": len(tally.studios), "applied": tally.applied}
+    # F2 -- see app/core/jobs.py::for_each_studio.
+    studios_failed = for_each_studio([studio_id for studio_id, _ in studios], one)
+
+    counts = {
+        "studios": len(tally.studios),
+        "studios_failed": studios_failed,
+        "applied": tally.applied,
+    }
     logger.info("plan changes applied", extra=counts)
     # The heartbeat carries the same counts the log line does. Counts only -- never a
     # studio slug, never a student: this row is read on a screen and mailed when red.

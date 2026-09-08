@@ -52,7 +52,7 @@ from sqlalchemy.orm import Session
 
 from app.core.clock import now
 from app.core.db import get_engine
-from app.core.jobs import record_run
+from app.core.jobs import for_each_studio, record_run
 from app.core.logging import configure_logging
 from app.core.tenancy import TenantSession, use_studio
 from app.models.attendance import Attendance
@@ -303,21 +303,32 @@ def _run_job() -> dict[str, int]:
             ).all()
         )
 
-    for studio_id, slug in studios:
-        tally.studios.append(slug)
+    by_id: dict[uuid.UUID, str] = {studio_id: slug for studio_id, slug in studios}
+
+    def one(studio_id: uuid.UUID) -> None:
+        tally.studios.append(by_id[studio_id])
         with (
             use_studio(studio_id),
             TenantSession(bind=get_engine(), expire_on_commit=False) as scoped,
         ):
             studio = scoped.get(Studio, studio_id)
             if studio is None:
-                continue
+                return
             raise_at_risk(scoped, studio, at=at, tally=tally)
             scoped.commit()
 
+    # F2 -- see app/core/jobs.py::for_each_studio.
+    studios_failed = for_each_studio([studio_id for studio_id, _ in studios], one)
+
     # Counts only (G7) — never a student's name, and the payload built above is never
     # logged either (§18.3 puts a notification payload in the "never" column).
-    counts = {"studios": len(tally.studios), "raised": tally.raised, "no_contact": tally.no_contact}
+    counts = {
+        "studios": len(tally.studios),
+        # F2 -- a partial run must not report as a clean one.
+        "studios_failed": studios_failed,
+        "raised": tally.raised,
+        "no_contact": tally.no_contact,
+    }
     logger.info("at-risk sweep complete", extra=counts)
     if tally.no_contact:
         logger.warning("some at-risk students have no guardian to contact", extra=counts)
