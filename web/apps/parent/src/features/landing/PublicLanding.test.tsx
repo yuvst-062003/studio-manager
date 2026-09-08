@@ -717,11 +717,19 @@ describe('the designed Gladiator page (Stitch, hardcoded content)', () => {
     expect(screen.getByTestId('booking-dialog')).toBeInTheDocument()
   })
 
-  it('renders the voices from the dojo', async () => {
+  it('renders the voices from the dojo, attributed to real former members', async () => {
+    // The two quotes here until 2026-09-08 came in with the rest of the approved Stitch
+    // copy — an AI design mockup writes plausible testimonials because that is what the
+    // layout needs, and one was attributed to a fifteen-year-old. Both are replaced by
+    // named alumni who approved their own wording.
     render(<PublicLanding slug="gladiator" locale="he" client={clientReturning(GLADIATOR)} />)
     const voices = await screen.findByTestId('landing-voices')
-    expect(voices).toHaveTextContent('אמא של יונתן')
-    expect(voices).toHaveTextContent('נבחרת גלדיאטור')
+    expect(voices).toHaveTextContent('יובל')
+    expect(voices).toHaveTextContent('איתי')
+    expect(voices).toHaveTextContent('בוגר המועדון')
+    // The invented pair, by name — this is the assertion that keeps them gone.
+    expect(voices).not.toHaveTextContent('אמא של יונתן')
+    expect(voices).not.toHaveTextContent('דניאל')
   })
 
   it('falls back to the bundled club mark when nothing is uploaded', async () => {

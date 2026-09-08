@@ -350,17 +350,27 @@ const HE: ClubCopy = {
     },
   ],
   voicesTitle: "קולות מהדוג'ו",
+  // **Two former members, by name, in their own words (2026-09-08).** These replace two
+  // quotes that came into this file with the rest of the approved Stitch copy — an AI design
+  // mockup writes plausible testimonials because that is what the layout needs, and one of
+  // the two was attributed to a fifteen-year-old, which put a publication-consent question
+  // on top of the truth question.
+  //
+  // Both of these are alumni who trained here and approved the wording under their own
+  // names. No years of results, no numbers, no claims about anybody else's child: what is
+  // said is how it felt, which is the part a person is entitled to say and nobody can
+  // contradict.
   voices: [
     {
       quote:
-        'מאז שהבן שלי הצטרף לגלדיאטור, הביטחון העצמי שלו זינק. הוא למד להתמודד עם הפסדים בכבוד ולשאוף תמיד להשתפר. סנסאי לביא תמיר הוא מודל לחיקוי אמיתי.',
-      name: 'אמא של יונתן',
+        'חמש עשרה שנה על המזרן הזה. מה שלוקחים מפה זה לא הטכניקה — זו היכולת לקום עוד פעם אחרי שנופלים, והיא נשארת הרבה אחרי שיוצאים מהאולם.',
+      name: 'יובל',
+      role: 'בוגר המועדון',
     },
     {
-      quote:
-        'אימונים קשים אבל מספקים בטירוף. האווירה פה היא של משפחה אחת גדולה שדוחפת אותך להיות הגרסה הכי טובה של עצמך, על המזרן ומחוצה לו.',
-      name: 'דניאל, בן 15',
-      role: 'נבחרת גלדיאטור',
+      quote: 'הגעתי בתור ילד ביישן ויצאתי עם ביטחון. ידעו מתי לדחוף ומתי לתת מקום.',
+      name: 'איתי',
+      role: 'בוגר המועדון',
     },
   ],
   galleryTitle: 'רגעים מהמועדון',
@@ -486,14 +496,15 @@ const EN: ClubCopy = {
   voices: [
     {
       quote:
-        'Since my son joined Gladiator his confidence has soared. He has learned to take a loss with dignity and to always aim to improve. Sensei Lavi Tamir is a true role model.',
-      name: 'Yonatan’s mother',
+        'Fifteen years on this mat. What you take away is not the technique — it is being able to get up again after you fall, and that stays with you long after you leave the hall.',
+      name: 'Yuval',
+      role: 'Club alumnus',
     },
     {
       quote:
-        'The training is hard but incredibly rewarding. The atmosphere here is one big family that pushes you to be the best version of yourself, on the mat and off it.',
-      name: 'Daniel, 15',
-      role: 'Gladiator squad',
+        'I arrived a shy kid and left with confidence. They knew when to push and when to give me room.',
+      name: 'Itai',
+      role: 'Club alumnus',
     },
   ],
   galleryTitle: 'Moments from the club',
@@ -617,14 +628,15 @@ const RU: ClubCopy = {
   voices: [
     {
       quote:
-        'С тех пор как мой сын пришёл в «Гладиатор», его уверенность взлетела. Он научился достойно принимать поражения и всегда стремиться стать лучше. Сэнсэй Лави Тамир — настоящий пример для подражания.',
-      name: 'Мама Йонатана',
+        'Пятнадцать лет на этом татами. Отсюда уносишь не технику — а умение подниматься после падения, и оно остаётся надолго после того, как уходишь из зала.',
+      name: 'Юваль',
+      role: 'Выпускник клуба',
     },
     {
       quote:
-        'Тренировки тяжёлые, но приносят огромное удовлетворение. Здесь атмосфера одной большой семьи, которая подталкивает тебя стать лучшей версией себя — на татами и вне его.',
-      name: 'Даниэль, 15 лет',
-      role: 'Сборная «Гладиатор»',
+        'Я пришёл застенчивым ребёнком, а ушёл с уверенностью. Тренеры знали, когда подтолкнуть, а когда дать пространство.',
+      name: 'Итай',
+      role: 'Выпускник клуба',
     },
   ],
   galleryTitle: 'Моменты из клуба',
