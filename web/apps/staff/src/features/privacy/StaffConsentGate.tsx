@@ -172,9 +172,6 @@ export function StaffConsentGate({
             <span className="text-sm font-black text-[var(--fg)]">{t(locale, titleKey)}</span>
           </label>
           <p className="mt-2 text-xs leading-relaxed text-[var(--text-muted)]">{t(locale, summaryKey)}</p>
-          <p className="mt-1 text-[11px] text-[var(--text-muted)]">
-            {t(locale, 'reports.privacy.doc.version')} {state.policy_version_label}
-          </p>
           <button
             type="button"
             data-testid={`staff-consent-read-${key}`}

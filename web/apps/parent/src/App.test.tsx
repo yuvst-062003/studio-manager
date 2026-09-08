@@ -471,7 +471,9 @@ describe('L6 — the anonymous landing touches no session', () => {
     // Walk the wizard's own step 1 to prove the resumed group survives all the way to
     // where a parent would actually see it, not only in an unobserved fetch.
     const user = userEvent.setup()
-    await screen.findByTestId('join-welcome-terms-version')
+    // The version pill is gone (owner, 2026-09-08). The document card itself is what
+    // proves step 1 rendered.
+    await screen.findByTestId('join-welcome-terms-read')
     // One tick now gates continue, not three (owner request, 2026-09-03).
     await user.click(screen.getByTestId('join-welcome-agree-check'))
     await user.click(screen.getByTestId('join-welcome-continue'))

@@ -99,15 +99,6 @@ const tickMarkOnStyle: CSSProperties = {
   borderColor: 'var(--accent)',
 }
 
-const versionPillStyle: CSSProperties = {
-  border: 'var(--border-width-hairline) solid var(--border-strong)',
-  borderRadius: 'var(--radius-pill)',
-  color: 'var(--text-muted)',
-  flex: 'none',
-  fontSize: 'var(--text-micro)',
-  padding: '1px var(--space-2)',
-}
-
 const summaryStyle: CSSProperties = {
   color: 'var(--text-muted)',
   fontSize: 'var(--text-caption)',
@@ -200,7 +191,6 @@ export type JoinWelcomeStepProps = {
    *  step). Null the same way `logoUrl` is: an older cached response, or a caller (a
    *  test, Door A/D's stripped-down welcome) that never had the number, renders no
    *  version line rather than a stale or fabricated one. */
-  clubTermsVersion: number | null
   privacyClient: PrivacyClient
   /** Always called with `true` -- reached only once the single tick is checked. The
    *  boolean keeps the call site symmetrical with `JoinFlow`'s existing
@@ -240,9 +230,7 @@ type DocumentCardProps = {
   onRead: () => void
   readTestId: string
   summary: string
-  testIdPrefix: string
   title: string
-  versionLine: string | null
 }
 
 /** One card, one document, one popup -- the shape decision 10 fixed and this redesign
@@ -256,9 +244,7 @@ function DocumentCard({
   onRead,
   readTestId,
   summary,
-  testIdPrefix,
   title,
-  versionLine,
 }: DocumentCardProps) {
   return (
     <div style={compactCardStyle}>
@@ -266,12 +252,12 @@ function DocumentCard({
         <span aria-hidden="true" style={agreed ? tickMarkOnStyle : tickMarkStyle}>
           {agreed ? <Icon name="check" size={11} /> : null}
         </span>
+        {/* The title, and nothing beside it. A version pill here was an internal number
+            wearing a badge — it meant nothing to the family reading the document, and this
+            product has shipped one unwanted version number before (owner, 2026-09-08).
+            `CLUB_TERMS_VERSION` and `POLICY_VERSION` are untouched and still gate consent;
+            what is gone is showing them. */}
         <h3 style={cardTitleStyle}>{title}</h3>
-        {versionLine ? (
-          <span data-testid={`${testIdPrefix}-version`} style={versionPillStyle}>
-            {versionLine}
-          </span>
-        ) : null}
       </div>
       {chip}
       <p style={summaryStyle}>{summary}</p>
@@ -287,7 +273,6 @@ export function JoinWelcomeStep({
   locale,
   studioName,
   logoUrl,
-  clubTermsVersion,
   privacyClient,
   onAccept,
   deferAcceptance = false,
@@ -328,14 +313,6 @@ export function JoinWelcomeStep({
   }, [openDoc])
 
   const dialogRef = useModalDialog(openDoc !== null, () => setOpenDoc(null))
-
-  const policyVersionLine = state
-    ? `${t(locale, 'reports.privacy.doc.version')} ${state.policy_version_label}`
-    : null
-  const clubVersionLine =
-    clubTermsVersion !== null
-      ? `${t(locale, 'reports.privacy.doc.version')} ${clubTermsVersion}`
-      : null
 
   async function submit() {
     if (!agreed || saving) return
@@ -401,9 +378,7 @@ export function JoinWelcomeStep({
           onRead={() => setOpenDoc('terms')}
           readTestId="join-welcome-terms-read"
           summary={t(locale, 'reports.privacy.gate.termsSummary')}
-          testIdPrefix="join-welcome-terms"
           title={t(locale, 'reports.privacy.terms.title')}
-          versionLine={policyVersionLine}
         />
 
         <DocumentCard
@@ -412,9 +387,7 @@ export function JoinWelcomeStep({
           onRead={() => setOpenDoc('policy')}
           readTestId="join-welcome-privacy-read"
           summary={t(locale, 'reports.privacy.gate.privacySummary')}
-          testIdPrefix="join-welcome-privacy"
           title={t(locale, 'reports.privacy.policy.title')}
-          versionLine={policyVersionLine}
         />
 
         {/* The club card -- same shape as the two above it (decision 10). The three
@@ -428,9 +401,7 @@ export function JoinWelcomeStep({
           onRead={() => setOpenDoc('club')}
           readTestId="join-welcome-club-read"
           summary={t(locale, 'health.clubTerms.summary')}
-          testIdPrefix="join-welcome-club"
           title={t(locale, 'health.clubTerms.title')}
-          versionLine={clubVersionLine}
         />
 
         {/* The ONE real control (owner request) -- a native `Checkbox`, not the three

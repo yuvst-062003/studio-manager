@@ -49,7 +49,7 @@ async function dirtyIt(user: ReturnType<typeof userEvent.setup>) {
   await user.type(first, 'x')
 }
 
-describe("the belt picker (bug #10)", () => {
+describe('the belt picker (bug #10)', () => {
   function renderWith(belts: { id: string; name: string }[]) {
     render(
       <StudentFormSheet

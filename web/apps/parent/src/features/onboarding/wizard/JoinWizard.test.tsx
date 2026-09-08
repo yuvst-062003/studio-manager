@@ -973,33 +973,28 @@ describe('Step1Agreements -- renders in English when given locale="en" (task 6)'
 // able to see which version they are agreeing to. `wizardSources.test.ts` covers the read
 // itself (`tokenSource.loadStudio` maps it, `studioSource.loadStudio` always answers
 // `null`); these two cover the render.
-describe('Step1Agreements -- the club terms version (gap 2)', () => {
-  it('renders the version beside the club-terms document when the source has one', () => {
+describe('Step1Agreements -- no version number on a document (owner, 2026-09-08)', () => {
+  it('shows the document, not its edition', () => {
+    // The owner asked for the document and not its version. A number beside a title is an
+    // internal fact wearing a badge: it tells a family nothing, and this product has
+    // shipped an unwanted version number before (CLAUDE.md's verification notes).
+    //
+    // `CLUB_TERMS_VERSION` is untouched and still load-bearing — it gates consent, is
+    // recorded against every grant, and a mismatch is still rejected. Only the display is
+    // gone.
     render(
       <Step1Agreements
         locale="he"
-        clubTermsVersion={7}
         agreed={false}
         onAgreedChange={() => {}}
         onContinue={() => {}}
       />,
     )
 
-    expect(screen.getByText(`${STEP1_COPY.termsVersion} 7`)).toBeInTheDocument()
-  })
-
-  it('renders no version text when clubTermsVersion is null (doors C/D)', () => {
-    render(
-      <Step1Agreements
-        locale="he"
-        clubTermsVersion={null}
-        agreed={false}
-        onAgreedChange={() => {}}
-        onContinue={() => {}}
-      />,
-    )
-
-    expect(screen.queryByText(new RegExp(STEP1_COPY.termsVersion))).toBeNull()
+    // The copy entry is gone too, so there is no string left to render by accident.
+    expect(screen.queryByText(/גרסת נוסח|גרסה/, { exact: false })).toBeNull()
+    // The document itself is still reachable, which is the thing that matters.
+    expect(screen.getAllByRole('button').length).toBeGreaterThan(0)
   })
 })
 

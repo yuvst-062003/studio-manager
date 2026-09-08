@@ -40,7 +40,6 @@ export type Step1AgreementsProps = {
    *  document card ('payments' -- see `DOCUMENT_ROWS`, the "תקנות ותנאי תשלום" row) when
    *  non-null; renders nothing extra when `null` (doors C/D, whose door has no such
    *  number to show -- see `wizardSources.ts::studioSource.loadStudio`'s own comment). */
-  clubTermsVersion?: number | null
   /** Lifted, not local: the prototype keeps this in the step's own state, so it is lost on
    *  back-navigation and on refresh while the step number IS persisted (§14.2). */
   agreed: boolean
@@ -51,7 +50,6 @@ export type Step1AgreementsProps = {
 export function Step1Agreements({
   locale,
   emblemUrl,
-  clubTermsVersion = null,
   agreed,
   onAgreedChange,
   onContinue,
@@ -102,14 +100,6 @@ export function Step1Agreements({
               <span className="text-[15px] font-bold text-[#0056c5] group-hover:text-[#001849] transition-colors">
                 {LEGAL_DOCS[key].title}
               </span>
-              {/* Gap 2 -- the club's own document ('payments': "תקנות ותנאי תשלום") is the
-                  one this version numbers. `terms`/`privacy` are the app-level documents
-                  and carry no `club_terms_version` of their own. */}
-              {key === 'payments' && clubTermsVersion !== null ? (
-                <span className="text-[11px] text-[#757681] font-semibold px-2 py-0.5 rounded-full bg-[#f2f3ff] border border-[#dee2f4]">
-                  {STEP1_COPY.termsVersion} {clubTermsVersion}
-                </span>
-              ) : null}
             </div>
             <div className="flex items-center gap-1 text-[#0056c5]">
               <span className="text-[11px] font-semibold opacity-75 group-hover:opacity-100">

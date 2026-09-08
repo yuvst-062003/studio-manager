@@ -364,7 +364,6 @@ export function BookingFlow({
       <JoinWelcomeStep
         deferAcceptance
         locale={locale}
-        clubTermsVersion={null}
         logoUrl={null}
         privacyClient={privacyClient}
         steps={TRIAL_STEPS}

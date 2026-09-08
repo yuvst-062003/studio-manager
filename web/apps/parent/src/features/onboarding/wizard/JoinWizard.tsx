@@ -304,7 +304,6 @@ export function JoinWizard({
           <Step1Agreements
             locale={locale}
             emblemUrl={studio.logoUrl}
-            clubTermsVersion={studio.clubTermsVersion}
             agreed={agreed}
             onAgreedChange={setAgreed}
             onContinue={() => setStep(2)}

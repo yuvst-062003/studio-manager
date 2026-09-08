@@ -158,7 +158,6 @@ export function step1Copy(locale: Locale) {
     close: t(locale, 'people.joinWizard.step1.close'),
     //: Gap 2 -- rendered as `{label} {n}`, the way the wizard renders its other counts.
     //: Never interpolated in the locale file itself.
-    termsVersion: t(locale, 'people.joinWizard.step1.termsVersion'),
   } as const
 }
 

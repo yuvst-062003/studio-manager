@@ -120,7 +120,6 @@ export function ConsentGate({
   if (status === 'open' || state == null) return <>{children}</>
 
   const both = accepted.terms && accepted.privacy
-  const version = `${t(locale, 'reports.privacy.doc.version')} ${state.policy_version_label}`
 
   const submit = async (): Promise<void> => {
     if (state.outstanding.length === 0) {
@@ -167,7 +166,6 @@ export function ConsentGate({
         <p style={{ color: 'var(--text-muted)' }}>
           {t(locale, 'reports.privacy.gate.termsSummary')}
         </p>
-        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-caption)' }}>{version}</p>
         <Button
           data-testid="consent-read-terms"
           onClick={() => setOpenDoc('terms')}
@@ -192,7 +190,6 @@ export function ConsentGate({
         <p style={{ color: 'var(--text-muted)' }}>
           {t(locale, 'reports.privacy.gate.privacySummary')}
         </p>
-        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-caption)' }}>{version}</p>
         <Button
           data-testid="consent-read-privacy"
           onClick={() => setOpenDoc('policy')}

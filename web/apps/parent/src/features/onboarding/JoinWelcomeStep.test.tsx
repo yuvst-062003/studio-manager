@@ -42,7 +42,6 @@ describe('JoinWelcomeStep', () => {
     render(
       <JoinWelcomeStep
         locale="he"
-        clubTermsVersion={CLUB_TERMS_TEST_VERSION}
         logoUrl={null}
         studioName="מועדון הדגמה"
         privacyClient={client}
@@ -92,7 +91,6 @@ describe('JoinWelcomeStep', () => {
     render(
       <JoinWelcomeStep
         locale="he"
-        clubTermsVersion={CLUB_TERMS_TEST_VERSION}
         logoUrl={null}
         studioName="מועדון הדגמה"
         privacyClient={client}
@@ -124,7 +122,6 @@ describe('JoinWelcomeStep', () => {
     render(
       <JoinWelcomeStep
         locale="he"
-        clubTermsVersion={CLUB_TERMS_TEST_VERSION}
         logoUrl={null}
         studioName="מועדון הדגמה"
         privacyClient={client}
@@ -165,7 +162,6 @@ describe('JoinWelcomeStep', () => {
     render(
       <JoinWelcomeStep
         locale="he"
-        clubTermsVersion={CLUB_TERMS_TEST_VERSION}
         logoUrl={null}
         studioName="מועדון הדגמה"
         privacyClient={client}
@@ -195,7 +191,6 @@ describe('JoinWelcomeStep', () => {
     render(
       <JoinWelcomeStep
         locale="he"
-        clubTermsVersion={CLUB_TERMS_TEST_VERSION}
         logoUrl={null}
         studioName="מועדון הדגמה"
         privacyClient={client}
@@ -230,7 +225,6 @@ describe('JoinWelcomeStep', () => {
     render(
       <JoinWelcomeStep
         locale="he"
-        clubTermsVersion={CLUB_TERMS_TEST_VERSION}
         logoUrl={LOGO_URL}
         studioName="מועדון הדגמה"
         privacyClient={client}
@@ -253,7 +247,6 @@ describe('JoinWelcomeStep', () => {
     render(
       <JoinWelcomeStep
         locale="he"
-        clubTermsVersion={CLUB_TERMS_TEST_VERSION}
         logoUrl={null}
         studioName="מועדון הדגמה"
         privacyClient={client}
@@ -267,12 +260,20 @@ describe('JoinWelcomeStep', () => {
   // Each card carries its OWN version -- terms and privacy come off the same
   // consent-status read (both move with POLICY_VERSION), club terms off the
   // `clubTermsVersion` prop (`OnboardingInfoOut.club_terms_version`, server-side).
-  it("shows each card's own document version", async () => {
+  it('shows no version number on any document card (owner, 2026-09-08)', async () => {
+    // The owner asked for the document, not its edition. A version pill beside a title is
+    // an internal number wearing a badge: it means nothing to the family reading it, and
+    // this product has already shipped one number nobody wanted (CLAUDE.md's verification
+    // notes, 'a version number nobody wanted').
+    //
+    // The versions themselves are untouched and still load-bearing —
+    // `CLUB_TERMS_VERSION` and `POLICY_VERSION` still gate consent, are still recorded
+    // against every grant, and a mismatch is still rejected. What is gone is displaying
+    // them.
     const client = makeClient()
     render(
       <JoinWelcomeStep
         locale="he"
-        clubTermsVersion={CLUB_TERMS_TEST_VERSION}
         logoUrl={null}
         studioName="מועדון הדגמה"
         privacyClient={client}
@@ -281,33 +282,11 @@ describe('JoinWelcomeStep', () => {
     )
     await screen.findByText('מועדון הדגמה')
 
-    const termsVersion = await screen.findByTestId('join-welcome-terms-version')
-    const privacyVersion = screen.getByTestId('join-welcome-privacy-version')
-    const clubVersion = screen.getByTestId('join-welcome-club-version')
-
-    expect(termsVersion).toHaveTextContent('v3')
-    expect(privacyVersion).toHaveTextContent('v3')
-    expect(clubVersion).toHaveTextContent(String(CLUB_TERMS_TEST_VERSION))
-  })
-
-  // F-finding: `clubTermsVersion` is optional and nullable the same way `logoUrl` is --
-  // an older cached `OnboardingInfoOut` (or Door A/D's stripped-down welcome, which
-  // passes `null` on purpose) must render no version line, not a stale or fabricated
-  // number.
-  it('renders no club-terms version line when clubTermsVersion is null', async () => {
-    const client = makeClient()
-    render(
-      <JoinWelcomeStep
-        locale="he"
-        clubTermsVersion={null}
-        logoUrl={null}
-        studioName="מועדון הדגמה"
-        privacyClient={client}
-        onAccept={vi.fn()}
-      />,
-    )
-    await screen.findByText('מועדון הדגמה')
+    expect(screen.queryByTestId('join-welcome-terms-version')).toBeNull()
+    expect(screen.queryByTestId('join-welcome-privacy-version')).toBeNull()
     expect(screen.queryByTestId('join-welcome-club-version')).toBeNull()
+    // The label too — an empty pill with the words and no number would be worse.
+    expect(screen.queryByText(t('he', 'reports.privacy.doc.version'), { exact: false })).toBeNull()
   })
 
   it("renders no back button -- this is the wizard's first step", async () => {
@@ -315,7 +294,6 @@ describe('JoinWelcomeStep', () => {
     render(
       <JoinWelcomeStep
         locale="he"
-        clubTermsVersion={CLUB_TERMS_TEST_VERSION}
         logoUrl={null}
         studioName="מועדון הדגמה"
         privacyClient={client}
@@ -337,7 +315,6 @@ describe('JoinWelcomeStep', () => {
     render(
       <JoinWelcomeStep
         locale="he"
-        clubTermsVersion={CLUB_TERMS_TEST_VERSION}
         logoUrl={null}
         studioName="מועדון הדגמה"
         privacyClient={client}
