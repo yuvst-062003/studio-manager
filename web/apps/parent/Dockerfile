@@ -15,6 +15,19 @@ RUN npm ci
 # dev-shaped bundle that expects a same-origin /api proxy, which no deployed host has.
 ARG VITE_API_ORIGIN
 ENV VITE_API_ORIGIN=$VITE_API_ORIGIN
+# #25 -- which hosts serve the club's landing page at their ROOT, and whose club. Vite
+# substitutes `import.meta.env.X` at BUILD time, and a Docker build sees a Railway service
+# variable only if the Dockerfile declares it as an ARG: setting the variable on the service
+# is necessary and not sufficient. Both were set and the first production build shipped
+# without them, so `www` served the sign-in wall instead of the shop window -- caught by
+# grepping the deployed bundle, not by anything that fails a build.
+#
+# Absent is the old behaviour exactly (`landingSlugFor` answers null), so a build without
+# them is degraded rather than broken -- which is why nothing shouted.
+ARG VITE_LANDING_SLUG
+ENV VITE_LANDING_SLUG=$VITE_LANDING_SLUG
+ARG VITE_LANDING_HOSTS
+ENV VITE_LANDING_HOSTS=$VITE_LANDING_HOSTS
 RUN npm run build --workspace @studio/parent
 
 FROM caddy:2-alpine
