@@ -541,7 +541,7 @@ export const schedule: Bundle = {
   'plan.changeFromTo': 'From {{from}} to {{to}}',
   'plan.cadence': '{{count}} sessions a week',
   'plan.cadenceOpen': 'Unlimited sessions',
-  'plan.feature.base': 'Two fixed base sessions a week',
+  'plan.feature.base': "The group's fixed base sessions",
   'plan.feature.baseOnly': 'No extra sessions',
   'plan.feature.extras': '{{count}} more session a week, your choice of day',
   'plan.feature.unlimited': 'Every session on the timetable, no weekly limit',

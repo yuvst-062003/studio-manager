@@ -633,7 +633,7 @@ export const schedule: Bundle = {
   // The derived card's words, for a plan the landing page has no copy for.
   'plan.cadence': '{{count}} אימונים בשבוע',
   'plan.cadenceOpen': 'אימונים ללא הגבלה',
-  'plan.feature.base': 'שני אימוני בסיס קבועים בשבוע',
+  'plan.feature.base': 'אימוני הבסיס הקבועים של הקבוצה',
   'plan.feature.baseOnly': 'ללא אימונים נוספים',
   'plan.feature.extras': 'עוד {{count}} אימון נוסף בשבוע, לבחירתכם',
   'plan.feature.unlimited': 'כל האימונים במערכת, ללא הגבלה שבועית',

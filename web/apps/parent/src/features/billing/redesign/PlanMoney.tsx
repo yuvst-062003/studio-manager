@@ -105,6 +105,7 @@ export function PlanMoney({
   method,
   context,
   busy,
+  previousAgorot,
   onPickMethod,
   onPayCard,
   onPromise,
@@ -117,6 +118,16 @@ export function PlanMoney({
   method: PaymentMethod | null
   context: MoneyContext | null
   busy: boolean
+  /**
+   * What the plan being LEFT costs, captured before the change was recorded.
+   *
+   * The standing-order step names it, and it cannot come from the payer's re-read total:
+   * an UPGRADE moves `price_plan_id` at request time, so by the time that total is read it
+   * is already the NEW amount — and the sentence "cancel the old order (₪400)" then names
+   * the amount the family is about to start paying rather than the one they must stop.
+   * A parent following that instruction cancels the wrong mandate.
+   */
+  previousAgorot: number | null
   onPickMethod: (next: PaymentMethod) => void
   onPayCard: () => void
   onPromise: (method: 'cash' | 'cheque', prepayMonths: number) => void
@@ -290,9 +301,11 @@ export function PlanMoney({
               <span className="font-bold text-[#ba1a1a]">②</span>
               <span className="min-w-0">
                 {fill(t(locale, 'schedule.plan.route.mandateStepTwo'), {
+                  // The plan being LEFT, captured before the change — never the re-read
+                  // total, which an upgrade has already moved. See the prop's own note.
                   amount:
-                    context && context.monthlyTotalAgorot > 0
-                      ? formatAgorot(context.monthlyTotalAgorot)
+                    previousAgorot !== null && previousAgorot > 0
+                      ? formatAgorot(previousAgorot)
                       : '',
                 })}
                 <span className="block text-[11px] font-bold text-[#ba1a1a] dark:text-red-300 mt-0.5">

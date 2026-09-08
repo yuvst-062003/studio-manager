@@ -77,6 +77,14 @@ export function PlanScreen({
   // Which plan's money step is open. One at a time: two open confirm steps would be two
   // changes a parent could send by accident.
   const [chosen, setChosen] = useState<PlanOption | null>(null)
+  /**
+   * What the plan being LEFT costs, captured at the moment of choosing.
+   *
+   * `view.current_plan` is re-read after the change, and an UPGRADE has already moved
+   * `price_plan_id` by then — so it is the new plan. The standing-order step names the
+   * amount the family must stop paying, and that number only exists before the write.
+   */
+  const [leavingAgorot, setLeavingAgorot] = useState<number | null>(null)
 
   const current = view.current_plan
   const currentAgorot = current?.monthly_amount_agorot ?? null
@@ -145,7 +153,39 @@ export function PlanScreen({
             >
               {t(locale, 'schedule.plan.currentHeading')}
             </h2>
-            <PlanCard plan={current} locale={locale} currentAgorot={currentAgorot} />
+            <PlanCard
+              plan={current}
+              locale={locale}
+              currentAgorot={currentAgorot}
+              // **The money step has to follow the plan that was chosen, even here.**
+              //
+              // An UPGRADE moves `student.price_plan_id` at request time — that is the
+              // §15 decision, access before payment. So the moment the request lands, the
+              // plan the parent picked stops being an option and becomes the current one:
+              // it leaves the list below and arrives in this card. Rendered only there,
+              // the money step vanished at exactly the moment it was needed, and the
+              // parent was left with a plan they had not paid for, a standing order still
+              // charging the old amount, and nothing on screen about either.
+              footer={
+                chosen?.id === current.id ? (
+                  <PlanMoney
+                    plan={current}
+                    locale={locale}
+                    method={method}
+                    context={money}
+                    busy={busy}
+                    previousAgorot={leavingAgorot}
+                    onPickMethod={onPickMethod}
+                    onPayCard={onPayCard}
+                    onPromise={onPromise}
+                    onDone={() => {
+                      setChosen(null)
+                      onCloseMoney()
+                    }}
+                  />
+                ) : null
+              }
+            />
           </section>
         ) : null}
 
@@ -209,6 +249,8 @@ export function PlanScreen({
                 disabled={busy}
                 onChoose={() => {
                   setChosen(plan)
+                  // Before the write, while `current` still means the plan being left.
+                  setLeavingAgorot(currentAgorot)
                   onChoosePlan(plan)
                 }}
                 footer={
@@ -239,6 +281,7 @@ export function PlanScreen({
                         method={method}
                         context={money}
                         busy={busy}
+                        previousAgorot={leavingAgorot}
                         onPickMethod={onPickMethod}
                         onPayCard={onPayCard}
                         onPromise={onPromise}

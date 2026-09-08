@@ -543,7 +543,7 @@ export const schedule: Bundle = {
   'plan.changeFromTo': 'С {{from}} на {{to}}',
   'plan.cadence': '{{count}} тренировки в неделю',
   'plan.cadenceOpen': 'Тренировки без ограничений',
-  'plan.feature.base': 'Две базовые тренировки в неделю',
+  'plan.feature.base': 'Базовые тренировки группы',
   'plan.feature.baseOnly': 'Без дополнительных тренировок',
   'plan.feature.extras': 'Ещё {{count}} тренировка в неделю на ваш выбор',
   'plan.feature.unlimited': 'Все тренировки расписания, без недельного лимита',

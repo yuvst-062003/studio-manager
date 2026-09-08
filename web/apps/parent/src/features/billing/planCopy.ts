@@ -79,16 +79,35 @@ function derived(plan: PlanLike, locale: Locale): PlanCardCopy {
   const allowance = plan.weekly_extra_allowance
   const features: string[] = [t(locale, 'schedule.plan.feature.base')]
 
-  if (allowance === null || allowance === undefined) {
+  /**
+   * **A NULL allowance is only "unlimited" when the cadence agrees.**
+   *
+   * The two columns are different facts and a club can set one without the other — the
+   * demo studio does exactly that, seeding `sessions_per_week` and leaving
+   * `weekly_extra_allowance` NULL on every plan. Read alone, the NULL says "no weekly
+   * limit" (the model's own note: "NULL rather than a large number, because 'no limit' is
+   * a third state"), and the card then printed 'פעמיים בשבוע' as its cadence directly
+   * above 'כל האימונים במערכת, ללא הגבלה שבועית' as its bullet. One card, two facts, and
+   * they contradicted each other.
+   *
+   * A plan that names a number of sessions a week is not unlimited whatever the other
+   * column is missing. So the cadence wins: unlimited is claimed only when BOTH say so.
+   */
+  const unlimited = (allowance === null || allowance === undefined) && perWeek === null
+
+  if (unlimited) {
     features.push(t(locale, 'schedule.plan.feature.unlimited'))
     // §5.1: the Saturday private lesson attaches its rule to the allowance being NULL, so
     // this bullet is true exactly when that one is.
     features.push(t(locale, 'schedule.plan.feature.private'))
-  } else if (allowance > 0) {
+  } else if (allowance !== null && allowance !== undefined && allowance > 0) {
     features.push(fill(t(locale, 'schedule.plan.feature.extras'), { count: String(allowance) }))
-  } else {
+  } else if (allowance === 0) {
     features.push(t(locale, 'schedule.plan.feature.baseOnly'))
   }
+  // A plan with a cadence and NO allowance recorded says nothing further. Silence is the
+  // honest answer where the club has filled in one column and not the other — inventing a
+  // bullet from a column nobody set is how the contradiction above happened.
 
   return {
     title: null,

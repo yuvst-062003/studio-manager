@@ -7,8 +7,10 @@
 //
 // **No price, anywhere** — C11 put that on the student, and `EnrollmentOut` has no field for
 // one. L2: this lane never renders an amount.
+import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { DetailRow } from '@studio/ui'
+import { DetailRow, MoneyDisplay } from '@studio/ui'
+import { apiFetch } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { StudentCardSectionProps } from '../redesign/TraineeCard'
 
@@ -73,13 +75,71 @@ export function EnrollmentsSection({ locale, enrollments = [] }: StudentCardSect
  * over the 44px floor. As a caption-sized link inside another row it was neither.
  */
 export function TrainingPlanRow({ locale, student }: StudentCardSectionProps) {
+  const plan = useMyPlan(student.id)
   return (
     <DetailRow
       href={`#/plan/${student.id}`}
       label={t(locale, 'people.card.plan')}
       testId="student-card-plan-link"
     >
-      {t(locale, 'schedule.plan.title')}
+      {/* The plan's NAME and what it costs — not the literal 'המסלול שלי', which is the
+          screen's title repeated as its own value. Every other row on this card answers
+          its label; this one used to say "the plan is: the plan".
+          `null` while the read is in flight or when the child has no plan (a `lead`, or a
+          child a manager has not priced), and then the row falls back to naming the
+          destination rather than printing an amount nobody set. */}
+      {plan === null ? (
+        t(locale, 'schedule.plan.title')
+      ) : (
+        <span className="flex items-baseline gap-2">
+          <bdi>{plan.plan_name}</bdi>
+          <MoneyDisplay agorot={plan.monthly_amount_agorot} label={plan.plan_name} />
+        </span>
+      )}
     </DetailRow>
   )
+}
+
+/**
+ * This child's plan, from `GET /me/training-plans`.
+ *
+ * A read of its own rather than a field on the card's payload: `StudentSummaryOut` is the
+ * roster row a coach also receives, and §13's third invariant keeps the price off it. The
+ * same reason home's pill has its own read.
+ *
+ * A failed read is `null`, which renders the row exactly as it did before this existed. A
+ * money row that guesses is worse than one that says less.
+ */
+function useMyPlan(
+  studentId: string,
+): { plan_name: string; monthly_amount_agorot: number } | null {
+  const [plan, setPlan] = useState<{
+    plan_name: string
+    monthly_amount_agorot: number
+  } | null>(null)
+
+  useEffect(() => {
+    let live = true
+    void apiFetch('/api/v1/me/training-plans')
+      .then(async (response) => {
+        if (!live || !response.ok) return
+        const body = (await response.json()) as {
+          items: {
+            student_id: string
+            plan_name: string | null
+            monthly_amount_agorot: number | null
+          }[]
+        }
+        const row = body.items.find((item) => item.student_id === studentId)
+        if (row?.plan_name != null && row.monthly_amount_agorot != null) {
+          setPlan({ plan_name: row.plan_name, monthly_amount_agorot: row.monthly_amount_agorot })
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [studentId])
+
+  return plan
 }

@@ -132,10 +132,20 @@ export function TraineeCard({
             )}
           </div>
           {/* The `mark` and `status` regions. Lanes place themselves here by naming a
-              region beside their `order` — the container still learns no section's name. */}
-          <div className="flex flex-col items-end gap-1 shrink-0">
+              region beside their `order` — the container still learns no section's name.
+              What the container DOES own is the box each region gets: `mark` is a small
+              fixed tab, because `BeltBar` (the one mark registered today) is a fill-your-
+              parent primitive built for a wide ledger header, and in an unsized flex column
+              it stretched into a stray stripe down the card. Sizing it here keeps the
+              registry's promise — any lane's mark renders sensibly — without this file
+              learning that lane's name. */}
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
             {paint(statuses)}
-            {paint(marks)}
+            {marks.length > 0 ? (
+              <span className="block w-8 h-2 rounded-full overflow-hidden [&_.studio-belt-bar]:block [&_.studio-belt-bar]:w-full [&_.studio-belt-bar]:h-full">
+                {paint(marks)}
+              </span>
+            ) : null}
           </div>
         </div>
 
