@@ -73,6 +73,28 @@ function render(ui: ReactElement) {
   return rtlRender(<ThemeProvider>{ui}</ThemeProvider>)
 }
 
+// Every call to action on this page is now a real link, and `landingViewHref` builds it
+// from `location.pathname` — so a test that asserts an href has to say where it is
+// standing. Reset after each one, or the club prefix leaks into the next test's page.
+afterEach(() => {
+  window.history.replaceState(null, '', '/')
+})
+
+/**
+ * jsdom implements no navigation: clicking a real `<a href>` prints "Not implemented" and
+ * proves nothing. The links here are asserted by their `href` instead — this exists for
+ * the one test that needs a click's SIDE EFFECT, the page remembering the pressed group.
+ */
+function clickWithoutNavigating(element: HTMLElement) {
+  const swallow = (event: Event) => event.preventDefault()
+  document.addEventListener('click', swallow)
+  try {
+    fireEvent.click(element)
+  } finally {
+    document.removeEventListener('click', swallow)
+  }
+}
+
 function renderIn(
   ui: ReactElement,
   { locale = 'he', theme = 'light' }: { locale?: Locale; theme?: ResolvedTheme } = {},
@@ -172,10 +194,14 @@ describe('PublicLanding — the shop window', () => {
     ).toBeInTheDocument()
   })
 
-  it('keeps the flow closed on load — reading first, booking on request', async () => {
+  it('opens nothing over itself — the booking is a page, reached by a link', async () => {
+    // §5.4a's rule survives the redesign: reading is free. What changed is where booking
+    // happens — `/t/{slug}/trial`, its own address — so this page renders no dialog in any
+    // state, and there is no longer a state in which it could.
     render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(LANDING)} />)
     await screen.findByTestId('landing-hero')
     expect(screen.queryByTestId('booking-dialog')).toBeNull()
+    expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.queryByTestId('booking-sign-in')).toBeNull()
   })
 
@@ -297,14 +323,17 @@ describe('PublicLanding — the shop window', () => {
 })
 
 describe('the header and footer chrome', () => {
-  it('carries the brand row — name, phone — and one way in that opens the flow', async () => {
-    const user = userEvent.setup()
+  it('carries the brand row — name, phone — and one way in: a link to the form', async () => {
+    window.history.replaceState(null, '', '/t/judo-tel-aviv')
     render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(LANDING)} />)
     const header = await screen.findByTestId('landing-header')
     expect(header).toHaveTextContent(LANDING.studio_name)
     expect(screen.getByTestId('landing-phone')).toHaveAttribute('href', 'tel:0521234567')
-    await user.click(screen.getByTestId('landing-join'))
-    expect(screen.getByTestId('booking-dialog')).toBeInTheDocument()
+    // An anchor, not a button: the club's main ask has to be middle-clickable, copyable
+    // and keyboard-reachable, and an element with an `href` is all three for free.
+    const join = screen.getByTestId('landing-join')
+    expect(join.tagName).toBe('A')
+    expect(join).toHaveAttribute('href', '/t/judo-tel-aviv/trial?group=g1')
   })
 
   it('links only the sections that exist — a club with no address gets no dead anchor', async () => {
@@ -328,6 +357,36 @@ describe('the header and footer chrome', () => {
     expect(footer).toHaveTextContent(t('he', 'people.landing.footerOffer'))
     expect(footer).toHaveTextContent(LANDING.studio_name)
     expect(footer).toHaveTextContent(t('he', 'people.landing.aboutTitle'))
+  })
+
+  it('links the club’s documents from the footer', async () => {
+    // §6 — the terms, the privacy policy and the payment conditions lived only inside
+    // popups behind a sign-in, which is the wrong way round for documents a stranger is
+    // meant to read BEFORE committing to anything.
+    window.history.replaceState(null, '', '/t/judo-tel-aviv')
+    render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(LANDING)} />)
+    const footer = await screen.findByTestId('landing-footer')
+    const legal = within(footer).getByTestId('landing-legal-link')
+    expect(legal).toHaveTextContent(t('he', 'people.bookTrial.legal.title'))
+    expect(legal).toHaveAttribute('href', '/t/judo-tel-aviv/legal')
+  })
+
+  it('keeps the documents link on a club with no sections to link', async () => {
+    // The link row used to render only when the club had an `about`, a timetable or an
+    // address. The documents are not one of the club's optional sections.
+    window.history.replaceState(null, '', '/t/judo-tel-aviv')
+    render(
+      <PublicLanding
+        slug="judo-tel-aviv"
+        locale="he"
+        client={clientReturning({ ...LANDING, about: null, address: null, groups: [] })}
+      />,
+    )
+    const footer = await screen.findByTestId('landing-footer')
+    expect(within(footer).getByTestId('landing-legal-link')).toHaveAttribute(
+      'href',
+      '/t/judo-tel-aviv/legal',
+    )
   })
 })
 
@@ -417,7 +476,7 @@ describe('the data-driven sections', () => {
   })
 })
 
-describe('booking — every call to action reaches the flow', () => {
+describe('booking — every call to action is a link to the form', () => {
   const TWO_GROUPS: Landing = {
     ...LANDING,
     groups: [
@@ -434,117 +493,95 @@ describe('booking — every call to action reaches the flow', () => {
     ],
   }
 
-  afterEach(() => {
+  // Until 2026-09-08 every test here pressed a button and looked for `booking-dialog`: the
+  // booking was a modal this page opened over itself. It is a page now, so what a call to
+  // action owes a visitor is an ADDRESS — one they can middle-click into a second tab,
+  // copy into a message, reach with the keyboard, and come back from with the back button.
+  // A dialog could give none of those. The assertions are therefore about `href`.
+
+  it('sends the hero’s call to action to the trial form, under this club’s prefix', async () => {
+    window.history.replaceState(null, '', '/t/judo-tel-aviv')
+    render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(TWO_GROUPS)} />)
+    const cta = await screen.findByTestId('landing-hero-cta')
+    expect(cta.tagName).toBe('A')
+    expect(cta).toHaveAttribute('href', '/t/judo-tel-aviv/trial?group=g1')
+  })
+
+  it('drops the club prefix at the root of a landing host, where the page has no slug', async () => {
+    // `gladiatorclub.co.il/` serves this same page with nothing in the path, and the form
+    // lives at `/trial` there. A hardcoded `/t/{slug}/trial` would be wrong on that host,
+    // and a hardcoded `/trial` would throw a `/t/{slug}` visitor onto whichever club the
+    // build happens to be configured with — which is why the href is derived per path.
     window.history.replaceState(null, '', '/')
-  })
-
-  // §3 Door A -- the booking form inside the dialog is now the shared wizard, opening
-  // on `JoinWelcomeStep` (agreements), never a "who is booking" form directly. There is
-  // no separate sign-in step to offer a shortcut from any more (decision 5: the wizard
-  // itself is anonymous-capable end to end), so the `booking-sign-in-link` assertions
-  // these tests used to make no longer apply to step 1 -- see `BookingFlow.test.tsx`
-  // for the wizard's own coverage of decisions 5/8/9 and F21.
-  it('the hero CTA opens the flow as a dialog, on the wizard’s welcome step', async () => {
-    const user = userEvent.setup()
     render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(TWO_GROUPS)} />)
-    await user.click(await screen.findByTestId('landing-hero-cta'))
-    const dialog = screen.getByTestId('booking-dialog')
-    expect(dialog).toHaveAttribute('role', 'dialog')
-    expect(within(dialog).getByTestId('join-welcome')).toBeInTheDocument()
-  })
-
-  it('each derived week-grid slot opens the same dialog', async () => {
-    const user = userEvent.setup()
-    render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(TWO_GROUPS)} />)
-    await user.click(await screen.findByTestId('landing-slot-1-g2'))
-    const dialog = screen.getByTestId('booking-dialog')
-    expect(within(dialog).getByTestId('join-welcome')).toBeInTheDocument()
-  })
-
-  // "The user presses the free trial and can't pick the team he wants" (2026-08-31) went
-  // through two answers. The first was a select in the DIALOG HEADER, which fixed the dead
-  // end and introduced a worse problem: the booking already asks for a group per child in
-  // the students step — siblings are often not in the same one — so a second control above
-  // the steps could only ever disagree with those. The owner read it as what it was, a
-  // question that does not belong to that screen. The header carries no group at all now,
-  // and the page's picked group survives as a PRE-FILL on the first row instead, which is
-  // the useful half -- decision 8's own panel, not a select in the header.
-  it('carries the page’s chosen group into the first row rather than showing it twice', async () => {
-    const user = userEvent.setup()
-    render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(TWO_GROUPS)} />)
-    await user.click(await screen.findByTestId('landing-hero-cta'))
-    const dialog = screen.getByTestId('booking-dialog')
-
-    // Nothing above the wizard's steps asks for a group.
-    expect(within(dialog).queryByTestId('booking-dialog-group')).toBeNull()
-
-    // One tick now gates continue, not three (owner request, 2026-09-03) -- the three
-    // document cards stayed, but only one control agrees to all of them.
-    await user.click(within(dialog).getByTestId('join-welcome-agree-check'))
-    await user.click(within(dialog).getByTestId('join-welcome-continue'))
-
-    // It is pre-filled on the first row instead, where the booking actually reads it.
-    const panel = await within(dialog).findByTestId(/^booking-row-panel-/)
-    expect(within(panel).getByTestId('booking-row-group-0-g1')).toBeChecked()
-  })
-
-  it('the close button still closes the flow back to the page', async () => {
-    const user = userEvent.setup()
-    render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(TWO_GROUPS)} />)
-    await user.click(await screen.findByTestId('landing-hero-cta'))
-    await user.click(screen.getByTestId('booking-dialog-close'))
-    expect(screen.queryByTestId('booking-dialog')).toBeNull()
-    expect(screen.getByTestId('landing-hero')).toBeInTheDocument()
-  })
-
-  it('shows no group control above the steps on the designed page either', async () => {
-    const user = userEvent.setup()
-    render(
-      <PublicLanding
-        slug="gladiator"
-        locale="he"
-        client={clientReturning({ ...TWO_GROUPS, slug: 'gladiator' })}
-      />,
+    expect(await screen.findByTestId('landing-hero-cta')).toHaveAttribute(
+      'href',
+      '/trial?group=g1',
     )
-    await user.click(await screen.findByTestId('landing-hero-cta'))
-    expect(screen.queryByTestId('booking-dialog-group')).toBeNull()
   })
-  it('the sticky bar opens the flow and disappears while it is open', async () => {
-    const user = userEvent.setup()
+
+  it('carries each week-grid slot’s own group into the form as ?group=', async () => {
+    // What `initialGroupId` used to do through the dialog's props. The form is a page, and
+    // a page's only inbound channel is its address — so the pick travels in the URL.
+    window.history.replaceState(null, '', '/t/judo-tel-aviv')
+    render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(TWO_GROUPS)} />)
+    const slot = await screen.findByTestId('landing-slot-1-g2')
+    expect(slot.tagName).toBe('A')
+    expect(slot).toHaveAttribute('href', '/t/judo-tel-aviv/trial?group=g2')
+    // The same group in each of its day columns — the contract pairs times with the group.
+    expect(screen.getByTestId('landing-slot-3-g2')).toHaveAttribute(
+      'href',
+      '/t/judo-tel-aviv/trial?group=g2',
+    )
+  })
+
+  it('makes the page’s general calls to action agree with the group just pressed', async () => {
+    // Why the picked group is still state and not merely a per-slot href: somebody who
+    // opens a slot in a new tab comes back to THIS page, and the sticky bar they meet next
+    // should point at the group they were looking at rather than at the first one.
+    window.history.replaceState(null, '', '/t/judo-tel-aviv')
+    render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(TWO_GROUPS)} />)
+    const sticky = await screen.findByTestId('landing-sticky-cta')
+    expect(sticky).toHaveAttribute('href', '/t/judo-tel-aviv/trial?group=g1')
+
+    clickWithoutNavigating(screen.getByTestId('landing-slot-1-g2'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('landing-sticky-cta')).toHaveAttribute(
+        'href',
+        '/t/judo-tel-aviv/trial?group=g2',
+      ),
+    )
+    expect(screen.getByTestId('landing-hero-cta')).toHaveAttribute(
+      'href',
+      '/t/judo-tel-aviv/trial?group=g2',
+    )
+  })
+
+  it('keeps the sticky bar’s crimson button, now as a link that never disappears', async () => {
     render(<PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(TWO_GROUPS)} />)
     const bar = await screen.findByTestId('landing-sticky-cta')
+    expect(bar.tagName).toBe('A')
     expect(bar).toHaveTextContent(t('he', 'people.landing.freeTrial'))
     // It is the page's own crimson button, not the app's. The desk-width float is styled
     // through `.landing-sticky-bar .gl-btn` — drop the class and the button keeps its
     // full-bar width in a corner with no background behind it, which looks like a bug and
     // fails no test that only checks the text.
     expect(bar).toHaveClass('gl-btn', 'gl-btn--red')
-    await user.click(bar)
-    expect(screen.getByTestId('booking-dialog')).toBeInTheDocument()
-    expect(screen.queryByTestId('landing-sticky-cta')).toBeNull()
   })
 
-  it('?book= reopens the flow after the sign-in round trip, group intact', async () => {
-    // The return_path carries the choice; landing on it signed-in must resume the booking,
-    // not drop the parent back on the shop window to start again. §2 decision 5: EVERY
-    // door shows the welcome screen and all three agreements, signed in or not -- so the
-    // dialog still opens on `JoinWelcomeStep` first, and the carried group shows up on
-    // the first row once the parent reaches the students step.
-    const user = userEvent.setup()
-    window.history.replaceState(null, '', '/t/judo-tel-aviv?book=g2')
+  it('offers no sticky call to action to a club with no group to book', async () => {
+    // The bar was gated on a group existing when it fed the dialog, and still is: a
+    // permanent invitation into a form with nothing to choose is worse than no invitation.
     render(
-      <PublicLanding slug="judo-tel-aviv" locale="he" client={clientReturning(TWO_GROUPS)} signedIn />,
+      <PublicLanding
+        slug="judo-tel-aviv"
+        locale="he"
+        client={clientReturning({ ...TWO_GROUPS, groups: [] })}
+      />,
     )
-    const dialog = await screen.findByTestId('booking-dialog')
-    expect(within(dialog).getByTestId('join-welcome')).toBeInTheDocument()
-
-    // One tick now gates continue, not three (owner request, 2026-09-03) -- the three
-    // document cards stayed, but only one control agrees to all of them.
-    await user.click(within(dialog).getByTestId('join-welcome-agree-check'))
-    await user.click(within(dialog).getByTestId('join-welcome-continue'))
-
-    const panel = await within(dialog).findByTestId(/^booking-row-panel-/)
-    expect(within(panel).getByTestId('booking-row-group-0-g2')).toBeChecked()
+    await screen.findByTestId('landing-hero')
+    expect(screen.queryByTestId('landing-sticky-cta')).toBeNull()
   })
 })
 
@@ -702,8 +739,8 @@ describe('the designed Gladiator page (Stitch, hardcoded content)', () => {
     expect(week).toHaveTextContent('אימון אישי')
   })
 
-  it('renders the three plans with shekel prices, and their buttons open the flow', async () => {
-    const user = userEvent.setup()
+  it('renders the three plans with shekel prices, and links their CTAs to the form', async () => {
+    window.history.replaceState(null, '', '/t/gladiator')
     render(<PublicLanding slug="gladiator" locale="he" client={clientReturning(GLADIATOR)} />)
     const plans = await screen.findByTestId('landing-plans')
     expect(plans).toHaveTextContent('מסלול יסוד')
@@ -713,8 +750,11 @@ describe('the designed Gladiator page (Stitch, hardcoded content)', () => {
     // Agorot through MoneyDisplay — 30000 renders as ₪300, never a float.
     expect(plans).toHaveTextContent('300')
     expect(plans).toHaveTextContent('550')
-    await user.click(screen.getByRole('button', { name: 'הצטרף עכשיו' }))
-    expect(screen.getByTestId('booking-dialog')).toBeInTheDocument()
+    // The plan card's own call to action is a link like every other one on the page.
+    expect(screen.getByRole('link', { name: 'הצטרף עכשיו' })).toHaveAttribute(
+      'href',
+      '/t/gladiator/trial?group=g1',
+    )
   })
 
   it('renders the voices from the dojo, attributed to real former members', async () => {

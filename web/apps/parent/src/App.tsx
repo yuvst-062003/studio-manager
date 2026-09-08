@@ -46,11 +46,15 @@ import { registerAttendanceSections } from './features/attendance'
 import { makeParentScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
 import {
+  LegalPage,
   PublicLanding,
+  TrialBookingPage,
   landingHostsFrom,
   landingSlugFor,
+  landingViewHref,
   makeLandingClient,
 } from './features/landing'
+import type { LandingClient, LandingRoute } from './features/landing'
 import { matchJoinPath } from './features/onboarding/joinPath'
 // The redesigned wizard (spec 2026-09-05). It replaced `JoinFlow`'s four screens for all
 // three doors that route through here (B, C, D) -- door A's own trial booking
@@ -173,28 +177,38 @@ export default function App() {
   // hoisted into `route.ts`: both Vite's build and vitest's transform replace exactly that
   // expression, and an aliased read survives untransformed as `undefined`. Unset is the
   // behaviour this app has always had, which is what keeps staging untouched.
-  const landingSlug = landingSlugFor(
+  const landingRoute = landingSlugFor(
     path,
     import.meta.env.VITE_LANDING_SLUG,
     landingHostsFrom(import.meta.env.VITE_LANDING_HOSTS),
     globalThis.location?.hostname ?? '',
   )
   const joinToken = matchJoinPath(path)
-  if (landingSlug) return <LandingShell slug={landingSlug} />
+  if (landingRoute) return <LandingShell route={landingRoute} />
   if (joinToken) return <JoinShell token={joinToken} />
   return <AuthedApp />
 }
 
-function LandingShell({ slug }: { slug: string }) {
+/**
+ * The club's three public pages: the shop window, the trial form and the documents.
+ *
+ * **Only the shop window fetches for itself.** `PublicLanding` owns its own request
+ * because it owns the three states a stranger can land in — loading, a slug nobody owns,
+ * a club with no schedule — and those states are what that screen is largely made of. The
+ * other two need the same payload for much less (a club's name and logo; its groups,
+ * address and phone), so they are fed by `LandingSubPage` below rather than each growing
+ * a copy of that machinery.
+ */
+function LandingShell({ route }: { route: LandingRoute }) {
   const [locale, setLocale] = useState<Locale>('he')
   useDocumentLocale(locale)
   const landingClient = useMemo(() => makeLandingClient(apiFetch), [])
   // §5.4a step 1 → step 2. The OAuth callback appends `signed_in=1` to its redirect, and
-  // that marker is the ONE case where the landing knows a refresh is worth firing — a
+  // that marker is the ONE case where these pages know a refresh is worth firing — a
   // full-page return is a fresh JS context with an empty in-memory token, so without it
-  // the booking flow greets the freshly-signed-in parent with its sign-in step again.
+  // the trial form would ask a freshly-signed-in parent for details it already has.
   // Anonymous visits stay refresh-free (L6). The render is held while restoring because
-  // BookingFlow picks its first step once, at mount.
+  // the trial form reads `signedIn` once, at mount.
   const [restoring, setRestoring] = useState(
     () => new URLSearchParams(globalThis.location?.search ?? '').has('signed_in'),
   )
@@ -213,16 +227,102 @@ function LandingShell({ slug }: { slug: string }) {
       {/* Language before login (§6.1): a Russian-speaking parent cannot read a Hebrew
           offer any more than a Hebrew consent screen. It goes INTO the page's header
           rather than above it — loose here it rendered unstyled over the hero. */}
-      <PublicLanding
-        slug={slug}
-        locale={locale}
-        client={landingClient}
-        languagePicker={<LanguagePicker locale={locale} onChoose={setLocale} />}
-        // Passive: the in-memory token, never a request. A cold anonymous load is
-        // simply not signed in, and the booking flow's own first step signs in.
-        signedIn={getAccessToken() !== null}
-      />
+      {route.view === 'landing' ? (
+        <PublicLanding
+          slug={route.slug}
+          locale={locale}
+          client={landingClient}
+          languagePicker={<LanguagePicker locale={locale} onChoose={setLocale} />}
+        />
+      ) : (
+        <LandingSubPage client={landingClient} locale={locale} route={route} />
+      )}
     </ThemeProvider>
+  )
+}
+
+/**
+ * The trial form and the documents page, and the one read they share.
+ *
+ * Both are reached directly — a link in an advertisement, the footer, a printed QR — so
+ * neither can assume the shop window ran first and left a payload behind. This is that
+ * payload: the club's name and logo for the documents, its groups, address and phone for
+ * the form.
+ *
+ * **A failed read offers the shop window rather than a retry button.** The three states a
+ * bad slug can be in — nobody owns it, the club has no schedule, the network dropped —
+ * are told apart properly by `PublicLanding` and nowhere else. Sending a stranger there
+ * gets them a real answer instead of this page guessing at one.
+ */
+function LandingSubPage({
+  client,
+  locale,
+  route,
+}: {
+  client: LandingClient
+  locale: Locale
+  route: LandingRoute
+}) {
+  //: `undefined` is "still asking", `null` is "asked and failed" — the same three-state
+  //: shape `PublicLanding` uses, for the same reason: a blank page and a failed page must
+  //: not be the same render.
+  const [landing, setLanding] = useState<Awaited<ReturnType<LandingClient['landing']>> | null>()
+
+  useEffect(() => {
+    let live = true
+    client
+      .landing(route.slug)
+      .then((body) => live && setLanding(body))
+      .catch(() => live && setLanding(null))
+    return () => {
+      live = false
+    }
+  }, [client, route.slug])
+
+  if (landing === undefined) return null
+
+  if (landing === null) {
+    return (
+      <main className="tw-scope mx-auto flex max-w-md flex-col items-center gap-4 p-8 text-center">
+        <p className="text-[15px] font-medium text-[#161b28]">{t(locale, 'common.loadFailed.body')}</p>
+        <a
+          className="rounded-xl bg-[#001849] px-5 py-3 text-[14px] font-bold text-white"
+          data-testid="landing-subpage-recover"
+          href={landingViewHref(globalThis.location?.pathname ?? '/', 'landing')}
+        >
+          {t(locale, 'people.bookTrial.legal.back')}
+        </a>
+      </main>
+    )
+  }
+
+  if (route.view === 'legal') {
+    return (
+      <LegalPage
+        backHref={landingViewHref(globalThis.location?.pathname ?? '/', 'trial')}
+        locale={locale}
+        logoUrl={landing.logo_url ? apiUrl(landing.logo_url) : null}
+        studioName={landing.studio_name}
+      />
+    )
+  }
+
+  return (
+    <TrialBookingPage
+      address={landing.address}
+      client={client}
+      groups={landing.groups ?? []}
+      //: The group the visitor pressed on the shop window, carried in the link rather
+      //: than in state — the form is a separate page now, and a page cannot inherit the
+      //: previous one's memory. `PublicLanding` writes it; this reads it.
+      initialGroupId={new URLSearchParams(globalThis.location?.search ?? '').get('group')}
+      locale={locale}
+      phone={landing.phone ?? null}
+      //: Passive: the in-memory token, never a request. A cold anonymous load is simply
+      //: not signed in, which is the ordinary case on this page.
+      signedIn={getAccessToken() !== null}
+      slug={route.slug}
+    />
   )
 }
 
@@ -262,8 +362,9 @@ function JoinShell({ token }: { token: string }) {
   // The privacy client belonged to the old `JoinFlow`'s payment step and nothing in the
   // redesigned wizard consumes it, so it is not rebuilt here (task 1c's own note) -- an
   // unused fetch held open for a screen that never reads it is worse than not fetching.
-  // F1/F10 -- the ONE `useSession()` call for this whole route. `JoinFlow` (now deleted)
-  // and `JoinWelcomeStep` used to each mount their own, and every mount's `refresh()` call
+  // F1/F10 -- the ONE `useSession()` call for this whole route. `JoinFlow` and
+  // `JoinWelcomeStep` (both since deleted) used to each mount their own, and every
+  // mount's `refresh()` call
   // rotates the refresh token -- three (with this one, four) rotations for one page load,
   // and a REMOUNT of any of them (e.g. `JoinWelcomeStep` on back-navigation) restarted
   // that instance at `status: 'loading'`, which its own render treated as "not signed

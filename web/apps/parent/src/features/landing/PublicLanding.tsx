@@ -11,11 +11,16 @@
 // no club ever shows another club's coach or prices.
 //
 // Domain decisions that survive the restyle: the sign-in wall stands in front of BOOKING,
-// never reading (§5.4a); every call to action opens the booking dialog, whose own group
-// select is where the choice lives now; `?book=` still resumes the flow after the sign-in
-// round trip; the phone keeps its bottom bar. The club's `headline`/`about`/`address`
-// remain data, chrome remains i18n, and ranges render through RangeText — the Stitch
-// prompt's own "ranges low first" rule.
+// never reading (§5.4a); the phone keeps its bottom bar. The club's `headline`/`about`/
+// `address` remain data, chrome remains i18n, and ranges render through RangeText — the
+// Stitch prompt's own "ranges low first" rule.
+//
+// **Every call to action is a LINK now, not a dialog** (2026-09-08). The trial booking is a
+// page of its own at `/t/{slug}/trial`, so the club's one ask is middle-clickable, copyable,
+// reachable from the keyboard and something the browser's own back button can return from
+// — none of which a `<button onClick>` over a modal gave it. The group a visitor pressed
+// rides along as `?group=`, which is the pre-fill the dialog used to receive as a prop: a
+// page's only inbound channel is its address.
 //
 // G12 — logical properties only. This page renders right-to-left in Hebrew and
 // left-to-right in English, and it is the one screen in the product a stranger sees first.
@@ -28,7 +33,7 @@ import type { Locale } from '@studio/i18n'
 import type { LandingClient, PublicGroup, PublicLanding as Landing } from './landingClient'
 import type { ClubContent, SlotCategory } from './clubContent'
 import { clubContentFor } from './clubContent'
-import { BookingDialog } from './BookingDialog'
+import { landingViewHref } from './route'
 import './landing.css'
 
 type LoadState =
@@ -135,17 +140,23 @@ function ContentSchedule({ content, locale }: { content: ClubContent; locale: Lo
 /**
  * The data-driven fallback for clubs without designed content: the same visual week, one
  * column per day somebody trains on, derived from the API's groups. Each slot is a real
- * button that opens the booking flow for ITS group. The public contract pairs times with
- * the group, not the day, so a group shows the same start times in each of its columns.
+ * LINK to the booking form for ITS group. The public contract pairs times with the group,
+ * not the day, so a group shows the same start times in each of its columns.
+ *
+ * `onPick` is not how a visitor gets there — `hrefFor` is. It records which group was
+ * pressed so the page's OTHER calls to action agree with it, which is what somebody who
+ * opens a slot in a new tab and comes back to this one finds waiting.
  */
 function DerivedSchedule({
   groups,
   locale,
-  onBook,
+  hrefFor,
+  onPick,
 }: {
   groups: PublicGroup[]
   locale: Locale
-  onBook: (id: string) => void
+  hrefFor: (id: string) => string
+  onPick: (id: string) => void
 }) {
   const days = WEEK.map((day) => ({
     day,
@@ -165,10 +176,10 @@ function DerivedSchedule({
               <ul className="gl-day-list">
                 {entries.map((group) => (
                   <li key={group.id}>
-                    <button
-                      type="button"
+                    <a
                       className="gl-slot gl-slot--judo gl-slot--button"
-                      onClick={() => onBook(group.id)}
+                      href={hrefFor(group.id)}
+                      onClick={() => onPick(group.id)}
                       data-testid={`landing-slot-${day}-${group.id}`}
                     >
                       {(group.training_times ?? []).length > 0 ? (
@@ -182,7 +193,7 @@ function DerivedSchedule({
                           <AgeRange locale={locale} group={group} />
                         </span>
                       ) : null}
-                    </button>
+                    </a>
                   </li>
                 ))}
               </ul>
@@ -231,14 +242,11 @@ export function PublicLanding({
   slug,
   locale,
   client,
-  signedIn = false,
   languagePicker,
 }: {
   slug: string
   locale: Locale
   client: LandingClient
-  /** §5.4a step 1 — sign-in-first. The flow renders the wall until this is true. */
-  signedIn?: boolean
   /** §6.1's language-before-login control, rendered into the header's end slot. Passed
    *  in rather than imported so this file keeps no dependency on the app's shell — the
    *  same reason `SignIn` takes it as a node. */
@@ -253,13 +261,12 @@ export function PublicLanding({
   // key outlives the bytes. A broken image on the club's shop window is worse than the
   // bundled mark, so a failed load falls back instead of showing a torn-page icon.
   const [logoFailed, setLogoFailed] = useState(false)
-  // The `?book=` resume: the sign-in round trip's return_path carries the picked group
-  // (BookingFlow writes it), so landing back here reopens the flow instead of dropping the
-  // parent on the shop window again. The dialog itself still waits for the landing to load
-  // and a group to exist — `flowOpen` alone renders nothing.
-  const [flowOpen, setFlowOpen] = useState(
-    () => new URLSearchParams(globalThis.location?.search ?? '').get('book') != null,
-  )
+  // The `?book=` resume is gone with the dialog, and nothing replaces it. It existed only
+  // because the booking had no address of its own: a sign-in round trip could come back to
+  // this page and nowhere else, so the return path smuggled the picked group in a query
+  // parameter and this component reopened the modal on arrival. The form is a page now —
+  // `/t/{slug}/trial?group=…` — so a return path can simply BE that page, and there is no
+  // state here left to restore.
 
   useEffect(() => {
     let live = true
@@ -336,16 +343,21 @@ export function PublicLanding({
   const clubName = content?.displayName ?? landing.studio_name
   const hasSchedule = groups.some((group) => (group.training_weekdays ?? []).length > 0)
 
-  // Derived, not synced: an explicit pick wins, then the round trip's `?book=`, then the
-  // first group — so the flow always opens with a real group carried in.
-  const resumedId = new URLSearchParams(globalThis.location?.search ?? '').get('book')
-  const selectedGroup =
-    groups.find((group) => group.id === (selectedId ?? resumedId)) ?? groups[0] ?? null
-  const bookGroup = (id: string) => {
-    setSelectedId(id)
-    setFlowOpen(true)
-  }
-  const openFlow = () => setFlowOpen(true)
+  // Derived, not synced: an explicit pick wins, else the first group — so the page's
+  // general calls to action always carry a real group into the form.
+  const selectedGroup = groups.find((group) => group.id === selectedId) ?? groups[0] ?? null
+
+  // `landingViewHref` reads the CURRENT path, so a visitor who arrived by `/t/{slug}` keeps
+  // their club's prefix and one who arrived at the club's own domain stays on the short
+  // `/trial`. A constant would have thrown the first group off their club's link and onto
+  // whichever club the build happens to be configured with.
+  const here = globalThis.location?.pathname ?? '/'
+  const trialPath = landingViewHref(here, 'trial')
+  const legalHref = landingViewHref(here, 'legal')
+  // The picked group as `?group=` — the pre-fill the dialog used to take as a prop. Encoded
+  // because this builds a URL, and an id that arrived over the network is not ours to trust.
+  const trialHref = (groupId?: string | null) =>
+    groupId ? `${trialPath}?group=${encodeURIComponent(groupId)}` : trialPath
 
   // The header's and footer's shared anchors. The designed content brings its own labels
   // (the club's voice); the data-driven page links only the sections that exist.
@@ -412,9 +424,9 @@ export function PublicLanding({
                 out. This is the one screen in the product a stranger meets before any
                 settings exist, so the control has to be on the page. */}
 
-            <button type="button" className="gl-btn gl-btn--navy" onClick={openFlow} data-testid="landing-join">
+            <a className="gl-btn gl-btn--navy" href={trialHref(selectedGroup?.id)} data-testid="landing-join">
               {t(locale, 'people.landing.joinNow')}
-            </button>
+            </a>
           </div>
         </div>
       </header>
@@ -443,9 +455,9 @@ export function PublicLanding({
               </h2>
               <p className="gl-lead">{content?.hero.lead ?? t(locale, 'people.landing.subtitle')}</p>
               <div className="gl-cta-row">
-                <button type="button" className="gl-btn gl-btn--red" onClick={openFlow} data-testid="landing-hero-cta">
+                <a className="gl-btn gl-btn--red" href={trialHref(selectedGroup?.id)} data-testid="landing-hero-cta">
                   {t(locale, 'people.landing.freeTrial')}
-                </button>
+                </a>
                 {content || landing.about ? (
                   <a className="gl-btn gl-btn--outline" href="#landing-about" data-testid="landing-hero-learn-more">
                     {t(locale, 'people.landing.learnMore')}
@@ -530,7 +542,7 @@ export function PublicLanding({
         {content ? (
           <ContentSchedule content={content} locale={locale} />
         ) : (
-          <DerivedSchedule groups={groups} locale={locale} onBook={bookGroup} />
+          <DerivedSchedule groups={groups} locale={locale} hrefFor={trialHref} onPick={setSelectedId} />
         )}
 
         {/* The club in photographs — content only, and bundled with the app rather than
@@ -591,13 +603,12 @@ export function PublicLanding({
                         </li>
                       ))}
                     </ul>
-                    <button
-                      type="button"
+                    <a
                       className={plan.highlighted ? 'gl-btn gl-btn--red gl-btn--full' : 'gl-btn gl-btn--outline gl-btn--full'}
-                      onClick={openFlow}
+                      href={trialHref(selectedGroup?.id)}
                     >
                       {plan.cta}
-                    </button>
+                    </a>
                   </article>
                 ))}
               </div>
@@ -695,20 +706,26 @@ export function PublicLanding({
             <bdi>{clubName}</bdi>
           </p>
           <p className="gl-footer-offer">{t(locale, 'people.landing.footerOffer')}</p>
-          {anchors.length > 0 ? (
-            <div className="gl-footer-nav">
-              {anchors.map((anchor) => (
-                <a key={anchor.href} className="gl-footer-navlink" href={anchor.href}>
-                  {anchor.label}
-                </a>
-              ))}
-              {landing.address ? (
-                <a className="gl-footer-navlink" href="#landing-where">
-                  {t(locale, 'people.landing.whereTitle')}
-                </a>
-              ) : null}
-            </div>
-          ) : null}
+          {/* The row renders on every club now, not only on one with sections to link:
+              the documents are not an optional section, and a footer with no way to the
+              terms is the one link a stranger is entitled to find on any club's page. */}
+          <div className="gl-footer-nav">
+            {anchors.map((anchor) => (
+              <a key={anchor.href} className="gl-footer-navlink" href={anchor.href}>
+                {anchor.label}
+              </a>
+            ))}
+            {landing.address ? (
+              <a className="gl-footer-navlink" href="#landing-where">
+                {t(locale, 'people.landing.whereTitle')}
+              </a>
+            ) : null}
+            {/* §6 — the club's documents, public and readable before anyone commits to
+                anything. Until now they existed only inside popups behind a sign-in. */}
+            <a className="gl-footer-navlink" href={legalHref} data-testid="landing-legal-link">
+              {t(locale, 'people.bookTrial.legal.title')}
+            </a>
+          </div>
           {landing.phone ? (
             <a className="gl-footer-phone" href={`tel:${phoneDigits}`}>
               <bdi dir="ltr">{landing.phone}</bdi>
@@ -717,34 +734,21 @@ export function PublicLanding({
           {content ? <p className="gl-footer-line">{content.copyright}</p> : null}
         </footer>
 
-        {/* The sticky CTA — pinned to the screen's bottom edge at every width: a full
-            bar on the phone, a floating button in the inline-end corner at a desk. Gone
-            while the flow is open: the dialog owns the screen then. */}
-        {!flowOpen && selectedGroup ? (
+        {/* The sticky CTA — pinned to the screen's bottom edge at every width: a full bar
+            on the phone, a floating button in the inline-end corner at a desk. It no longer
+            disappears, because nothing opens over the page any more; it stays gated on a
+            group existing, since a club with none has nothing to book and a permanent bar
+            to an empty form is worse than no bar. */}
+        {selectedGroup ? (
           <div className="landing-sticky-bar">
-            <button
-              type="button"
+            <a
               className="gl-btn gl-btn--red gl-btn--full"
-              onClick={openFlow}
+              href={trialHref(selectedGroup.id)}
               data-testid="landing-sticky-cta"
             >
               {t(locale, 'people.landing.freeTrial')}
-            </button>
+            </a>
           </div>
-        ) : null}
-
-        {flowOpen && selectedGroup ? (
-          <BookingDialog
-            slug={slug}
-            locale={locale}
-            client={client}
-            groups={groups}
-            group={selectedGroup}
-            signedIn={signedIn}
-            address={landing.address ?? null}
-            phone={landing.phone ?? null}
-            onClose={() => setFlowOpen(false)}
-          />
         ) : null}
       </main>
     </div>

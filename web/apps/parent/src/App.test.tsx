@@ -381,17 +381,16 @@ describe('L6 — the anonymous landing touches no session', () => {
     // the landing never refreshes for anonymous visitors. The callback's marker is the
     // one case where a refresh is known to be worth it — without acting on it the booking
     // flow greets the freshly-signed-in parent with its sign-in step again, forever.
-    // Redesign 2026-08-29: the flow no longer opens on load; the return_path carries the
-    // picked group as `?book=`, and THAT reopens the flow.
+    // Redesign 2026-09-08: the booking is a PAGE now, at `/t/{slug}/trial`, so there is
+    // nothing to reopen — the return path simply is that page. `?book=` is gone with the
+    // dialog it used to reopen; the picked group travels as `?group=`, which is the same
+    // link the shop window's call to action already builds.
     //
-    // F21 (2026-09-03) rebuilt Door A onto the shared wizard, so "resumes" no longer means
-    // jumping straight to a step of its own — every door's wizard opens at the SAME step 1
-    // (`JoinWelcomeStep`, `join-welcome`) regardless of how it was reached. What proves this
-    // is actually a resume rather than a fresh, empty booking is the GROUP surviving the
-    // round trip: `initialGroupId` (carried from `?book=g1`) fires `BookingFlow`'s slot
-    // fetch for g1 on mount, before any card is even ticked, and the same group is still the
-    // one selected once the family step renders — never a blank pick the parent has to redo.
-    globalThis.history.pushState({}, '', '/t/gladiator?book=g1&signed_in=1')
+    // What proves this is a resume rather than a fresh, empty booking is the GROUP
+    // surviving the round trip: `initialGroupId` (carried from `?group=g1`) fires the slot
+    // fetch for g1 on mount, before the parent touches anything, and the same group is
+    // still the one selected once the form renders — never a blank pick to redo.
+    globalThis.history.pushState({}, '', '/t/gladiator/trial?group=g1&signed_in=1')
     const calls: string[] = []
     vi.stubGlobal(
       'fetch',
@@ -456,36 +455,25 @@ describe('L6 — the anonymous landing touches no session', () => {
     render(<App />)
     await waitFor(() => expect(calls.some((url) => url.includes('/auth/refresh'))).toBe(true))
 
-    // The wizard opened on its own — no click on "הצטרפות" — proving the session restore
-    // is what reopened it, not a fresh visit.
-    await screen.findByTestId('join-welcome')
-    // The PICKED group's slots are already being fetched, before the parent has ticked a
-    // single card: `initialGroupId` carried g1 through the redirect into `BookingFlow`'s
-    // mount effect, the seam `?book=` actually has to cross.
+    // The form is the page the OAuth return landed on — no click anywhere to open it.
+    await screen.findByTestId('trial-booking-page')
+    // The PICKED group's slots are already being fetched, before the parent has touched
+    // anything: `initialGroupId` carried g1 through the redirect into the page's mount
+    // effect, the seam `?group=` actually has to cross.
     await waitFor(() =>
       expect(calls.some((url) => url.includes('/api/v1/public/groups/g1/trial-slots'))).toBe(
         true,
       ),
     )
 
-    // Walk the wizard's own step 1 to prove the resumed group survives all the way to
-    // where a parent would actually see it, not only in an unobserved fetch.
-    const user = userEvent.setup()
-    // The version pill is gone (owner, 2026-09-08). The document card itself is what
-    // proves step 1 rendered.
-    await screen.findByTestId('join-welcome-terms-read')
-    // One tick now gates continue, not three (owner request, 2026-09-03).
-    await user.click(screen.getByTestId('join-welcome-agree-check'))
-    await user.click(screen.getByTestId('join-welcome-continue'))
-
-    await screen.findByTestId('booking-students-step')
-    // Still g1 — the exact group chosen before the OAuth round trip, not merely SOME
-    // group, and not a blank pick the parent is made to repeat.
-    expect(screen.getByTestId('booking-row-group-0-g1')).toBeChecked()
+    // And it survives all the way to where a parent would actually see it, not only in an
+    // unobserved fetch: still g1, the exact group chosen before the round trip, not merely
+    // SOME group and not a blank pick the parent is made to repeat.
+    await waitFor(() => expect(screen.getByTestId('trial-group-0-g1')).toBeChecked())
 
     // The marker is one-shot: stripped so a copied URL or a later reload does not refire
-    // it — while `book` survives the strip; it is what resumed the flow just now.
-    expect(globalThis.location.search).toBe('?book=g1')
+    // it — while `group` survives the strip; it is what made this a resume.
+    expect(globalThis.location.search).toBe('?group=g1')
     globalThis.history.pushState({}, '', '/')
   }, 15000)
 })

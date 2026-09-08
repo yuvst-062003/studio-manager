@@ -180,7 +180,9 @@ describe('§6.1 step 5, mounted in the shell', () => {
   })
 
   it('starts the shared join link on its own welcome+agreements step even when the app would pass the regular gate', async () => {
-    // `JoinWelcomeStep` always shows both cards regardless of prior acceptance --
+    // The join wizard's step 1 always shows all three documents regardless of prior
+    // acceptance -- `Step1Agreements`, since `JoinWelcomeStep` was deleted with Door A's
+    // old flow on 2026-09-08 --
     // the same "forceReview" behavior the old external ConsentGate wrapper enforced --
     // so a family that already holds the current policy at the app level still meets
     // this step on the join link.

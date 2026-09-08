@@ -5,8 +5,10 @@
  * crimson #ba1a1a, the zen-dot ground — with a dark equivalent under [data-theme='dark'],
  * and every rule here is logical-property only (G12).
  *
- * The booking dialog is app UI, not marketing: `.landing-scrim` and
- * `.landing-booking-dialog` keep the app's tokens, and the flow inside them is unchanged.
+ * The booking form is no longer here. It was a dialog over this page until 2026-09-08 and
+ * is now a page of its own at `/t/{slug}/trial`, styled with the join wizard's Tailwind
+ * scope rather than these rules — so `.landing-scrim` and `.landing-booking-dialog` went
+ * with it.
  */
 
 .landing-root {
@@ -552,12 +554,18 @@
   border-inline-start-color: var(--gl-cat-personal-edge);
 }
 
+/* The derived week grid's slots are <a> elements — the booking form is a page now, so a
+ * slot is a link to it (2026-09-08). `color`/`text-decoration` are the two the user agent
+ * gives a link and nothing else here wants: the slot's own spans set their colours, and an
+ * underline propagates into every one of them. */
 .gl-slot--button {
   border-block: 0;
   border-inline-end: 0;
+  color: inherit;
   cursor: pointer;
   font: inherit;
   inline-size: 100%;
+  text-decoration: none;
 }
 
 .gl-slot--button:hover {
@@ -890,37 +898,6 @@
   padding-block-start: var(--space-3);
 }
 
-/* -- the booking dialog: app UI, app tokens (unchanged) ------------------------------- */
-.landing-scrim {
-  background: var(--scrim);
-  inset-block: 0;
-  inset-inline: 0;
-  position: fixed;
-  z-index: 40;
-}
-
-.landing-booking-dialog {
-  background: var(--surface);
-  border-start-end-radius: var(--radius-xl);
-  border-start-start-radius: var(--radius-xl);
-  box-shadow: 0 -12px 32px rgb(23 21 15 / 18%);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  inset-block-end: 0;
-  inset-inline: 0;
-  max-block-size: 85dvh;
-  overflow-y: auto;
-  padding: var(--space-5);
-
-  /* F5 -- this sheet's bottom edge sits flush with the viewport bottom, and the
-   * accessibility FAB (z-index 60) floats above it, so a primary button at the end of a
-   * scrolled sheet lands underneath the FAB. Reserves its corner the same way the doors
-   * do (`--a11y-fab-clearance`, beside `.studio-a11y__fab` in primitives.css). */
-  padding-block-end: calc(var(--space-5) + var(--a11y-fab-clearance));
-  position: fixed;
-  z-index: 41;
-}
 
 /* -- the sticky CTA: the way in, at every scroll position and every width ------------- */
 .landing-sticky-bar {
@@ -1038,19 +1015,6 @@
     padding-inline: var(--space-6);
   }
 
-  .landing-booking-dialog {
-    border-radius: var(--radius-xl);
-    block-size: fit-content;
-    inline-size: 100%;
-    inset-block: 0;
-    inset-inline: 0;
-    margin: auto;
-    max-inline-size: 30rem;
-
-    /* F5 -- at this width the sheet is a centered card, nowhere near the FAB's
-     * viewport corner, so the base rule's reserved clearance is reset. */
-    padding-block-end: var(--space-5);
-  }
 }
 
 /* -- #26's theme toggle --------------------------------------------------------------

@@ -680,6 +680,11 @@ waves:
         title: Landing — the record
         status: shipped
         on: 2026-08-27
+      - id: L9
+        title: Landing — the trial booking is one page, not three screens
+        status: shipped
+        on: 2026-09-08
+        source: docs/superpowers/specs/2026-09-08-trial-booking-redesign.md
       - id: J1
         title: >-
           Trial to member — the journey, and the three holes in it. §5.4a ④ has asked

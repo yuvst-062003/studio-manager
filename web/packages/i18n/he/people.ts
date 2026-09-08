@@ -226,7 +226,9 @@ export const people: Bundle = {
   // The single tick that replaced the three cards' own separate ticks (owner request,
   // 2026-09-03): names all three documents by their real titles, so agreeing once is
   // still informed consent, not a blind bundle. The grant this tick triggers stays
-  // three separately-versioned records regardless -- see `JoinWelcomeStep.tsx`.
+  // three separately-versioned records regardless -- see `wizard/Step1Agreements.tsx`
+  // (`JoinWelcomeStep.tsx`, the old Door A screen this comment used to name, was deleted
+  // on 2026-09-08 when the trial booking became a page of its own).
   'join.welcome.agreeAll': 'קראתי ואני מאשר/ת: תנאי שימוש, מדיניות פרטיות ותקנון ותנאי תשלום',
   'directions.title': 'הוראות הגעה',
   'directions.openMaps': 'פתיחה במפות',
@@ -1072,4 +1074,82 @@ export const people: Bundle = {
   'emergency.saving': 'שומר…',
   'emergency.later': 'אמלא בהמשך',
   'emergency.saveFailed': 'השמירה נכשלה. נסו שוב.',
+
+  // -- the public trial booking page (Door A, `/trial`) ---------------------------
+  //
+  // A separate prefix from `trial.*`, which the dashboard and staff screens already own
+  // (`trial.one`, `trial.outcome.*`, …). Those describe a trial lesson to STAFF; these are
+  // the words a parent who has never signed in reads on the club's own address.
+  //
+  // `{n}` `{name}` `{age}` `{date}` are replaced at the call site with `.replace()`, the
+  // way `health.onboarding.stepOf` already is — never interpolated here.
+  'bookTrial.pageTitle': 'שיעור ניסיון חינם',
+  'bookTrial.badge': 'השיעור הראשון על חשבוננו',
+  'bookTrial.heading': 'ניפגש על המזרן',
+  'bookTrial.lede': 'ממלאים את הפרטים, בוחרים קבוצה ומועד — ונתראה באימון. שתי דקות, בלי חשבון ובלי סיסמה.',
+
+  'bookTrial.traineeSection': 'מי מגיע/ה לאימון',
+  'bookTrial.traineeN': 'מתאמן/ת {n}',
+  'bookTrial.firstName': 'שם פרטי',
+  'bookTrial.lastName': 'שם משפחה',
+  'bookTrial.birthdate': 'תאריך לידה',
+  'bookTrial.group': 'קבוצה',
+  'bookTrial.slot': 'מועד שיעור הניסיון',
+  'bookTrial.addTrainee': 'הוספת ילד/ה נוסף/ת',
+  'bookTrial.removeTrainee': 'הסרה',
+
+  // One contact per booking: the parent block belongs to the FIRST trainee, and a second
+  // trainee reads `parentCarried` above the same shared fields.
+  'bookTrial.minorBand': '{name} בן/בת {age} — נבקש גם את הפרטים שלכם, ההורים',
+  'bookTrial.parentSection': 'פרטי ההורה / אפוטרופוס',
+  'bookTrial.parentName': 'שם ההורה',
+  'bookTrial.parentPhone': 'טלפון',
+  'bookTrial.parentEmail': 'אימייל',
+  'bookTrial.emailHint': 'האישור נשלח למייל, והוא גם מה שמזהה אתכם אם תיכנסו לאזור האישי בהמשך.',
+  'bookTrial.parentCarried': 'מולא מ{name} — אם זה הורה אחר, שנו כאן',
+  'bookTrial.ownPhone': 'טלפון',
+  'bookTrial.ownEmail': 'אימייל',
+
+  'bookTrial.health.title': 'הצהרת בריאות',
+  'bookTrial.health.lede': 'נדרשת לפי חוק הספורט. אם הכל תקין — לחיצה אחת.',
+  'bookTrial.health.allGood': 'הכל תקין',
+  'bookTrial.health.report': 'יש מה לדווח',
+  'bookTrial.health.confirmed': 'אין מגבלה רפואית הידועה לנו המונעת מ{name} להתאמן',
+  'bookTrial.health.declaredBy': '{name} · {date} · אישור דיגיטלי',
+  'bookTrial.health.emergency': 'טלפון לשעת חירום',
+
+  'bookTrial.consent': 'קראתי ואני מאשר/ת את תקנון המועדון, מדיניות הפרטיות ותנאי התשלום.',
+  'bookTrial.readDocuments': 'קריאת המסמכים',
+  'bookTrial.submit': 'קביעת שיעור הניסיון',
+  'bookTrial.submitNote': 'ללא עלות וללא התחייבות · אישור נשלח למייל מיד',
+  'bookTrial.submitting': 'שולח…',
+
+  'bookTrial.aside.nextTitle': 'מה קורה אחרי שנרשמים',
+  'bookTrial.aside.next1Title': 'אישור למייל, מיד',
+  'bookTrial.aside.next1Body': 'עם התאריך, השעה והכתובת.',
+  'bookTrial.aside.next2Title': 'מגיעים לאימון',
+  'bookTrial.aside.next2Body': 'בגדים נוחים ובקבוק מים. חליפת ג\'ודו לא צריך.',
+  'bookTrial.aside.next3Title': 'מחליטים אחר כך',
+  'bookTrial.aside.next3Body': 'שיעור הניסיון אינו מחייב דבר.',
+  'bookTrial.aside.whereTitle': 'איפה אנחנו',
+  'bookTrial.aside.askTitle': 'שאלה לפני שנרשמים?',
+  'bookTrial.aside.askBody': 'כתבו לנו, עונים תוך כמה שעות.',
+  'bookTrial.aside.whatsapp': 'שיחה בוואטסאפ',
+
+  // `/legal`. The documents themselves are `joinWizard.legal.*` via `legalDocs()` — this
+  // page adds only its own frame, so nothing here duplicates a legal sentence.
+  'bookTrial.legal.title': 'מסמכים ותקנון',
+  'bookTrial.legal.back': 'חזרה לטופס ההרשמה',
+  'bookTrial.legal.contents': 'תוכן העניינים',
+
+  'bookTrial.error.firstName': 'נא למלא שם פרטי',
+  'bookTrial.error.lastName': 'נא למלא שם משפחה',
+  'bookTrial.error.birthdate': 'נא למלא תאריך לידה',
+  'bookTrial.error.group': 'נא לבחור קבוצה',
+  'bookTrial.error.slot': 'נא לבחור מועד',
+  'bookTrial.error.parentName': 'נא למלא את שם ההורה',
+  'bookTrial.error.phone': 'נא למלא מספר טלפון',
+  'bookTrial.error.email': 'כתובת אימייל לא תקינה',
+  'bookTrial.error.consent': 'יש לאשר את התקנון כדי להמשיך',
+  'bookTrial.error.health': 'נא לענות על הצהרת הבריאות',
 }
