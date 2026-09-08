@@ -75,7 +75,16 @@ export function SignIn({
         <SplashScreen
           locale={locale}
           tone="parent"
-          mark={<img src={logoUrl} alt={t(locale, `common.appName.${app}`)} />}
+          // The wordmark, not the crest (owner, 2026-09-08). The crest is 315KB and this is
+          // the screen that exists because the network is slow; the wordmark is text, weighs
+          // nothing, and is what the two staff apps already show — so all three loading
+          // screens differ by colour alone, which is the distinction that was wanted.
+          mark={
+            <p className="studio-splash__wordmark" aria-label={t(locale, `common.appName.${app}`)}>
+              <span aria-hidden="true">{t(locale, 'common.brand.wordmark')}</span>
+              <small aria-hidden="true">{t(locale, 'common.brand.club')}</small>
+            </p>
+          }
         />
       )
     }

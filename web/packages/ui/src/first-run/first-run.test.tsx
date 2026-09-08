@@ -86,9 +86,11 @@ describe('SignIn', () => {
     // Named for a screen reader, which sees no animation at all.
     expect(splash).toHaveAttribute('role', 'status')
     expect(splash).toHaveAccessibleName(t('he', 'common.auth.loading'))
-    // The club's mark is on it — the point is that this looks like the app, not like a
-    // failure.
-    expect(splash.querySelector('img')).toBeTruthy()
+    // The club's name is on it — the point is that this looks like the app, not like a
+    // failure. The WORDMARK and not the crest (owner, 2026-09-08): text costs no request,
+    // and the crest was 315KB on the one screen that exists because the network is slow.
+    expect(splash.querySelector('.studio-splash__wordmark')).toBeTruthy()
+    expect(splash.querySelector('img')).toBeNull()
     // Decorative: three dots that say "working" to someone who can see them and nothing at
     // all to someone who cannot, which is why the name above carries the meaning.
     expect(splash.querySelectorAll('[aria-hidden="true"] span').length).toBeGreaterThanOrEqual(3)
