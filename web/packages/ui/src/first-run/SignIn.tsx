@@ -22,6 +22,7 @@ import { InAppBrowserBanner } from './InAppBrowserBanner'
 import { startUrl, useAuthProviders } from './useAuthProviders'
 import './gladiator-signin.css'
 import logoUrl from './assets/gladiator-logo.png'
+import { SplashScreen } from './SplashScreen'
 
 export type { SignInProvider } from './useAuthProviders'
 
@@ -64,6 +65,20 @@ export function SignIn({
   // `app` rather than replacing the screen, because this one file also serves the staff
   // app and the dashboard, and the brief was for parents. The other two are unmoved.
   if (app === 'parent') {
+    // Nothing decided yet: the session restore and this fetch are two sequential round
+    // trips to an API in `sfo`, and the screen underneath would otherwise be the finished
+    // design with its one button missing — which is what the owner saw and reported as a
+    // blank page. `null` means "still asking"; an empty array means "asked, and there are
+    // none", which is a real answer and gets the real screen with its own message.
+    if (providers === null) {
+      return (
+        <SplashScreen
+          locale={locale}
+          tone="parent"
+          mark={<img src={logoUrl} alt={t(locale, `common.appName.${app}`)} />}
+        />
+      )
+    }
     return (
       <div className="gsignin gsignin--parent" data-testid="sign-in">
         <div className="gsignin-parent__rule" />
@@ -140,6 +155,24 @@ export function SignIn({
           </p>
         </div>
       </div>
+    )
+  }
+
+  // The same wait, for the two staff-side apps. Their own ground colour and their own
+  // mark: a manager runs both, and which one is opening should be readable before it has
+  // opened. See `SplashScreen`.
+  if (providers === null) {
+    return (
+      <SplashScreen
+        locale={locale}
+        tone={app === 'dashboard' ? 'dashboard' : 'staff'}
+        mark={
+          <p className="studio-splash__wordmark" aria-label={t(locale, `common.appName.${app}`)}>
+            <span aria-hidden="true">{t(locale, 'common.brand.wordmark')}</span>
+            <small aria-hidden="true">{t(locale, 'common.brand.club')}</small>
+          </p>
+        }
+      />
     )
   }
 
