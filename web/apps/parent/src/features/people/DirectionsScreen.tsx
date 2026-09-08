@@ -9,6 +9,7 @@ import { apiFetch } from '@studio/core'
 import { Card, Icon, LoadFailed } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { ScreenHeader } from '../shell/ScreenHeader'
 
 type StudioInfo = { name: string; address: string | null; phone: string | null }
 
@@ -57,10 +58,15 @@ export function DirectionsScreen({ locale }: { locale: Locale }) {
   if (studio === null) return null
 
   return (
-    <section aria-labelledby="directions-title" style={pageStyle} data-testid="directions">
-      <div className="studio-page-header">
-        <h1 id="directions-title">{t(locale, 'people.directions.title')}</h1>
-      </div>
+    <section aria-labelledby="directions-header-title" style={pageStyle} data-testid="directions">
+      {/* A1 — no way back. The page header carried the title and nothing else, so it becomes
+          the ScreenHeader's: one heading on the screen, and now an exit beside it. The
+          landmark points at the header's own `h1` rather than keeping a second one. */}
+      <ScreenHeader
+        locale={locale}
+        title={t(locale, 'people.directions.title')}
+        testId="directions-header"
+      />
       <Card>
         <strong>
           <bdi>{studio.name}</bdi>

@@ -360,6 +360,14 @@ export const people: Bundle = {
   // the card lines up against them, so a label that wraps moves every row beside it.
   'card.membership': 'Membership',
   'card.plan': 'Plan',
+  // 2c's redesign (2026-09-08). The card became a screen with its own header, so these
+  // are the header's own strings rather than more ledger labels.
+  'card.guardians': 'Parents',
+  // Every guardian who is not a parent moves the whole row to this word — true of a set
+  // containing a grandparent, where 'Parents' is not.
+  'card.guardiansPlural': 'Guardians',
+  'card.noBelt': 'No belt recorded',
+  'card.callGuardian': 'Call {{name}}',
   'alerts.title': 'Alert centre',
   'alerts.empty': 'Nothing needs your attention',
   'alerts.pendingRequests': 'Join requests waiting',

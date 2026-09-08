@@ -24,13 +24,13 @@ import {
   DraftNotice,
   EmptyState,
   LoadFailed,
-  PageHeader,
   PolicyDocument,
   SectionHeader,
   StatusChip,
 } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { ScreenHeader } from '../shell/ScreenHeader'
 
 import type { ConsentState, PrivacyClient, PrivacyRequest, PrivacyRequests } from './privacyClient'
 
@@ -194,9 +194,17 @@ export function PrivacyScreen({
 
   return (
     <div data-testid="privacy-screen" style={columnStyle}>
-      <PageHeader
-        subtitle={t(locale, 'reports.privacy.screen.subtitle')}
+      {/* A1 — no way back. It matters more here than anywhere: §11.3/§11.4 make this the
+          screen a subject exercises a legal right on, and one they cannot leave is one they
+          will avoid opening.
+          `PageHeader` is GONE rather than kept above its own duplicate — it renders an
+          `h1`, and a screen with two announces itself twice. Its subtitle moves onto the
+          header, which is what a subtitle is for. */}
+      <ScreenHeader
+        locale={locale}
         title={t(locale, 'reports.privacy.title')}
+        subtitle={t(locale, 'reports.privacy.screen.subtitle')}
+        testId="privacy-header"
       />
 
       {/* §11.3 */}

@@ -16,6 +16,27 @@
 // separately and answered separately — which is correct, and is what the old card could
 // not do.
 
+/**
+ * One child's plan, on the wire — `GET /me/training-plans`.
+ *
+ * **Why home needs its own read for this.** `HomeChild` below comes from `/me/students`,
+ * whose `StudentSummaryOut` deliberately omits `price_plan_id`: that shape is the roster
+ * row a COACH also receives from a list, and §13's third invariant keeps financial fields
+ * off it. A tuition amount there would ride onto every screen that happens to list
+ * students. So the plan arrives separately, on a parent-scoped route, and `Resolve` fetches
+ * it beside the others.
+ *
+ * Snake_case because it is the payload, untouched — the pill reads two fields off it and
+ * mapping the whole row into camelCase would be a second shape to keep in step.
+ */
+export type HomePlanRow = {
+  student_id: string
+  student_name: string
+  /** `null` for a `lead`, or a child a manager has not priced yet. The pill is not drawn. */
+  plan_name: string | null
+  monthly_amount_agorot: number | null
+}
+
 /** One of the family's children, as the chips and the belt bars need them. */
 export type HomeChild = {
   id: string

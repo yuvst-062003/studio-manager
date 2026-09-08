@@ -1,14 +1,24 @@
-// `2c` behind `#/student/<id>` (P1/P2). The container existed, its sections registered,
-// and no route rendered it — the composite screen the slot system was built for was
-// unreachable in the running app.
+// The container behind `#/student/<id>`. Replaces `StudentCardSection.tsx`, deleted in the
+// same commit.
+//
+// **The guardians read changed, and it is the whole reason this file is not a rename.**
+// It read `GET /me/guardians`, which walks every one of the caller's children and
+// deduplicates by person — so a household with two children showed an identical list on
+// both cards, and a grandparent who guards only one of them appeared on the other (A3).
+// It is now `GET /me/students/{id}/guardians`: one child, every guardian linked to them, no
+// dedup.
+//
+// Filtering the old deduplicated list client-side would have been worse, not better: dedup
+// keeps only the FIRST child's row for a person who guards both, so a shared parent
+// filtered by `student_id` would vanish from the second child's card entirely.
 import { useEffect, useState } from 'react'
 import { LoadFailed } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { StudentCard } from './StudentCard'
-import type { EnrollmentOut, GuardianOut, PeopleClient, StudentSummary } from './peopleClient'
+import { TraineeCard } from './TraineeCard'
+import type { EnrollmentOut, GuardianOut, PeopleClient, StudentSummary } from '../peopleClient'
 
-export function StudentCardSection({
+export function TraineeCardSection({
   client,
   locale,
   studentId,
@@ -32,7 +42,7 @@ export function StudentCardSection({
     // because a 403 on a side read must not turn the whole card into an error.
     void Promise.all([
       client.myStudents(),
-      client.myGuardians().catch(() => ({ items: [] as GuardianOut[] })),
+      client.studentGuardians(studentId).catch(() => ({ items: [] as GuardianOut[] })),
       client.enrollments(studentId).catch(() => [] as EnrollmentOut[]),
     ])
       .then(([students, guardians, enrollments]) => {
@@ -67,7 +77,7 @@ export function StudentCardSection({
     return <p data-testid="student-card-missing">{t(locale, 'people.student.empty')}</p>
   }
   return (
-    <StudentCard
+    <TraineeCard
       enrollments={data.enrollments}
       guardians={data.guardians}
       locale={locale}

@@ -27,6 +27,7 @@ import type { Locale } from '@studio/i18n'
 import { HomeScreen } from '../home/redesign/HomeScreen'
 import { familyNameOf } from '../home/redesign/derive'
 import type { FamilyEvent, Intents, Lesson } from '../home/redesign/derive'
+import type { HomePlanRow } from '../home/redesign/types'
 import { makeIntentClient } from '../home/intentClient'
 import { cancelReasonLabel } from '../schedule/client'
 import { everyChildIsOnATrial, makePeopleClient, nextTrialLesson, useMyStudents } from '../people'
@@ -110,6 +111,33 @@ export function Resolve({
   // no `sessionStartsAt` at all — so every trial family fell through to the fallback copy.
   // `null` means "not asked yet or nothing booked", which is the same thing to the screen.
   const [trialLesson, setTrialLesson] = useState<TrialLesson | null>(null)
+  /**
+   * One row per child, for בית's plan pill — `GET /me/training-plans`.
+   *
+   * Read HERE and not in `HomeScreen`, which "deliberately does NOT fetch": this component
+   * is the one place holding `useSession`, and a second reader would be a second
+   * `/auth/refresh` on every visit.
+   *
+   * `[]` and not `null` on failure. A family whose plan read has a bad minute sees a home
+   * with no pill on it — which is exactly what a family with no priced child sees, and is
+   * the right degradation for a shortcut. It is not a claim about anything, unlike the
+   * schedule read below, whose failure has its own banner because an empty week is.
+   */
+  const [plans, setPlans] = useState<readonly HomePlanRow[]>([])
+  useEffect(() => {
+    if (!session.access.parent) return
+    let live = true
+    void apiFetch('/api/v1/me/training-plans')
+      .then(async (response) => {
+        if (!live || !response.ok) return
+        const body = (await response.json()) as { items: HomePlanRow[] }
+        setPlans(body.items)
+      })
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [session.access.parent])
   useEffect(() => {
     if (!session.access.parent) return
     let live = true
@@ -307,6 +335,7 @@ export function Resolve({
     // App.tsx since the ship audit mounted it. The W1 `hasChildren` boolean is retired
     // with it: `mine` has named the children since M3, so the home renders them.
     <HomeScreen
+      plans={plans}
       locale={locale}
       clubName={session.activeStudioName ?? ''}
       familyName={

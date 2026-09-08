@@ -843,9 +843,25 @@ class StandingOrderLinkListOut(BaseModel):
 
 @router.get("/me/standing-order-links", response_model=StandingOrderLinkListOut)
 def my_standing_order_links(
-    request: Request, session: TenantSessionDep
+    request: Request,
+    session: TenantSessionDep,
+    plan_id: uuid.UUID | None = None,
+    student_id: uuid.UUID | None = None,
 ) -> StandingOrderLinkListOut:
     """Payment-routes spec §6 -- **this payer's own children only.**
+
+    **`plan_id` is the plan-change case, and a downgrade is why it exists.** Without it this
+    route answers for the plan each child points at NOW. An upgrade moves
+    `student.price_plan_id` at request time, so a re-read already carries the new mandate; a
+    downgrade does not move until the first of the month, so the family would be handed the
+    link for the plan they are leaving and would sign the wrong mandate -- the exact failure
+    this route's own docstring is about. With `plan_id` the caller asks for the link of the
+    plan being moved TO, for one of their own children.
+
+    **It is still not the catalogue.** The plan must be active and carry a link, and
+    `student_id` must be the caller's own child, or the answer is empty. A 300 ₪ payer
+    cannot enumerate the 550 ₪ link by guessing ids, because knowing an id is not the
+    check -- being that child's guardian is.
 
     The full catalogue is never exposed here: a 300 ₪ payer who could see the 550 ₪ link
     could sign the 550 ₪ mandate by accident, and the club would collect from a family
@@ -862,18 +878,42 @@ def my_standing_order_links(
     """
     students = StudentService.for_guardian(session, person_id=_caller(request))
     by_id = {row.id: row for row in students}
+
+    if plan_id is not None:
+        # The plan-change case. One child, one named plan -- and the guardian check is the
+        # same `by_id` membership every other branch of this route relies on.
+        if student_id is None or student_id not in by_id:
+            return StandingOrderLinkListOut(items=[])
+        plan = session.get(PricePlan, plan_id)
+        if plan is None or plan.active_to is not None or not plan.standing_order_link_url:
+            return StandingOrderLinkListOut(items=[])
+        child = by_id[student_id]
+        return StandingOrderLinkListOut(
+            items=[
+                StandingOrderLinkOut(
+                    student_id=student_id,
+                    student_name=f"{child.first_name} {child.last_name}",
+                    plan_name=plan.name,
+                    amount_agorot=plan.monthly_amount_agorot,
+                    url=plan.standing_order_link_url,
+                )
+            ]
+        )
+
     links = CatalogueService(session).links_for_students(list(by_id))
     return StandingOrderLinkListOut(
         items=[
             StandingOrderLinkOut(
-                student_id=student_id,
-                student_name=f"{by_id[student_id].first_name} {by_id[student_id].last_name}",
+                student_id=row_student_id,
+                student_name=(
+                    f"{by_id[row_student_id].first_name} {by_id[row_student_id].last_name}"
+                ),
                 plan_name=plan.name,
                 amount_agorot=plan.monthly_amount_agorot,
                 # Not Optional: `links_for_students` only returns plans that have one.
                 url=plan.standing_order_link_url or "",
             )
-            for student_id, plan in links
+            for row_student_id, plan in links
         ]
     )
 

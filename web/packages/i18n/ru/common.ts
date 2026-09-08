@@ -218,6 +218,10 @@ export const common: Bundle = {
   'install.banner.text': 'Установите приложение — уведомления и работа офлайн',
   'install.banner.cta': 'Установить',
   'install.banner.dismiss': 'Не сейчас',
+  // The one way back, on every screen behind or beside the tabs. `install.back` below
+  // says the same word and belongs to one walkthrough; this is the app-wide control's
+  // accessible name, which is all a screen reader gets — the chevron is decorative.
+  'action.back': 'Назад',
   'install.back': 'Назад',
   'update.available': 'Доступна новая версия',
   'update.reload': 'Обновить',

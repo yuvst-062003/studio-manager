@@ -20,6 +20,7 @@ import {
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { HomeTop } from './HomeTop'
+import type { HomePlan } from './HomeTop'
 import { HomeSchedule } from './HomeSchedule'
 import { AbsenceModal } from './AbsenceModal'
 import { MonthCalendarModal } from './MonthCalendarModal'
@@ -42,7 +43,7 @@ import {
   weekdayOf,
 } from './derive'
 import type { FamilyEvent, Intents, Lesson } from './derive'
-import type { HomeChild, HomeSession } from './types'
+import type { HomeChild, HomePlanRow, HomeSession } from './types'
 
 /** The writes בית makes. One narrow interface so the screen can be tested without a fetch. */
 export type HomeWriter = {
@@ -73,10 +74,16 @@ export function HomeScreen({
   cancelReasonLabel,
   onAbsenceReported,
   onRetry,
+  plans = [],
 }: {
   locale: Locale
   clubName: string
   familyName: string | null
+  /** One row per child, from `GET /me/training-plans`. The pill in the header reads the
+   *  SELECTED child's row out of it — which is why the list arrives rather than one plan:
+   *  the selection lives in this screen, not in the caller. Defaults to `[]` so a mount
+   *  that predates the pill still renders a home. */
+  plans?: readonly HomePlanRow[]
   /** `null` while the roster is still loading — not `[]`, which is a family with no
    *  children and draws a legitimately empty screen. */
   childList: readonly HomeChild[] | null
@@ -103,6 +110,41 @@ export function HomeScreen({
 }) {
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null)
   const [selectedDayKey, setSelectedDayKey] = useState<string>(todayKey)
+
+  /**
+   * The header pill's plan.
+   *
+   * Three cases, and the middle one is the reason this is derived here rather than passed
+   * in ready-made:
+   *
+   *  - ONE child in the family: always that child's plan. `selectedChildId` is `null` for
+   *    them too — the chip strip is not even drawn below one child — so "nothing selected"
+   *    cannot mean "several children" in that household.
+   *  - Several children, one selected: that child's plan.
+   *  - Several children, none selected: no amount and a chooser. Summing two children's
+   *    prices into one number would be a figure the club does not charge, and quietly
+   *    showing the first child's is a lie about whose plan it is.
+   *
+   * `null` when there is no plan to name — a `lead`, a child a manager has not priced, or
+   * a read that failed. An empty plan pill is a question a parent cannot answer.
+   */
+  const planPill: HomePlan | null = useMemo(() => {
+    if (plans.length === 0) return null
+    const single = plans.length === 1 ? plans[0]! : null
+    const chosen = selectedChildId
+      ? (plans.find((row) => row.student_id === selectedChildId) ?? null)
+      : single
+    if (chosen === null) {
+      return { studentId: null, planName: null, monthlyAgorot: null, isFamilyWide: true }
+    }
+    if (chosen.plan_name === null) return null
+    return {
+      studentId: chosen.student_id,
+      planName: chosen.plan_name,
+      monthlyAgorot: chosen.monthly_amount_agorot,
+      isFamilyWide: false,
+    }
+  }, [plans, selectedChildId])
   const [absenceTarget, setAbsenceTarget] = useState<HomeSession | null>(null)
   const [absenceBusy, setAbsenceBusy] = useState(false)
   const [absenceFailure, setAbsenceFailure] = useState<AbsenceFailure>(null)
@@ -405,6 +447,7 @@ export function HomeScreen({
         familyName={familyName}
         childList={childList ?? []}
         selectedChildId={selectedChildId}
+        plan={planPill}
         onSelectChild={setSelectedChildId}
         onOpenNotifications={() => {
           // The prototype opens a coach-notifications modal. This product has one inbox and

@@ -875,6 +875,32 @@ def my_student_status_history(
     )
 
 
+@router.get("/me/students/{student_id}/guardians", response_model=GuardianListResponse)
+def my_student_guardians(
+    student_id: uuid.UUID, request: Request, session: TenantSessionDep
+) -> GuardianListResponse:
+    """The guardians of ONE of my children -- the trainee card's row.
+
+    **Why this exists beside `/me/guardians`.** That one answers "who are this family's
+    guardians" and deduplicates by person across every child, which is right for a screen
+    about the family and wrong for a card about one child: a household with two children
+    rendered an identical list on both cards, and a grandparent who is a guardian of one of
+    them appeared on the other. Filtering the deduplicated list client-side would be worse
+    still -- dedup keeps only the first child's row per person, so a shared parent would
+    vanish from the second child's card entirely.
+
+    **No dedup here, and that is the point.** One student, every guardian linked to them.
+
+    No role dependency, the same reason as every other `/me/*` read: §3.1 -- "guardian is
+    not a role". **404 and never 403** for a student outside my children, so a parent
+    probing ids cannot learn which of them exist in this studio.
+    """
+    person_id = _person_id(request)
+    if student_id not in StudentService.guardian_student_ids(session, person_id=person_id):
+        raise _not_found()
+    return _guardian_list(session, student_id)
+
+
 @router.get("/me/guardians", response_model=GuardianListResponse)
 def my_guardians(request: Request, session: TenantSessionDep) -> GuardianListResponse:
     """Parent `12i`'s guardians section -- the FAMILY's guardians, read by one of them.

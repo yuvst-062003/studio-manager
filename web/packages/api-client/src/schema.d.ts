@@ -2148,6 +2148,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/payment-methods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Payment Methods */
+        get: operations["my_payment_methods_api_v1_me_payment_methods_get"];
+        /**
+         * Set My Payment Methods
+         * @description Whole or not at all.
+         *
+         *     Every id is checked before anything is written. A half-applied save leaves the picker
+         *     showing one child changed and one not, with no error naming which -- and the family
+         *     then presses save again and changes the first child twice.
+         */
+        put: operations["set_my_payment_methods_api_v1_me_payment_methods_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/payment-promises": {
         parameters: {
             query?: never;
@@ -2304,6 +2329,19 @@ export interface paths {
          * My Standing Order Links
          * @description Payment-routes spec §6 -- **this payer's own children only.**
          *
+         *     **`plan_id` is the plan-change case, and a downgrade is why it exists.** Without it this
+         *     route answers for the plan each child points at NOW. An upgrade moves
+         *     `student.price_plan_id` at request time, so a re-read already carries the new mandate; a
+         *     downgrade does not move until the first of the month, so the family would be handed the
+         *     link for the plan they are leaving and would sign the wrong mandate -- the exact failure
+         *     this route's own docstring is about. With `plan_id` the caller asks for the link of the
+         *     plan being moved TO, for one of their own children.
+         *
+         *     **It is still not the catalogue.** The plan must be active and carry a link, and
+         *     `student_id` must be the caller's own child, or the answer is empty. A 300 ₪ payer
+         *     cannot enumerate the 550 ₪ link by guessing ids, because knowing an id is not the
+         *     check -- being that child's guardian is.
+         *
          *     The full catalogue is never exposed here: a 300 ₪ payer who could see the 550 ₪ link
          *     could sign the 550 ₪ mandate by accident, and the club would collect from a family
          *     that never agreed to it. Closed plans are excluded by `links_for_students`, because a
@@ -2438,6 +2476,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/students/{student_id}/guardians": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Student Guardians
+         * @description The guardians of ONE of my children -- the trainee card's row.
+         *
+         *     **Why this exists beside `/me/guardians`.** That one answers "who are this family's
+         *     guardians" and deduplicates by person across every child, which is right for a screen
+         *     about the family and wrong for a card about one child: a household with two children
+         *     rendered an identical list on both cards, and a grandparent who is a guardian of one of
+         *     them appeared on the other. Filtering the deduplicated list client-side would be worse
+         *     still -- dedup keeps only the first child's row per person, so a shared parent would
+         *     vanish from the second child's card entirely.
+         *
+         *     **No dedup here, and that is the point.** One student, every guardian linked to them.
+         *
+         *     No role dependency, the same reason as every other `/me/*` read: §3.1 -- "guardian is
+         *     not a role". **404 and never 403** for a student outside my children, so a parent
+         *     probing ids cannot learn which of them exist in this studio.
+         */
+        get: operations["my_student_guardians_api_v1_me_students__student_id__guardians_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/students/{student_id}/join": {
         parameters: {
             query?: never;
@@ -2528,6 +2600,40 @@ export interface paths {
          *     'guardian is not a role'; the shape is the club's shop window, not a settings read.
          */
         get: operations["my_studio_api_v1_me_studio_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/training-plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Training Plans
+         * @description One row per child: which plan they are on, and any change already scheduled.
+         *
+         *     **The read home and the trainee card draw a plan from.** Neither can get it from
+         *     `/me/students`: `StudentSummaryOut` is the shape a coach receives from a list, and
+         *     invariant 3 reads `price_plan_id` as financial, so a tuition amount there would ride
+         *     onto every screen that lists students. And neither can afford
+         *     `GET /students/{id}/training-plan` per child -- that route computes a whole club week
+         *     per call, and home would make one request per child to draw a pill.
+         *
+         *     So: a parent-scoped list, priced, with no timetable in it at all.
+         *
+         *     `next_effective_on` is computed HERE, from `app.core.clock.now()` -- the same clock the
+         *     worker applies a downgrade on. A client computing "the first of next month" from the
+         *     device clock disagrees with the worker across a timezone boundary, which is a wrong date
+         *     printed under a button the parent is about to press.
+         */
+        get: operations["my_training_plans_api_v1_me_training_plans_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -9161,6 +9267,53 @@ export interface components {
             /** Total Students */
             total_students: number;
         };
+        /** MyPlanListOut */
+        MyPlanListOut: {
+            /** Items */
+            items: components["schemas"]["MyPlanRowOut"][];
+        };
+        /**
+         * MyPlanRowOut
+         * @description One child's plan, for a screen that shows several children at once.
+         *
+         *     **Why this is not a field on `StudentSummaryOut`.** That shape is what a coach receives
+         *     from a list, and invariant 3's detector reads `price_plan_id` as financial — a tuition
+         *     amount on it would ride onto every screen that happens to list students. This is a
+         *     parent-scoped shape, like `TrainingPlanOut` beside it, and it carries §12's amendment
+         *     for the same reason that one does.
+         *
+         *     **Why not `GET /students/{id}/training-plan` per child.** That route computes a whole
+         *     club week per call. Home renders a plan pill on every visit and would make one request
+         *     per child to draw it.
+         *
+         *     Every field is nullable where the fact can be absent: a `lead` has no plan, and a pill
+         *     drawn from an invented one is worse than no pill.
+         */
+        MyPlanRowOut: {
+            /** Monthly Amount Agorot */
+            monthly_amount_agorot: number | null;
+            /**
+             * Next Effective On
+             * Format: date
+             */
+            next_effective_on: string;
+            /** Plan Name */
+            plan_name: string | null;
+            /** Price Plan Id */
+            price_plan_id: string | null;
+            scheduled_change?: components["schemas"]["PlanChangeOut"] | null;
+            /** Sessions Per Week */
+            sessions_per_week: number | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Student Name */
+            student_name: string;
+            /** Weekly Extra Allowance */
+            weekly_extra_allowance: number | null;
+        };
         /** MyProfileOut */
         MyProfileOut: {
             /** Display Name */
@@ -9761,6 +9914,41 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** PaymentMethodIn */
+        PaymentMethodIn: {
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "upay_card" | "cash" | "cheque" | "standing_order";
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+        };
+        /** PaymentMethodListIn */
+        PaymentMethodListIn: {
+            /** Items */
+            items: components["schemas"]["PaymentMethodIn"][];
+        };
+        /** PaymentMethodListOut */
+        PaymentMethodListOut: {
+            /** Items */
+            items: components["schemas"]["PaymentMethodOut"][];
+        };
+        /** PaymentMethodOut */
+        PaymentMethodOut: {
+            /** Method */
+            method: string | null;
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Student Name */
+            student_name: string;
+        };
         /**
          * PaymentOrderCreateIn
          * @description The parent picks charges; the server prices them. `expected_amount_agorot` is
@@ -10059,6 +10247,8 @@ export interface components {
              * Format: date
              */
             effective_on: string;
+            /** From Plan Name */
+            from_plan_name?: string | null;
             /** From Price Plan Id */
             from_price_plan_id: string | null;
             /**
@@ -10080,6 +10270,11 @@ export interface components {
              * Format: uuid
              */
             student_id: string;
+            /**
+             * To Plan Name
+             * @default
+             */
+            to_plan_name: string;
             /**
              * To Price Plan Id
              * Format: uuid
@@ -10110,6 +10305,8 @@ export interface components {
             monthly_amount_agorot: number;
             /** Name */
             name: string;
+            /** Sessions Per Week */
+            sessions_per_week?: number | null;
             /** Weekly Extra Allowance */
             weekly_extra_allowance: number | null;
         };
@@ -16591,6 +16788,59 @@ export interface operations {
             };
         };
     };
+    my_payment_methods_api_v1_me_payment_methods_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentMethodListOut"];
+                };
+            };
+        };
+    };
+    set_my_payment_methods_api_v1_me_payment_methods_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentMethodListIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentMethodListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     my_payment_promises_api_v1_me_payment_promises_get: {
         parameters: {
             query?: never;
@@ -16794,7 +17044,10 @@ export interface operations {
     };
     my_standing_order_links_api_v1_me_standing_order_links_get: {
         parameters: {
-            query?: never;
+            query?: {
+                plan_id?: string | null;
+                student_id?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -16808,6 +17061,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StandingOrderLinkListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -16934,6 +17196,37 @@ export interface operations {
             };
         };
     };
+    my_student_guardians_api_v1_me_students__student_id__guardians_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuardianListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     join_the_club_api_v1_me_students__student_id__join_post: {
         parameters: {
             query?: never;
@@ -17019,6 +17312,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["app__schemas__studio__StudioOut"];
+                };
+            };
+        };
+    };
+    my_training_plans_api_v1_me_training_plans_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyPlanListOut"];
                 };
             };
         };

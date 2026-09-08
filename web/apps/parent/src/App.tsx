@@ -85,7 +85,7 @@ import { UpdatesScreen } from './features/comms/redesign/UpdatesScreen'
 import { JoinClubSection, makePeopleClient, registerPeopleSections } from './features/people'
 import { ProfileScreen } from './features/people/redesign/ProfileScreen'
 // `2c` behind `#/student/<id>` — the composite card the slot system was built for (P2).
-import { StudentCardSection } from './features/people/StudentCardSection'
+import { TraineeCardSection } from './features/people/redesign/TraineeCardSection'
 import { registerBillingSections } from './features/billing/StudentCardBillingSection'
 import { DirectionsScreen } from './features/people/DirectionsScreen'
 // `12f` behind the hash the payments tab links to, and §5.10's return leg (P1).
@@ -94,7 +94,7 @@ import { PaymentCompleteSection } from './features/billing/PaymentCompleteSectio
 // The training-plan screen, per child. `#/plan/<studentId>` for the same reason `#/belts/`
 // carries ids: a family with two children has two plans and two upgrade decisions, and a
 // screen that summed them could not mark anything — a booking names a student.
-import { TrainingPlanSection } from './features/billing/TrainingPlanSection'
+import { PlanSection } from './features/billing/redesign/PlanSection'
 // §6.1's plan step — 300 / 400 / 550 and how the money moves, asked once, right after the
 // health declaration. Every piece of it existed behind `#/plan/<studentId>` and nothing in
 // the first-run sequence reached it, so a family finished signup with no plan at all.
@@ -923,7 +923,7 @@ function AuthedApp() {
               children={(gatedChildren ?? []).map(({ id, display_name }) => ({ id, display_name }))}
             />
           ) : cardStudentId ? (
-            <StudentCardSection client={peopleClient} locale={locale} studentId={cardStudentId} />
+            <TraineeCardSection client={peopleClient} locale={locale} studentId={cardStudentId} />
           ) : paymentCompleteRef ? (
             <PaymentCompleteSection locale={locale} publicRef={paymentCompleteRef} />
           ) : onPaymentsHistory ? (
@@ -940,7 +940,7 @@ function AuthedApp() {
             // Same reasoning as the payments screen above: the route resolves the family
             // from the session, so a student id that is not this caller's child answers
             // 404 and the section renders nothing rather than another family's plan.
-            <TrainingPlanSection locale={locale} studentId={planStudentId} />
+            <PlanSection locale={locale} studentId={planStudentId} />
           ) : onShop ? (
             // Checkpoint 4 of the parent-app redesign. `ShopSection` + `OrderItemsScreen`
             // are replaced by the port of the prototype's `GearScreen`; both stay on disk

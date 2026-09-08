@@ -44,6 +44,8 @@ from app.schemas.training_plan import (
     GroupEligibilityOut,
     GroupKindIn,
     ManagerPlanChangeOut,
+    MyPlanListOut,
+    MyPlanRowOut,
     PlanChangeIn,
     PlanChangeListOut,
     PlanChangeOut,
@@ -55,7 +57,7 @@ from app.schemas.training_plan import (
 from app.services.people.students import StudentService
 from app.services.schedule.booking import BookingService, week_start
 from app.services.schedule.errors import BookingRefusedError, PlanChangeRefusedError
-from app.services.schedule.plan_change import PlanChangeService
+from app.services.schedule.plan_change import PlanChangeService, first_of_next_month
 from app.services.schedule.plan_offer import offered_plans
 
 router = APIRouter(tags=["billing"])
@@ -107,17 +109,34 @@ def _plan_option(
         name=plan.name,
         monthly_amount_agorot=plan.monthly_amount_agorot,
         weekly_extra_allowance=plan.weekly_extra_allowance,
+        sessions_per_week=plan.sessions_per_week,
         is_offered=plan.id in offered_ids,
         is_current=plan.id == current_id,
     )
 
 
-def _change_out(change: PlanChange) -> PlanChangeOut:
+def _plan_name(session: TenantSessionDep, plan_id: uuid.UUID | None) -> str | None:
+    """A plan's name, including a CLOSED one.
+
+    Looked up rather than read off the options list, because §5.15 closes a plan instead of
+    overwriting it: a change scheduled before a re-pricing points at a plan the parent
+    screen's option list no longer contains, and the banner would have had no name for the
+    plan being left.
+    """
+    if plan_id is None:
+        return None
+    plan = session.get(PricePlan, plan_id)
+    return plan.name if plan else None
+
+
+def _change_out(session: TenantSessionDep, change: PlanChange) -> PlanChangeOut:
     return PlanChangeOut(
         id=change.id,
         student_id=change.student_id,
         from_price_plan_id=change.from_price_plan_id,
         to_price_plan_id=change.to_price_plan_id,
+        from_plan_name=_plan_name(session, change.from_price_plan_id),
+        to_plan_name=_plan_name(session, change.to_price_plan_id) or "",
         effective_on=change.effective_on,
         status=change.status,
         settlement_status=change.settlement_status,
@@ -127,6 +146,65 @@ def _change_out(change: PlanChange) -> PlanChangeOut:
 
 
 # -- the parent's screen -------------------------------------------------------
+@router.get("/me/training-plans", response_model=MyPlanListOut)
+def my_training_plans(request: Request, session: TenantSessionDep) -> MyPlanListOut:
+    """One row per child: which plan they are on, and any change already scheduled.
+
+    **The read home and the trainee card draw a plan from.** Neither can get it from
+    `/me/students`: `StudentSummaryOut` is the shape a coach receives from a list, and
+    invariant 3 reads `price_plan_id` as financial, so a tuition amount there would ride
+    onto every screen that lists students. And neither can afford
+    `GET /students/{id}/training-plan` per child -- that route computes a whole club week
+    per call, and home would make one request per child to draw a pill.
+
+    So: a parent-scoped list, priced, with no timetable in it at all.
+
+    `next_effective_on` is computed HERE, from `app.core.clock.now()` -- the same clock the
+    worker applies a downgrade on. A client computing "the first of next month" from the
+    device clock disagrees with the worker across a timezone boundary, which is a wrong date
+    printed under a button the parent is about to press.
+    """
+    rows: list[MyPlanRowOut] = []
+    effective_on = first_of_next_month(now().date())
+    # One query for every child's scheduled change, rather than one per child. Same
+    # predicate the single-student route uses -- `status == 'scheduled'` is the live one,
+    # because a change is a row and `applied` and `cancelled` are its history.
+    scheduled_by_student = {
+        change.student_id: change
+        for change in session.execute(
+            select(PlanChange).where(PlanChange.status == "scheduled")
+        ).scalars()
+    }
+    for row in StudentService.for_guardian(session, person_id=_caller(request)):
+        # `for_guardian` returns `StudentRow`, the joined list shape — which carries no
+        # `price_plan_id`, deliberately: it is the roster row a coach also receives, and
+        # invariant 3 keeps the price off it. So the price comes from the model row, the
+        # same two-step `_own_student` above makes.
+        student = session.get(Student, row.id)
+        if student is None:  # pragma: no cover -- for_guardian just returned it
+            continue
+        plan = (
+            session.get(PricePlan, student.price_plan_id)
+            if student.price_plan_id is not None
+            else None
+        )
+        scheduled = scheduled_by_student.get(student.id)
+        rows.append(
+            MyPlanRowOut(
+                student_id=student.id,
+                student_name=f"{row.first_name} {row.last_name}".strip(),
+                price_plan_id=plan.id if plan else None,
+                plan_name=plan.name if plan else None,
+                monthly_amount_agorot=plan.monthly_amount_agorot if plan else None,
+                weekly_extra_allowance=plan.weekly_extra_allowance if plan else None,
+                sessions_per_week=plan.sessions_per_week if plan else None,
+                next_effective_on=effective_on,
+                scheduled_change=_change_out(session, scheduled) if scheduled else None,
+            )
+        )
+    return MyPlanListOut(items=rows)
+
+
 @router.get("/students/{student_id}/training-plan", response_model=TrainingPlanOut)
 def training_plan(
     student_id: uuid.UUID, request: Request, session: TenantSessionDep
@@ -239,7 +317,7 @@ def training_plan(
             _plan_option(plan, offered_ids=offered, current_id=student.price_plan_id)
             for plan in plans
         ],
-        scheduled_change=_change_out(scheduled) if scheduled else None,
+        scheduled_change=_change_out(session, scheduled) if scheduled else None,
     )
 
 
@@ -351,7 +429,7 @@ def request_plan_change(
     except PlanChangeRefusedError as exc:
         raise _refused(exc) from exc
     session.commit()
-    return _change_out(change)
+    return _change_out(session, change)
 
 
 @router.delete("/students/{student_id}/plan-changes/{change_id}", response_model=PlanChangeOut)
@@ -371,7 +449,7 @@ def cancel_plan_change(
     except PlanChangeRefusedError as exc:
         raise _refused(exc) from exc
     session.commit()
-    return _change_out(change)
+    return _change_out(session, change)
 
 
 # -- the manager ---------------------------------------------------------------
@@ -450,7 +528,9 @@ def plan_change_queue(_: ManagerOrOwner, session: TenantSessionDep) -> PlanChang
         after = session.get(PricePlan, change.to_price_plan_id)
         items.append(
             ManagerPlanChangeOut(
-                **_change_out(change).model_dump(),
+                **_change_out(session, change).model_dump(
+                    exclude={"from_plan_name", "to_plan_name"}
+                ),
                 student_name=f"{person.first_name} {person.last_name}" if person else "",
                 from_plan_name=before.name if before else None,
                 to_plan_name=after.name if after else "",
@@ -476,4 +556,4 @@ def settle_plan_change(
     except PlanChangeRefusedError as exc:
         raise _refused(exc) from exc
     session.commit()
-    return _change_out(change)
+    return _change_out(session, change)

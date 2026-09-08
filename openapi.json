@@ -6975,14 +6975,14 @@
           "student_id",
           "from_price_plan_id",
           "to_price_plan_id",
+          "from_plan_name",
+          "to_plan_name",
           "effective_on",
           "status",
           "settlement_status",
           "requested_at",
           "applied_at",
           "student_name",
-          "from_plan_name",
-          "to_plan_name",
           "monthly_difference_agorot"
         ],
         "title": "ManagerPlanChangeOut",
@@ -7383,6 +7383,119 @@
           "pending_agorot"
         ],
         "title": "MonthlyReportSummary",
+        "type": "object"
+      },
+      "MyPlanListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MyPlanRowOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "MyPlanListOut",
+        "type": "object"
+      },
+      "MyPlanRowOut": {
+        "description": "One child's plan, for a screen that shows several children at once.\n\n**Why this is not a field on `StudentSummaryOut`.** That shape is what a coach receives\nfrom a list, and invariant 3's detector reads `price_plan_id` as financial — a tuition\namount on it would ride onto every screen that happens to list students. This is a\nparent-scoped shape, like `TrainingPlanOut` beside it, and it carries §12's amendment\nfor the same reason that one does.\n\n**Why not `GET /students/{id}/training-plan` per child.** That route computes a whole\nclub week per call. Home renders a plan pill on every visit and would make one request\nper child to draw it.\n\nEvery field is nullable where the fact can be absent: a `lead` has no plan, and a pill\ndrawn from an invented one is worse than no pill.",
+        "properties": {
+          "monthly_amount_agorot": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly Amount Agorot"
+          },
+          "next_effective_on": {
+            "format": "date",
+            "title": "Next Effective On",
+            "type": "string"
+          },
+          "plan_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Name"
+          },
+          "price_plan_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Plan Id"
+          },
+          "scheduled_change": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlanChangeOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sessions_per_week": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sessions Per Week"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "student_name": {
+            "title": "Student Name",
+            "type": "string"
+          },
+          "weekly_extra_allowance": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekly Extra Allowance"
+          }
+        },
+        "required": [
+          "student_id",
+          "student_name",
+          "price_plan_id",
+          "plan_name",
+          "monthly_amount_agorot",
+          "weekly_extra_allowance",
+          "sessions_per_week",
+          "next_effective_on"
+        ],
+        "title": "MyPlanRowOut",
         "type": "object"
       },
       "MyProfileOut": {
@@ -8848,6 +8961,94 @@
         "title": "PaymentCompleteOut",
         "type": "object"
       },
+      "PaymentMethodIn": {
+        "properties": {
+          "method": {
+            "enum": [
+              "upay_card",
+              "cash",
+              "cheque",
+              "standing_order"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "method"
+        ],
+        "title": "PaymentMethodIn",
+        "type": "object"
+      },
+      "PaymentMethodListIn": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PaymentMethodIn"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PaymentMethodListIn",
+        "type": "object"
+      },
+      "PaymentMethodListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PaymentMethodOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PaymentMethodListOut",
+        "type": "object"
+      },
+      "PaymentMethodOut": {
+        "properties": {
+          "method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Method"
+          },
+          "student_id": {
+            "format": "uuid",
+            "title": "Student Id",
+            "type": "string"
+          },
+          "student_name": {
+            "title": "Student Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "student_id",
+          "student_name",
+          "method"
+        ],
+        "title": "PaymentMethodOut",
+        "type": "object"
+      },
       "PaymentOrderCreateIn": {
         "description": "The parent picks charges; the server prices them. `expected_amount_agorot` is\nabsent on purpose -- §5.10 compares the IPN against a server-side sum, and a\nclient-supplied expected amount would be the thing it is compared to.\n\n**The list may be empty, and the emptiness is not the schema's business.** An order\nover no charges used to be a 422 here, which made \"pay a term up front by card\" a\nrequest the server rejected before any rule about it could run: a family in good\nstanding owes nothing, so their basket has no charge ids in it at all. What is refused\nis an order that buys NOTHING -- no charges and no months forward -- and that rule\nneeds `prepay_months` to decide, so it lives in `OrderService.create` where both halves\nare in scope. One authority, not two that can disagree.",
         "properties": {
@@ -9511,6 +9712,17 @@
             "title": "Effective On",
             "type": "string"
           },
+          "from_plan_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Plan Name"
+          },
           "from_price_plan_id": {
             "anyOf": [
               {
@@ -9544,6 +9756,11 @@
           "student_id": {
             "format": "uuid",
             "title": "Student Id",
+            "type": "string"
+          },
+          "to_plan_name": {
+            "default": "",
+            "title": "To Plan Name",
             "type": "string"
           },
           "to_price_plan_id": {
@@ -9589,6 +9806,17 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "sessions_per_week": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sessions Per Week"
           },
           "weekly_extra_allowance": {
             "anyOf": [
@@ -22119,6 +22347,67 @@
         ]
       }
     },
+    "/api/v1/me/payment-methods": {
+      "get": {
+        "operationId": "my_payment_methods_api_v1_me_payment_methods_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentMethodListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "My Payment Methods",
+        "tags": [
+          "billing"
+        ]
+      },
+      "put": {
+        "description": "Whole or not at all.\n\nEvery id is checked before anything is written. A half-applied save leaves the picker\nshowing one child changed and one not, with no error naming which -- and the family\nthen presses save again and changes the first child twice.",
+        "operationId": "set_my_payment_methods_api_v1_me_payment_methods_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentMethodListIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentMethodListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set My Payment Methods",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
     "/api/v1/me/payment-promises": {
       "get": {
         "operationId": "my_payment_promises_api_v1_me_payment_promises_get",
@@ -22393,8 +22682,44 @@
     },
     "/api/v1/me/standing-order-links": {
       "get": {
-        "description": "Payment-routes spec §6 -- **this payer's own children only.**\n\nThe full catalogue is never exposed here: a 300 ₪ payer who could see the 550 ₪ link\ncould sign the 550 ₪ mandate by accident, and the club would collect from a family\nthat never agreed to it. Closed plans are excluded by `links_for_students`, because a\nstudent still pointing at last year's plan would otherwise be handed a link at last\nyear's amount.\n\nNo role dependency, like every other `/me/*` read -- §3.1: \"guardian is not a role\".\n\n**Read live, never precached.** The parent app is an installed PWA and the rest of\nthis screen is cache-friendly; a stale payment link is not a stale roster, it sends a\nfamily to sign a mandate at the wrong amount and neither they nor the manager finds\nout until the reconciliation queue disagrees months later.",
+        "description": "Payment-routes spec §6 -- **this payer's own children only.**\n\n**`plan_id` is the plan-change case, and a downgrade is why it exists.** Without it this\nroute answers for the plan each child points at NOW. An upgrade moves\n`student.price_plan_id` at request time, so a re-read already carries the new mandate; a\ndowngrade does not move until the first of the month, so the family would be handed the\nlink for the plan they are leaving and would sign the wrong mandate -- the exact failure\nthis route's own docstring is about. With `plan_id` the caller asks for the link of the\nplan being moved TO, for one of their own children.\n\n**It is still not the catalogue.** The plan must be active and carry a link, and\n`student_id` must be the caller's own child, or the answer is empty. A 300 ₪ payer\ncannot enumerate the 550 ₪ link by guessing ids, because knowing an id is not the\ncheck -- being that child's guardian is.\n\nThe full catalogue is never exposed here: a 300 ₪ payer who could see the 550 ₪ link\ncould sign the 550 ₪ mandate by accident, and the club would collect from a family\nthat never agreed to it. Closed plans are excluded by `links_for_students`, because a\nstudent still pointing at last year's plan would otherwise be handed a link at last\nyear's amount.\n\nNo role dependency, like every other `/me/*` read -- §3.1: \"guardian is not a role\".\n\n**Read live, never precached.** The parent app is an installed PWA and the rest of\nthis screen is cache-friendly; a stale payment link is not a stale roster, it sends a\nfamily to sign a mandate at the wrong amount and neither they nor the manager finds\nout until the reconciliation queue disagrees months later.",
         "operationId": "my_standing_order_links_api_v1_me_standing_order_links_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "plan_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Plan Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "student_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Student Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -22405,6 +22730,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "My Standing Order Links",
@@ -22611,6 +22946,50 @@
         ]
       }
     },
+    "/api/v1/me/students/{student_id}/guardians": {
+      "get": {
+        "description": "The guardians of ONE of my children -- the trainee card's row.\n\n**Why this exists beside `/me/guardians`.** That one answers \"who are this family's\nguardians\" and deduplicates by person across every child, which is right for a screen\nabout the family and wrong for a card about one child: a household with two children\nrendered an identical list on both cards, and a grandparent who is a guardian of one of\nthem appeared on the other. Filtering the deduplicated list client-side would be worse\nstill -- dedup keeps only the first child's row per person, so a shared parent would\nvanish from the second child's card entirely.\n\n**No dedup here, and that is the point.** One student, every guardian linked to them.\n\nNo role dependency, the same reason as every other `/me/*` read: §3.1 -- \"guardian is\nnot a role\". **404 and never 403** for a student outside my children, so a parent\nprobing ids cannot learn which of them exist in this studio.",
+        "operationId": "my_student_guardians_api_v1_me_students__student_id__guardians_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuardianListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Student Guardians",
+        "tags": [
+          "people"
+        ]
+      }
+    },
     "/api/v1/me/students/{student_id}/join": {
       "post": {
         "description": "Entrance A — the destination §5.4a ④'s \"איך היה?\" never had.\n\nThe worker has asked a trial family how their lesson went on days 1, 3 and 7 since M3,\nwith no link and no action, and written them off as `lost` after 21 days. The only route\nin was a manager opening the student card. This is the other entrance; both end on the\nsame sequence — health declaration → payment method per child → pay.\n\n**It cannot reuse `POST /students/{id}/convert`.** That route is `ManagerOrOwner`, takes\na single `group_id`, and takes a manager-chosen `price_plan_id`. This one is reached by\na guardian, takes the groups they ticked, and derives the price from them.\n\n**No role dependency**, for the reason `/me/students` gives: §3.1 — \"guardian is not a\nrole\", so `require_roles` here would refuse every guardian in the product. The check\nthat matters is the record one, and it is the same as `/me/students/{id}/status-history`\nmakes: **404, never 403.** Under `/me/` the collection is \"my children\", so an id outside\nit does not exist — and a 403 would confirm the child is in this studio.",
@@ -22747,6 +23126,28 @@
         "summary": "My Studio",
         "tags": [
           "studio"
+        ]
+      }
+    },
+    "/api/v1/me/training-plans": {
+      "get": {
+        "description": "One row per child: which plan they are on, and any change already scheduled.\n\n**The read home and the trainee card draw a plan from.** Neither can get it from\n`/me/students`: `StudentSummaryOut` is the shape a coach receives from a list, and\ninvariant 3 reads `price_plan_id` as financial, so a tuition amount there would ride\nonto every screen that lists students. And neither can afford\n`GET /students/{id}/training-plan` per child -- that route computes a whole club week\nper call, and home would make one request per child to draw a pill.\n\nSo: a parent-scoped list, priced, with no timetable in it at all.\n\n`next_effective_on` is computed HERE, from `app.core.clock.now()` -- the same clock the\nworker applies a downgrade on. A client computing \"the first of next month\" from the\ndevice clock disagrees with the worker across a timezone boundary, which is a wrong date\nprinted under a button the parent is about to press.",
+        "operationId": "my_training_plans_api_v1_me_training_plans_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyPlanListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "My Training Plans",
+        "tags": [
+          "billing"
         ]
       }
     },

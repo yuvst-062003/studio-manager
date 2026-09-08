@@ -363,6 +363,12 @@ export const people: Bundle = {
   // the card lines up against them, so a label that wraps moves every row beside it.
   'card.membership': 'Членство',
   'card.plan': 'Программа',
+  // 2c's redesign (2026-09-08). The card became a screen with its own header, so these
+  // are the header's own strings rather than more ledger labels.
+  'card.guardians': 'Родители',
+  'card.guardiansPlural': 'Опекуны',
+  'card.noBelt': 'Пояс не присвоен',
+  'card.callGuardian': 'Позвонить {{name}}',
   'alerts.title': 'Центр уведомлений',
   'alerts.empty': 'Ничего не требует внимания',
   'alerts.pendingRequests': 'Заявки на вступление',

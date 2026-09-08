@@ -46,6 +46,24 @@ export function makePeopleClient(fetcher: Fetcher) {
       fetcher('/api/v1/me/guardians').then(json<{ items: GuardianOut[] }>),
 
     /**
+     * The guardians of ONE child — the trainee card's row.
+     *
+     * **Not `myGuardians()` filtered.** That read deduplicates by person across the whole
+     * family, which is right for a screen about the family and wrong for a card about one
+     * child: two siblings showed an identical list, and a grandparent who guards only one
+     * of them appeared on the other. Filtering it here would be worse still — dedup keeps
+     * only the first child's row for a shared parent, so that parent would disappear from
+     * the second child's card entirely.
+     *
+     * 404 for a student outside this caller's children, never 403: an id that is not mine
+     * does not exist rather than being forbidden.
+     */
+    studentGuardians: (studentId: string): Promise<{ items: GuardianOut[] }> =>
+      fetcher(`/api/v1/me/students/${studentId}/guardians`).then(
+        json<{ items: GuardianOut[] }>,
+      ),
+
+    /**
      * Screen 8's account rows — the CALLER's own record, singular.
      *
      * Deliberately not a filter over `myGuardians()`: that read returns the family's

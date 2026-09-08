@@ -425,6 +425,15 @@ export const people: Bundle = {
   // the card lines up against them, so a label that wraps moves every row beside it.
   'card.membership': 'חברות',
   'card.plan': 'מסלול',
+  // 2c's redesign (2026-09-08). The card became a screen with its own header, so these
+  // are the header's own strings rather than more ledger labels.
+  'card.guardians': 'הורים',
+  // Every guardian who is not a parent moves the whole row to this word. It is what the
+  // join wizard's own form already says — 'פרטי ההורה / אפוטרופוס' — and it is true of a
+  // set containing a grandparent, where 'הורים' is not.
+  'card.guardiansPlural': 'אפוטרופוסים',
+  'card.noBelt': 'טרם נקבעה חגורה',
+  'card.callGuardian': 'חיוג ל{{name}}',
   'alerts.title': 'מרכז התראות',
   'alerts.empty': 'אין התראות שדורשות טיפול',
   'alerts.pendingRequests': 'בקשות הצטרפות ממתינות',

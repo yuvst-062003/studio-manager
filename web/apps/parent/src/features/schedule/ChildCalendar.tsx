@@ -26,6 +26,7 @@ import {
 } from '@studio/core'
 import { DIRECTION, t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { ScreenHeader } from '../shell/ScreenHeader'
 import { cancelReasonLabel, closuresOverlapping } from './client'
 import type { ClosureRow, ParentScheduleClient, SessionRow } from './client'
 import { SessionAttendanceDialog, reportedKey } from './SessionAttendanceDialog'
@@ -872,11 +873,17 @@ export function ChildCalendar({
   const openSessions = openDay ? sessionsOn(openDay) : []
 
   return (
-    <section aria-labelledby="child-calendar-title" data-testid="child-calendar" style={pageStyle}>
+    <section aria-labelledby="calendar-header-title" data-testid="child-calendar" style={pageStyle}>
+      {/* A1 — no way back. `#/calendar` had exactly one link in the whole signed-in app
+          (הגדרות → לוח אימונים), so a parent who followed it was stranded on a screen they
+          had to hunt for in the first place. The title moves into the header; the row below
+          keeps היום, which is about where you are rather than what the screen is called. */}
+      <ScreenHeader
+        locale={locale}
+        title={t(locale, 'schedule.calendar.title')}
+        testId="calendar-header"
+      />
       <div style={titleRowStyle}>
-        <h1 id="child-calendar-title" style={{ margin: 0 }}>
-          {t(locale, 'schedule.calendar.title')}
-        </h1>
         {/* Navigating three months out and losing the way back is the complaint every
             calendar with arrows and no home key eventually gets. Out of the month band:
             it is about where you are, not about what you are looking at. */}

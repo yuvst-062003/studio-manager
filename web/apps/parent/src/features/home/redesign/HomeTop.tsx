@@ -1,6 +1,6 @@
-import { Bell } from 'lucide-react'
+import { Bell, ChevronLeft, Ticket } from 'lucide-react'
 
-import { fill } from '@studio/core'
+import { fill, formatAgorot } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { HomeChild } from './types'
@@ -13,10 +13,15 @@ export function HomeTop({
   selectedChildId,
   onSelectChild,
   onOpenNotifications,
+  plan = null,
 }: {
   /** The club's name. Replaces the prototype's hardcoded "מועדון ג׳ודו גלדיאטור". */
   clubName: string
   locale: Locale
+  /** The selected child's plan, or `null` when there is none to show — a `lead`, a child a
+   *  manager has not priced, or a failed read. Optional so a mount that predates the pill
+   *  still renders a header. */
+  plan?: HomePlan | null
   /** The guardian's surname, or null. When null the greeting is `schedule.home.greeting` alone —
    *  the prototype's "עונת תשפ״ה (2025/26)" season suffix has no source in this app and
    *  must NOT be rendered or invented. */
@@ -73,6 +78,24 @@ export function HomeTop({
           </button>
         </div>
       </div>
+
+      {/* ── The plan pill ────────────────────────────────────────────────────────────
+       *
+       * D1/D3 — home said nothing about the plan, and the plan screen had ONE link in the
+       * whole signed-in app: profile tab → המתאמנים שלי sheet → the child's card → the
+       * מסלול row. Three taps, on the screen a parent goes to in order to change their own
+       * phone number. The upgrade offer §5.1 computes is the club's main upsell.
+       *
+       * It shows the plan AT REST rather than only on press (owner, 2026-09-08), because a
+       * bare icon answers "what am I on?" only after you have already asked it.
+       *
+       * D2 — it cannot come from a read home already makes. `StudentSummaryOut` omits
+       * `price_plan_id` on purpose: that shape is the coach-reachable roster row, and
+       * invariant 3 keeps the price off it. `GET /me/training-plans` is the parent-scoped
+       * read, and `Resolve` fetches it with everything else so home keeps its rule of not
+       * fetching.
+       */}
+      {plan ? <PlanPill locale={locale} plan={plan} /> : null}
 
       {/* No urgent banner (owner, 2026-09-07). It said "דרוש טיפול דחוף בהרשמה" over an
           outstanding balance or a missing declaration — neither of which is urgent in the
@@ -141,5 +164,51 @@ export function HomeTop({
       </div>
       ) : null}
     </header>
+  )
+}
+
+/** One child's plan, as home shows it. Every field nullable where the fact can be absent:
+ *  a `lead` has no plan, and a pill drawn from an invented one is worse than no pill. */
+export type HomePlan = {
+  studentId: string | null
+  planName: string | null
+  monthlyAgorot: number | null
+  /** Several children and none selected. The pill then names no amount and opens a
+   *  chooser: summing two children's prices into one number would be a figure the club
+   *  does not charge, and silently picking the first is a lie about whose plan it is. */
+  isFamilyWide: boolean
+}
+
+function PlanPill({ locale, plan }: { locale: Locale; plan: HomePlan }) {
+  const label = plan.isFamilyWide
+    ? t(locale, 'schedule.plan.familyPill')
+    : [plan.planName, plan.monthlyAgorot === null ? null : formatAgorot(plan.monthlyAgorot)]
+        .filter(Boolean)
+        .join(' · ')
+
+  return (
+    <a
+      href={plan.isFamilyWide || plan.studentId === null ? '#/profile' : `#/plan/${plan.studentId}`}
+      data-testid="home-plan-pill"
+      className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-[0.99] transition-all cursor-pointer"
+    >
+      <span className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-400/15 text-[#0056c5] dark:text-blue-300 flex items-center justify-center shrink-0">
+        <Ticket className="w-4 h-4" aria-hidden="true" />
+      </span>
+      <span className="flex-1 min-w-0 text-start">
+        <span className="block text-[10px] font-semibold text-slate-400 dark:text-slate-500">
+          {t(locale, 'schedule.plan.title')}
+        </span>
+        <span className="block text-xs font-bold text-slate-900 dark:text-slate-50 truncate">
+          <bdi>{label}</bdi>
+        </span>
+      </span>
+      {/* ChevronLeft, not Right: in a right-to-left document "onward" points left, which is
+          the direction every other disclosure arrow in this app already goes. */}
+      <ChevronLeft
+        className="w-4 h-4 text-slate-300 dark:text-slate-600 shrink-0"
+        aria-hidden="true"
+      />
+    </a>
   )
 }

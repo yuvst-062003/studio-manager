@@ -609,6 +609,64 @@ export const schedule: Bundle = {
   'plan.confirmCancel': 'ביטול',
   'plan.claimPending': 'הדיווח על התשלום ממתין לאישור המנהל',
   'plan.claimDeclined': 'המנהל סימן שהתשלום לא התקבל. אפשר לפנות למועדון או לשלוח שוב.',
+  // -- the 2026-09-08 redesign ------------------------------------------------
+  // The screen is titled after the CHILD. It is per child, reached per child, and a family
+  // with two children had two screens with identical headings.
+  'plan.titleFor': 'המסלול של {{name}}',
+  // The pill's label when several children are enrolled and none is selected. It names
+  // no amount on purpose: summing two children's prices into one figure would be a
+  // number the club does not charge, and silently showing the first child's is a lie
+  // about whose plan it is.
+  'plan.familyPill': 'מסלולים',
+  'plan.currentHeading': 'המסלול הנוכחי',
+  'plan.otherPlans': 'מסלולים אחרים',
+  // The direction, said in words. `plan.upgrade` above is 'שדרוג המסלול'; a family moving
+  // 550 to 300 was told they were upgrading, because the button read `is_offered` rather
+  // than the price.
+  'plan.downgrade': 'מעבר למסלול חסכוני',
+  // What a change actually does, said BEFORE the parent commits. The upgrade line is
+  // §15's open item 3 on the screen: access opens now, the price moves on the 1st, and the
+  // club carries the difference deliberately.
+  'plan.upgradeEffect': 'האימונים נפתחים מיד. החיוב החדש יעלה ב־1 ב{{month}} — על החודש הזה לא מגיע תשלום נוסף.',
+  'plan.downgradeEffect': 'המסלול ישתנה ב־1 ב{{month}}. עד אז לא משתנה כלום, והאימונים שכבר סומנו נשמרים.',
+  'plan.changeFromTo': 'מ־{{from}} ל־{{to}}',
+  // The derived card's words, for a plan the landing page has no copy for.
+  'plan.cadence': '{{count}} אימונים בשבוע',
+  'plan.cadenceOpen': 'אימונים ללא הגבלה',
+  'plan.feature.base': 'שני אימוני בסיס קבועים בשבוע',
+  'plan.feature.baseOnly': 'ללא אימונים נוספים',
+  'plan.feature.extras': 'עוד {{count}} אימון נוסף בשבוע, לבחירתכם',
+  'plan.feature.unlimited': 'כל האימונים במערכת, ללא הגבלה שבועית',
+  'plan.feature.private': 'אימון פרטני בשבת',
+  // The extras counter, in place of a paragraph plus a dashed empty state.
+  'plan.extrasCount': '{{used}} / {{total}}',
+  'plan.noExtrasShort': 'אין אימונים נוספים פתוחים השבוע',
+  // -- the money a plan change moves (2026-09-08) ------------------------------
+  // C1: the confirm step asked "how would you like to pay?" and its default answer
+  // recorded the change and said the manager would telephone. It now names the family's
+  // OWN route — `student.payment_method` — and does what that route needs.
+  'plan.route.heading': 'אמצעי התשלום שלכם: {{method}}',
+  'plan.route.pickMethod': 'איך תשלמו על המסלול?',
+  // Card. There is no proration by design, so an upgrade mid-month has nothing to charge
+  // today — saying so is what stops a parent thinking the payment failed.
+  'plan.route.cardNothingDue': 'אין מה לשלם כרגע. החיוב החדש יעלה ב־1 בחודש הבא.',
+  'plan.route.cardPay': 'תשלום בכרטיס',
+  // Cash. The club's floor is a MINIMUM and the twelve-month ceiling beats it.
+  'plan.route.cashMonths': 'כמה חודשים תשלמו מראש?',
+  'plan.route.cashMonthsChip': '{{count}} חודשים',
+  'plan.route.cashNoHeadroom': 'שילמתם מראש עד {{month}} — אין מה לשלם קדימה כרגע.',
+  'plan.route.cashSend': 'שליחת בקשה למנהל',
+  // הוראת קבע — two steps, and the second is the one the club loses money on.
+  'plan.route.mandateTitle': 'הוראת קבע — שני צעדים',
+  'plan.route.mandateStepOne': 'חתימה על הוראת קבע חדשה',
+  'plan.route.mandateStepTwo': 'ביטול ההוראה הישנה ({{amount}}) בבנק שלכם',
+  'plan.route.mandateWarning': 'אחרת המועדון יגבה את שני הסכומים.',
+  'plan.route.mandateLink': 'לקישור החתימה',
+  'plan.route.mandateMissing': 'המועדון עדיין לא הגדיר קישור למסלול הזה. הוא ייצור אתכם קשר.',
+  // Cheques buy a season for the FAMILY, not for one child.
+  'plan.route.chequeSend': 'אביא צ׳קים',
+  'plan.route.done': 'הבקשה נרשמה.',
+  'plan.route.cancel': 'ביטול',
   'plan.group.kind': 'סוג הקבוצה',
   'plan.group.kind.base': 'אימון בסיס',
   'plan.group.kind.extra': 'אימון נוסף',

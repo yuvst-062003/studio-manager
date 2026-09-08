@@ -7,6 +7,7 @@
 import { useState } from 'react'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { ScreenHeader } from '../shell/ScreenHeader'
 import { Button, DetailRow, EmptyState } from '@studio/ui'
 import { ijfUrl, techniqueBySlug } from './data'
 import { IjfSheet } from './IjfSheet'
@@ -47,10 +48,26 @@ export function TechniqueDetail({ locale, slug }: { locale: Locale; slug: string
 
   return (
     <article className="studio-technique" data-testid={`technique-${technique.slug}`}>
+      {/* A1 — `App.tsx`'s own routing comment says this screen "is reached only from the
+          list and its own back control returns there". It had no back control: the only
+          `location.hash = '#/techniques'` in the file is inside the not-found branch
+          above, which a reader of that comment would never look for. */}
+      <ScreenHeader
+        locale={locale}
+        title={technique.nameRomaji}
+        subtitle={technique.nameHebrew}
+        onBack={() => {
+          globalThis.location.hash = '#/techniques'
+        }}
+        testId="technique-header"
+      />
       <header className="studio-technique__hero">
-        <h1 className="studio-technique__name">
+        {/* A `p`, not an `h1`: `ScreenHeader` above is now the screen's heading, and two of
+            them is a screen that announces itself twice. The hero keeps its size and keeps
+            the kanji, which the header has no room for. */}
+        <p className="studio-technique__name">
           <bdi>{technique.nameRomaji}</bdi>
-        </h1>
+        </p>
         <span className="studio-technique__sub">
           <bdi>{`${technique.nameHebrew} · ${technique.nameKanji}`}</bdi>
         </span>

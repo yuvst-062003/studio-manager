@@ -17,7 +17,7 @@ import { DetailsSection, StudentStatusSection } from './sections/DetailsSection'
 import { EnrollmentsSection, TrainingPlanRow } from './sections/EnrollmentsSection'
 import { GuardiansSection } from './sections/GuardiansSection'
 import { StatusHistorySection } from './sections/StatusHistorySection'
-import type { StudentCardSectionProps } from './StudentCard'
+import type { StudentCardSectionProps } from './redesign/TraineeCard'
 
 export function registerPeopleSections(): void {
   // The header. §5.4a surfaces `student.status` everywhere a student is rendered, and the

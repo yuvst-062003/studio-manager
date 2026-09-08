@@ -173,7 +173,7 @@ const SCHEDULE: { day: number; slots: SlotSpec[] }[] = [
 ]
 
 /** Agorot (G2). ₪300 is 30000. One list, so no language can quote a different price. */
-const PRICES_AGOROT = [30000, 40000, 55000] as const
+export const PRICES_AGOROT = [30000, 40000, 55000] as const
 
 const LOGO_URL = '/clubs/gladiator-logo.png'
 

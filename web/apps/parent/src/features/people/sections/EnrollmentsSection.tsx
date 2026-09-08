@@ -10,7 +10,7 @@
 import type { CSSProperties } from 'react'
 import { DetailRow } from '@studio/ui'
 import { t } from '@studio/i18n'
-import type { StudentCardSectionProps } from '../StudentCard'
+import type { StudentCardSectionProps } from '../redesign/TraineeCard'
 
 // One group per line inside the row's value: the group and its days are one fact, and two
 // groups are two facts under one label. A flex row with a gap, because the group and the

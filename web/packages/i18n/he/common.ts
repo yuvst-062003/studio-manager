@@ -239,6 +239,10 @@ export const common: Bundle = {
   'install.banner.text': 'התקינו את האפליקציה — התראות ועבודה גם בלי אינטרנט',
   'install.banner.cta': 'להתקנה',
   'install.banner.dismiss': 'לא עכשיו',
+  // The one way back, on every screen behind or beside the tabs. `install.back` below
+  // says the same word and belongs to one walkthrough; this is the app-wide control's
+  // accessible name, which is all a screen reader gets — the chevron is decorative.
+  'action.back': 'חזרה',
   'install.back': 'חזרה',
   'update.available': 'גרסה חדשה זמינה',
   'update.reload': 'רענון',

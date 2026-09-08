@@ -28,6 +28,7 @@ import type { CSSProperties } from 'react'
 import { BeltBar, Card, EmptyState, LoadFailed } from '@studio/ui'
 import { formatDateInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
+import { ScreenHeader } from '../shell/ScreenHeader'
 import type { Locale } from '@studio/i18n'
 import { segmentFill, segmentStates } from './client'
 import type { LadderRankOut, ParentBeltsClient, StudentBeltOut } from './client'
@@ -112,7 +113,10 @@ export function BeltProgressScreen({
 
   return (
     <div style={pageStyle}>
-      <h2 style={{ margin: 0 }}>{t(locale, 'events.belt.progress')}</h2>
+      {/* A1 — this screen had no way back at all. Reached from the trainee card, and in an
+          installed PWA there is no browser chrome to fall back on. The heading below became
+          the header's title, so the screen still names itself exactly once. */}
+      <ScreenHeader locale={locale} title={t(locale, 'events.belt.progress')} testId="belt-header" />
 
       {loaded && awards.length === 0 ? (
         <EmptyState title={t(locale, 'events.belt.none')} />

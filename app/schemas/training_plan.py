@@ -31,6 +31,13 @@ class PlanOptionOut(BaseModel):
     #: NULL is unlimited. The screen reads this to say "no weekly limit" rather than a
     #: number, and to know that the private lesson is included.
     weekly_extra_allowance: int | None
+    #: `PricePlan.sessions_per_week` — C11's label, "'פעמיים בשבוע' is 2, 'כל יום' is 5".
+    #:
+    #: **A LABEL and not the rule**, exactly as the column's own note says: the enforced
+    #: rule is `weekly_extra_allowance` above. It is here because the redesigned plan card
+    #: needs a cadence line, and this is the club's own words for one. NULL is open
+    #: membership, and the card says that rather than printing a number it does not have.
+    sessions_per_week: int | None = None
     is_offered: bool
     is_current: bool
 
@@ -83,6 +90,15 @@ class PlanChangeOut(BaseModel):
     student_id: uuid.UUID
     from_price_plan_id: uuid.UUID | None
     to_price_plan_id: uuid.UUID
+    #: The two plans by NAME, so the parent's banner can say what is changing into what.
+    #:
+    #: It said only "ייכנס לתוקף ב־<date>", and the client cannot fill the gap: a plan that
+    #: has been CLOSED (§5.15 never overwrites a price, it closes one and opens another) is
+    #: not in the options list the screen holds, so a change scheduled before a re-pricing
+    #: had no name to show for the plan being left. `from_plan_name` is NULL only when there
+    #: was no previous plan — a first assignment.
+    from_plan_name: str | None = None
+    to_plan_name: str = ""
     effective_on: datetime.date
     status: str
     settlement_status: str
@@ -152,3 +168,40 @@ class GroupEligibilityIn(BaseModel):
 class GroupEligibilityOut(BaseModel):
     extra_group_id: uuid.UUID
     base_group_ids: list[uuid.UUID]
+
+
+class MyPlanRowOut(BaseModel):
+    """One child's plan, for a screen that shows several children at once.
+
+    **Why this is not a field on `StudentSummaryOut`.** That shape is what a coach receives
+    from a list, and invariant 3's detector reads `price_plan_id` as financial — a tuition
+    amount on it would ride onto every screen that happens to list students. This is a
+    parent-scoped shape, like `TrainingPlanOut` beside it, and it carries §12's amendment
+    for the same reason that one does.
+
+    **Why not `GET /students/{id}/training-plan` per child.** That route computes a whole
+    club week per call. Home renders a plan pill on every visit and would make one request
+    per child to draw it.
+
+    Every field is nullable where the fact can be absent: a `lead` has no plan, and a pill
+    drawn from an invented one is worse than no pill.
+    """
+
+    student_id: uuid.UUID
+    student_name: str
+    price_plan_id: uuid.UUID | None
+    plan_name: str | None
+    monthly_amount_agorot: int | None
+    weekly_extra_allowance: int | None
+    sessions_per_week: int | None
+    #: `first_of_next_month(now())`, from `app.core.clock` — the day a downgrade lands.
+    #:
+    #: **Sent by the server rather than computed on the client.** It is the date the worker
+    #: will actually act on, and a client computing it from the device clock disagrees with
+    #: the worker across a timezone boundary and at every month end.
+    next_effective_on: datetime.date
+    scheduled_change: PlanChangeOut | None = None
+
+
+class MyPlanListOut(BaseModel):
+    items: list[MyPlanRowOut]
