@@ -75,8 +75,10 @@ empty card.
 
 ## 3. What this depends on, and must not touch
 
-The parent-payments redesign is **in flight in this working tree** (uncommitted as of
-2026-09-08 18:00). This work reads it and must not edit it:
+The parent-payments redesign **landed on `main` at 18:46 on 2026-09-08**, while this spec was
+being written. Every dependency below is now present, so **no lane is blocked** — the
+sequencing in §13 stands for merge reasons, not availability. This work reads these files
+and does not edit them:
 
 | Depended on | Owner |
 | --- | --- |
@@ -90,10 +92,23 @@ The parent-payments redesign is **in flight in this working tree** (uncommitted 
 **Rule for every lane in this work: stage by explicit path, never `git add -A`.** Another
 session is committing to `main` in the same checkout.
 
-If any of the above is not on `main` when this work starts, it blocks **lanes 4 and 5 only**
-— the money (§6), the home pill (§7), and the cleanup (§11.3, §11.4). Lanes 1, 2 and 3 —
-the card, the plan screen's shape, and the back control on the other five screens — have no
-dependency on it and can land first.
+All five lanes can therefore start. Lanes 4 and 5 were written as blocked and are not; what
+survives of that ordering is the merge caution, which is worth keeping while another session
+may still be working in `features/billing/`.
+
+**One thing did go wrong under this rule, and it is recorded here rather than repaired.**
+Commit `b800235f`, whose message is entirely about deleting superseded screens, carries 25
+files of the payments redesign — `PaymentMethodSheet.tsx`, `prepay_ceiling.py`,
+`payment_methods.py`, `pay.ts` and the rest. Staging by explicit path is not enough when two
+sessions share a checkout: `git commit` takes the whole index, and the other session staged
+its work between this one's `git add` and its `git commit`. Their own commit, `66300dcd`,
+was left with the migration and `state.yaml`.
+
+Nothing is lost and nothing is broken — every file is on `main` and the tree is clean. The
+history is mislabelled, and it stays mislabelled: rewriting two commits that another live
+session has already built on top of is a worse failure than a wrong commit message. The fix
+for next time is `git commit -- <paths>`, or `git stash` of anything unstaged, not a better
+`git add`.
 
 ---
 
