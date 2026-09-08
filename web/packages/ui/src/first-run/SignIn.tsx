@@ -50,12 +50,12 @@ export function SignIn({
   languagePicker?: ReactNode
   userAgent?: string
 }) {
-  const providers = useAuthProviders()
+  const { status, list: providers } = useAuthProviders()
 
   // `startUrl` and not a second copy of the same template literal. The manager sign-in
   // landed on main while this branch was open and moved that URL into one helper; two
   // hand-built copies of an OAuth start link is exactly the drift that helper prevents.
-  const providerLinks = (providers ?? []).map((provider) => ({
+  const providerLinks = providers.map((provider) => ({
     key: provider.name,
     href: startUrl(provider, app, returnPath),
     label: t(locale, LABEL[provider.name] ?? 'common.auth.continueWithGoogle'),
@@ -70,7 +70,7 @@ export function SignIn({
     // design with its one button missing — which is what the owner saw and reported as a
     // blank page. `null` means "still asking"; an empty array means "asked, and there are
     // none", which is a real answer and gets the real screen with its own message.
-    if (providers === null) {
+    if (status === 'loading') {
       return (
         <SplashScreen
           locale={locale}
@@ -124,7 +124,7 @@ export function SignIn({
                   : provider.label}
               </a>
             ))}
-            {providers !== null && providers.length === 0 ? (
+            {status === 'ready' && providers.length === 0 ? (
               <p className="gsignin-parent__fine">{t(locale, 'common.auth.noProviders')}</p>
             ) : (
               <p className="gsignin-parent__hint">{t(locale, 'common.auth.parentHint')}</p>
@@ -161,7 +161,7 @@ export function SignIn({
   // The same wait, for the two staff-side apps. Their own ground colour and their own
   // mark: a manager runs both, and which one is opening should be readable before it has
   // opened. See `SplashScreen`.
-  if (providers === null) {
+  if (status === 'loading') {
     return (
       <SplashScreen
         locale={locale}
@@ -196,7 +196,7 @@ export function SignIn({
         <div className="gsignin__stack">
           <span className="gsignin__eyebrow">{t(locale, `common.auth.eyebrow.${app}`)}</span>
           <InAppBrowserBanner locale={locale} userAgent={userAgent} />
-          {(providers ?? []).map((provider) => (
+          {providers.map((provider) => (
             <a
               key={provider.name}
               className={BUTTON_CLASS[provider.name] ?? 'gsignin__btn gsignin__btn--google'}
@@ -205,7 +205,7 @@ export function SignIn({
               {t(locale, LABEL[provider.name] ?? 'common.auth.continueWithGoogle')}
             </a>
           ))}
-          {providers !== null && providers.length === 0 ? (
+          {status === 'ready' && providers.length === 0 ? (
             // The state every developer machine is in: no OAuth client configured, so the
             // list is honestly empty. Saying so beats a card with a hole in it — and in
             // production this renders only if configuration is genuinely broken, which is

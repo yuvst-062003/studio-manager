@@ -25,8 +25,26 @@ export const API_ORIGIN: string = import.meta.env.VITE_API_ORIGIN ?? ''
  * `null` while the answer is unknown — which is NOT the same as "there are none". The
  * screens render different copy for the two, so the distinction has to survive the hook.
  */
-export function useAuthProviders(): SignInProvider[] | null {
-  const [providers, setProviders] = useState<SignInProvider[] | null>(null)
+/** Loading, answered, or asked-and-could-not-tell.
+ *
+ * **Three states, not two, and the third is why.** `null` used to mean both "still asking"
+ * and "the request failed", which was harmless while both rendered the same screen. It
+ * stopped being harmless on 2026-09-08, when "still asking" gained a loading screen: a
+ * failed fetch would then have held that screen for ever.
+ *
+ * Collapsing failure into `[]` instead is also wrong, and `ManagerSignIn.test.tsx` says so
+ * in as many words — **unknown is not the same as empty**. An empty answer means the server
+ * has no provider configured, which is a misconfiguration worth naming on screen. A failed
+ * request means we do not know, and the honest screen for that is the ordinary one without
+ * its button, not a notice accusing the deployment of something it may not have done.
+ */
+export type AuthProvidersState =
+  | { status: 'loading'; list: readonly SignInProvider[] }
+  | { status: 'ready'; list: readonly SignInProvider[] }
+  | { status: 'failed'; list: readonly SignInProvider[] }
+
+export function useAuthProviders(): AuthProvidersState {
+  const [state, setState] = useState<AuthProvidersState>({ status: 'loading', list: [] })
 
   useEffect(() => {
     let alive = true
@@ -35,12 +53,16 @@ export function useAuthProviders(): SignInProvider[] | null {
         const response = await fetch(`${API_ORIGIN}/api/v1/auth/providers`, {
           credentials: 'include',
         })
-        if (!response.ok) return
+        if (!response.ok) {
+          if (alive) setState({ status: 'failed', list: [] })
+          return
+        }
         const body = await response.json()
-        if (alive) setProviders(body.items ?? [])
+        if (alive) setState({ status: 'ready', list: body.items ?? [] })
       } catch {
         // Offline on the sign-in screen means no buttons, which is the truth. An error
-        // banner here would ask someone to act on something they cannot fix.
+        // banner here would ask somebody to act on something they cannot fix.
+        if (alive) setState({ status: 'failed', list: [] })
       }
     })()
     return () => {
@@ -48,7 +70,7 @@ export function useAuthProviders(): SignInProvider[] | null {
     }
   }, [])
 
-  return providers
+  return state
 }
 
 /**

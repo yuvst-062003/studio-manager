@@ -13,6 +13,8 @@ import { InstallWalkthrough, isIosSafari } from './InstallWalkthrough'
 import { LanguagePicker } from './LanguagePicker'
 import { RefusalScreen } from './RefusalScreen'
 import { SignIn } from './SignIn'
+import { ManagerSignIn } from './ManagerSignIn'
+import { DashboardSignIn } from './DashboardSignIn'
 
 const IOS = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1'
 const ANDROID = 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36'
@@ -90,6 +92,25 @@ describe('SignIn', () => {
     // Decorative: three dots that say "working" to someone who can see them and nothing at
     // all to someone who cannot, which is why the name above carries the meaning.
     expect(splash.querySelectorAll('[aria-hidden="true"] span').length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('shows the loading screen on the screens the apps ACTUALLY mount', async () => {
+    // The first version of this shipped into `SignIn`'s shared branch and reached neither
+    // staff-side app, because the staff app mounts `ManagerSignIn` and the dashboard mounts
+    // `DashboardSignIn` — `SignIn` dresses the parent app and nothing else. Every test
+    // passed and two of the three bundles had no loading screen in them at all; it was
+    // caught by grepping the deployed JavaScript, not by anything in this file.
+    //
+    // So this asserts the components the apps really use, by name.
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})))
+
+    const manager = render(<ManagerSignIn locale="he" onChooseLocale={vi.fn()} />)
+    expect(await screen.findByTestId('sign-in-splash')).toHaveAttribute('data-tone', 'staff')
+    manager.unmount()
+
+    const dash = render(<DashboardSignIn locale="he" onChooseLocale={vi.fn()} />)
+    expect(await screen.findByTestId('sign-in-splash')).toHaveAttribute('data-tone', 'dashboard')
+    dash.unmount()
   })
 
   it('opens each app on its own ground, so you know which one is starting', async () => {
