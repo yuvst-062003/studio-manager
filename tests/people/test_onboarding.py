@@ -3157,3 +3157,314 @@ def test_an_adult_member_keeps_one_aliyah_year_on_the_one_row_they_are(
     student = tenant_session.get(Student, student_ids[0])
     assert student.person_id == parent.id, "the adult member is one person in both roles"
     assert tenant_session.get(Person, parent.id).aliyah_year_encrypted == "1999"
+
+
+def _identity(app_session) -> uuid.UUID:
+    """An `auth_identity` for a family about to register. Written through `app_session`
+    because `register` takes the id, not the row."""
+    from app.models.identity import AuthIdentity
+
+    row = AuthIdentity(
+        provider="google",
+        provider_subject=f"onboarding-{uuid.uuid4().hex[:8]}",
+        email=f"{uuid.uuid4().hex[:8]}@example.invalid",
+        email_verified=True,
+        is_private_relay=False,
+        is_developer=False,
+    )
+    app_session.add(row)
+    app_session.commit()
+    return row.id
+
+
+# -- the belt a family declares at registration (owner review, 2026-09-08) ------------
+#
+# Bug #10 gave the wizard the CLUB's own belt ladder so a family would not register
+# against belts the club does not award. The picker shipped, the review card showed the
+# answer back -- and `toRegisterPayload` carried no belt field and `OnboardingChildIn` had
+# none to receive it, so every child registered through the wizard landed with
+# `current_belt_id` NULL. The question was asked, answered, displayed, and dropped.
+
+
+@pytest.fixture
+def a_belt_rank(app_session: Session, studio: Studio, a_class: uuid.UUID) -> uuid.UUID:
+    from app.models.belts import BeltRank
+
+    rank = BeltRank(
+        studio_id=studio.id,
+        class_id=a_class,
+        name="חגורה כחולה",
+        kyu=None,
+        order_index=3,
+        color_hex="#0056c5",
+    )
+    app_session.add(rank)
+    app_session.commit()
+    return rank.id
+
+
+def test_a_declared_belt_lands_on_the_student(
+    tenant_session, app_session, studio, a_group, twice_weekly, a_belt_rank
+):
+    identity = _identity(app_session)
+    _, student_ids, _, _ = OnboardingService.register(
+        tenant_session,
+        studio_id=studio.id,
+        identity_id=identity,
+        first_name="שירה",
+        last_name="לוי",
+        phone=None,
+        email=None,
+        children=[
+            {
+                "first_name": "נועה",
+                "last_name": "לוי",
+                "birthdate": None,
+                "group_ids": [a_group],
+                "self": False,
+                "belt_rank_id": a_belt_rank,
+            }
+        ],
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+    assert tenant_session.get(Student, student_ids[0]).current_belt_id == a_belt_rank
+
+
+def test_a_declared_belt_writes_no_grading_history(
+    tenant_session, app_session, studio, a_group, twice_weekly, a_belt_rank
+):
+    """`student_belt` is THIS club's grading record -- who awarded it, on what date, at
+    which exam. A parent saying "she already has a blue belt" is not this club awarding
+    one, and a history row would put a grading the club never held on `12d`'s progress
+    screen, signed by nobody."""
+    from app.models.belts import StudentBelt
+
+    identity = _identity(app_session)
+    _, student_ids, _, _ = OnboardingService.register(
+        tenant_session,
+        studio_id=studio.id,
+        identity_id=identity,
+        first_name="שירה",
+        last_name="לוי",
+        phone=None,
+        email=None,
+        children=[
+            {
+                "first_name": "נועה",
+                "last_name": "לוי",
+                "birthdate": None,
+                "group_ids": [a_group],
+                "self": False,
+                "belt_rank_id": a_belt_rank,
+            }
+        ],
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+    assert (
+        tenant_session.execute(
+            select(StudentBelt).where(StudentBelt.student_id == student_ids[0])
+        ).first()
+        is None
+    )
+
+
+def test_a_belt_from_another_studio_is_refused(
+    tenant_session, app_session, studio, a_group, twice_weekly
+):
+    """The same authority `price_plan_id` gets, and for the same reason: the picker only
+    ever offers this club's ladder, but a stale or crafted id must not silently record a
+    rank that belongs to somebody else's wall."""
+    from app.models.belts import BeltRank
+    from app.models.structure import Class
+    from app.models.studio import Studio as StudioModel
+
+    other = StudioModel(name="מועדון אחר", slug=f"other-{uuid.uuid4().hex[:8]}")
+    app_session.add(other)
+    app_session.flush()
+    other_class = Class(studio_id=other.id, name="ג'ודו", discipline="judo")
+    app_session.add(other_class)
+    app_session.flush()
+    stray = BeltRank(
+        studio_id=other.id,
+        class_id=other_class.id,
+        name="חגורה זרה",
+        kyu=None,
+        order_index=0,
+        color_hex="#000000",
+    )
+    app_session.add(stray)
+    app_session.commit()
+
+    identity = _identity(app_session)
+    with pytest.raises(RefusedError):
+        OnboardingService.register(
+            tenant_session,
+            studio_id=studio.id,
+            identity_id=identity,
+            first_name="שירה",
+            last_name="לוי",
+            phone=None,
+            email=None,
+            children=[
+                {
+                    "first_name": "נועה",
+                    "last_name": "לוי",
+                    "birthdate": None,
+                    "group_ids": [a_group],
+                    "self": False,
+                    "belt_rank_id": stray.id,
+                }
+            ],
+            at=T0,
+            schedule=twice_weekly,
+        )
+
+
+def test_no_belt_declared_leaves_it_unrecorded(
+    tenant_session, app_session, studio, a_group, twice_weekly
+):
+    """The field is optional and stays optional. 'No belt recorded' is a real answer for a
+    beginner, and it must not become a guess."""
+    identity = _identity(app_session)
+    _, student_ids, _, _ = OnboardingService.register(
+        tenant_session,
+        studio_id=studio.id,
+        identity_id=identity,
+        first_name="שירה",
+        last_name="לוי",
+        phone=None,
+        email=None,
+        children=[
+            {
+                "first_name": "נועה",
+                "last_name": "לוי",
+                "birthdate": None,
+                "group_ids": [a_group],
+                "self": False,
+            }
+        ],
+        at=T0,
+        schedule=twice_weekly,
+    )
+    tenant_session.commit()
+    assert tenant_session.get(Student, student_ids[0]).current_belt_id is None
+
+
+def _stub_schedule(monkeypatch, studio):
+    """A group with a real weekly rhythm.
+
+    `EnrollmentService` refuses a group with no materialized sessions -- it has no weekly
+    volume, so a child enrolled in it has no price -- and the fixtures create groups
+    without a timetable. Same stub the join-link session test above installs.
+    """
+    from app.routers import onboarding as onboarding_router
+
+    class _TwiceWeekly:
+        def materialize_sessions(self, group_id, from_date, to_date):
+            return [
+                make_session(
+                    studio_id=studio.id,
+                    group_id=group_id,
+                    training_year_id=uuid.uuid4(),
+                    starts_at=moment,
+                )
+                for moment in (SUNDAY, SUNDAY + timedelta(days=3))
+            ]
+
+    monkeypatch.setattr(onboarding_router, "ScheduleService", lambda session: _TwiceWeekly())
+
+
+def test_the_belt_survives_the_router_and_not_only_the_service(
+    client, app_session, studio, a_group, a_belt_rank, as_manager, fake_provider, monkeypatch
+):
+    """The seam, per CLAUDE.md: a field added to an API is not proven by a test that calls
+    the service with a hand-built dict. The defect this closes was EXACTLY a missing wire
+    -- the wizard collected the belt, the review card showed it, and the payload dropped
+    it -- so the thing worth asserting is the whole path, `POST` to column.
+    """
+    _stub_schedule(monkeypatch, studio)
+    created = client.post("/api/v1/onboarding-link", headers=as_manager.headers)
+    token = created.json()["url"].rsplit("/join/", 1)[1]
+
+    client.cookies.clear()
+    subject = f"joiner-{uuid.uuid4()}"
+    fake_provider.register(code="c-belt", subject=subject, email=f"{subject}@example.invalid")
+    signed = sign_in(client, code="c-belt").json()
+    headers = {"Authorization": f"Bearer {signed['access_token']}"}
+
+    registered = client.post(
+        f"/api/v1/onboarding/{token}/register",
+        headers=headers,
+        json={
+            "first_name": "שירה",
+            "last_name": "לוי",
+            "children": [
+                {
+                    "first_name": "נועה",
+                    "last_name": "לוי",
+                    "group_ids": [str(a_group)],
+                    "belt_rank_id": str(a_belt_rank),
+                }
+            ],
+        },
+    )
+    assert registered.status_code == 201, registered.text
+    student_id = registered.json()["student_ids"][0]
+    assert app_session.get(Student, uuid.UUID(student_id)).current_belt_id == a_belt_rank
+
+
+def test_the_router_refuses_another_studios_belt(
+    client, app_session, studio, a_group, as_manager, fake_provider, monkeypatch
+):
+    """422 and not a silent drop. A stale or crafted id must not quietly leave the child
+    with no belt when the family believes they declared one."""
+    from app.models.belts import BeltRank
+    from app.models.structure import Class
+    from app.models.studio import Studio as StudioModel
+
+    other = StudioModel(name="מועדון אחר", slug=f"other-{uuid.uuid4().hex[:8]}")
+    app_session.add(other)
+    app_session.flush()
+    other_class = Class(studio_id=other.id, name="ג\'ודו", discipline="judo")
+    app_session.add(other_class)
+    app_session.flush()
+    stray = BeltRank(
+        studio_id=other.id,
+        class_id=other_class.id,
+        name="חגורה זרה",
+        kyu=None,
+        order_index=0,
+        color_hex="#000000",
+    )
+    app_session.add(stray)
+    app_session.commit()
+
+    _stub_schedule(monkeypatch, studio)
+    created = client.post("/api/v1/onboarding-link", headers=as_manager.headers)
+    token = created.json()["url"].rsplit("/join/", 1)[1]
+    client.cookies.clear()
+    subject = f"joiner-{uuid.uuid4()}"
+    fake_provider.register(code="c-stray", subject=subject, email=f"{subject}@example.invalid")
+    signed = sign_in(client, code="c-stray").json()
+
+    refused = client.post(
+        f"/api/v1/onboarding/{token}/register",
+        headers={"Authorization": f"Bearer {signed['access_token']}"},
+        json={
+            "first_name": "שירה",
+            "last_name": "לוי",
+            "children": [
+                {
+                    "first_name": "נועה",
+                    "last_name": "לוי",
+                    "group_ids": [str(a_group)],
+                    "belt_rank_id": str(stray.id),
+                }
+            ],
+        },
+    )
+    assert refused.status_code == 422, refused.text

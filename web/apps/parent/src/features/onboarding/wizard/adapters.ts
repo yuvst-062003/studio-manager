@@ -91,6 +91,9 @@ export type RegisterPayload = {
     grade: string | null
     aliyah_year: string | null
     price_plan_id: string | null
+    /** The belt this child already holds, from the club's own ladder. `null` is "no belt
+     *  recorded" — a beginner's ordinary state, not an unanswered picker. */
+    belt_rank_id: string | null
     other_parent: {
       first_name: string
       last_name: string | null
@@ -167,6 +170,15 @@ export function toRegisterPayload(
         //: last wins. The server enforces the same rule (`_apply_family_details`).
         aliyah_year: minor ? student.aliyahYear.trim() || null : null,
         price_plan_id: student.planId || null,
+        //: Bug #10's belt picker, finally on the wire (2026-09-08). The wizard fetched the
+        //: club's own ladder, rendered the picker and showed the answer back on the review
+        //: card -- and this object had no belt field, so every child registered through it
+        //: landed with `current_belt_id` NULL. The question was asked, answered, displayed
+        //: and dropped.
+        //:
+        //: Empty means "no belt recorded", which is the ordinary state of a beginner and a
+        //: different thing from a picker nobody answered.
+        belt_rank_id: student.beltId || null,
         //: הורה 2, per CHILD rather than per family: two siblings in one submission can
         //: genuinely have different second parents, which is what F7 made the API's own
         //: shape per-child for. `first_name` is what the API requires of a second parent
