@@ -16,24 +16,32 @@ The audit behind it is published at
 
 ## 1. What is wrong now
 
-Eighteen findings. The ones that decide the shape of the work:
+**All eighteen findings, and the section that answers each.** Nothing appears here that this
+spec leaves undone. §12's non-goals are decisions with reasons, and not one of them is a
+finding from this table.
 
-| id | Defect |
-| --- | --- |
-| **A1** | `#/student/<id>` has no back control. `ParentShell` draws no app header by design, and the card is opened from a bottom sheet that closes behind it. In an installed PWA there is no browser back — the screen is a dead end. `#/plan/<id>` (**B4**) is the same, one level deeper. |
-| **A2** | An adult member is listed as his own parent. `guardian.relation` is already `'self'` for anyone who registered themselves; `GuardiansSection` renders a fixed הורים over whatever names return. |
-| **A3** | The guardians row shows the *family's* guardians, not the child's. `GET /me/guardians` walks every one of the caller's children and deduplicates by person, so both siblings' cards carry an identical list. |
-| **A4** | That row links to `#/profile`, which since the 2026-09-06 review has no guardian view at all. There is now nowhere in the app that shows a second guardian's phone number. |
-| **B1** | Plan options describe themselves with a credit balance: `PlanRow` renders `weekly_extra_allowance` through `schedule.plan.remaining` = נותרו {{count}}, so the 400 ₪ plan reads "1 remaining". |
-| **B2** | There is no word for a downgrade. Every non-current plan says שדרוג המסלול or בחירת המסלול; a family moving 550 → 300 is told they are upgrading. |
-| **B3** | The screen never says when a change lands — an upgrade is immediate, a downgrade waits for the first of the month — nor which plan a scheduled change moves from and to. |
-| **B5** | Two-thirds of the plan screen is a timetable the app shows in two other places. |
-| **C1** | Choosing a plan collects no money. אשלם דרך האפליקציה records the change and answers המנהל ייצור קשר לגבי התשלום — a promise that somebody will telephone. |
-| **C2** | A standing-order family changing plan keeps paying the old amount. `standing_order_link_url` hangs off the *price plan*; change the plan and the signed mandate is the wrong mandate. G8 says the provider cannot cancel it for us. |
-| **C3** | The cash floor and the twelve-month prepayment ceiling do not reach this screen. |
-| **C4** | An upgrade is free until the first — deliberately, no proration — and the screen never says so. |
-| **D1/D2** | Home says nothing about the plan, and cannot: `StudentSummaryOut` omits `price_plan_id` because it shares a shape with the coach-reachable roster. |
-| **D3** | The plan is three taps deep behind a single link, on the screen where a parent goes to change their own phone number. |
+| id | Defect | Answered in |
+| --- | --- | --- |
+| **A1** | `#/student/<id>` has no back control. `ParentShell` draws no app header by design, and the card is opened from a bottom sheet that closes behind it. In an installed PWA there is no browser back — the screen is a dead end. | §4.1 |
+| **A2** | An adult member is listed as his own parent. `guardian.relation` is already `'self'` for anyone who registered themselves; `GuardiansSection` renders a fixed הורים over whatever names return. | §4.3 |
+| **A3** | The guardians row shows the *family's* guardians, not the child's. `GET /me/guardians` walks every one of the caller's children and deduplicates by person, so both siblings' cards carry an identical list. | §4.3 |
+| **A4** | That row links to `#/profile`, which since the 2026-09-06 review has no guardian view at all. There is now nowhere in the app that shows a second guardian's phone number. | §4.3 |
+| **A5** | The card is styled from the previous design system while every screen around it is the current one, and rows render only when their data exists — a real student collapses to five rows on a two-thirds empty screen. | §4.2 |
+| **A6** | Nothing on the card identifies the child but their name: no avatar, and no belt in the header until one is graded. | §4.2 |
+| **B1** | Plan options describe themselves with a credit balance: `PlanRow` renders `weekly_extra_allowance` through `schedule.plan.remaining` = נותרו {{count}}, so the 400 ₪ plan reads "1 remaining". | §5.2 |
+| **B2** | There is no word for a downgrade. Every non-current plan says שדרוג המסלול or בחירת המסלול; a family moving 550 → 300 is told they are upgrading. | §5.3 |
+| **B3** | The screen never says when a change lands — an upgrade is immediate, a downgrade waits for the first of the month — nor which plan a scheduled change moves from and to. | §5.3 |
+| **B4** | `#/plan/<id>` has no back control either, and its only entrance is a screen that has none. | §4.1 |
+| **B5** | Two-thirds of the plan screen is a timetable the app shows in two other places. | §5.1 |
+| **B6** | The plan screen is titled המסלול שלי — "my plan" — on a route that is per child. Two children give two identically titled screens. | §5 |
+| **B7** | The extras section renders נותרו 0 above a full-width dashed empty state: two ways of saying "nothing to do", in the middle of the screen. | §5.1 |
+| **C1** | Choosing a plan collects no money. אשלם דרך האפליקציה records the change and answers המנהל ייצור קשר לגבי התשלום — a promise that somebody will telephone. | §6 |
+| **C2** | A standing-order family changing plan keeps paying the old amount. `standing_order_link_url` hangs off the *price plan*; change the plan and the signed mandate is the wrong mandate. G8 says the provider cannot cancel it for us. | §6.4 |
+| **C3** | The cash floor and the twelve-month prepayment ceiling do not reach this screen. | §6.3 |
+| **C4** | An upgrade is free until the first — deliberately, no proration — and the screen never says so. | §5.3, §6.2 |
+| **D1/D2** | Home says nothing about the plan, and cannot: `StudentSummaryOut` omits `price_plan_id` because it shares a shape with the coach-reachable roster. | §7, §8 |
+| **D3** | The plan is three taps deep behind a single link, on the screen where a parent goes to change their own phone number. | §7 |
+| **D4** | Every new string is trilingual across two namespaces, and `billing.ts` belongs to another lane. | §9 |
 
 ---
 
@@ -82,8 +90,10 @@ The parent-payments redesign is **in flight in this working tree** (uncommitted 
 **Rule for every lane in this work: stage by explicit path, never `git add -A`.** Another
 session is committing to `main` in the same checkout.
 
-If any of the above is not on `main` when this work starts, it blocks §6 and §7 only. §4
-(the card) and §5 (the plan screen's shape) have no dependency on it and can land first.
+If any of the above is not on `main` when this work starts, it blocks **lanes 4 and 5 only**
+— the money (§6), the home pill (§7), and the cleanup (§11.3, §11.4). Lanes 1, 2 and 3 —
+the card, the plan screen's shape, and the back control on the other five screens — have no
+dependency on it and can land first.
 
 ---
 
@@ -93,10 +103,9 @@ Route unchanged: `#/student/<id>`.
 
 ### 4.1 The frame
 
-A new `ScreenHeader` in `web/apps/parent/src/features/shell/`, because A1 is not one
-screen's defect — belts, technique detail, directions and לוח הילד
-share it, and a fifth hand-rolled back button is a fifth chance to get the RTL chevron
-backwards.
+A new `ScreenHeader` in `web/apps/parent/src/features/shell/`. One component rather than a
+back button per screen: eight screens need one, and eight hand-rolled chevrons are eight
+chances to point it the wrong way in a right-to-left document.
 
 ```
 ScreenHeader({ title, subtitle?, onBack?, locale })
@@ -110,8 +119,27 @@ ScreenHeader({ title, subtitle?, onBack?, locale })
   other disclosure arrow in the app. It is decorative; the accessible name is the label.
 - Sticky to the top of the phone column, above the scroll, so a long card keeps its exit.
 
-This spec adopts it on the trainee card and the plan screen. The other four screens are
-listed in §12 and are separate work.
+**Every screen that needs one adopts it, in this work.** A1 is not the trainee card's
+defect; it is the app's, and a component built to fix it that fixes it on two screens out
+of seven leaves five parents still stranded. The survey, from a grep for
+`ArrowRight|ArrowLeft|history.back` across `features/`:
+
+| Screen | Hash | Today | After |
+| --- | --- | --- | --- |
+| Trainee card | `#/student/<id>` | nothing | `ScreenHeader` |
+| Plan | `#/plan/<id>` | nothing | `ScreenHeader` |
+| Belt progress | `#/belts/<…>` | nothing — a dead end | `ScreenHeader` |
+| Directions | `#/directions` | nothing | `ScreenHeader` |
+| Child calendar | `#/calendar` | nothing | `ScreenHeader` |
+| Privacy | `#/privacy` | nothing | `ScreenHeader` |
+| Payments | `#/payments` | nothing | `ScreenHeader` — **lane 5**, the file is the payments lane's (§3) |
+| Technique detail | `#/techniques/<slug>` | a `Button` hardcoded to `#/techniques`, in one branch only | `ScreenHeader`, which restores the intent `App.tsx`'s own comment already claims |
+| Club shop | `#/shop` | nothing | **unchanged** — it is a tab, and a tab needs no back |
+
+The five beyond our two screens are one import and one element each, and they are grouped
+into their own commit per §13 so a screenshot pass covers them together. `PayScreen` waits
+for lane 5 for the same reason everything else in §3 does: another session is editing that
+file now.
 
 ### 4.2 The card itself
 
@@ -245,10 +273,32 @@ planCopyFor(locale, monthlyAmountAgorot) → { cadence, features, badge?, highli
   the last time.
 - **The card always renders the database amount**, `PlanOptionOut.monthly_amount_agorot`,
   never `priceAgorot`. A club that re-prices loses its bullets, never shows a wrong number.
-- **No match falls back to derived copy**, from `weekly_extra_allowance`: the cadence line
-  is the database plan's own name, and the bullets are the two or three facts the API does
-  carry (base sessions included, `n` extra sessions a week or no weekly limit, the Saturday
-  private lesson when the plan opens one).
+- **No match falls back to derived copy.** The cadence line comes from
+  `PricePlan.sessions_per_week` — a column that already exists, is exactly this label
+  ("C11 — 'פעמיים בשבוע' is 2, 'כל יום' is 5"), and is `NULL` for open membership. It is
+  added to `PlanOptionOut`, which is the only schema change §5 needs. The bullets are the
+  facts the API carries: the base sessions, `n` extra a week or no weekly limit
+  (`weekly_extra_allowance`), and the Saturday private lesson when the plan opens one.
+
+**The fallback is not the rare path — it is the demo studio's only path.** `seed_money` in
+`app/services/demo/layers.py` seeds 24,000 / 32,000 / 42,000, and `PRICES_AGOROT` is
+30,000 / 40,000 / 55,000. So on the demo studio — which the §19 developer account and every
+local checkout run against — **nothing matches and every card renders derived copy**. Two
+consequences, both binding:
+
+1. **The §13 checkpoint screenshots must be taken against a studio priced 300/400/550**, or
+   they will show the fallback and be signed off as the landing-style design they are not.
+   The reviewer is told which studio the screenshot came from.
+2. **The derived path gets the same care as the matched one.** It is what a developer sees
+   every day and what any club that is not Gladiator sees for ever. It is not a degraded
+   card: same layout, same badge slot left empty, bullets from real data.
+
+**And a guard, because a silent divergence is what this join risks.** A test asserts that
+every amount in `PRICES_AGOROT` is one this app can actually price a plan at, and fails
+loudly rather than quietly falling back, so a club that re-prices learns it from CI instead
+of from a parent. The landing page's own hardcoded prices are the other half of that defect
+and are §12's — but the guard names it, which is the difference between a known gap and an
+unknown one.
 
 The card's two title lines are then:
 
@@ -518,7 +568,24 @@ reads the per-child route and never `/me/guardians`.
 `GET /me/standing-order-links?plan_id=` refuses a plan the caller's children are not on.
 
 **The frame** — `ScreenHeader`'s back falls through to `#/` with no history entry; the
-chevron's direction is asserted in both directions.
+chevron's direction is asserted in both directions. And **one test that owns the rule rather
+than the component**: it walks §4.1's table and asserts each of those screens renders a
+`ScreenHeader`, so a ninth screen added behind the tabs without one is a failure rather than
+a discovery. That is the difference between fixing A1 eight times and fixing it once.
+
+**The plan copy** — the three matching prices resolve; an unmatched price falls back and
+never yields an empty card; the mapper is keyed by price, asserted by reordering
+`clubContent`'s array and getting the same answers; and the derived cadence reads
+`sessions_per_week`, with `NULL` rendering the open-membership wording rather than "null
+times a week".
+
+**The price guard** (§5.2) — every amount in `PRICES_AGOROT` is one a plan can be priced at,
+and the test says in its failure message that the landing page and the database have
+diverged, because a bare assertion failure here would send the next reader to the wrong file.
+
+**Lane 5** carries no behaviour change, so its gate is `npm run typecheck` — which is what
+catches all nine moved importers — plus the billing suites that already cover
+`makeParentBillingClient` and `submitUpayForm` through their new home.
 
 `routes.reachable.test.ts` continues to guard that both screens are reachable, and gains the
 home pill as a third entrance to `#/plan/`.
@@ -573,21 +640,51 @@ slot key and its order, so no other lane's file reopens.
 `trainingPlanClient.ts` **survives**. It is the endpoint layer, not the screen, and the new
 container calls the same five methods.
 
-### 11.3 What is explicitly NOT deleted
+### 11.3 The two superseded screens nobody has been able to delete (lane 5)
 
-- **`features/billing/PaymentsSection.tsx`** — nine live importers, and it holds
-  `makeParentBillingClient`, `DEMO_SIMULATOR` and `submitUpayForm`, which `ClubShop`,
-  `ParentPayments`, `PaymentOverlay` and the join wizard all use. It is superseded *as a
-  screen* and load-bearing *as a module*, and untangling that is the payments lane's work
-  (§3), not this one's.
-- **`features/billing/PaymentsScreen.tsx`** — imported by `PaymentsSection` and the billing
-  barrel. Same owner, same reason.
-- **The stale `App.tsx` comments** naming `ShopSection`, `OrderItemsScreen` and
-  `ProfileSection`. They are wrong today — those files are already gone — but they are the
-  shop and profile lanes' history, and correcting them here would put this work in three
-  other lanes' file for no behaviour change.
+`PaymentsScreen.tsx` and `PaymentsSection.tsx` were replaced by `ParentPayments` on
+2026-09-07 under the same "stays on disk until accepted" comment, and unlike the shop and
+profile pair they are still here — because `PaymentsSection.tsx` is **superseded as a screen
+and load-bearing as a module**. Four of its five exports have nothing to do with the screen:
 
-### 11.4 The check
+```
+BillingRequestError      PaymentOverlay, ParentPayments
+DEMO_SIMULATOR           ClubShop, ParentPayments, submitJoin
+submitUpayForm           PaymentOverlay, PaymentFrame
+makeParentBillingClient  ClubShop, ParentPayments, PaymentHistorySection,
+                         StudentCardBillingSection, TrainingPlanSection, App.tsx
+PaymentsSection          ← nothing. The dead half.
+```
+
+That is why it survived: deleting the screen means moving four exports and updating nine
+importers, which nobody wanted to do inside a feature commit. It is a twenty-minute job with
+a compiler holding the other end, and leaving it undone is what §11's opening paragraph is
+about.
+
+**The move.** The four go to `features/billing/billingClient.ts`, which already holds
+`BillingClient` and its wire types and is what every one of those nine importers is actually
+reaching for. Then `PaymentsSection.tsx` and `PaymentsScreen.tsx` both delete — with
+`PaymentsScreen`'s `DebtRow`, `PrepayTerms` and `StandingOrderLink` types, which the
+`redesign/` screens replaced with their own — and `features/billing/index.ts` drops its two
+`PaymentsScreen` exports.
+
+**Sequenced after the payments lane lands**, and for one reason only: another session has
+`PaymentsSection.tsx` open right now (§3). This is not a scope question; it is a merge
+question, and doing it on top of their commit costs nothing.
+
+### 11.4 The stale comments (lane 5)
+
+Four comments in `App.tsx` — lines 935, 937, 945 and 988 — describe `ShopSection`,
+`OrderItemsScreen`, `ProfileSection` and `GuardianSettings` as files that "stay on disk
+until the redesign is accepted end to end". **All four files are already gone.** The
+comments are the last trace of the pattern §11 exists to break, and they are actively
+misleading: they tell the next reader that a fallback exists.
+
+They are corrected in lane 5, in the same commit as §11.3, because that commit is already
+in `App.tsx` and because a comment that describes a deleted file is exactly the rot the
+deletion was meant to prevent.
+
+### 11.5 The check
 
 After each lane, `grep` for the deleted symbols across `web/apps/parent/src` and expect
 nothing outside the lane's own diff. `npm run typecheck` is the real gate: a missed importer
@@ -598,25 +695,40 @@ reason the type moves rather than being duplicated at the new path.
 
 ## 12. Deliberately not in this
 
-- **`ScreenHeader` on the other four screens.** Belts, technique detail, directions and
-  לוח הילד share A1. The component is built to be adopted; adopting
-  it there is separate work with its own screenshots.
-- **A guardian screen.** §4.3 answers the row in place. A real guardian view — add, remove,
-  set primary — is a feature, not a fix.
-- **Proration.** The no-proration rule is the club's. This spec says it out loud on screen
-  and changes nothing about it.
-- **The landing page.** Its prices are hardcoded in `clubContent.ts` and can already diverge
-  from the database. That is a real defect and it is not this one.
-- **Moving the extra-session marking to home.** Considered and rejected: it needs the week's
-  bookable sessions, which home does not read.
-- **Who may change a plan.** Unchanged — any guardian of the child. §5.3 has no permission
-  to branch on.
+Four, and each is a decision with a reason rather than a finding pushed out of scope. §1's
+table shows every finding answered.
+
+- **A guardian screen — add, remove, set primary.** §4.3 answers A4 in place: the row shows
+  each guardian, their relation and a `tel:` action, which is the whole of what the card was
+  failing to give. A managed guardian list is a feature the product does not have on any
+  surface, staff included, and building the first one behind a fix would be inventing scope
+  the owner has not asked for.
+- **Proration.** An upgrade mid-month costs nothing extra and the club carries the
+  difference. That is the club's rule, deliberately taken (§15 open item 3). This spec makes
+  it visible (C4) and changes nothing about it.
+- **The landing page's hardcoded prices.** `PRICES_AGOROT` lives in `clubContent.ts` and can
+  already disagree with `price_plan` — the club's own site can quote a price it does not
+  charge. It is a real defect, it predates this work, and fixing it properly means deciding
+  whether the public contract starts serving prices, which is a product decision about a
+  page this spec does not otherwise touch. §5.2's guard makes the divergence fail CI here,
+  so this work makes the gap **visible** without pretending to close it.
+- **Moving the extra-session marking to home.** Considered and rejected on the merits: home
+  does not read the week's bookable sessions, and adding that read to make the plan screen
+  shorter trades one screen's clutter for another's.
+
+**Not on this list, and in scope after the owner's review of 2026-09-08:** `ScreenHeader` on
+every screen that lacks one (§4.1), the deletion of `PaymentsSection` and `PaymentsScreen`
+(§11.3), and the four stale `App.tsx` comments (§11.4). All three were deferred in the first
+draft and pulled back in, because a spec that diagnoses a defect and then schedules the fix
+for nobody is precisely how `PaymentsSection` came to be still here a day after the screen
+that replaced it shipped.
 
 ---
 
 ## 13. Order of work
 
-Three lanes. The first two are independent of the payments redesign and of each other.
+Five lanes. Lanes 1 and 2 are independent of the payments redesign and of each other; lane 3
+needs lane 1's component and nothing else; lanes 4 and 5 wait on §3.
 
 1. **The frame and the card** — `ScreenHeader`, the card header, `DetailRow`'s restyle,
    `GET /me/students/{id}/guardians`, the relation-aware row. **Deletes** §11.1's four files
@@ -625,8 +737,19 @@ Three lanes. The first two are independent of the payments redesign and of each 
 2. **The plan screen's shape** — `GET /me/training-plans`, `planCopy.ts`, the landing-style
    cards, upgrade/downgrade, the effect lines, the banner, the removal of
    תמיד כלול. **Deletes** §11.2's three files in the same commit. Screenshot checkpoint.
-3. **The money and home** — the four routes, `plan_id` on the mandate links, the plan names
+3. **The back control everywhere else** — `ScreenHeader` on belt progress, directions, the
+   child calendar, privacy and technique detail (§4.1). One import and one element each,
+   in one commit, with one screenshot pass over the five. Depends on lane 1 only, for the
+   component.
+4. **The money and home** — the four routes, `plan_id` on the mandate links, the plan names
    on `PlanChangeOut`, the home pill. **Blocked** until §3's payments work is on `main`.
+5. **The cleanup** — move `BillingRequestError`, `DEMO_SIMULATOR`, `submitUpayForm` and
+   `makeParentBillingClient` into `billingClient.ts`, update the nine importers, delete
+   `PaymentsSection.tsx` and `PaymentsScreen.tsx` and the billing barrel's two exports, add
+   `ScreenHeader` to `PayScreen`, and correct the four stale `App.tsx` comments (§11.3,
+   §11.4). **Blocked** on the same work as lane 4, and for the same merge reason. No
+   behaviour changes, so the gate is `npm run typecheck` plus the billing suites — no
+   screenshot.
 
 **The deletion lands with the replacement, never after it.** A commit that adds the new
 screen and leaves the old one for a follow-up is the pattern §11 exists to break: the
