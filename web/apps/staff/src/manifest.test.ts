@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { THEME_COLOR } from '@studio/ui/theme'
+import { SPLASH_GROUND, THEME_COLOR } from '@studio/ui/theme'
 import { manifest } from '../manifest.config'
 
 describe('staff manifest (§6.5 — the install is the product, not boilerplate)', () => {
@@ -22,9 +22,18 @@ describe('staff manifest (§6.5 — the install is the product, not boilerplate)
     expect(manifest.scope).toBe('/')
   })
 
-  it('takes theme and background colours from the D2 token layer, not literals', () => {
+  it('takes its chrome colour from the D2 token layer, not a literal', () => {
     expect(manifest.theme_color).toBe(THEME_COLOR.light)
-    expect(manifest.background_color).toBe(THEME_COLOR.light)
+  })
+
+  it('opens on the same ground the app\u2019s own loading screen paints', () => {
+    // `background_color` is what the OPERATING SYSTEM paints before a line of JavaScript
+    // runs; `SplashScreen` paints the instant React mounts. While these differed, opening
+    // the installed app showed two loading screens in two colours, one after the other
+    // (owner, 2026-09-08). One constant, and `splash.contract.test.ts` holds the stylesheet
+    // to it as well.
+    expect(manifest.background_color).toBe(SPLASH_GROUND.staff)
+    expect(manifest.background_color).not.toBe(manifest.theme_color)
   })
 
   it('declares RTL and Hebrew, so the install dialog is not mirrored wrong', () => {

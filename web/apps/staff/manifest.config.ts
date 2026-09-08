@@ -1,4 +1,4 @@
-import { THEME_COLOR } from '@studio/ui/theme'
+import { SPLASH_GROUND, THEME_COLOR } from '@studio/ui/theme'
 import type { AppManifest, ManifestIcon } from '@studio/ui/manifest'
 
 const icons: ManifestIcon[] = [
@@ -37,7 +37,14 @@ export const manifest: AppManifest = {
   dir: 'rtl',
   lang: 'he',
   theme_color: THEME_COLOR.light,
-  background_color: THEME_COLOR.light,
+  // **The OS paints this before any JavaScript runs**, and the app's own loading screen
+  // paints the instant React mounts. When the two differed, opening the installed app
+  // showed two loading screens in two colours, one after the other (owner, 2026-09-08).
+  // `SPLASH_GROUND` is the one value; `splash.contract.test.ts` keeps the stylesheet on it.
+  //
+  // `theme_color` is deliberately NOT changed: it is the app's chrome, the app is not navy,
+  // and `ThemeProvider` rewrites it live on mount anyway.
+  background_color: SPLASH_GROUND.staff,
   categories: ['sports', 'education', 'productivity'],
   icons,
 }

@@ -1,4 +1,4 @@
-import { GROUND_COLOR } from '@studio/ui/theme'
+import { GROUND_COLOR, SPLASH_GROUND } from '@studio/ui/theme'
 import type { AppManifest, ManifestIcon } from '@studio/ui/manifest'
 
 const icons: ManifestIcon[] = [
@@ -36,7 +36,14 @@ export const manifest: AppManifest = {
   // status bar are #fcf9f8, not the staff apps' warm grey. `THEME_COLOR` is the inward
   // record and naming it here is what put a mismatched band behind the installed app.
   theme_color: GROUND_COLOR.outward.light,
-  background_color: GROUND_COLOR.outward.light,
+  // **The OS paints this before any JavaScript runs**, and the app's own loading screen
+  // paints the instant React mounts. When the two differed, opening the installed app
+  // showed two loading screens in two colours, one after the other (owner, 2026-09-08).
+  // `SPLASH_GROUND` is the one value; `splash.contract.test.ts` keeps the stylesheet on it.
+  //
+  // `theme_color` is deliberately NOT changed: it is the app's chrome, the app is not navy,
+  // and `ThemeProvider` rewrites it live on mount anyway.
+  background_color: SPLASH_GROUND.parent,
   categories: ['sports', 'education', 'productivity'],
   icons,
 }

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { GROUND_COLOR } from '@studio/ui/theme'
+import { GROUND_COLOR, SPLASH_GROUND } from '@studio/ui/theme'
 import { manifest } from '../manifest.config'
 
 const testDir = dirname(fileURLToPath(import.meta.url))
@@ -28,9 +28,18 @@ describe('parent manifest (§6.5 — the install is the product, not boilerplate
     expect(manifest.scope).toBe('/')
   })
 
-  it('takes theme and background colours from the D2 token layer, not literals', () => {
+  it('takes its chrome colour from the D2 token layer, not a literal', () => {
     expect(manifest.theme_color).toBe(GROUND_COLOR.outward.light)
-    expect(manifest.background_color).toBe(GROUND_COLOR.outward.light)
+  })
+
+  it('opens on the same ground the app\u2019s own loading screen paints', () => {
+    // `background_color` is what the OPERATING SYSTEM paints before a line of JavaScript
+    // runs; `SplashScreen` paints the instant React mounts. While these differed, opening
+    // the installed app showed two loading screens in two colours, one after the other
+    // (owner, 2026-09-08). One constant, and `splash.contract.test.ts` holds the stylesheet
+    // to it as well.
+    expect(manifest.background_color).toBe(SPLASH_GROUND.parent)
+    expect(manifest.background_color).not.toBe(manifest.theme_color)
   })
 
   it('declares RTL and Hebrew, so the install dialog is not mirrored wrong', () => {
