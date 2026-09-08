@@ -666,7 +666,7 @@ def test_a_club_terms_acceptance_at_the_pre_bump_version_is_no_longer_current(
     from app.services.health.club_terms import CLUB_TERMS_CONSENT_TYPE
     from app.services.privacy.consent import ConsentService
 
-    PRE_BUMP_VERSION = 1
+    PRE_BUMP_VERSION = 1  # noqa: N806 -- a constant, and read as one below
     tenant_session.add(
         ConsentRecord(
             subject_type="person",

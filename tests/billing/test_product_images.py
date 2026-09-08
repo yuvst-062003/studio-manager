@@ -104,7 +104,7 @@ def test_replacing_a_photo_with_another_format_leaves_no_stale_object(
 
 
 # -- who may reach it ---------------------------------------------------------
-def test_a_guardian_may_READ_a_product_photo_because_the_shop_renders_it(
+def test_a_guardian_may_READ_a_product_photo_because_the_shop_renders_it(  # noqa: N802 -- READ contrasts with the refusal below
     client, app_session, studio, as_manager, a_priced_student, as_guardian_of
 ) -> None:
     # Deliberately not manager-only. A catalogue a parent can read while its pictures 403
@@ -119,7 +119,7 @@ def test_a_guardian_may_READ_a_product_photo_because_the_shop_renders_it(
     assert response.content == PNG
 
 
-def test_a_guardian_may_NOT_upload_one(
+def test_a_guardian_may_NOT_upload_one(  # noqa: N802 -- NOT contrasts with the case above
     client, app_session, studio, a_priced_student, as_guardian_of
 ) -> None:
     product_id = _product(app_session, studio)

@@ -16,9 +16,11 @@ from app.core.clock import now
 from app.models.billing import Charge, PricePlan
 from app.models.people import Enrollment, Student, TrialBooking
 from app.models.person import Guardian, Person
+from app.models.studio import Studio
 from app.services.people.errors import DuplicateStudentError, NotFoundError, RefusedError
 from app.services.people.onboarding import OnboardingService
 from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 from tests.conftest import sign_in
 from tests.people.conftest import T0, make_session
 

@@ -265,7 +265,7 @@ def test_a_grant_at_the_pre_bump_version_no_longer_clears_the_gate(
     This proves the BEHAVIOUR the bump exists for -- that the gate stands again -- not just
     that the constant now reads 2.
     """
-    PRE_BUMP_VERSION = 1
+    PRE_BUMP_VERSION = 1  # noqa: N806 -- a constant, and read as one below
     for consent_type in ("terms", "privacy"):
         tenant_session.add(
             ConsentRecord(

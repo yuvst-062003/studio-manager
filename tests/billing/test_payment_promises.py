@@ -558,7 +558,7 @@ def test_a_charge_under_an_open_card_order_cannot_also_be_promised_as_cash(
         )
 
 
-def test_a_charge_under_the_payers_OWN_abandoned_card_order_can_be_promised_as_cash(
+def test_a_charge_under_the_payers_OWN_abandoned_card_order_can_be_promised_as_cash(  # noqa: N802 -- OWN is the whole point of the case
     tenant_session, app_session, studio, a_priced_student
 ):
     """The other half of "if they owe it, they can pay it" (owner asked, 2026-09-07).

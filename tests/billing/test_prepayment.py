@@ -21,8 +21,8 @@ from app.services.billing import BillingService
 from app.services.billing.errors import RefusedError
 from app.services.billing.orders import OrderService
 from app.services.billing.payment_promise import PaymentPromiseService
-from app.services.billing.prepay_ceiling import prepay_headroom_months
 from app.services.billing.payments import PaymentService
+from app.services.billing.prepay_ceiling import prepay_headroom_months
 from app.services.billing.run import BillingRunService
 from sqlalchemy import func, select
 from tests.billing.conftest import MONTHLY_AGOROT, PERIOD, T0
