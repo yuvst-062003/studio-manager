@@ -176,6 +176,11 @@ export const health: Bundle = {
     'ביטול מנוי יבוצע בכתב עד ה-27 לחודש, ויהיה תקף לגבי חודשים עתידיים בלבד.',
   'clubTerms.payment.proRata':
     'בעת ביטול מנוי שנתי, התעריף החודשי יחושב בהתאם לניצול החודשים בפועל של המנוי (לדוגמה: אם המנוי ניצל שלושה חודשים, החישוב יבוצע לפי תעריף מנוי לשלושה חודשים).',
+  // The registering body, named once and rendered wherever the club identifies itself:
+  // the תקנון, the parent's profile and the staff account screen. The NAME was already
+  // here, in the cheque payee line — a payee is not the same as naming the party to the
+  // agreement, and the number is what makes the name verifiable in רשם העמותות.
+  'clubTerms.entity': 'בריין בילדינג (ע״ר) 580647295',
   'clubTerms.accept': 'קראתי את התקנון ותנאי התשלום ואני מאשר/ת אותם',
   'clubTerms.required': 'יש לאשר את התקנון ותנאי התשלום כדי להמשיך',
   'clubTerms.alreadyAccepted': 'אישרתם את התקנון ותנאי התשלום',

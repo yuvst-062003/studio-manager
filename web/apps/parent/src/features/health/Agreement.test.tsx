@@ -373,6 +373,16 @@ describe('RegistrationStep', () => {
     expect(body.signer.national_id).toBe('100000017')
   })
 
+  it('names the registering body on the club\u2019s own \u05ea\u05e7\u05e0\u05d5\u05df', async () => {
+    // The \u05e2\u05de\u05d5\u05ea\u05d4's name was already here \u2014 as the PAYEE on the cheque line, which is not
+    // the same as naming the party to the agreement. The registration number is what makes
+    // the name verifiable in \u05e8\u05e9\u05dd \u05d4\u05e2\u05de\u05d5\u05ea\u05d5\u05ea, and it is what the pre-transaction
+    // disclosure duty asks for alongside the name.
+    render(<ClubTermsStep locale="he" onAccept={vi.fn()} />)
+    expect(screen.getByTestId('club-terms-entity')).toHaveTextContent('580647295')
+    expect(screen.getByTestId('club-terms-entity')).toHaveTextContent('\u05d1\u05e8\u05d9\u05d9\u05df \u05d1\u05d9\u05dc\u05d3\u05d9\u05e0\u05d2')
+  })
+
   it('asks an adult for no second parent and no pickup contacts (#9)', async () => {
     // The owner's #9: 'wizard asks for parent + pickup details even for an adult'. The
     // grade was already dropped for a self-guarding student; הורה 2 and the מלווים מורשים

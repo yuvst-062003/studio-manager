@@ -130,6 +130,7 @@ export const health: Bundle = {
     'Cancellation must be given in writing by the 27th of the month, and takes effect for future months only.',
   'clubTerms.payment.proRata':
     'When an annual membership is cancelled, the monthly rate is recalculated against the months actually used (for example: three months used is charged at the three-month rate).',
+  'clubTerms.entity': 'Brain Building (registered association) 580647295',
   'clubTerms.accept': 'I have read the club terms and payment terms and I accept them',
   'clubTerms.required': 'The club terms and payment terms must be accepted to continue',
   'clubTerms.alreadyAccepted': 'You have accepted the club terms and payment terms',

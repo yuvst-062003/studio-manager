@@ -108,6 +108,17 @@ export function ContactActions({
         {t(locale, 'people.profile.contactNone')}
       </p>
     )}
+      {/* Who the club IS, under the ways to reach it. A family that needs to write to the
+          registering body — a complaint, a cancellation, a rights request — needs its
+          registered name and number, and the תקנון they signed is behind an onboarding they
+          have already finished. Unconditional: unlike the buttons above, this does not
+          depend on a setting anyone had to fill in. */}
+      <p
+        data-testid="profile-club-entity"
+        className="text-[11px] text-slate-400 dark:text-slate-500 text-center pt-3"
+      >
+        {t(locale, 'health.clubTerms.entity')}
+      </p>
     </>
   )
 }

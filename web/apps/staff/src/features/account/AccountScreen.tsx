@@ -377,6 +377,17 @@ export function AccountScreen({
         </section>
       ) : null}
 
+      {/* Who the club IS. Staff sign the same club's agreements and answer families who ask
+          who they are contracting with; the registered name and number belong where the
+          person holding the app can read them without opening a parent's תקנון. Outside the
+          manager-only block above, because identifying the club is not a management action. */}
+      <p
+        data-testid="account-club-entity"
+        className="text-[11px] text-[var(--fg-muted)] text-center pt-1"
+      >
+        {t(locale, 'health.clubTerms.entity')}
+      </p>
+
       <section aria-labelledby="account-group-notifications" className="flex flex-col gap-2">
         <GroupHeading id="account-group-notifications">
           {t(locale, 'common.account.group.notifications')}

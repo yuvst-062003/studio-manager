@@ -31,6 +31,14 @@ const formStyle: CSSProperties = {
   inlineSize: '100%',
 }
 
+//: The registering body's line. Quieter than a clause, because it is not one — it says who
+//: the agreement is with, not what it obliges.
+const entityStyle: CSSProperties = {
+  color: 'var(--text-muted)',
+  fontSize: 'var(--text-caption)',
+  marginBlockStart: 'var(--space-2)',
+}
+
 const clauseStyle: CSSProperties = {
   color: 'var(--text-secondary)',
   marginBlockEnd: 'var(--space-3)',
@@ -92,6 +100,13 @@ export function ClubTermsStep({
             {t(locale, key)}
           </p>
         ))}
+        {/* Who the agreement is WITH. The name was already above, as the payee on the cheque
+            line — a payee is not a party, and the registration number is what makes the name
+            verifiable in רשם העמותות. Last, because it identifies the document rather than
+            adding a term to it. */}
+        <p data-testid="club-terms-entity" style={entityStyle}>
+          {t(locale, 'health.clubTerms.entity')}
+        </p>
       </Card>
 
       <Checkbox

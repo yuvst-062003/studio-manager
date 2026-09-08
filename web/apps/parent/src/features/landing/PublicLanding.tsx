@@ -536,7 +536,10 @@ export function PublicLanding({
         {/* The club in photographs — content only, and bundled with the app rather than
             uploaded (clubContent.ts). Every tile is lazy: the section sits below the fold
             and a parent on a phone should not pay for it before scrolling to it. */}
-        {content ? (
+        {/* No photographs, no section. The set is held back pending rights and guardian
+            consent (clubContent.ts), and a heading with an empty grid under it reads as a
+            broken page — on the one page a stranger sees first. */}
+        {content && content.gallery.length > 0 ? (
           <section className="gl-section" aria-labelledby="landing-gallery" data-testid="landing-gallery">
             <div className="gl-section-inner">
               <h2 id="landing-gallery" className="gl-title">
