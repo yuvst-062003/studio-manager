@@ -20,10 +20,8 @@ import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { InAppBrowserBanner } from './InAppBrowserBanner'
 import { startUrl, useAuthProviders } from './useAuthProviders'
-import { useSplashHold } from './useSplashHold'
 import './gladiator-signin.css'
 import logoUrl from './assets/gladiator-logo.png'
-import { SplashScreen } from './SplashScreen'
 
 export type { SignInProvider } from './useAuthProviders'
 
@@ -51,15 +49,12 @@ export function SignIn({
   languagePicker?: ReactNode
   userAgent?: string
 }) {
-  const { status, list: providers } = useAuthProviders()
-  // A minimum, never a delay — see `useSplashHold`. Without it a fast launch flashed the
-  // loading screen past too quickly to follow, which is the complaint that produced it.
-  const holding = useSplashHold()
+  const providers = useAuthProviders()
 
   // `startUrl` and not a second copy of the same template literal. The manager sign-in
   // landed on main while this branch was open and moved that URL into one helper; two
   // hand-built copies of an OAuth start link is exactly the drift that helper prevents.
-  const providerLinks = providers.map((provider) => ({
+  const providerLinks = (providers ?? []).map((provider) => ({
     key: provider.name,
     href: startUrl(provider, app, returnPath),
     label: t(locale, LABEL[provider.name] ?? 'common.auth.continueWithGoogle'),
@@ -69,29 +64,6 @@ export function SignIn({
   // `app` rather than replacing the screen, because this one file also serves the staff
   // app and the dashboard, and the brief was for parents. The other two are unmoved.
   if (app === 'parent') {
-    // Nothing decided yet: the session restore and this fetch are two sequential round
-    // trips to an API in `sfo`, and the screen underneath would otherwise be the finished
-    // design with its one button missing — which is what the owner saw and reported as a
-    // blank page. `null` means "still asking"; an empty array means "asked, and there are
-    // none", which is a real answer and gets the real screen with its own message.
-    if (status === 'loading' || holding) {
-      return (
-        <SplashScreen
-          locale={locale}
-          tone="parent"
-          // The wordmark, not the crest (owner, 2026-09-08). The crest is 315KB and this is
-          // the screen that exists because the network is slow; the wordmark is text, weighs
-          // nothing, and is what the two staff apps already show — so all three loading
-          // screens differ by colour alone, which is the distinction that was wanted.
-          mark={
-            <p className="studio-splash__wordmark" aria-label={t(locale, `common.appName.${app}`)}>
-              <span aria-hidden="true">{t(locale, 'common.brand.wordmark')}</span>
-              <small aria-hidden="true">{t(locale, 'common.brand.club')}</small>
-            </p>
-          }
-        />
-      )
-    }
     return (
       <div className="gsignin gsignin--parent" data-testid="sign-in">
         <div className="gsignin-parent__rule" />
@@ -137,7 +109,7 @@ export function SignIn({
                   : provider.label}
               </a>
             ))}
-            {status === 'ready' && providers.length === 0 ? (
+            {providers !== null && providers.length === 0 ? (
               <p className="gsignin-parent__fine">{t(locale, 'common.auth.noProviders')}</p>
             ) : (
               <p className="gsignin-parent__hint">{t(locale, 'common.auth.parentHint')}</p>
@@ -171,24 +143,6 @@ export function SignIn({
     )
   }
 
-  // The same wait, for the two staff-side apps. Their own ground colour and their own
-  // mark: a manager runs both, and which one is opening should be readable before it has
-  // opened. See `SplashScreen`.
-  if (status === 'loading' || holding) {
-    return (
-      <SplashScreen
-        locale={locale}
-        tone={app === 'dashboard' ? 'dashboard' : 'staff'}
-        mark={
-          <p className="studio-splash__wordmark" aria-label={t(locale, `common.appName.${app}`)}>
-            <span aria-hidden="true">{t(locale, 'common.brand.wordmark')}</span>
-            <small aria-hidden="true">{t(locale, 'common.brand.club')}</small>
-          </p>
-        }
-      />
-    )
-  }
-
   return (
     <div className="gsignin" data-testid="sign-in">
       {languagePicker ? <div className="gsignin__lang">{languagePicker}</div> : null}
@@ -209,7 +163,7 @@ export function SignIn({
         <div className="gsignin__stack">
           <span className="gsignin__eyebrow">{t(locale, `common.auth.eyebrow.${app}`)}</span>
           <InAppBrowserBanner locale={locale} userAgent={userAgent} />
-          {providers.map((provider) => (
+          {(providers ?? []).map((provider) => (
             <a
               key={provider.name}
               className={BUTTON_CLASS[provider.name] ?? 'gsignin__btn gsignin__btn--google'}
@@ -218,7 +172,7 @@ export function SignIn({
               {t(locale, LABEL[provider.name] ?? 'common.auth.continueWithGoogle')}
             </a>
           ))}
-          {status === 'ready' && providers.length === 0 ? (
+          {providers !== null && providers.length === 0 ? (
             // The state every developer machine is in: no OAuth client configured, so the
             // list is honestly empty. Saying so beats a card with a hole in it — and in
             // production this renders only if configuration is genuinely broken, which is

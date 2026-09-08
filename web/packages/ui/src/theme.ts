@@ -22,23 +22,6 @@ export type Surface = 'inward' | 'outward' | 'staff'
  * declarations, which is what makes the "cannot drift" in the first paragraph true rather
  * than aspirational.
  */
-/** What the loading screen paints, per app.
- *
- * **Read by two things that must not disagree**: `first-run/splash.css`, which paints it in
- * the browser, and each app's `manifest.config.ts`, whose `background_color` is what the
- * OPERATING SYSTEM paints before a single line of JavaScript runs. When those two differed,
- * opening the installed app showed two loading screens in two colours, one after the other
- * — which is what the owner reported on 2026-09-08.
- *
- * CSS cannot import this file, so `splash.contract.test.ts` reads the stylesheet and asserts
- * the literals match. That test is the only thing keeping them together.
- */
-export const SPLASH_GROUND = {
-  parent: '#001849',
-  staff: '#14306b',
-  dashboard: '#101828',
-} as const
-
 export const GROUND_COLOR: Record<Surface, Record<ResolvedTheme, string>> = {
   inward: {
     light: '#f7f5f1',

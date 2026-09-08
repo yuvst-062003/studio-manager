@@ -24,8 +24,6 @@ import { LOCALES, t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { ENDONYM } from './LanguagePicker'
 import { startUrl, useAuthProviders } from './useAuthProviders'
-import { useSplashHold } from './useSplashHold'
-import { SplashScreen } from './SplashScreen'
 import logo from './assets/gladiator-team.png'
 import './manager-signin.css'
 
@@ -60,31 +58,11 @@ export function ManagerSignIn({
   onChooseLocale: (locale: Locale) => void
   returnPath?: string
 }) {
-  const { status, list } = useAuthProviders()
-  const holding = useSplashHold()
+  const providers = useAuthProviders()
   // The mock draws exactly one button. Apple is not configured for this app, and when it
   // is, `useAuthProviders` will return it — so render whatever the server offers rather
   // than hard-coding Google and shipping a screen that cannot grow a second button.
-  // Nothing decided yet. `GET /auth/providers` is a round trip to an API in `sfo` and the
-  // session restore precedes it, so on a phone this screen sat finished-but-buttonless for
-  // seconds -- which is what the owner reported on the parent app, and this screen has the
-  // same shape. `null` is "still asking"; `[]` is "asked, and there are none", which is a
-  // real answer and keeps the screen below with its own message.
-  if (status === 'loading' || holding) {
-    return (
-      <SplashScreen
-        locale={locale}
-        tone="staff"
-        mark={
-          <p className="studio-splash__wordmark" aria-label={t(locale, 'common.appName.staff')}>
-            <span aria-hidden="true">{t(locale, 'common.brand.wordmark')}</span>
-            <small aria-hidden="true">{t(locale, 'common.brand.club')}</small>
-          </p>
-        }
-      />
-    )
-  }
-
+  const list = providers ?? []
 
   return (
     <div className="msignin" data-testid="sign-in">
@@ -122,7 +100,7 @@ export function ManagerSignIn({
               </a>
             ))}
             <p className="msignin__blurb">
-              {status === 'ready' && list.length === 0
+              {providers !== null && providers.length === 0
                 ? // The state every developer machine is in: no OAuth client configured,
                   // so the list is honestly empty. In production this renders only if
                   // configuration is genuinely broken — exactly when a person at this

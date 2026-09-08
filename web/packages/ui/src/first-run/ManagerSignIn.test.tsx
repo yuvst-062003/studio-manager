@@ -19,23 +19,6 @@ const answerWith = (items: unknown[]) =>
 
 afterEach(() => vi.unstubAllGlobals())
 
-/** Render, then wait for the loading screen to give way.
- *
- * These screens gained a real loading state on 2026-09-08 (`SplashScreen`): `providers`
- * starts `null`, which now means "still asking" and holds a splash on top, so the FIRST
- * paint is no longer the sign-in screen. Every assertion below is about the settled screen,
- * so waiting once here beats scattering `findBy` through twenty of them.
- *
- * The wait is on the splash LEAVING rather than on any particular button arriving, so a
- * test whose fixture offers no providers at all still works — that case renders the screen
- * with its own message, which is exactly what it asserts.
- */
-async function renderSettled(ui: Parameters<typeof render>[0]) {
-  const view = render(ui)
-  await waitFor(() => expect(screen.queryByTestId('sign-in-splash')).toBeNull())
-  return view
-}
-
 describe('ManagerSignIn', () => {
   beforeEach(() => answerWith([GOOGLE]))
 
@@ -43,7 +26,7 @@ describe('ManagerSignIn', () => {
     // §5.2 — 'OAuth must never run inside a webview. Google returns disallowed_useragent.
     // The flow is a standard top-level redirect.' An in-page request is the first step
     // toward being one, and this screen's button is the most redesigned element on it.
-    const { container } = await renderSettled(<ManagerSignIn locale="he" onChooseLocale={vi.fn()} />)
+    const { container } = render(<ManagerSignIn locale="he" onChooseLocale={vi.fn()} />)
     await waitFor(() =>
       expect(
         screen.getByRole('link', { name: t('he', 'common.auth.manager.signInWithGoogle') }),
@@ -57,7 +40,7 @@ describe('ManagerSignIn', () => {
   it('tells the server this app began the flow', async () => {
     // The callback returns to that app's own origin; §6.5 gives each PWA one. Hard-coded
     // to 'staff' in this component, so a wrong value here would be silent forever.
-    await renderSettled(<ManagerSignIn locale="he" onChooseLocale={vi.fn()} />)
+    render(<ManagerSignIn locale="he" onChooseLocale={vi.fn()} />)
     await waitFor(() => {
       const href = screen.getByRole('link', {
         name: t('he', 'common.auth.manager.signInWithGoogle'),
@@ -71,7 +54,7 @@ describe('ManagerSignIn', () => {
     // A button for an unconfigured provider fails one step AFTER the user picked their
     // account. The mock draws one button; the screen must not hard-code one.
     answerWith([])
-    await renderSettled(<ManagerSignIn locale="he" onChooseLocale={vi.fn()} />)
+    render(<ManagerSignIn locale="he" onChooseLocale={vi.fn()} />)
     await waitFor(() =>
       expect(screen.getByText(t('he', 'common.auth.noProviders'))).toBeInTheDocument(),
     )
@@ -87,7 +70,7 @@ describe('ManagerSignIn', () => {
         throw new TypeError('offline')
       }),
     )
-    await renderSettled(<ManagerSignIn locale="he" onChooseLocale={vi.fn()} />)
+    render(<ManagerSignIn locale="he" onChooseLocale={vi.fn()} />)
     await waitFor(() => expect(screen.getByText(/Google/)).toBeInTheDocument())
     expect(
       screen.queryByRole('link', { name: t('he', 'common.auth.manager.signInWithGoogle') }),
@@ -101,17 +84,17 @@ describe('ManagerSignIn', () => {
     // a Hebrew consent screen.' The mock moved the picker into the footer; it did not
     // remove it, and this screen is the only place a coach can reach it before signing in.
     const onChooseLocale = vi.fn()
-    await renderSettled(<ManagerSignIn locale="he" onChooseLocale={onChooseLocale} />)
+    render(<ManagerSignIn locale="he" onChooseLocale={onChooseLocale} />)
     expect(screen.getByRole('button', { name: 'עברית' })).toHaveAttribute('aria-pressed', 'true')
     await userEvent.click(screen.getByRole('button', { name: 'Русский' }))
     expect(onChooseLocale).toHaveBeenCalledWith('ru')
   })
 
-  it('links both legal documents at hashes this app routes', async () => {
+  it('links both legal documents at hashes this app routes', () => {
     // The footer's two links are the reason `LegalScreen` exists. If these drift from the
     // constants the staff shell routes on, the links become a screen that renders nothing
     // — which is exactly how they would fail silently.
-    await renderSettled(<ManagerSignIn locale="he" onChooseLocale={vi.fn()} />)
+    render(<ManagerSignIn locale="he" onChooseLocale={vi.fn()} />)
     expect(
       screen.getByRole('link', { name: t('he', 'common.auth.manager.terms') }),
     ).toHaveAttribute('href', TERMS_HASH)
@@ -120,11 +103,11 @@ describe('ManagerSignIn', () => {
     ).toHaveAttribute('href', PRIVACY_HASH)
   })
 
-  it('gives the club mark an accessible name and hides every decorative layer', async () => {
+  it('gives the club mark an accessible name and hides every decorative layer', () => {
     // The ground, the grid, the hatch, the vignette and the kanji are texture. A screen
     // reader announcing 柔道 between the badge and the logo would be noise, and the crest
     // is the one image here that carries meaning.
-    const { container } = await renderSettled(<ManagerSignIn locale="he" onChooseLocale={vi.fn()} />)
+    const { container } = render(<ManagerSignIn locale="he" onChooseLocale={vi.fn()} />)
     expect(screen.getByRole('img', { name: t('he', 'common.appName.staff') })).toBeInTheDocument()
     // `queryByText` walks the DOM, not the accessibility tree, so it finds hidden nodes —
     // the property worth asserting is the one that keeps the kanji out of that tree.
@@ -136,11 +119,11 @@ describe('ManagerSignIn', () => {
     expect(screen.getAllByRole('img')).toHaveLength(1)
   })
 
-  it('renders the eyebrow and the blurb from i18n in every locale', async () => {
+  it('renders the eyebrow and the blurb from i18n in every locale', () => {
     // No inline strings (.claude/rules/ui-rtl-a11y.md). The badge deliberately reads the
     // same in all three — see he/common.ts — but the blurb must not.
     for (const locale of ['he', 'en', 'ru'] as const) {
-      const { unmount } = await renderSettled(<ManagerSignIn locale={locale} onChooseLocale={vi.fn()} />)
+      const { unmount } = render(<ManagerSignIn locale={locale} onChooseLocale={vi.fn()} />)
       expect(screen.getByText(t(locale, 'common.auth.manager.badge'))).toBeInTheDocument()
       expect(screen.getByText(t(locale, 'common.auth.manager.blurb'))).toBeInTheDocument()
       unmount()

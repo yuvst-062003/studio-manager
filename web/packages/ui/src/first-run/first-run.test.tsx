@@ -13,8 +13,6 @@ import { InstallWalkthrough, isIosSafari } from './InstallWalkthrough'
 import { LanguagePicker } from './LanguagePicker'
 import { RefusalScreen } from './RefusalScreen'
 import { SignIn } from './SignIn'
-import { ManagerSignIn } from './ManagerSignIn'
-import { DashboardSignIn } from './DashboardSignIn'
 
 const IOS = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1'
 const ANDROID = 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36'
@@ -66,91 +64,6 @@ describe('SignIn', () => {
         }),
       ),
     )
-  })
-
-  it('shows a loading screen while the providers are still coming (owner, 2026-09-08)', async () => {
-    // The owner opened the parent app on 4G and watched a blank cream page with a logo on
-    // it for several seconds. The logo is bundled so it draws at once; the BUTTON waits on
-    // `GET /auth/providers`, and the API is in `sfo` while the users are in Israel — two
-    // sequential round trips of ~370ms each from a wired connection, and rather more from a
-    // phone. A page that shows nothing happening reads as broken.
-    //
-    // A promise that never settles, so the screen stays in its waiting state for the
-    // assertion: the real one resolves in milliseconds under test, which is precisely the
-    // condition that made this invisible in the first place.
-    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})))
-    render(<SignIn locale="he" app="parent" />)
-
-    const splash = await screen.findByTestId('sign-in-splash')
-    expect(splash).toBeInTheDocument()
-    // Named for a screen reader, which sees no animation at all.
-    expect(splash).toHaveAttribute('role', 'status')
-    expect(splash).toHaveAccessibleName(t('he', 'common.auth.loading'))
-    // The club's name is on it — the point is that this looks like the app, not like a
-    // failure. The WORDMARK and not the crest (owner, 2026-09-08): text costs no request,
-    // and the crest was 315KB on the one screen that exists because the network is slow.
-    expect(splash.querySelector('.studio-splash__wordmark')).toBeTruthy()
-    expect(splash.querySelector('img')).toBeNull()
-    // Decorative: three dots that say "working" to someone who can see them and nothing at
-    // all to someone who cannot, which is why the name above carries the meaning.
-    expect(splash.querySelectorAll('[aria-hidden="true"] span').length).toBeGreaterThanOrEqual(3)
-  })
-
-  it('shows the loading screen on the screens the apps ACTUALLY mount', async () => {
-    // The first version of this shipped into `SignIn`'s shared branch and reached neither
-    // staff-side app, because the staff app mounts `ManagerSignIn` and the dashboard mounts
-    // `DashboardSignIn` — `SignIn` dresses the parent app and nothing else. Every test
-    // passed and two of the three bundles had no loading screen in them at all; it was
-    // caught by grepping the deployed JavaScript, not by anything in this file.
-    //
-    // So this asserts the components the apps really use, by name.
-    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})))
-
-    const manager = render(<ManagerSignIn locale="he" onChooseLocale={vi.fn()} />)
-    expect(await screen.findByTestId('sign-in-splash')).toHaveAttribute('data-tone', 'staff')
-    manager.unmount()
-
-    const dash = render(<DashboardSignIn locale="he" onChooseLocale={vi.fn()} />)
-    expect(await screen.findByTestId('sign-in-splash')).toHaveAttribute('data-tone', 'dashboard')
-    dash.unmount()
-  })
-
-  it('opens each app on its own ground, so you know which one is starting', async () => {
-    // A manager runs the staff app and the dashboard; a parent with a child in the club
-    // may have the parent app beside them. Three identical loading screens would make the
-    // first second of every launch ambiguous, which is the second the owner was looking at
-    // when he asked why it looked broken.
-    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})))
-    const tones: Record<string, string> = {}
-    for (const app of ['parent', 'staff', 'dashboard'] as const) {
-      const view = render(<SignIn locale="he" app={app} />)
-      const splash = await screen.findByTestId('sign-in-splash')
-      tones[app] = splash.getAttribute('data-tone') ?? ''
-      view.unmount()
-    }
-    expect(new Set(Object.values(tones)).size).toBe(3)
-  })
-
-  it('names the loading screen for a screen reader in every app', async () => {
-    // The dots are `aria-hidden`, so without this the screen is silent — and the apps that
-    // are NOT the parent app were the easy ones to forget.
-    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})))
-    for (const app of ['parent', 'staff', 'dashboard'] as const) {
-      const view = render(<SignIn locale="he" app={app} />)
-      const splash = await screen.findByTestId('sign-in-splash')
-      expect(splash).toHaveAccessibleName(t('he', 'common.auth.loading'))
-      view.unmount()
-    }
-  })
-
-  it('replaces the loading screen with the real one once they arrive', async () => {
-    render(<SignIn locale="he" app="parent" />)
-    await waitFor(() =>
-      expect(screen.getAllByRole('link').some((l) => l.getAttribute('href')?.includes('/auth/'))).toBe(
-        true,
-      ),
-    )
-    expect(screen.queryByTestId('sign-in-splash')).toBeNull()
   })
 
   it('renders a top-level link, never a fetch or an iframe', async () => {

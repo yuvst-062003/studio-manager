@@ -118,7 +118,6 @@ export const common: Bundle = {
   // §6.1's first run.
   'language.title': 'язык',
   // -- the parent app's sign-in face (owner's Stitch design, 2026-09-01) ---------
-  'auth.loading': 'Загружаем приложение…',
   'auth.parentHint': 'Войдите через Google, чтобы открыть расписание тренировок, пояса и соревнования.',
   'auth.signInWithGoogle': 'Войти через Google',
   'auth.rights': 'Все права защищены',

@@ -20,23 +20,6 @@ const answerWith = (items: unknown[]) =>
 
 afterEach(() => vi.unstubAllGlobals())
 
-/** Render, then wait for the loading screen to give way.
- *
- * These screens gained a real loading state on 2026-09-08 (`SplashScreen`): `providers`
- * starts `null`, which now means "still asking" and holds a splash on top, so the FIRST
- * paint is no longer the sign-in screen. Every assertion below is about the settled screen,
- * so waiting once here beats scattering `findBy` through twenty of them.
- *
- * The wait is on the splash LEAVING rather than on any particular button arriving, so a
- * test whose fixture offers no providers at all still works — that case renders the screen
- * with its own message, which is exactly what it asserts.
- */
-async function renderSettled(ui: Parameters<typeof render>[0]) {
-  const view = render(ui)
-  await waitFor(() => expect(screen.queryByTestId('sign-in-splash')).toBeNull())
-  return view
-}
-
 describe('DashboardSignIn', () => {
   beforeEach(() => answerWith([GOOGLE]))
 
@@ -44,7 +27,7 @@ describe('DashboardSignIn', () => {
     // §5.2 — 'OAuth must never run inside a webview. Google returns disallowed_useragent.
     // The flow is a standard top-level redirect.' An in-page request is the first step
     // toward being one, and this screen's button is the most redesigned element on it.
-    const { container } = await renderSettled(<DashboardSignIn locale="he" onChooseLocale={vi.fn()} />)
+    const { container } = render(<DashboardSignIn locale="he" onChooseLocale={vi.fn()} />)
     await waitFor(() =>
       expect(
         screen.getByRole('link', { name: t('he', 'common.auth.signInWithGoogle') }),
@@ -60,7 +43,7 @@ describe('DashboardSignIn', () => {
     // used to be a prop the dashboard passed to `SignIn`, and passing "staff" there once
     // sent a signed-in manager to the wrong origin. It is hard-coded in the component
     // now, which makes a wrong value silent forever unless this pins it.
-    await renderSettled(<DashboardSignIn locale="he" onChooseLocale={vi.fn()} />)
+    render(<DashboardSignIn locale="he" onChooseLocale={vi.fn()} />)
     await waitFor(() => {
       const href = screen
         .getByRole('link', { name: t('he', 'common.auth.signInWithGoogle') })
@@ -71,7 +54,7 @@ describe('DashboardSignIn', () => {
   })
 
   it('carries the return path into the start URL', async () => {
-    await renderSettled(<DashboardSignIn locale="he" onChooseLocale={vi.fn()} returnPath="/#/billing" />)
+    render(<DashboardSignIn locale="he" onChooseLocale={vi.fn()} returnPath="/#/billing" />)
     await waitFor(() =>
       expect(
         screen
@@ -85,7 +68,7 @@ describe('DashboardSignIn', () => {
     // A button for an unconfigured provider fails one step AFTER the user picked their
     // account. The export draws one button; the screen must not hard-code one.
     answerWith([])
-    await renderSettled(<DashboardSignIn locale="he" onChooseLocale={vi.fn()} />)
+    render(<DashboardSignIn locale="he" onChooseLocale={vi.fn()} />)
     await waitFor(() =>
       expect(screen.getByText(t('he', 'common.auth.noProviders'))).toBeInTheDocument(),
     )
@@ -101,7 +84,7 @@ describe('DashboardSignIn', () => {
         throw new TypeError('offline')
       }),
     )
-    await renderSettled(<DashboardSignIn locale="he" onChooseLocale={vi.fn()} />)
+    render(<DashboardSignIn locale="he" onChooseLocale={vi.fn()} />)
     await waitFor(() =>
       expect(
         screen.getByRole('heading', { name: t('he', 'common.auth.dashboard.title') }),
@@ -122,18 +105,18 @@ describe('DashboardSignIn', () => {
     // remove it, and this screen is the only place a manager can reach it before signing
     // in. The dashboard used to mount a separate `LanguagePicker` here.
     const onChooseLocale = vi.fn()
-    await renderSettled(<DashboardSignIn locale="he" onChooseLocale={onChooseLocale} />)
+    render(<DashboardSignIn locale="he" onChooseLocale={onChooseLocale} />)
     expect(screen.getByRole('button', { name: 'עברית' })).toHaveAttribute('aria-pressed', 'true')
     await userEvent.click(screen.getByRole('button', { name: 'Русский' }))
     expect(onChooseLocale).toHaveBeenCalledWith('ru')
   })
 
-  it('gives the club mark an accessible name and hides every decorative layer', async () => {
+  it('gives the club mark an accessible name and hides every decorative layer', () => {
     // The ground, the grid, the kanji and Google's own mark are texture. A screen reader
     // announcing 柔道 above the title would be noise, and the crest is the one image here
     // that carries meaning — 'Gladiator Manager', which is what distinguishes this screen
     // from the other two apps' and which the wordmark on the crest cannot say.
-    const { container } = await renderSettled(<DashboardSignIn locale="he" onChooseLocale={vi.fn()} />)
+    const { container } = render(<DashboardSignIn locale="he" onChooseLocale={vi.fn()} />)
     expect(
       screen.getByRole('img', { name: t('he', 'common.appName.dashboard') }),
     ).toBeInTheDocument()
@@ -147,21 +130,21 @@ describe('DashboardSignIn', () => {
     expect(screen.getAllByRole('img')).toHaveLength(1)
   })
 
-  it('makes the sign-in the page heading, not the wordmark', async () => {
+  it('makes the sign-in the page heading, not the wordmark', () => {
     // The export sets the club name at 48px across the top and the card's title at 32px,
     // so the bigger text is the one that is NOT the heading. Ranking them the other way
     // would announce a brand name where a screen reader expects what this page is for.
-    await renderSettled(<DashboardSignIn locale="he" onChooseLocale={vi.fn()} />)
+    render(<DashboardSignIn locale="he" onChooseLocale={vi.fn()} />)
     const headings = screen.getAllByRole('heading')
     expect(headings).toHaveLength(1)
     expect(headings[0]).toHaveTextContent(t('he', 'common.auth.dashboard.title'))
   })
 
-  it('renders the title, the blurb and the copyright from i18n in every locale', async () => {
+  it('renders the title, the blurb and the copyright from i18n in every locale', () => {
     // No inline strings (.claude/rules/ui-rtl-a11y.md). The wordmark deliberately reads
     // the same in all three — see he/common.ts — but the rest must not.
     for (const locale of ['he', 'en', 'ru'] as const) {
-      const { unmount } = await renderSettled(<DashboardSignIn locale={locale} onChooseLocale={vi.fn()} />)
+      const { unmount } = render(<DashboardSignIn locale={locale} onChooseLocale={vi.fn()} />)
       expect(screen.getByText(t(locale, 'common.auth.dashboard.wordmark'))).toBeInTheDocument()
       expect(screen.getByText(t(locale, 'common.auth.dashboard.blurb'))).toBeInTheDocument()
       expect(screen.getByText(t(locale, 'common.auth.dashboard.copyright'))).toBeInTheDocument()

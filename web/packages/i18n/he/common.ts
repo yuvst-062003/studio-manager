@@ -121,9 +121,6 @@ export const common: Bundle = {
   // §6.1's first run. The refusal wording is §6.1's own, verbatim.
   'language.title': 'שפה',
   // -- the parent app's sign-in face (owner's Stitch design, 2026-09-01) ---------
-  // The loading screen's accessible name. Someone using a screen reader sees no dots and
-  // no animation — this sentence is the entire signal that the app is working.
-  'auth.loading': 'טוען את האפליקציה…',
   'auth.parentHint': 'הזדהו עם חשבון Google כדי להיכנס ליומן האימונים, החגורות והתחרויות.',
   'auth.signInWithGoogle': 'התחברות עם Google',
   'auth.rights': 'כל הזכויות שמורות',

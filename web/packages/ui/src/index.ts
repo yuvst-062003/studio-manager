@@ -69,7 +69,6 @@ export { PercentDisplay } from './primitives/PercentDisplay'
 export { ProgressBar } from './primitives/ProgressBar'
 // A range is one ltr island. Three separate bidi bugs came from not having this.
 export { RangeText } from './primitives/RangeText'
-export { SplashScreen } from './first-run/SplashScreen'
 export { Radio } from './primitives/Radio'
 export { SegmentedControl } from './primitives/SegmentedControl'
 export { StatusChip } from './primitives/StatusChip'
