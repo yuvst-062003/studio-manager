@@ -685,6 +685,17 @@ waves:
         status: shipped
         on: 2026-09-08
         source: docs/superpowers/specs/2026-09-08-trial-booking-redesign.md
+      - id: P12
+        title: >-
+          Parent — the trainee card and the plan screen, the two the redesign never
+          reached. A way back on all eight screens behind the tabs; the guardians row
+          reads relation, so an adult member is no longer his own parent; plan cards
+          drawn like the landing page's tiers with upgrade and downgrade said in words;
+          a plan change moves real money on all four routes; a plan pill on home. The
+          superseded screens are deleted, PaymentsSection and PaymentsScreen with them.
+        status: shipped
+        on: 2026-09-08
+        source: docs/superpowers/specs/2026-09-08-trainee-card-and-plan-redesign.md
       - id: J1
         title: >-
           Trial to member — the journey, and the three holes in it. §5.4a ④ has asked
