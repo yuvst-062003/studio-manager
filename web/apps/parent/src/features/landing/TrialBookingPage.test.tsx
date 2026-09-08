@@ -238,6 +238,27 @@ describe('the seam -- what the form actually sends', () => {
 })
 
 describe('the birthdate decides the shape of the form', () => {
+  it('asks for nobody’s contact details until the birthdate says whose', async () => {
+    // `isMinor('')` is `true` by design -- an unknown age counts as a minor wherever a
+    // safety decision turns on it. That default must not reach the screen: a fresh form
+    // used to open with the PARENT block already drawn, asking for a guardian's name and
+    // phone before a birthdate existed to say a guardian was even involved (owner,
+    // 2026-09-08). Neither block belongs there until the date decides which one it is.
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByTestId('trial-booking-page')
+
+    expect(screen.queryByTestId('trial-parent-block')).toBeNull()
+    expect(screen.queryByTestId('trial-own-contact')).toBeNull()
+
+    // And it is the birthdate that reveals it -- a name alone still says nothing about age.
+    await fillTrainee(user, 0, { first: 'יעל', last: 'כהן', birthdate: '' })
+    expect(screen.queryByTestId('trial-parent-block')).toBeNull()
+
+    await fillTrainee(user, 0, { first: 'יעל', last: 'כהן', birthdate: '2019-04-01' })
+    expect(screen.getByTestId('trial-parent-block')).toBeInTheDocument()
+  })
+
   it('renders the parent block for a minor, announced', async () => {
     const user = userEvent.setup()
     renderPage()

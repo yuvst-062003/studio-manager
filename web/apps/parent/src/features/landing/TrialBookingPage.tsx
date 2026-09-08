@@ -181,6 +181,17 @@ export function TrialBookingPage({
 
   const first = trainees[0]!
   const firstIsMinor = isMinor(first.birthdate, today)
+  //: **Known, which is not the same question as under-18.** `isMinor('')` is deliberately
+  //: `true` -- an unknown age is treated as a minor everywhere a safety decision turns on
+  //: it, and that default is right. But it must not make this screen ASK for a parent's
+  //: details before anyone has typed a birthdate: on a fresh form the parent block used to
+  //: be there from the first paint, with no age on screen to justify it (owner,
+  //: 2026-09-08). The block waits until the birthdate says which contact it is asking for.
+  //:
+  //: Only the RENDER is gated. `firstIsMinor`'s other three readers -- `declaredBy`, the
+  //: guardian name split and the contact validation -- all run at submit, and a birthdate
+  //: is required to get there (`errorsFor` below), so the age is known by then.
+  const firstAgeKnown = Number.isFinite(ageFrom(first.birthdate, today))
   const traineeLabel = (index: number) =>
     t(locale, 'people.bookTrial.traineeN').replace('{n}', String(index + 1))
   const nameOf = (row: SubjectRow, index: number) => row.firstName.trim() || traineeLabel(index)
@@ -362,13 +373,14 @@ export function TrialBookingPage({
 
             {trainees.map((row, index) => {
               const age = ageFrom(row.birthdate, today)
-              const contactMode: ContactMode = signedIn
-                ? 'none'
-                : index > 0
-                  ? 'carried'
-                  : firstIsMinor
-                    ? 'parent'
-                    : 'own'
+              const contactMode: ContactMode =
+                signedIn || !firstAgeKnown
+                  ? 'none'
+                  : index > 0
+                    ? 'carried'
+                    : firstIsMinor
+                      ? 'parent'
+                      : 'own'
               return (
                 <TrialTraineeCard
                   carriedFrom={nameOf(first, 0)}
