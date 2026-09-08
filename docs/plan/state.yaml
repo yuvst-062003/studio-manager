@@ -861,6 +861,56 @@ waves:
           reaches for cash.
         status: shipped
         on: 2026-09-07
+      - id: S5c
+        title: Screen 5, revised — the receipt, the floor and the ceiling
+        why: >-
+          Six defects from the owner's review of S5b, and two of them were rules the server
+          did not have.
+
+          S5b's first rule — the debt leads and never moves — was written against ₪208.33
+          owed above buttons offering ₪500, and it created that defect's mirror: ₪375 at
+          the top above a button charging ₪1,275, with nothing explaining the gap. Both
+          versions protect the same thing, that a reader is never asked to assemble a total
+          out of two figures. Freezing the top number was one way; showing the sum is the
+          other, and it is the one that also answers "what am I paying FOR" — which the
+          frozen version could not, because a debt of a shop item plus a month of tuition
+          was a single figure with no way to tell them apart. The headline is now what the
+          button charges and the receipt beneath it is the arithmetic, with the debt as a
+          line inside it. The row labels need nothing new on the wire: `proration_note` is
+          already where both shop routes write the item's name.
+
+          The club's cash term became a floor rather than the whole offer. It was presented
+          as the answer, so a family who wanted five months of cash had no control to say
+          so — while the server had accepted any number all along.
+
+          A family could pay past the end of the season, and nothing anywhere noticed:
+          `MAX_PREPAY_MONTHS` capped ONE order and counted nothing already bought, so
+          twelve months forward followed by twelve more was twenty-four, silently, on both
+          routes. The ceiling is now cumulative, measured off `payer_credit` — the same
+          number the screen already showed as שולם מראש — and enforced in `OrderService`
+          and `PaymentPromiseService` alike. It is expressed in agorot rather than in
+          months so a re-priced family is not rounded two different ways by the screen and
+          the server. It never blocks settling a debt: a family a year ahead who still owes
+          an old month must be able to clear it.
+
+          `student.payment_method` is new, and it exists because a promise structurally
+          cannot carry a card: `payment_promise.method` is IN ('cash','cheque',
+          'standing_order'), so the join wizard recorded three of its four methods and
+          dropped the fourth — and פרופיל, which derived the method from the promise list,
+          told every card family לא הוגדר however many times they answered. Per child,
+          beside `price_plan_id`, because a הוראת קבע mandate is signed per child at that
+          child's own price. S5b's "stored nowhere" is deliberately reversed here: what
+          §5.10 forbids is a stored payment MODE that routes money without asking, and this
+          stores a statement of intent that moves nothing.
+
+          אמצעי תשלום stopped being an inert label and became the picker it was named
+          after. הוראת קבע and צ׳קים are its detail now, revealed by the method selected,
+          rather than two always-open cards shouting at every family regardless of whether
+          they use either. The mandate link is matched to its child by id and not by
+          displayed name — two siblings sharing a name would otherwise sign at the wrong
+          amount, every month, silently.
+        status: shipped
+        on: 2026-09-08
       - id: S6
         title: Screen 6 — calendar
         status: pending
