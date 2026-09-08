@@ -387,6 +387,48 @@ def list_payment_orders(
     )
 
 
+@router.get("/me/payment-orders", response_model=PaymentOrderPage)
+def my_payment_orders(
+    request: Request,
+    session: TenantSessionDep,
+    after: uuid.UUID | None = None,
+    limit: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+) -> PaymentOrderPage:
+    """The way back to a payment page the family opened and walked away from.
+
+    `create` holds a payer's own `pending` order for `REPLACE_GRACE_MINUTES` before a fresh
+    attempt may take it over, and that hold is correct -- uPay's IPN lands about five
+    minutes after a real payment, so releasing the charges sooner would offer the same
+    month for a second card payment while money is already in flight.
+
+    What was missing is the parent's side of that window. The only reads over an order took
+    a `public_ref`, and the parent app held the one it had in React state, which does not
+    survive leaving the screen or closing the PWA. A family who opened uPay, thought better
+    of it and came back therefore met a generic failure for ten minutes with nothing on
+    screen to say why -- the same "you owe X above a button that cannot pay X" dead end
+    `_replaceable_order_ids` was written to end, reached by the other road.
+
+    Scoped to the caller, never to a `payer_person_id` the client may name: `public_ref` is
+    what opens a payment page, so a listing that took its payer from a query parameter
+    would hand one family the way into another family's checkout. Only `pending` orders are
+    returned, because they are the only ones there is anything to resume -- `paid` settled
+    the month, and `amount_mismatch` means real money arrived at the wrong amount and a
+    human must look before anyone pays again.
+    """
+    service = OrderService(session)
+    rows, next_cursor = service.list_orders(
+        status="pending",
+        payer_person_id=_caller(request),
+        after=after,
+        limit=limit,
+    )
+    return PaymentOrderPage(
+        items=[_order_out(service, row) for row in rows],
+        next_cursor=next_cursor,
+        has_more=next_cursor is not None,
+    )
+
+
 @router.post("/payment-orders", response_model=PaymentOrderOut, status_code=status.HTTP_201_CREATED)
 def create_payment_order(
     body: PaymentOrderCreateIn,

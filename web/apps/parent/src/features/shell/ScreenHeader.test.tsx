@@ -65,7 +65,6 @@ const SCREENS_THAT_NEED_A_WAY_BACK = [
   'features/billing/redesign/PlanScreen.tsx',
   'features/belts/BeltProgressScreen.tsx',
   'features/people/DirectionsScreen.tsx',
-  'features/schedule/ChildCalendar.tsx',
   'features/privacy/PrivacyScreen.tsx',
   'features/techniques/TechniqueDetail.tsx',
   'features/billing/redesign/PayScreen.tsx',

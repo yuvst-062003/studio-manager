@@ -73,12 +73,29 @@ describe('the סנכרון יומן popup', () => {
       name: t('he', 'people.profile.calendarSync.apple'),
     })
 
-    // Icon-only: the accessible name comes from `aria-label`, and the glyph itself is
-    // hidden. A `<svg>` left un-hidden inside a labelled control is announced twice.
+    // The glyph stays hidden — an un-hidden `<svg>` inside a labelled control is announced
+    // twice — but the control is no longer icon-ONLY. A generic calendar glyph for Google
+    // and a phone glyph for iOS told a sighted reader nothing about which was which (owner,
+    // 2026-09-08), so each carries a short visible name too.
     for (const control of [copy, google, apple]) {
       expect(control).toHaveAttribute('aria-label')
-      expect(control.textContent).toBe('')
       expect(control.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+    }
+
+    expect(google).toHaveTextContent(t('he', 'people.profile.calendarSync.googleShort'))
+    expect(apple).toHaveTextContent(t('he', 'people.profile.calendarSync.appleShort'))
+    expect(copy).toHaveTextContent(t('he', 'people.profile.calendarSync.copyShort'))
+
+    // WCAG 2.5.3 (label in name): a voice-control user who says what they can SEE must hit
+    // the control they meant. The visible name has to be inside the accessible one, not
+    // merely near it — 'Google' and 'iOS' are what distinguishes these two at all.
+    for (const [control, short] of [
+      [google, 'googleShort'],
+      [apple, 'appleShort'],
+      [copy, 'copyShort'],
+    ] as const) {
+      const accessibleName = control.getAttribute('aria-label') ?? ''
+      expect(accessibleName).toContain(t('he', `people.profile.calendarSync.${short}`))
     }
   })
 

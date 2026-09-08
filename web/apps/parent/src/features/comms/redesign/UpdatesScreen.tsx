@@ -19,7 +19,7 @@
 //    following a design.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {  } from 'lucide-react'
-import { formatDateInStudioZone } from '@studio/core'
+import { formatDateInStudioZone, useRefreshSignal } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { ACTIONS } from '../actionCatalogue'
@@ -89,9 +89,13 @@ export function UpdatesScreen({
     [client],
   )
 
+  // Pull-to-refresh re-reads in place rather than reloading the document
+  // (2026-09-08). It joins the dependency array this loader already has, so the
+  // subscription cannot end up half-wired -- see tools/__tests__/refresh-coverage.
+  const refreshSignal = useRefreshSignal()
   useEffect(() => {
     load(null)
-  }, [load])
+  }, [load, refreshSignal])
 
   /**
    * The next page, and the pending flag that goes with it.

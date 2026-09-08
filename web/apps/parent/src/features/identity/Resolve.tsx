@@ -18,7 +18,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { StudioSwitcher } from '@studio/ui'
 import type { Session } from '@studio/core'
-import { apiFetch, studioDayKey } from '@studio/core'
+import { apiFetch, studioDayKey, useRefreshSignal } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 // Checkpoint 2 of the parent-app redesign. `ParentHome` (artboard 1a, the 2026-09-01
@@ -154,6 +154,9 @@ export function Resolve({
       live = false
     }
   }, [mine, peopleClient, session.access.parent])
+  // Pull-to-refresh re-reads in place instead of reloading the document (2026-09-08).
+  // In the dependency array the loader already has, so this read cannot be half-subscribed.
+  const refreshSignal = useRefreshSignal()
   useEffect(() => {
     if (!session.access.parent) return
     let live = true
@@ -270,7 +273,7 @@ export function Resolve({
     return () => {
       live = false
     }
-  }, [scheduleClient, session.access.parent, intentEpoch])
+  }, [scheduleClient, session.access.parent, intentEpoch, refreshSignal])
 
   // Held while the sole studio is being activated, for the reason the health gate holds
   // its own render: a home drawn before the scope exists is a home whose every read 401s,

@@ -16,7 +16,7 @@
 // loaded may be minutes old, and a manager who repriced a גי in between would otherwise have
 // the app tell a parent one figure while charging another.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { apiFetch, formatAgorot, formatDateInStudioZone } from '@studio/core'
+import { apiFetch, formatAgorot, formatDateInStudioZone, useRefreshSignal } from '@studio/core'
 import type { Locale } from '@studio/i18n'
 import { t } from '@studio/i18n'
 import { DEMO_SIMULATOR, makeParentBillingClient } from '../billingClient'
@@ -54,6 +54,11 @@ export function ClubShop({ locale }: { locale: Locale }) {
   const [orders, setOrders] = useState<readonly OrderRow[] | null>(null)
   const [ordersOpen, setOrdersOpen] = useState(false)
 
+  // Pull-to-refresh re-reads in place rather than reloading the document
+  // (2026-09-08). It joins the dependency array this loader already has, so the
+  // subscription cannot end up half-wired -- see tools/__tests__/refresh-coverage.
+  const refreshSignal = useRefreshSignal()
+
   useEffect(() => {
     let live = true
     // `setFailed(false)` used to sit here, synchronously — which is a cascading render the
@@ -89,7 +94,7 @@ export function ClubShop({ locale }: { locale: Locale }) {
     return () => {
       live = false
     }
-  }, [attempt])
+  }, [attempt, refreshSignal])
 
   useEffect(() => {
     let live = true

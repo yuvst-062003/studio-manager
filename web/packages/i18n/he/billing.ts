@@ -556,5 +556,6 @@ export const billing: Bundle = {
   // ── the ceiling (D6) ────────────────────────────────────────────────────────
   // Said out loud rather than leaving the chips simply absent, which reads as a bug.
   'pay.ceilingReached': 'שילמתם מראש עד הסוף — אפשר לשלם חודשים נוספים כשהמנוי יתקדם.',
+  'pay.noMonthlyPrice': 'למנוי עדיין לא נקבע מחיר חודשי, ולכן אפשר לשלם כאן רק את החוב הקיים. פנו למועדון כדי לשלם חודשים מראש.',
   'pay.secureNote': 'עסקה מאובטחת ע״פ תקן PCI-DSS',
 }

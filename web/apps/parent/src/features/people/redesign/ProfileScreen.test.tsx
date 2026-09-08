@@ -224,16 +224,17 @@ describe('סנכרון יומן inside הגדרות', () => {
     expect(await screen.findByTestId('calendar-sync-popup')).toBeInTheDocument()
   })
 
-  it('still leads to לוח הילד, from a row that says so', async () => {
-    // `#/calendar` had exactly one link in the whole signed-in app and it was the row above,
-    // mislabelled. Splitting them must not strand the screen — the two rows now say which
-    // is which.
+  it('no longer offers לוח האימונים, because the screen behind it is gone', async () => {
+    // Deleted with `#/calendar` itself (owner, 2026-09-08). בית draws the month in its own
+    // modal, with the same lessons and the same absence controls, so the second copy was
+    // one more place for §12b to drift. The row is asserted ABSENT rather than simply
+    // dropped from the file: a link to a route nothing serves is a blank screen, and this
+    // is the assertion that would catch it coming back.
     stubClub()
     renderScreen()
     await userEvent.click(await screen.findByTestId('profile-row-settings'))
-    const link = await screen.findByTestId('link-calendar')
-    expect(link).toHaveAttribute('href', '#/calendar')
-    expect(link).toHaveTextContent(t('he', 'people.profile.trainingCalendar'))
+    expect(await screen.findByTestId('row-calendar-sync')).toBeInTheDocument()
+    expect(screen.queryByTestId('link-calendar')).toBeNull()
   })
 })
 

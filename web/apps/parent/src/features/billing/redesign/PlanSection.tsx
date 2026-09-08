@@ -9,7 +9,7 @@
 // ceiling agree by construction: `refuse_past_ceiling` prices from the payer's monthly
 // total, so the client must read that total AFTER the change has moved it.
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { apiFetch } from '@studio/core'
+import { apiFetch, useRefreshSignal } from '@studio/core'
 import { LoadFailed } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -37,6 +37,9 @@ export function PlanSection({ locale, studentId }: { locale: Locale; studentId: 
   // is exactly one place that writes `view` — the allowance, the offer list and the reasons
   // are all derived from the same server state, and a client that recomputed them would be
   // a second implementation of §5.1.
+  // Pull-to-refresh re-reads in place instead of reloading the document (2026-09-08).
+  // In the dependency array the loader already has, so this read cannot be half-subscribed.
+  const refreshSignal = useRefreshSignal()
   const [reloads, setReloads] = useState(0)
 
   useEffect(() => {
@@ -76,7 +79,7 @@ export function PlanSection({ locale, studentId }: { locale: Locale; studentId: 
     return () => {
       alive = false
     }
-  }, [client, studentId, reloads])
+  }, [client, studentId, reloads, refreshSignal])
 
   const refresh = useCallback(() => setReloads((n) => n + 1), [])
 

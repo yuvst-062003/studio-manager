@@ -482,6 +482,30 @@ export function PayScreen({
                 {plural(locale, 'billing.pay.forward', ask.forwardMonths)}
               </p>
             ) : null}
+            {/* **A greyed chip must say why it is greyed (owner, 2026-09-08).**
+                The report was "I press one month or two months and the amount doesn't
+                change". It could not change: `monthsBlocked` disables every chip whose
+                forward half exceeds `headroom`, and `effectiveMonths` then falls back to
+                the largest chip that is still allowed — so tapping 2 with room for 1 leaves
+                both the selection and the total exactly where they were, with nothing on
+                screen to account for it.
+
+                The cash branch has said this since the ceiling shipped; the card branch,
+                where the owner met it, said nothing at all. Two reasons, because they are
+                genuinely different and the fix for each is different: a family at the
+                twelve-month ceiling has paid ahead, while a child with no open price plan
+                has a `monthly_total_agorot` of 0 — which is not a small allowance but none,
+                and is the club's data to correct, not the parent's. */}
+            {MONTH_CHIPS.some((chip) => monthsBlocked(chip)) ? (
+              <p
+                data-testid="pay-months-capped"
+                className="text-[12px] text-[#444650] dark:text-slate-400 bg-[#e9edff] dark:bg-slate-800 rounded-xl p-2.5"
+              >
+                {terms.monthlyTotalAgorot > 0
+                  ? t(locale, 'billing.pay.ceilingReached')
+                  : t(locale, 'billing.pay.noMonthlyPrice')}
+              </p>
+            ) : null}
 
             {/* ── bug #16: how many payments. The card's second question, and the last
                 one before the button. Below the months rather than beside them: "three

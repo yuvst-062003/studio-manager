@@ -7993,6 +7993,18 @@
             ],
             "title": "Aliyah Year"
           },
+          "belt_rank_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Belt Rank Id"
+          },
           "birthdate": {
             "anyOf": [
               {
@@ -21420,7 +21432,7 @@
     "/api/v1/health": {
       "get": {
         "description": "Liveness. Deliberately carries no tenant data and needs no auth.\n\n`revision` is best-effort and never affects `status`: this endpoint answers \"is this\nprocess alive\", and a database it cannot reach does not make it dead. Letting the\nfailure propagate would turn every database blip into a page.",
-        "operationId": "read_health_api_v1_health_get",
+        "operationId": "read_health_api_v1_health_head",
         "responses": {
           "200": {
             "content": {
@@ -21440,7 +21452,7 @@
       },
       "head": {
         "description": "Liveness. Deliberately carries no tenant data and needs no auth.\n\n`revision` is best-effort and never affects `status`: this endpoint answers \"is this\nprocess alive\", and a database it cannot reach does not make it dead. Letting the\nfailure propagate would turn every database blip into a page.",
-        "operationId": "read_health_api_v1_health_get",
+        "operationId": "read_health_api_v1_health_head",
         "responses": {
           "200": {
             "content": {
@@ -22403,6 +22415,69 @@
           }
         },
         "summary": "Set My Payment Methods",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/me/payment-orders": {
+      "get": {
+        "description": "The way back to a payment page the family opened and walked away from.\n\n`create` holds a payer's own `pending` order for `REPLACE_GRACE_MINUTES` before a fresh\nattempt may take it over, and that hold is correct -- uPay's IPN lands about five\nminutes after a real payment, so releasing the charges sooner would offer the same\nmonth for a second card payment while money is already in flight.\n\nWhat was missing is the parent's side of that window. The only reads over an order took\na `public_ref`, and the parent app held the one it had in React state, which does not\nsurvive leaving the screen or closing the PWA. A family who opened uPay, thought better\nof it and came back therefore met a generic failure for ten minutes with nothing on\nscreen to say why -- the same \"you owe X above a button that cannot pay X\" dead end\n`_replaceable_order_ids` was written to end, reached by the other road.\n\nScoped to the caller, never to a `payer_person_id` the client may name: `public_ref` is\nwhat opens a payment page, so a listing that took its payer from a query parameter\nwould hand one family the way into another family's checkout. Only `pending` orders are\nreturned, because they are the only ones there is anything to resume -- `paid` settled\nthe month, and `amount_mismatch` means real money arrived at the wrong amount and a\nhuman must look before anyone pays again.",
+        "operationId": "my_payment_orders_api_v1_me_payment_orders_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentOrderPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Payment Orders",
         "tags": [
           "billing"
         ]

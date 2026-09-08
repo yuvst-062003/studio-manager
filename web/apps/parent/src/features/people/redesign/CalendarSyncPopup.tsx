@@ -60,12 +60,27 @@ export function rangedFeedUrl(url: string, from: string, to: string): string {
   return `${url}${url.includes('?') ? '&' : '?'}from=${from}&to=${to}`
 }
 
-/** One of the three. Icon-only, so `label` is the ONLY accessible name it has. */
+/**
+ * One of the three. **No longer icon-only (owner, 2026-09-08.)**
+ *
+ * A generic calendar glyph stood for Google and a phone glyph for iOS, which told a reader
+ * nothing about which was which — "the icons are not clear of what is ios calendar and what
+ * is google calendar". The `aria-label`s were right the whole time and invisible, so the
+ * control was legible to a screen reader and a guess to everyone else.
+ *
+ * Each now carries a short VISIBLE name under its icon. The `aria-label` stays the fuller
+ * sentence and still CONTAINS the visible text, which is what WCAG 2.5.3 (label in name)
+ * asks: a voice-control user saying "Google" must hit the control that reads Google.
+ */
 const CONTROL_CLASS =
-  'w-12 h-12 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 ' +
-  'text-[#0056c5] dark:text-blue-300 flex items-center justify-center shadow-xs ' +
+  'flex-1 min-w-0 px-2 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 ' +
+  'text-[#0056c5] dark:text-blue-300 flex flex-col items-center justify-center gap-1 shadow-xs ' +
   'hover:bg-blue-50 dark:hover:bg-blue-400/15 active:scale-95 transition-all cursor-pointer ' +
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0056c5]'
+
+/** The visible name under the glyph. Truncates rather than wrapping a row of three. */
+const CONTROL_LABEL_CLASS =
+  'text-[11px] font-semibold leading-none max-w-full truncate text-slate-700 dark:text-slate-200'
 
 export function CalendarSyncPopup({
   locale,
@@ -207,7 +222,7 @@ export function CalendarSyncPopup({
               `tools/__tests__/inert-buttons.test.ts` exists for, and a disabled-looking
               icon row would say nothing about which of the two is missing. */}
           {url !== null ? (
-            <div className="flex items-center justify-center gap-3 pt-1">
+            <div className="flex items-stretch justify-center gap-2 pt-1">
               <button
                 type="button"
                 onClick={copy}
@@ -216,6 +231,9 @@ export function CalendarSyncPopup({
                 className={CONTROL_CLASS}
               >
                 <Copy className="w-5 h-5" aria-hidden="true" />
+                <span className={CONTROL_LABEL_CLASS} aria-hidden="true">
+                  {t(locale, 'people.profile.calendarSync.copyShort')}
+                </span>
               </button>
               {/* Google's subscribe dialog takes the https:// form. */}
               <a
@@ -227,11 +245,17 @@ export function CalendarSyncPopup({
                 className={CONTROL_CLASS}
               >
                 <Calendar className="w-5 h-5" aria-hidden="true" />
+                <span className={CONTROL_LABEL_CLASS} aria-hidden="true">
+                  {t(locale, 'people.profile.calendarSync.googleShort')}
+                </span>
               </a>
               {/* Apple's is `webcal://`, and the scheme is the whole point: the https://
                   form downloads a one-off snapshot that never updates again, which looks
                   like it worked. §12 — there is no third-party calendar WRITE API on Apple
-                  at all, so subscription is not one option among several. */}
+                  at all, so subscription is not one option among several.
+
+                  The glyph is a phone rather than an apple because the mark is a trademark
+                  we do not ship; the WORD under it is what tells the two apart now. */}
               <a
                 href={webcalUrl(url)}
                 aria-label={t(locale, 'people.profile.calendarSync.apple')}
@@ -239,6 +263,9 @@ export function CalendarSyncPopup({
                 className={CONTROL_CLASS}
               >
                 <Smartphone className="w-5 h-5" aria-hidden="true" />
+                <span className={CONTROL_LABEL_CLASS} aria-hidden="true">
+                  {t(locale, 'people.profile.calendarSync.appleShort')}
+                </span>
               </a>
             </div>
           ) : null}

@@ -20,7 +20,7 @@
 // `/me/standing-order-links` is deliberately NOT here: the mandate links moved to
 // פרופיל → תשלומים with the route itself.
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { apiFetch, formatAgorot, formatDateInStudioZone, formatMonthLabel } from '@studio/core'
+import { apiFetch, formatAgorot, formatDateInStudioZone, formatMonthLabel, useRefreshSignal } from '@studio/core'
 import { LoadFailed } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -43,6 +43,22 @@ type StudentRow = { id: string; first_name: string; last_name: string }
 
 const NO_TERMS: PayTerms = { cashMonths: 0, monthlyTotalAgorot: 0 }
 
+/**
+ * The identity of one ask: the charges it settles, the months it buys forward, and how it
+ * splits. Two asks with the same key may share one payment order; two with different keys
+ * must not, which is what stops a resume from reopening a page for the wrong amount.
+ *
+ * **Charge ids are sorted.** The screen builds them oldest-first out of `askFor`, and the
+ * server returns `charge_ids` in its own order — a match that depended on the two happening
+ * to agree would be a resume that worked by luck and stopped working on a re-order nobody
+ * would think to look at.
+ */
+const orderKey = (
+  chargeIds: readonly string[],
+  forwardMonths: number,
+  instalments: number,
+): string => `${[...chargeIds].sort().join(',')}|${forwardMonths}|${instalments}`
+
 export function ParentPayments({ locale }: { locale: Locale }) {
   const billing = useMemo(() => makeParentBillingClient(apiFetch), [])
   const [debts, setDebts] = useState<readonly DebtRow[] | null>(null)
@@ -59,6 +75,11 @@ export function ParentPayments({ locale }: { locale: Locale }) {
   // loader directly, so there is exactly one writer for `debts` — two racing writers
   // would leave the screen showing a list nobody asked for.
   const [reloads, setReloads] = useState(0)
+  // Pull-to-refresh re-reads in place instead of reloading the document (2026-09-08). It
+  // joins the dependency array the loader already has, so this read cannot end up
+  // half-subscribed — and the loader never blanks `debts` first, so the screen stays on
+  // screen under the spinner instead of flashing back to its skeleton.
+  const refreshSignal = useRefreshSignal()
   /**
    * A card order opened but not yet handed to the overlay, and the ask it was opened for.
    *
@@ -137,7 +158,7 @@ export function ParentPayments({ locale }: { locale: Locale }) {
     return () => {
       live = false
     }
-  }, [billing, reloads])
+  }, [billing, reloads, refreshSignal])
 
   const refresh = useCallback(() => setReloads((n) => n + 1), [])
 
@@ -171,17 +192,31 @@ export function ParentPayments({ locale }: { locale: Locale }) {
         // 1. It is part of the reuse KEY as well: an order opened for one payment and then
         // handed back for three would put the parent on a uPay page for terms they did not
         // pick, which is the same failure the month count is already keyed against.
-        const key = `${ask.chargeIds.join(',')}|${ask.forwardMonths}|${ask.instalments}`
-        const publicRef =
-          pendingOrder?.key === key
-            ? pendingOrder.publicRef
-            : (
-                await billing.createOrder(
-                  [...ask.chargeIds],
-                  ask.instalments,
-                  ask.forwardMonths,
-                )
-              ).public_ref
+        const key = orderKey(ask.chargeIds, ask.forwardMonths, ask.instalments)
+        let publicRef = pendingOrder?.key === key ? pendingOrder.publicRef : null
+        if (publicRef === null) {
+          // An order of the family's OWN, still pending over exactly these charges, is the
+          // page to reopen — not a second one. `create` refuses for REPLACE_GRACE_MINUTES
+          // while it stands, and `pendingOrder` above cannot carry us there: it is cleared
+          // the moment a form opens, and dies outright when the screen unmounts or the PWA
+          // closes. So a parent who opened uPay and came back met `billing.pay.failed` with
+          // nothing on screen to say why, for ten minutes (owner report, 2026-09-08).
+          const resumable = (await billing.myOpenOrders()).find(
+            (order) =>
+              // Both carry a server-side default, so the generated client types them
+              // optional; an order that named no charges is a forward-only buy, not a
+              // reason to skip the comparison.
+              orderKey(
+                (order.charge_ids ?? []).map(String),
+                order.prepay_months ?? 0,
+                order.max_payments,
+              ) === key,
+          )
+          publicRef =
+            resumable?.public_ref ??
+            (await billing.createOrder([...ask.chargeIds], ask.instalments, ask.forwardMonths))
+              .public_ref
+        }
         setPendingOrder({ publicRef, key })
         const form = await billing.orderForm(publicRef)
         setPendingOrder(null)

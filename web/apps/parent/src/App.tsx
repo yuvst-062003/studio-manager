@@ -37,13 +37,10 @@ import type { ParentTab } from './features/shell/ParentTabBar'
 import { AccessGate } from './features/identity/AccessGate'
 import type { InvitedStudent } from './features/identity/AccessGate'
 import { Resolve } from './features/identity/Resolve'
-import { ScheduleSection, isCalendarRoute } from './features/schedule/ScheduleSection'
 // `12a` — the absence pre-report (P1). Every layer of this feature existed except a line
 // of routing, so nothing in the product could produce an absence report — the state the
 // staff roster, the dashboard count and `הודעתם מראש` are all built to read.
-import { AbsenceScreen, makeAbsenceClient } from './features/absence'
 import { registerAttendanceSections } from './features/attendance'
-import { makeParentScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
 import {
   LegalPage,
@@ -473,17 +470,14 @@ function AuthedApp() {
   // an RTL document and hears it announced with a Hebrew voice.
   useDocumentLocale(locale)
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
-  // Both memoised for the same reason: each screen reads through its client in an effect
-  // keyed on the client, so a fresh object every render would re-fetch forever — the
-  // month for 12b, the club for 13a.
-  const scheduleClient = useMemo(() => makeParentScheduleClient(apiFetch), [])
+  // Memoised for the same reason each time: a screen reads through its client in an effect
+  // keyed on the client, so a fresh object every render would re-fetch forever.
   const billingClient = useMemo(() => makeParentBillingClient(apiFetch), [])
   const peopleClient = useMemo(() => makePeopleClient(apiFetch), [])
   const eventsClient = useMemo(() => makeParentEventsClient(apiFetch), [])
   const beltsClient = useMemo(() => makeParentBeltsClient(apiFetch), [])
   const commsClient = useMemo(() => makeParentCommsClient(apiFetch), [])
   const healthClient = useMemo(() => makeHealthClient(apiFetch), [])
-  const absenceClient = useMemo(() => makeAbsenceClient(apiFetch), [])
   const privacyClient = useMemo(() => makePrivacyClient(apiFetch), [])
   // §3 Door C -- the manager's invitation (`/?invite=<token>`), and now also the trial
   // follow-up's reuse of that same link for a family who may already have full access
@@ -678,7 +672,6 @@ function AuthedApp() {
     ? (hash.slice('#/payment-complete/'.length).split(/[?&#/]/)[0] ?? '')
     : ''
   // `12a` — the absence pre-report.
-  const onAbsence = hash === '#/absence'
   // `2c` — the student card, per child.
   const cardStudentId = hash.startsWith('#/student/') ? hash.slice('#/student/'.length) : ''
   // 12i — the profile tab's screen (ship-audit B4: built in W2, mounted by nothing).
@@ -896,33 +889,7 @@ function AuthedApp() {
               now, and the payments screen (Profile → תשלומים) is where anyone changes one.
               Neither blocks the app. `App.test.tsx`'s "no second payment question" guards
               it. */}
-          {session.access.parent && isCalendarRoute(hash) ? (
-            // §5.12's subscription panel used to stand under this calendar. **Deleted, not
-            // moved out of the way (#29, 2026-09-08):** the owner reported that הגדרות →
-            // סנכרון יומן — whose one job is the subscribe controls — opened THIS screen and
-            // buried them below a whole month of lessons. They are a popup on that row now
-            // (`features/people/redesign/CalendarSyncPopup.tsx`), so `#/calendar` is לוח
-            // הילד and nothing else, and there is no second copy of §5.12 to drift.
-            <ScheduleSection
-                locale={locale}
-                client={scheduleClient}
-                hash={hash}
-                today={today}
-                // The popup a lesson opens writes through `12a`'s client, not a second
-                // one: the deadline, the refusal codes and the no-queue rule are all
-                // already correct there, and two clients is two places for them to drift.
-                absence={absenceClient}
-            />
-          ) : onAbsence ? (
-            // `12a`. The children come from the same read §6.1's gate makes; inside the
-            // gate they are non-null. The screen itself refuses to work offline, on
-            // purpose (§10.2) — preserve that by never wrapping it in a cache.
-            <AbsenceScreen
-              client={absenceClient}
-              locale={locale}
-              children={(gatedChildren ?? []).map(({ id, display_name }) => ({ id, display_name }))}
-            />
-          ) : cardStudentId ? (
+          {cardStudentId ? (
             <TraineeCardSection client={peopleClient} locale={locale} studentId={cardStudentId} />
           ) : paymentCompleteRef ? (
             <PaymentCompleteSection locale={locale} publicRef={paymentCompleteRef} />

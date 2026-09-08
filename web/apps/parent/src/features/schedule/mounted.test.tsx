@@ -5,7 +5,6 @@
 // imported nothing from this folder. A component test renders the component directly,
 // which is exactly the thing a guardian cannot do. This one renders `App` and navigates
 // the way a guardian does — by the hash, and by the nav drawer.
-import userEvent from '@testing-library/user-event'
 import { render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../../App'
@@ -67,33 +66,22 @@ afterEach(() => {
 })
 
 describe('the parent app mounts lane SCHEDULE', () => {
-  it('renders 12b לוח הילד at #/calendar', async () => {
+  it('no longer serves 12b לוח הילד at #/calendar, and falls back to home', async () => {
+    // Deleted with its settings row (owner, 2026-09-08): בית draws the month in its own
+    // modal (`features/home/redesign/MonthCalendarModal`) with the same lessons and the
+    // same absence controls, so לוח הילד was a second copy of §12b to keep in step.
+    //
+    // The hash is asserted to fall THROUGH to home rather than merely to stop rendering the
+    // calendar. A deleted route that matched nothing and rendered nothing would be a blank
+    // screen for anyone holding the old link — a bookmark, or a phone that restored the
+    // tab — and blank is the one outcome no test would otherwise notice.
     globalThis.location.hash = '#/calendar'
     vi.stubGlobal('fetch', signedInAs({ parent: true }))
 
     render(<App />)
 
-    await waitFor(() => expect(screen.getByTestId('child-calendar')).toBeInTheDocument())
-  })
-
-  it('offers the calendar from a screen, so the hash is not the only way in', async () => {
-    // A screen reachable only by typing a URL is not reachable on a phone. This used to
-    // open the nav drawer; the redesign deleted it (§4), and the owner's review of
-    // 2026-09-06 turned פרופיל into a card of button-rows — so the link now sits inside the
-    // הגדרות sheet, as §5.12's CALENDAR FEED. That is what `#/calendar` still exists for
-    // now that בית draws the month itself in a modal.
-    //
-    // The test WALKS that path rather than asserting the link is on the surface: one tap is
-    // reachable, and a test that demanded no taps would be asserting a layout instead of
-    // the property it was written for — that something in the running app leads here.
-    globalThis.location.hash = '#/profile'
-    vi.stubGlobal('fetch', signedInAs({ parent: true }))
-
-    render(<App />)
-
-    await userEvent.click(await screen.findByTestId('profile-row-settings'))
-    const link = await screen.findByTestId('link-calendar')
-    expect(link).toHaveAttribute('href', '#/calendar')
+    await waitFor(() => expect(screen.queryByTestId('child-calendar')).toBeNull())
+    expect(await screen.findByTestId('parent-home')).toBeInTheDocument()
   })
 
   it('leaves home as home on every other hash', async () => {

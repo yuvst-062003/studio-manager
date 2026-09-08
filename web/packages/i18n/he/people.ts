@@ -404,7 +404,6 @@ export const people: Bundle = {
   'trialHome.countdown': 'עוד {n} ימים',
   'trialHome.tomorrow': 'מחר',
   'trialHome.today': 'היום',
-  'trialHome.addToCalendar': 'הוספה ליומן',
   'trialHome.directions': 'איך מגיעים',
   'trialHome.whatToBring': 'מה להביא',
   'trialHome.whatToBringHint': 'בגדים נוחים ובקבוק מים. הגיעו עשר דקות לפני',
@@ -627,7 +626,6 @@ export const people: Bundle = {
   // לוח הילד (12b) at `#/calendar`. It used to hide behind the 'סנכרון יומן' label above,
   // which is how tapping "calendar sync" opened a calendar screen instead of the subscribe
   // controls (owner, 2026-09-08). Two rows now, each saying what it opens.
-  'profile.trainingCalendar': 'לוח האימונים',
   'profile.close': 'סגירה',
   // -- #29's סנכרון יומן popup ------------------------------------------------------
   // A date range, then three ICON-ONLY controls. Every one of those three names is an
@@ -641,6 +639,14 @@ export const people: Bundle = {
   'profile.calendarSync.copy': 'העתקת קישור היומן',
   'profile.calendarSync.google': 'הוספה ליומן Google',
   'profile.calendarSync.apple': 'הוספה ליומן iOS',
+  // The three controls are ICON-ONLY no longer. A generic calendar glyph and a phone
+  // glyph gave a reader nothing to tell Google from iOS by (owner, 2026-09-08); the
+  // aria-labels above were correct and invisible. These are the VISIBLE names, kept short
+  // enough for three side by side, and each is a substring of its aria-label above so
+  // WCAG 2.5.3 (label in name) still holds.
+  'profile.calendarSync.copyShort': 'העתקת קישור',
+  'profile.calendarSync.googleShort': 'Google',
+  'profile.calendarSync.appleShort': 'iOS',
   'profile.calendarSync.copied': 'הקישור הועתק',
   'profile.loading': 'טוען…',
   // -- when a פרופיל sheet's own read failed --------------------------------------

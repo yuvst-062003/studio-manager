@@ -133,6 +133,24 @@ export function AccessibilityMenu({
       )}
 
       {open ? (
+        <>
+        {/* **A scrim, and a centred panel (owner, 2026-09-08).** This was a 20rem rectangle
+            pinned to the bottom corner — `aria-modal="true"` and a focus trap already said
+            it was a dialog, while the layout said it was a dropdown, and inside the app it
+            read as something stuck to the edge of the screen rather than a thing the reader
+            had opened. The scrim is what makes the two agree: the page behind is dimmed and
+            inert, which is the promise `aria-modal` is already making to a screen reader.
+
+            Click-to-dismiss goes on the scrim rather than on a document listener, because
+            the panel is a sibling here and not a child — a listener on the document would
+            have to exclude the panel's own subtree, and every control inside it would be one
+            `stopPropagation` away from closing the dialog it lives in. */}
+        <div
+          className="studio-a11y__scrim"
+          data-testid="a11y-scrim"
+          aria-hidden="true"
+          onClick={() => setOpen(false)}
+        />
         <div
           role="dialog"
           aria-modal="true"
@@ -220,6 +238,7 @@ export function AccessibilityMenu({
             </Button>
           </div>
         </div>
+        </>
       ) : null}
     </>
   )

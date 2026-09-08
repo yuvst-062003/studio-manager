@@ -519,7 +519,6 @@ export const schedule: Bundle = {
   'plan.choose': 'Выбрать этот тариф',
   'plan.confirmTitle': 'Подтверждение смены тарифа',
   'plan.howWillYouPay': 'Как вы хотите оплатить?',
-  'plan.payLater': 'Оплачу через приложение',
   'plan.alreadyPaid': 'Уже оплачено',
   'plan.claimMethod': 'Как было оплачено?',
   'plan.claimHint': 'Менеджер получит уведомление и подтвердит получение оплаты.',

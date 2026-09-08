@@ -396,21 +396,13 @@ export function SettingsSheet({
           <span>{t(locale, 'people.profile.privacy')}</span>
           <ChevronLeft className="w-4 h-4 text-slate-400" aria-hidden="true" />
         </a>
-        {/* **Two rows where there was one (#29, owner 2026-09-08).** The single row was
-            labelled 'סנכרון יומן' and pointed at `#/calendar` — לוח הילד, a whole calendar
-            SCREEN, with the subscribe panel stacked below it. So the label promised the
-            subscribe controls and the tap delivered a calendar.
-
-            Splitting them keeps both honest, and keeps לוח הילד reachable: `#/calendar` had
-            exactly one link in the entire signed-in app and it was this one. */}
-        <a
-          href="#/calendar"
-          data-testid="link-calendar"
-          className="flex items-center justify-between px-3.5 py-3 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer"
-        >
-          <span>{t(locale, 'people.profile.trainingCalendar')}</span>
-          <ChevronLeft className="w-4 h-4 text-slate-400" aria-hidden="true" />
-        </a>
+        {/* **One row again, and this time it is the right one (owner, 2026-09-08).** #29
+            split 'סנכרון יומן' into a subscribe popup and a לוח האימונים link, because the
+            single row promised the subscribe controls and delivered a whole calendar screen.
+            The link is now gone with the screen it pointed at: לוח הילד was superseded by
+            the home screen's own month view (`features/home/redesign/MonthCalendarModal`),
+            which carries the same lessons and the same absence controls, so a second copy
+            was one more place for §12b to drift. */}
         <button
           type="button"
           aria-haspopup="dialog"

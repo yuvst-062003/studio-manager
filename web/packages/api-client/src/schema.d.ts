@@ -1710,7 +1710,7 @@ export interface paths {
          *     process alive", and a database it cannot reach does not make it dead. Letting the
          *     failure propagate would turn every database blip into a page.
          */
-        get: operations["read_health_api_v1_health_get"];
+        get: operations["read_health_api_v1_health_head"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1723,7 +1723,7 @@ export interface paths {
          *     process alive", and a database it cannot reach does not make it dead. Letting the
          *     failure propagate would turn every database blip into a page.
          */
-        head: operations["read_health_api_v1_health_get"];
+        head: operations["read_health_api_v1_health_head"];
         patch?: never;
         trace?: never;
     };
@@ -2166,6 +2166,45 @@ export interface paths {
          *     then presses save again and changes the first child twice.
          */
         put: operations["set_my_payment_methods_api_v1_me_payment_methods_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/payment-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Payment Orders
+         * @description The way back to a payment page the family opened and walked away from.
+         *
+         *     `create` holds a payer's own `pending` order for `REPLACE_GRACE_MINUTES` before a fresh
+         *     attempt may take it over, and that hold is correct -- uPay's IPN lands about five
+         *     minutes after a real payment, so releasing the charges sooner would offer the same
+         *     month for a second card payment while money is already in flight.
+         *
+         *     What was missing is the parent's side of that window. The only reads over an order took
+         *     a `public_ref`, and the parent app held the one it had in React state, which does not
+         *     survive leaving the screen or closing the PWA. A family who opened uPay, thought better
+         *     of it and came back therefore met a generic failure for ten minutes with nothing on
+         *     screen to say why -- the same "you owe X above a button that cannot pay X" dead end
+         *     `_replaceable_order_ids` was written to end, reached by the other road.
+         *
+         *     Scoped to the caller, never to a `payer_person_id` the client may name: `public_ref` is
+         *     what opens a payment page, so a listing that took its payer from a query parameter
+         *     would hand one family the way into another family's checkout. Only `pending` orders are
+         *     returned, because they are the only ones there is anything to resume -- `paid` settled
+         *     the month, and `amount_mismatch` means real money arrived at the wrong amount and a
+         *     human must look before anyone pays again.
+         */
+        get: operations["my_payment_orders_api_v1_me_payment_orders_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -9548,6 +9587,8 @@ export interface components {
         OnboardingChildIn: {
             /** Aliyah Year */
             aliyah_year?: string | null;
+            /** Belt Rank Id */
+            belt_rank_id?: string | null;
             /** Birthdate */
             birthdate?: string | null;
             /** First Name */
@@ -16203,7 +16244,7 @@ export interface operations {
             };
         };
     };
-    read_health_api_v1_health_get: {
+    read_health_api_v1_health_head: {
         parameters: {
             query?: never;
             header?: never;
@@ -16223,7 +16264,7 @@ export interface operations {
             };
         };
     };
-    read_health_api_v1_health_get: {
+    read_health_api_v1_health_head: {
         parameters: {
             query?: never;
             header?: never;
@@ -16828,6 +16869,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaymentMethodListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_payment_orders_api_v1_me_payment_orders_get: {
+        parameters: {
+            query?: {
+                after?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentOrderPage"];
                 };
             };
             /** @description Validation Error */

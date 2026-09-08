@@ -346,7 +346,6 @@ export const people: Bundle = {
   'trialHome.countdown': 'Осталось дней: {n}',
   'trialHome.tomorrow': 'Завтра',
   'trialHome.today': 'Сегодня',
-  'trialHome.addToCalendar': 'Добавить в календарь',
   'trialHome.directions': 'Как добраться',
   'trialHome.whatToBring': 'Что взять с собой',
   'trialHome.whatToBringHint':
@@ -521,7 +520,6 @@ export const people: Bundle = {
   // лоח הילד (12b) at `#/calendar`. It used to hide behind the label above, which is how
   // tapping "calendar sync" opened a calendar screen instead of the subscribe controls
   // (owner, 2026-09-08). Two rows now, each saying what it opens.
-  'profile.trainingCalendar': 'Расписание тренировок',
   'profile.close': 'Закрыть',
   // -- #29's calendar-sync popup ----------------------------------------------------
   // A date range, then three ICON-ONLY controls. Every one of those three names is an
@@ -535,6 +533,9 @@ export const people: Bundle = {
   'profile.calendarSync.copy': 'Скопировать ссылку на календарь',
   'profile.calendarSync.google': 'Добавить в Google Календарь',
   'profile.calendarSync.apple': 'Добавить в календарь iOS',
+  'profile.calendarSync.copyShort': 'Копировать',
+  'profile.calendarSync.googleShort': 'Google',
+  'profile.calendarSync.appleShort': 'iOS',
   'profile.calendarSync.copied': 'Ссылка скопирована',
   'profile.loading': 'Загрузка…',
   // -- when a פרופיל sheet's own read failed --------------------------------------

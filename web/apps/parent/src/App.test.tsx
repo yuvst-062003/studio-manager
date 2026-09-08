@@ -212,10 +212,18 @@ describe('an account with no studio at all (mirrors the dashboard app’s 2026-0
 })
 
 describe('the P1 routes — screens that were built and rendered by nothing', () => {
-  it('routes #/absence to the absence pre-report', async () => {
+  it('no longer routes #/absence, because בית reports an absence itself', async () => {
+    // `12a`'s standalone screen is deleted (owner, 2026-09-08). Home carries the newer flow
+    // — `AllDayAbsenceSheet` for one lesson and `RangeAbsenceSheet` for a family away for a
+    // week — so the old screen was a second, thinner way to write the same report.
+    //
+    // Asserted to fall through to home rather than merely to stop rendering: an old link on
+    // a phone that restored its tab must land somewhere, and a route matching nothing would
+    // render a blank screen no other test looks at.
     globalThis.location.hash = '#/absence'
     render(<App />)
-    await waitFor(() => expect(screen.getByTestId('absence-screen')).toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByTestId('absence-screen')).toBeNull())
+    expect(await screen.findByTestId('parent-home')).toBeInTheDocument()
   })
 
   it('routes #/payments/history to the payment history screen', async () => {

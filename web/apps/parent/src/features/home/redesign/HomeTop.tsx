@@ -1,4 +1,4 @@
-import { Bell, ChevronLeft, Ticket } from 'lucide-react'
+import { Bell, Ticket } from 'lucide-react'
 
 import { fill, formatAgorot } from '@studio/core'
 import { t } from '@studio/i18n'
@@ -51,6 +51,33 @@ export function HomeTop({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* ── The plan, beside the bell ───────────────────────────────────────────────
+           *
+           * D1/D3 — home said nothing about the plan, and the plan screen had ONE link in
+           * the whole signed-in app: profile tab → המתאמנים שלי sheet → the child's card →
+           * the מסלול row. Three taps, on the screen a parent goes to in order to change
+           * their own phone number. The upgrade offer §5.1 computes is the club's main
+           * upsell.
+           *
+           * **A control in the header, not a card under it (owner, 2026-09-08.)** It was a
+           * full-width row of its own — "the current plan should be an icon next to the
+           * bell, not a full button". Two rules survive that move and shape what is left:
+           * it still reads AT REST, because a bare glyph answers "what am I on?" only after
+           * you have already asked it; and it still never invents a number, so a family
+           * with several children and none chosen shows no amount at all.
+           *
+           * So the compact form keeps the PRICE and drops the caption and the chevron — the
+           * price is the fact a parent recognises their plan by, and the caption said only
+           * that a plan is a plan.
+           *
+           * D2 — it cannot come from a read home already makes. `StudentSummaryOut` omits
+           * `price_plan_id` on purpose: that shape is the coach-reachable roster row, and
+           * invariant 3 keeps the price off it. `GET /me/training-plans` is the
+           * parent-scoped read, and `Resolve` fetches it with everything else so home keeps
+           * its rule of not fetching.
+           */}
+          {plan ? <PlanPill locale={locale} plan={plan} /> : null}
+
           {/* No absence button here (owner, 2026-09-07). There were TWO reading
               "דיווח היעדרות" on this screen and they did different things: this one opened
               `#/absence` — one child, one session, picked from scratch — while the floating
@@ -58,8 +85,9 @@ export function HomeTop({
               away was thirty trips through the single-session form. Two buttons with the
               same words and different behaviour is worse than either alone, and the single
               case is already better served by `נעדר/ת?` on the lesson card itself, where
-              the lesson is in front of you. `#/absence` stays reachable from the calendar
-              (`ChildCalendar`'s `calendar-absence`). */}
+              the lesson is in front of you. `#/absence` and the calendar that was its last
+              link are both gone since 2026-09-08 — the range sheet and the lesson card are
+              now the only two ways to report an absence, which is the point. */}
 
           {/* A way into עדכונים, and NOT a second unread indicator (owner, 2026-09-07).
               The red count and the ringing-bell state were removed: the tab bar already
@@ -78,24 +106,6 @@ export function HomeTop({
           </button>
         </div>
       </div>
-
-      {/* ── The plan pill ────────────────────────────────────────────────────────────
-       *
-       * D1/D3 — home said nothing about the plan, and the plan screen had ONE link in the
-       * whole signed-in app: profile tab → המתאמנים שלי sheet → the child's card → the
-       * מסלול row. Three taps, on the screen a parent goes to in order to change their own
-       * phone number. The upgrade offer §5.1 computes is the club's main upsell.
-       *
-       * It shows the plan AT REST rather than only on press (owner, 2026-09-08), because a
-       * bare icon answers "what am I on?" only after you have already asked it.
-       *
-       * D2 — it cannot come from a read home already makes. `StudentSummaryOut` omits
-       * `price_plan_id` on purpose: that shape is the coach-reachable roster row, and
-       * invariant 3 keeps the price off it. `GET /me/training-plans` is the parent-scoped
-       * read, and `Resolve` fetches it with everything else so home keeps its rule of not
-       * fetching.
-       */}
-      {plan ? <PlanPill locale={locale} plan={plan} /> : null}
 
       {/* No urgent banner (owner, 2026-09-07). It said "דרוש טיפול דחוף בהרשמה" over an
           outstanding balance or a missing declaration — neither of which is urgent in the
@@ -180,35 +190,45 @@ export type HomePlan = {
 }
 
 function PlanPill({ locale, plan }: { locale: Locale; plan: HomePlan }) {
+  /** The full sentence, and the control's accessible name. Unabbreviated: the visible face
+   *  is a price, and a price alone does not say it is a plan. */
   const label = plan.isFamilyWide
     ? t(locale, 'schedule.plan.familyPill')
     : [plan.planName, plan.monthlyAgorot === null ? null : formatAgorot(plan.monthlyAgorot)]
         .filter(Boolean)
         .join(' · ')
 
+  /**
+   * What is drawn, which is deliberately less than what is said.
+   *
+   * The price, when there is one — it is what a parent recognises their own plan by, and it
+   * fits beside a bell where "פעמיים בשבוע · ₪300" does not. `null` where no single price
+   * is TRUE: a family with several children and none selected would need a sum the club
+   * never charges, so the glyph stands alone and the name carries the rest.
+   */
+  const face =
+    plan.isFamilyWide || plan.monthlyAgorot === null ? null : formatAgorot(plan.monthlyAgorot)
+
   return (
     <a
       href={plan.isFamilyWide || plan.studentId === null ? '#/profile' : `#/plan/${plan.studentId}`}
       data-testid="home-plan-pill"
-      className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-[0.99] transition-all cursor-pointer"
+      // Matches the bell's own shape so the two read as one cluster of controls rather than
+      // a control and a leftover: same radius, same border, same surface, same press.
+      title={label}
+      aria-label={`${t(locale, 'schedule.plan.title')}: ${label}`}
+      className="flex items-center gap-1.5 ps-2 pe-2.5 py-2.5 rounded-2xl bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700 shadow-xs active:scale-95 transition-all cursor-pointer text-[#0056c5] dark:text-blue-300"
     >
-      <span className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-400/15 text-[#0056c5] dark:text-blue-300 flex items-center justify-center shrink-0">
-        <Ticket className="w-4 h-4" aria-hidden="true" />
-      </span>
-      <span className="flex-1 min-w-0 text-start">
-        <span className="block text-[10px] font-semibold text-slate-400 dark:text-slate-500">
-          {t(locale, 'schedule.plan.title')}
+      <Ticket className="w-5 h-5 shrink-0" aria-hidden="true" />
+      {face === null ? null : (
+        <span
+          data-testid="home-plan-pill-amount"
+          className="text-xs font-bold tabular-nums text-slate-900 dark:text-slate-50"
+          aria-hidden="true"
+        >
+          <bdi>{face}</bdi>
         </span>
-        <span className="block text-xs font-bold text-slate-900 dark:text-slate-50 truncate">
-          <bdi>{label}</bdi>
-        </span>
-      </span>
-      {/* ChevronLeft, not Right: in a right-to-left document "onward" points left, which is
-          the direction every other disclosure arrow in this app already goes. */}
-      <ChevronLeft
-        className="w-4 h-4 text-slate-300 dark:text-slate-600 shrink-0"
-        aria-hidden="true"
-      />
+      )}
     </a>
   )
 }

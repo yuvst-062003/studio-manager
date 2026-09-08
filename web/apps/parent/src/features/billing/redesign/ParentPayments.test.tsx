@@ -46,6 +46,7 @@ let promises: unknown[]
 let terms: { cash_prepay_months: number; cheque_prepay_months: number; monthly_total_agorot: number }
 let creditAgorot: number
 let standingOrderActive: boolean
+let openOrders: unknown[]
 let orderResponse: () => Response
 let formResponse: () => Response
 
@@ -76,6 +77,8 @@ function respond(path: string, init?: RequestInit): Response {
     })
   }
   if (path.startsWith('/api/v1/me/standing-order')) return jsonResponse({ active: standingOrderActive })
+  // Before `/api/v1/payment-orders`: this is the payer's own listing, not the create.
+  if (path.startsWith('/api/v1/me/payment-orders')) return jsonResponse({ items: openOrders })
   if (path.endsWith('/form')) return formResponse()
   if (path.startsWith('/api/v1/payment-orders')) return orderResponse()
   return jsonResponse({ items: [] })
@@ -97,6 +100,7 @@ beforeEach(async () => {
   terms = { cash_prepay_months: 3, cheque_prepay_months: 12, monthly_total_agorot: MONTHLY }
   creditAgorot = 0
   standingOrderActive = false
+  openOrders = []
   orderResponse = () => jsonResponse({ public_ref: 'ref-1' })
   formResponse = () =>
     jsonResponse({ action: 'https://app.upay.co.il/checkout', fields: { ref: 'ref-1' } })
@@ -529,5 +533,92 @@ describe('the states either side of owing money', () => {
     const last = screen.getByTestId('pay-last-payment')
     expect(last).toHaveTextContent('250₪')
     expect(last).not.toHaveTextContent('999₪')
+  })
+})
+
+describe('a payment the family opened and walked away from', () => {
+  // The owner's report: "if I pressed pay, didn't complete the pay and exit, the app
+  // doesn't allow me to open the payment link again."
+  //
+  // `create` holds the payer's own pending order for REPLACE_GRACE_MINUTES — correctly,
+  // since uPay's IPN lands about five minutes after a real payment. The half that was
+  // missing is the way back: the `public_ref` lived in React state, which is cleared the
+  // moment a form opens and gone entirely when the screen unmounts. So the second attempt
+  // POSTed a new order over charges the first one still claimed, was refused 409, and the
+  // screen showed a generic failure with nothing to say why.
+  const RESUMABLE = {
+    public_ref: 'ref-abandoned',
+    status: 'pending',
+    charge_ids: [CHARGE.id],
+    prepay_months: 0,
+    max_payments: 1,
+  }
+
+  it('reopens the order it already has instead of asking for a second one', async () => {
+    openOrders = [RESUMABLE]
+    const user = await open()
+    await user.click(payButton())
+
+    await waitFor(() =>
+      expect(calls.some((call) => call.path === '/api/v1/payment-orders/ref-abandoned/form')).toBe(
+        true,
+      ),
+    )
+    // The point of the fix: no second order is created over charges the first still holds.
+    const created = calls.filter(
+      (call) => call.path.startsWith('/api/v1/payment-orders?') && call.init?.method === 'POST',
+    )
+    expect(created).toHaveLength(0)
+  })
+
+  it('still opens a fresh order when the pending one is for a different ask', async () => {
+    // A stuck order must not be reused for a different amount — that would open a payment
+    // page for money the family did not agree to. Two months forward is a different ask.
+    openOrders = [{ ...RESUMABLE, prepay_months: 2 }]
+    const user = await open()
+    await user.click(payButton())
+
+    await waitFor(() =>
+      expect(
+        calls.some(
+          (call) => call.path.startsWith('/api/v1/payment-orders?') && call.init?.method === 'POST',
+        ),
+      ).toBe(true),
+    )
+    // and the form fetched is the NEW order's, not the stuck one's
+    expect(calls.some((call) => call.path === '/api/v1/payment-orders/ref-1/form')).toBe(true)
+  })
+})
+
+describe('a month chip that cannot be chosen says why', () => {
+  // The owner's report: "when I press to pay in card one month or two months, that amount
+  // doesn't change." It could not. `monthsBlocked` disables every chip whose forward half
+  // exceeds the headroom and `effectiveMonths` falls back to the largest allowed chip, so
+  // the tap changed neither the selection nor the total — silently. The cash branch had
+  // explained this since the ceiling shipped; the card branch, where the owner met it,
+  // said nothing.
+  it('names the ceiling when the family has paid as far ahead as the club takes', async () => {
+    creditAgorot = 12 * MONTHLY // exactly the twelve-month ceiling: no room for a forward month
+    await open()
+    expect(screen.getByTestId('pay-months-capped')).toHaveTextContent(
+      t('he', 'billing.pay.ceilingReached'),
+    )
+  })
+
+  it('names the missing price when the child has no monthly total at all', async () => {
+    // `monthly_total_agorot` is 0 when no OPEN price plan points at the child. That is not
+    // a small allowance, it is none — and it is the club's data to fix, so the copy says so
+    // rather than blaming the ceiling.
+    terms = { cash_prepay_months: 3, cheque_prepay_months: 12, monthly_total_agorot: 0 }
+    await open()
+    expect(screen.getByTestId('pay-months-capped')).toHaveTextContent(
+      t('he', 'billing.pay.noMonthlyPrice'),
+    )
+  })
+
+  it('says nothing at all when every chip is genuinely available', async () => {
+    // The note must not become furniture: a family with room to prepay sees no warning.
+    await open()
+    expect(screen.queryByTestId('pay-months-capped')).toBeNull()
   })
 })

@@ -600,7 +600,6 @@ export const schedule: Bundle = {
   'plan.choose': 'בחירת המסלול',
   'plan.confirmTitle': 'אישור מעבר למסלול',
   'plan.howWillYouPay': 'איך תרצו לשלם?',
-  'plan.payLater': 'אשלם דרך האפליקציה',
   'plan.alreadyPaid': 'כבר שילמתי',
   'plan.claimMethod': 'איך שולם?',
   'plan.claimHint': 'המנהל יקבל הודעה ויאשר שהתשלום התקבל.',

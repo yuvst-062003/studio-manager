@@ -100,9 +100,12 @@ export function TrialHome({
         )}
       </Card>
 
-      <a href="#/calendar" data-testid="trial-home-calendar">
-        {t(locale, 'people.trialHome.addToCalendar')}
-      </a>
+      {/* 'הוסף ליומן' pointed at `#/calendar`, which is gone with לוח הילד (owner,
+          2026-09-08). The link is removed rather than repointed: it promised to add THIS
+          lesson to a calendar and delivered a month view of every lesson, which is the same
+          confusion #29 fixed on the הגדרות row. The subscribe controls a family actually
+          wants are `CalendarSyncPopup`'s, and those live behind הגדרות — which a trial
+          family reaches once they join. */}
       <a href="#/directions" data-testid="trial-home-directions">
         {t(locale, 'people.trialHome.directions')}
       </a>

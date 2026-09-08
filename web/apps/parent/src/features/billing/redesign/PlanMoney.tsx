@@ -70,12 +70,24 @@ export async function readMoneyContext(planId: string, studentId: string): Promi
     apiFetch('/api/v1/me/charges?status=open'),
     apiFetch(`/api/v1/me/standing-order-links?plan_id=${planId}&student_id=${studentId}`),
   ])
-  const terms = termsRes.ok
-    ? ((await termsRes.json()) as { cash_prepay_months: number; monthly_total_agorot: number })
-    : { cash_prepay_months: 0, monthly_total_agorot: 0 }
-  const balance = balanceRes.ok
-    ? ((await balanceRes.json()) as { credit_agorot?: number })
-    : { credit_agorot: 0 }
+  // **Money reads throw; absences do not.** A failed terms read used to become
+  // `monthly_total_agorot: 0`, and zero is not a smaller offer here — it is no offer at
+  // all. `prepayHeadroomMonths` answers 0 for it, `cashMonthChips` returns NO CHIPS for a
+  // zero headroom, and the card route then prices every forward month at nothing. So the
+  // family reached the payment step of a plan change with nothing to press and no error to
+  // read (owner, 2026-09-08). `ParentPayments` fixed the identical defect on the payments
+  // screen and wrote the rule down — "a wrong number about money is worse than an error" —
+  // and this loader was written the older way and kept it.
+  //
+  // `PlanSection.run` catches this and shows `common.error.generic`, which is the outcome
+  // §the-dead-end-rule asks for: refuse, rather than accept and strand.
+  if (!termsRes.ok) throw new Error(`prepay-terms ${termsRes.status}`)
+  if (!balanceRes.ok) throw new Error(`balance ${balanceRes.status}`)
+  const terms = (await termsRes.json()) as {
+    cash_prepay_months: number
+    monthly_total_agorot: number
+  }
+  const balance = (await balanceRes.json()) as { credit_agorot?: number }
   const charges = chargesRes.ok
     ? ((await chargesRes.json()) as { items: { id: string }[] })
     : { items: [] }

@@ -12,7 +12,7 @@
 // `ProfileSection`'s own header records why: "a studio read that 403s must not blank a
 // screen whose subject is the parent."
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { apiFetch, formatAgorot, formatMonthLabel } from '@studio/core'
+import { apiFetch, formatAgorot, formatMonthLabel, useRefreshSignal } from '@studio/core'
 import { useTheme } from '@studio/ui'
 import { ENDONYM } from '@studio/ui'
 import { LOCALES, t } from '@studio/i18n'
@@ -122,6 +122,11 @@ export function ProfileScreen({
     setFailed({ children: false, details: false, money: false, club: false })
     setEpoch((n) => n + 1)
   }, [])
+
+  // Pull-to-refresh re-reads in place rather than reloading the document
+  // (2026-09-08). It joins the dependency array this loader already has, so the
+  // subscription cannot end up half-wired -- see tools/__tests__/refresh-coverage.
+  const refreshSignal = useRefreshSignal()
 
   useEffect(() => {
     let live = true
@@ -305,7 +310,7 @@ export function ProfileScreen({
     return () => {
       live = false
     }
-  }, [locale, epoch])
+  }, [locale, epoch, refreshSignal])
 
   const familyName = useMemo(
     () => (children === null ? null : familyNameOf(children.map((child) => child.lastName))),

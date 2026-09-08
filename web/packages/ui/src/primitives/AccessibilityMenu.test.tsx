@@ -24,6 +24,31 @@ describe('AccessibilityMenu', () => {
     expect(screen.getByText(t('he', 'common.a11y.statement.title'))).toBeInTheDocument()
   })
 
+  it('opens as a dialog over a dimmed page, not a rectangle stuck to the corner', async () => {
+    // The owner's report: "accessibility should open a popup and not a rectangle on the
+    // side — ugly design." It carried `aria-modal="true"` and a focus trap all along, so it
+    // already CLAIMED to be a modal; only the layout disagreed, anchored to the bottom
+    // corner with nothing behind it. The scrim is what makes the claim true for a sighted
+    // reader as well as a screen-reader one.
+    renderIn(<AccessibilityMenu locale="he" />)
+    expect(screen.queryByTestId('a11y-scrim')).toBeNull()
+
+    await userEvent.click(screen.getByTestId('a11y-open'))
+    expect(screen.getByTestId('a11y-scrim')).toBeInTheDocument()
+    expect(screen.getByTestId('a11y-panel')).toHaveAttribute('aria-modal', 'true')
+  })
+
+  it('closes when the page behind it is clicked', async () => {
+    // Dismissing on the scrim rather than on a document listener: the panel is the scrim's
+    // SIBLING, so a document listener would have to exclude the panel's own subtree and
+    // every control inside it would sit one stopPropagation away from closing its dialog.
+    renderIn(<AccessibilityMenu locale="he" />)
+    await userEvent.click(screen.getByTestId('a11y-open'))
+    await userEvent.click(screen.getByTestId('a11y-scrim'))
+    expect(screen.queryByTestId('a11y-panel')).toBeNull()
+    expect(screen.queryByTestId('a11y-scrim')).toBeNull()
+  })
+
   it('tells a keyboard-only parent to call the club, since decision 13 deleted the typed-name signature fallback', async () => {
     renderIn(<AccessibilityMenu locale="he" />)
     await userEvent.click(screen.getByTestId('a11y-open'))

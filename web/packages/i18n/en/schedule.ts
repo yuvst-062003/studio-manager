@@ -517,7 +517,6 @@ export const schedule: Bundle = {
   'plan.choose': 'Choose this plan',
   'plan.confirmTitle': 'Confirm the plan change',
   'plan.howWillYouPay': 'How would you like to pay?',
-  'plan.payLater': 'I will pay through the app',
   'plan.alreadyPaid': 'Already paid',
   'plan.claimMethod': 'How was it paid?',
   'plan.claimHint': 'The manager will be notified and confirm the payment was received.',

@@ -73,11 +73,12 @@ describe('TrialHome — §6.3', () => {
     )
   })
 
-  it('offers add-to-calendar, directions and what to bring', () => {
+  it('offers directions and what to bring, and no longer a dead calendar link', () => {
     render(<TrialHome students={[student()]} locale="he" sessionStartsAt={STARTS} />)
-    expect(screen.getByTestId('trial-home-calendar')).toHaveAccessibleName(
-      t('he', 'people.trialHome.addToCalendar'),
-    )
+    // 'הוסף ליומן' went with `#/calendar` (owner, 2026-09-08). It promised to add THIS
+    // lesson and opened a month of every lesson — the confusion #29 fixed on the הגדרות
+    // row, left standing here.
+    expect(screen.queryByTestId('trial-home-calendar')).toBeNull()
     expect(screen.getByTestId('trial-home-directions')).toHaveAccessibleName(
       t('he', 'people.trialHome.directions'),
     )

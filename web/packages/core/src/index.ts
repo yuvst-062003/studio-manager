@@ -71,3 +71,4 @@ export type { Contactable } from './comms'
 // exist and were left untouched on purpose — see `./text.ts` for why. New callers use
 // this one.
 export { fill } from './text'
+export { refreshGeneration, requestRefresh, useRefreshSignal } from './refreshBus'

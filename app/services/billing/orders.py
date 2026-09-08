@@ -415,10 +415,17 @@ class OrderService:
         self,
         *,
         status: str | None = None,
+        payer_person_id: uuid.UUID | None = None,
         after: uuid.UUID | None = None,
         limit: int = 50,
     ) -> tuple[list[PaymentOrder], uuid.UUID | None]:
         """The orders a manager may look at, newest first, optionally by status.
+
+        `payer_person_id` narrows the same query to one family, which is what
+        `GET /me/payment-orders` needs: a parent may read their own orders and nobody
+        else's. It is a filter here rather than a second method because the shape, the
+        ordering and the cursor are identical -- two near-copies of this query would be
+        two places for the tenancy and paging rules to drift apart.
 
         §5.10's high-priority alert counts `amount_mismatch` orders, and its last threat row
         counts `pending` ones older than a day. Neither could be asked for: the only reads
@@ -432,6 +439,8 @@ class OrderService:
         query = select(PaymentOrder)
         if status is not None:
             query = query.where(PaymentOrder.status == status)
+        if payer_person_id is not None:
+            query = query.where(PaymentOrder.payer_person_id == payer_person_id)
         if after is not None:
             query = query.where(PaymentOrder.id > after)
         rows = list(

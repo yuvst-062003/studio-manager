@@ -8,18 +8,33 @@
 // app-viewport.css also switches Chrome's off deliberately, because the frame bouncing is
 // the thing that reads as a web page; this replaces it with the part worth keeping.)
 //
-// **It reloads the document.** Not a per-screen re-fetch: this shell holds a dozen
-// independent reads across five tabs, and a refresh that quietly missed one would be worse
-// than none — the parent would be looking at a stale number believing they had just asked
-// for it. `location.reload()` re-runs every one of them, and against a precached shell it
-// costs a few hundred milliseconds.
+// **It re-reads in place; it does not reload the document (owner, 2026-09-08).** It used
+// to call `location.reload()`, and the reasoning was sound as far as it went: this shell
+// holds a dozen independent reads across five tabs, and a refresh that quietly missed one
+// would be worse than none — the parent would be looking at a stale number believing they
+// had just asked for it. A document reload cannot miss one.
+//
+// It also restarts the app. The launch screen, the default tab, the top of the list: "it
+// regenerates the screen from the start". A refresh should update what you are looking at,
+// not take it away and rebuild it around you.
+//
+// `requestRefresh()` (packages/core/src/refreshBus.ts) publishes to every loader instead,
+// and the missed-read risk is answered by construction rather than by reloading: a loader
+// subscribes by putting `useRefreshSignal()` in the dependency array it already has, and
+// `tools/__tests__/refresh-coverage.test.ts` fails the build for a screen-level loader that
+// does not.
 //
 // **Touch only.** A mouse or keyboard already has a reload; this exists for the finger.
 import { useEffect, useRef, useState } from 'react'
 import { RotateCw } from 'lucide-react'
+import { requestRefresh } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { backgroundScrollLocked } from '../onboarding/wizard/useDialog'
+
+/** How long the indicator spins after the signal goes out. The refresh is in-place now, so
+ *  there is no document load to end it — see `onEnd`. */
+const SPIN_MS = 700
 
 /** How far the finger must travel before the pull commits, in real pixels of movement. */
 const THRESHOLD = 72
@@ -121,8 +136,18 @@ export function PullToRefresh({
         refreshingRef.current = true
         setRefreshing(true)
         setPull(MAX_PULL / 2)
-        // `?? reload` at call time, not at mount: a test swaps the prop in.
-        ;(refreshRef.current ?? (() => globalThis.location.reload()))()
+        // `?? requestRefresh` at call time, not at mount: a test swaps the prop in.
+        ;(refreshRef.current ?? requestRefresh)()
+        // The screen stays where it is; only its data is re-read. So the indicator is on a
+        // timer rather than on a promise — nothing here knows how many loaders answered, and
+        // waiting on "all of them" would need a registry that could go stale. It spins long
+        // enough to be seen and to cover a cached round trip, then withdraws whatever
+        // happened, which is what a native bar does.
+        globalThis.setTimeout(() => {
+          refreshingRef.current = false
+          setRefreshing(false)
+          paint(0)
+        }, SPIN_MS)
       } else {
         paint(0)
       }

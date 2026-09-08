@@ -99,6 +99,10 @@ export type BillingClient = {
   ): Promise<PaymentOrderOut>
   orderForm(publicRef: string): Promise<UpayForm>
   orderStatus(publicRef: string): Promise<PaymentOrderOut>
+  /** The payer's own `pending` orders — the way back to a uPay page they opened and left.
+   *  `createOrder` is refused while one of these still holds its charges, and the
+   *  `public_ref` that would reopen it lived only in React state until this existed. */
+  myOpenOrders(): Promise<PaymentOrderOut[]>
 }
 
 // There is deliberately no `makeBillingClient` here any more (ship-audit D5). The one
@@ -331,6 +335,13 @@ export function makeParentBillingClient(fetcher: Fetcher): BillingClient {
     },
     async orderStatus(publicRef) {
       return json<PaymentOrderOut>(await fetcher(`/api/v1/payment-orders/${publicRef}`))
+    },
+    async myOpenOrders() {
+      // Scoped to the caller by the server; no payer id is sent, for the same reason
+      // `createOrder` sends none — a `public_ref` opens a payment page.
+      const response = await fetcher('/api/v1/me/payment-orders')
+      if (!response.ok) return []
+      return (await response.json()).items as PaymentOrderOut[]
     },
   }
 }
