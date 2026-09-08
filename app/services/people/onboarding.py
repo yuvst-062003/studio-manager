@@ -31,6 +31,7 @@ from typing import Any, NamedTuple
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from app.models.belts import BeltRank
 from app.models.billing import PricePlan
 from app.models.onboarding import OnboardingLink
 from app.models.people import Enrollment, Student
@@ -345,6 +346,23 @@ class OnboardingService:
                 enrollment_id=created_enrollments[0].id,
                 child_name=f"{child_person.first_name} {child_person.last_name}",
             )
+
+        # The belt the family says this child already holds (bug #10's picker, wired
+        # 2026-09-08). Recorded on the student and NOWHERE else: `student_belt` is this
+        # club's grading history -- who awarded it, on what date, at which exam -- and a
+        # parent saying "she has a blue belt from her old club" is not this club awarding
+        # one. A history row here would put a grading nobody held on `12d`'s progress
+        # screen, signed by no coach.
+        requested_belt_id = child.get("belt_rank_id")
+        if requested_belt_id is not None:
+            rank = session.get(BeltRank, requested_belt_id)
+            # The same authority `price_plan_id` gets below, for the same reason: the
+            # picker only ever offers this club's own ladder, but a stale or crafted id
+            # must not silently record a rank off somebody else's wall.
+            if rank is None or rank.studio_id != studio_id:
+                raise RefusedError(f"belt rank {requested_belt_id} is not this club's")
+            student.current_belt_id = rank.id
+            session.flush()
 
         volume = weekly_volume(volume_pairs)
         plan: PricePlan | None

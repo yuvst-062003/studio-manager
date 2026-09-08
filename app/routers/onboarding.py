@@ -191,6 +191,18 @@ class OnboardingChildIn(BaseModel):
     #: accepting creates a dead end": the picker only ever OFFERS a covering plan, but a
     #: stale or crafted request must not silently mis-price a family.
     price_plan_id: uuid.UUID | None = None
+    #: The belt this child already holds, from the club's own ladder (bug #10's picker,
+    #: wired 2026-09-08). Optional -- "no belt recorded" is the ordinary state of a
+    #: beginner and must not become a guess.
+    #:
+    #: **It sets `student.current_belt_id` and writes no `student_belt` row.** That table is
+    #: this club's grading history, with an awarding coach and a date; a family declaring a
+    #: rank earned at their old club is not this club awarding one, and inventing a history
+    #: row would put a grading nobody held on the parent's belt-progress screen.
+    #:
+    #: A rank belonging to another studio is refused, the same authority `price_plan_id`
+    #: gets above and for the same reason.
+    belt_rank_id: uuid.UUID | None = None
 
 
 class OnboardingRegisterIn(BaseModel):
@@ -480,6 +492,7 @@ def register(
                         "national_id": child.national_id,
                         "grade": child.grade,
                         "aliyah_year": child.aliyah_year,
+                        "belt_rank_id": child.belt_rank_id,
                         "health": (
                             {
                                 "template_id": child.health.template_id,
@@ -717,6 +730,7 @@ def register_additional_child(
                     "national_id": child.national_id,
                     "grade": child.grade,
                     "aliyah_year": child.aliyah_year,
+                    "belt_rank_id": child.belt_rank_id,
                     "health": (
                         {
                             "template_id": child.health.template_id,

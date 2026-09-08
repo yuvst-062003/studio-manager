@@ -183,3 +183,26 @@ describe('toRegisterPayload — שנת עליה and הורה 2', () => {
     expect(toRegisterPayload([child], OPTIONS).phone).toBe('050-1234567')
   })
 })
+
+describe('the belt a family declares', () => {
+  // Bug #10 gave the wizard the CLUB's own ladder so a family would not register against
+  // belts the club does not award. The picker shipped, the review card showed the answer
+  // back — and THIS function had no belt field, so every child registered through the
+  // wizard landed with `current_belt_id` NULL. Asked, answered, displayed, dropped.
+  it('rides on the payload the registration actually posts', () => {
+    const payload = toRegisterPayload(
+      [emptyStudent('c1', { firstName: 'נועה', lastName: 'לוי', beltId: 'belt-blue' })],
+      { templateId: null, clubTermsAccepted: true },
+    )
+    expect(payload.children[0]!.belt_rank_id).toBe('belt-blue')
+  })
+
+  it('sends null when the picker was left alone', () => {
+    // "No belt recorded" is a beginner's ordinary state and must not become a guess.
+    const payload = toRegisterPayload(
+      [emptyStudent('c1', { firstName: 'נועה', lastName: 'לוי' })],
+      { templateId: null, clubTermsAccepted: true },
+    )
+    expect(payload.children[0]!.belt_rank_id).toBeNull()
+  })
+})

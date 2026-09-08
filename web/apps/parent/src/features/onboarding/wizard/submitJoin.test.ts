@@ -393,4 +393,37 @@ describe('recording how the family says they will pay', () => {
 
     expect(result.outcomes[0]!.state).toBe('card_pending')
   })
+
+  it('records the method for a card child this run raised no charge for', async () => {
+    // The gap in the first cut of this fix, found 2026-09-08. A card child with no open
+    // charge returns EARLY -- there is nothing for uPay to bill -- and the method write
+    // was iterating the same list that early return skips. So door D's commonest shape,
+    // a family adding a child who is already on the roster, still recorded nothing and
+    // the profile still said `לא הוגדר`.
+    //
+    // Choosing a method is a statement of intent. It does not depend on there being
+    // something to bill this minute.
+    const savePaymentMethods = vi.fn().mockResolvedValue(undefined)
+    const deps = makeDeps({ charges: [], savePaymentMethods })
+
+    const result = await submitJoin(
+      input({ students: [student('c1')], methods: { c1: 'credit' }, deps }),
+    )
+
+    expect(savePaymentMethods).toHaveBeenCalledWith([{ studentId: 's1', method: 'upay_card' }])
+    // …and the outcome it reports is unchanged: there really was nothing to charge.
+    expect(result.outcomes[0]!.reason).toBe('no_charge_for_card')
+  })
+
+  it('records the method even when the charges read failed', async () => {
+    // Same reasoning one step further out. The registration landed; the family answered
+    // the question; losing their answer because a DIFFERENT read failed helps nobody.
+    const savePaymentMethods = vi.fn().mockResolvedValue(undefined)
+    const deps = makeDeps({ savePaymentMethods })
+    deps.billing.openCharges = vi.fn().mockRejectedValue(new Error('offline'))
+
+    await submitJoin(input({ students: [student('c1')], methods: { c1: 'cash' }, deps }))
+
+    expect(savePaymentMethods).toHaveBeenCalledWith([{ studentId: 's1', method: 'cash' }])
+  })
 })

@@ -55,6 +55,7 @@ const REGISTER_PAYLOAD: RegisterPayload = {
       grade: 'grade_3',
       aliyah_year: null,
       price_plan_id: 'plan-1',
+      belt_rank_id: null,
       other_parent: null,
       pickup_contacts: [],
       health: null,
