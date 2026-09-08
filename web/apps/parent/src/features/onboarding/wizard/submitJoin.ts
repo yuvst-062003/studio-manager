@@ -150,6 +150,21 @@ export async function submitJoin(input: SubmitJoinInput): Promise<SubmitJoinResu
 
   const outcomes: PaymentOutcome[] = []
   const active: ActiveRow[] = []
+  /**
+   * How each child says they will pay, for `PUT /me/payment-methods`.
+   *
+   * **Deliberately not `active`.** That list is "children with something to bill right
+   * now", and two of the early returns below leave it: a card child this run raised no
+   * charge for, and every child when the charges read failed. Recording the method off
+   * `active` therefore missed door D's commonest shape -- a family adding a child already
+   * on the roster -- and those families still read `לא הוגדר` after answering. Choosing a
+   * method is a statement of intent; it does not depend on there being an invoice.
+   */
+  const declared: { studentId: string; method: string }[] = []
+
+  /** `credit` is the wizard's word; `upay_card` is `payment.method`'s, which is what the
+   *  column holds and what `methodKey` already translates for display. */
+  const stored = (method: PaymentMethod) => (method === 'credit' ? 'upay_card' : method)
 
   students.forEach((draft, index) => {
     const method = methods[draft.id] ?? 'credit'
@@ -163,18 +178,8 @@ export async function submitJoin(input: SubmitJoinInput): Promise<SubmitJoinResu
       return
     }
 
-    if (openCharges === null) {
-      outcomes.push({
-        draftId: draft.id,
-        name,
-        method,
-        amountAgorot,
-        state: 'not_recorded',
-        reason: 'write_failed',
-      })
-      return
-    }
-
+    // Resolved BEFORE the charges are consulted, because the method write below needs it
+    // and does not care whether there is anything to bill.
     const studentId = registered.child_student_ids[index]
     if (studentId === undefined) {
       outcomes.push({
@@ -184,6 +189,22 @@ export async function submitJoin(input: SubmitJoinInput): Promise<SubmitJoinResu
         amountAgorot,
         state: 'not_recorded',
         reason: 'no_student',
+      })
+      return
+    }
+
+    // The family answered the question and the registration landed. Record it whatever
+    // happens to the money below.
+    declared.push({ studentId, method: stored(method) })
+
+    if (openCharges === null) {
+      outcomes.push({
+        draftId: draft.id,
+        name,
+        method,
+        amountAgorot,
+        state: 'not_recorded',
+        reason: 'write_failed',
       })
       return
     }
@@ -223,23 +244,15 @@ export async function submitJoin(input: SubmitJoinInput): Promise<SubmitJoinResu
     active.push({ outcome, studentId, method, charges, planId: draft.planId })
   })
 
-  // How the family says they will pay, recorded for EVERY active child before any money
-  // moves. `active` already excludes the children awaiting a manager's review, and a
-  // preference recorded for one of those would be a fact about a registration that has not
-  // happened.
+  // How the family says they will pay. See `declared` above for why it is not `active`.
+  // Children awaiting a manager's review are excluded there: a preference recorded for one
+  // of those would be a fact about a registration that has not happened.
   //
   // Swallowed on failure, deliberately: `register` has already landed by here, and losing
   // a preference the family can set again in פרופיל is not worth failing a join over.
-  if (active.length > 0) {
+  if (declared.length > 0) {
     try {
-      await deps.savePaymentMethods(
-        active.map((row) => ({
-          studentId: row.studentId,
-          // `credit` is the wizard's word for it; `upay_card` is `payment.method`'s, which
-          // is what the column holds and what `methodKey` already translates for display.
-          method: row.method === 'credit' ? 'upay_card' : row.method,
-        })),
-      )
+      await deps.savePaymentMethods(declared)
     } catch {
       // Nothing downstream reads it, and no outcome changes.
     }
