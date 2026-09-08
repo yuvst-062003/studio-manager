@@ -57,6 +57,10 @@ export const PAYMENT_CLAUSE_KEYS = [
   'health.clubTerms.payment.cheques',
   'health.clubTerms.payment.cancellation',
   'health.clubTerms.payment.proRata',
+  //: Last, and last on purpose. The three above are the club's own rules; this one says how
+  //: to invoke them and that the consumer's statutory rights sit above all four. A route
+  //: stated before the terms it applies to reads as fine print about fine print.
+  'health.clubTerms.payment.refund',
 ] as const
 
 export function ClubTermsStep({

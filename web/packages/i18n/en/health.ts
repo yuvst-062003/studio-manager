@@ -131,6 +131,8 @@ export const health: Bundle = {
   'clubTerms.payment.proRata':
     'When an annual membership is cancelled, the monthly rate is recalculated against the months actually used (for example: three months used is charged at the three-month rate).',
   'clubTerms.entity': 'Brain Building (registered association) 580647295',
+  'clubTerms.payment.refund':
+    'A request to cancel a subscription or to be refunded goes to the club manager — through the contact details on the profile screen in the app. The manager handles the request and comes back to you. Your rights under Israeli consumer law apply in any case, and nothing above reduces them.',
   'clubTerms.accept': 'I have read the club terms and payment terms and I accept them',
   'clubTerms.required': 'The club terms and payment terms must be accepted to continue',
   'clubTerms.alreadyAccepted': 'You have accepted the club terms and payment terms',

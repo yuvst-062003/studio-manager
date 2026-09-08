@@ -181,6 +181,11 @@ export const health: Bundle = {
   // here, in the cheque payee line — a payee is not the same as naming the party to the
   // agreement, and the number is what makes the name verifiable in רשם העמותות.
   'clubTerms.entity': 'בריין בילדינג (ע״ר) 580647295',
+  // #4 of the legal audit — HOW to ask, and whose rights come first. The club's own two
+  // rules (the 27th, and the pro-rata calculation) are above; this is the route, and the
+  // sentence that stops the תקנון reading as though it defines the consumer's rights.
+  'clubTerms.payment.refund':
+    'בקשת ביטול מנוי או החזר כספי מופנית למנהל המועדון — דרך פרטי הקשר שבמסך הפרופיל באפליקציה. המנהל מטפל בבקשה ומעדכן אתכם. זכויותיכם לפי חוק הגנת הצרכן עומדות בכל מקרה, ואין באמור לעיל כדי לגרוע מהן.',
   'clubTerms.accept': 'קראתי את התקנון ותנאי התשלום ואני מאשר/ת אותם',
   'clubTerms.required': 'יש לאשר את התקנון ותנאי התשלום כדי להמשיך',
   'clubTerms.alreadyAccepted': 'אישרתם את התקנון ותנאי התשלום',

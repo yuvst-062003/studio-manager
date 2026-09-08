@@ -100,7 +100,7 @@ export const reports: Bundle = {
     'The information you provide — the health declaration above all — must be accurate and current. The coach on the mat sees health flags only, and those flags are derived from your answers. A missing or wrong answer is a safety risk to your child.',
   'privacy.terms.s4.title': 'Payments',
   'privacy.terms.s4.body':
-    'The club sets prices and the refund policy. Card payments are processed by uPay, the payment provider, and we do not store card details. A standing order cannot be opened through the app; a payment received that way is marked paid by the club by hand.',
+    'The club\u2019s prices and its cancellation and refund terms are set out in the club rules and payment terms you accepted. Your rights under Israeli consumer law apply in any case, and nothing in those rules reduces them. A request to cancel or to be refunded goes to the club manager, through the contact details on the profile screen. Card payments are processed by uPay, the payment provider, and we do not store card details. A standing order cannot be opened through the app; a payment received that way is marked paid by the club by hand.',
   'privacy.terms.s5.title': 'Fair use',
   'privacy.terms.s5.body':
     'Do not use anyone else’s account, do not attempt to reach data that is not yours, and do not copy information about other students or their families.',

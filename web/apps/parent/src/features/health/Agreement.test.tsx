@@ -373,6 +373,23 @@ describe('RegistrationStep', () => {
     expect(body.signer.national_id).toBe('100000017')
   })
 
+  it('says how to ask for a refund, and whose rights come first', async () => {
+    // Legal audit #4. The club's own two rules — cancel in writing by the 27th, and the
+    // pro-rata calculation — were already here; what was missing was the ROUTE, and a
+    // sentence saying the תקנון does not define the consumer's rights. The terms elsewhere
+    // said "the club sets prices and the refund policy", which hands the duty to the club
+    // and leaves the consumer with nothing: statutory rights do not depend on what a club
+    // sets, and a term that appears to contract out of them is void.
+    render(<ClubTermsStep locale="he" onAccept={vi.fn()} />)
+    const refund = screen.getByTestId('health.clubTerms.payment.refund')
+    expect(refund).toHaveTextContent('\u05de\u05e0\u05d4\u05dc \u05d4\u05de\u05d5\u05e2\u05d3\u05d5\u05df')
+    expect(refund).toHaveTextContent('\u05d7\u05d5\u05e7 \u05d4\u05d2\u05e0\u05ea \u05d4\u05e6\u05e8\u05db\u05df')
+    // Last of the four: a route stated before the terms it applies to is fine print about
+    // fine print.
+    const clauses = screen.getAllByTestId(/^health\.clubTerms\.payment\./)
+    expect(clauses.at(-1)).toBe(refund)
+  })
+
   it('names the registering body on the club\u2019s own \u05ea\u05e7\u05e0\u05d5\u05df', async () => {
     // The \u05e2\u05de\u05d5\u05ea\u05d4's name was already here \u2014 as the PAYEE on the cheque line, which is not
     // the same as naming the party to the agreement. The registration number is what makes
