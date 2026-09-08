@@ -383,7 +383,7 @@ export function AccountScreen({
           manager-only block above, because identifying the club is not a management action. */}
       <p
         data-testid="account-club-entity"
-        className="text-[11px] text-[var(--fg-muted)] text-center pt-1"
+        className="text-[11px] text-[var(--text-muted)] text-center pt-1"
       >
         {t(locale, 'health.clubTerms.entity')}
       </p>

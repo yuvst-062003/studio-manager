@@ -37,6 +37,31 @@
     <title>Gladiator Coach</title>
   </head>
   <body>
+    <!-- **The first pixel is already the loading screen.**
+
+         Without this there were THREE screens on a cold start, not two: the OS splash from
+         the manifest, then this page painted in `--ground` (cream) the moment the CSS
+         parsed, and only THEN React's own splash. The middle one is the white flash the
+         owner kept seeing after the manifest was already fixed — it happens before any
+         JavaScript exists, so nothing in the app could have removed it.
+
+         Inline, and deliberately: it must paint without the CSS bundle, without the JS
+         bundle and without a font. The colours are the same literals as
+         `packages/ui/src/theme.ts::SPLASH_GROUND` and `first-run/splash.css`, so the OS
+         splash, this, and React's splash are one continuous screen — which is what makes a
+         launch read as "waiting, then the app" rather than as three things flashing past.
+
+         `main.tsx` removes it once React has painted. Inside #root would be tidier and is
+         wrong: React clears the container on first render, which would take the splash away
+         at mount instead of when there is something to replace it with. -->
+    <div id="boot-splash" style="position:fixed;inset:0;z-index:70;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2rem;background:#14306b">
+      <p style="margin:0;color:#fff;font:800 clamp(1.75rem,9vw,2.75rem)/1 Helvetica,sans-serif;letter-spacing:.18em">GLADIATOR<br><span style="font-size:.42em;font-weight:600;letter-spacing:.32em;opacity:.7">CLUB</span></p>
+      <div aria-hidden="true" style="display:flex;gap:.6rem">
+        <span style="width:.6rem;height:.6rem;border-radius:50%;background:#aac7ff;opacity:.35"></span>
+        <span style="width:.6rem;height:.6rem;border-radius:50%;background:#aac7ff;opacity:1"></span>
+        <span style="width:.6rem;height:.6rem;border-radius:50%;background:#aac7ff;opacity:.6"></span>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
