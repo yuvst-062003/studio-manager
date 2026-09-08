@@ -52,11 +52,17 @@
          splash, this, and React's splash are one continuous screen — which is what makes a
          launch read as "waiting, then the app" rather than as three things flashing past.
 
+         The mark is the app ICON, not `clubs/gladiator-logo.png`. Same crest, 45KB instead
+         of 315KB — and this is the screen shown while a slow network is the problem, so the
+         largest asset in the product had no business being on it. It is also the exact
+         image the OS splash draws from the manifest, which makes that handover invisible
+         too. Verified with JavaScript disabled: the disc rendered empty until this changed.
+
          `main.tsx` removes it once React has painted. Inside #root would be tidier and is
          wrong: React clears the container on first render, which would take the splash away
          at mount instead of when there is something to replace it with. -->
     <div id="boot-splash" style="position:fixed;inset:0;z-index:70;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2rem;background:#001849">
-      <img src="/clubs/gladiator-logo.png" alt="" width="150" height="150" style="width:42vw;max-width:150px;min-width:112px;height:auto;padding:.9rem;border-radius:50%;background:#fff;box-shadow:0 10px 40px rgba(0,0,0,.35)">
+      <img src="/icons/icon-192.png" alt="" width="150" height="150" style="width:42vw;max-width:150px;min-width:112px;height:auto;border-radius:50%;background:#fff;box-shadow:0 10px 40px rgba(0,0,0,.35)">
       <div aria-hidden="true" style="display:flex;gap:.6rem">
         <span style="width:.6rem;height:.6rem;border-radius:50%;background:#aac7ff;opacity:.35"></span>
         <span style="width:.6rem;height:.6rem;border-radius:50%;background:#aac7ff;opacity:1"></span>
