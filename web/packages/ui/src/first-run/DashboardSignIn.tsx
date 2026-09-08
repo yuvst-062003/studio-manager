@@ -26,6 +26,7 @@ import { LOCALES, t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { ENDONYM } from './LanguagePicker'
 import { startUrl, useAuthProviders } from './useAuthProviders'
+import { useSplashHold } from './useSplashHold'
 import { SplashScreen } from './SplashScreen'
 import logo from './assets/gladiator-team.png'
 import './dashboard-signin.css'
@@ -70,6 +71,7 @@ export function DashboardSignIn({
   returnPath?: string
 }) {
   const { status, list } = useAuthProviders()
+  const holding = useSplashHold()
   // The mock draws exactly one button. Apple is not configured for this app, and when it
   // is, `useAuthProviders` will return it — so render whatever the server offers rather
   // than hard-coding Google and shipping a screen that cannot grow a second button.
@@ -78,7 +80,7 @@ export function DashboardSignIn({
   // seconds -- which is what the owner reported on the parent app, and this screen has the
   // same shape. `null` is "still asking"; `[]` is "asked, and there are none", which is a
   // real answer and keeps the screen below with its own message.
-  if (status === 'loading') {
+  if (status === 'loading' || holding) {
     return (
       <SplashScreen
         locale={locale}

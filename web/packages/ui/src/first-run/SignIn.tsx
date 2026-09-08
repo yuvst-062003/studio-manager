@@ -20,6 +20,7 @@ import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { InAppBrowserBanner } from './InAppBrowserBanner'
 import { startUrl, useAuthProviders } from './useAuthProviders'
+import { useSplashHold } from './useSplashHold'
 import './gladiator-signin.css'
 import logoUrl from './assets/gladiator-logo.png'
 import { SplashScreen } from './SplashScreen'
@@ -51,6 +52,9 @@ export function SignIn({
   userAgent?: string
 }) {
   const { status, list: providers } = useAuthProviders()
+  // A minimum, never a delay — see `useSplashHold`. Without it a fast launch flashed the
+  // loading screen past too quickly to follow, which is the complaint that produced it.
+  const holding = useSplashHold()
 
   // `startUrl` and not a second copy of the same template literal. The manager sign-in
   // landed on main while this branch was open and moved that URL into one helper; two
@@ -70,7 +74,7 @@ export function SignIn({
     // design with its one button missing — which is what the owner saw and reported as a
     // blank page. `null` means "still asking"; an empty array means "asked, and there are
     // none", which is a real answer and gets the real screen with its own message.
-    if (status === 'loading') {
+    if (status === 'loading' || holding) {
       return (
         <SplashScreen
           locale={locale}
@@ -170,7 +174,7 @@ export function SignIn({
   // The same wait, for the two staff-side apps. Their own ground colour and their own
   // mark: a manager runs both, and which one is opening should be readable before it has
   // opened. See `SplashScreen`.
-  if (status === 'loading') {
+  if (status === 'loading' || holding) {
     return (
       <SplashScreen
         locale={locale}
