@@ -14,7 +14,7 @@ import type { CSSProperties } from 'react'
 import { Button, useModalDialog } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { submitUpayForm } from './PaymentsSection'
+import { submitUpayForm } from './billingClient'
 import type { UpayForm } from './billingClient'
 
 export const PAYMENT_OVERLAY_FRAME_NAME = 'upay-payment-overlay'

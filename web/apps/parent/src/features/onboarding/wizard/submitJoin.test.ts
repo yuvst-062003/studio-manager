@@ -2,7 +2,7 @@
 // is either a state a screen would read or an argument a wire call actually carried.
 import { describe, expect, it, vi } from 'vitest'
 import type { ChargeOut, PaymentOrderOut, PaymentPromiseOut, UpayForm } from '../../billing/billingClient'
-import { DEMO_SIMULATOR } from '../../billing/PaymentsSection'
+import { DEMO_SIMULATOR } from '../../billing/billingClient'
 import type { MandateLink } from '../../billing/billingClient'
 import { emptyStudent } from './types'
 import type { StudentDraft, WizardPlan } from './types'

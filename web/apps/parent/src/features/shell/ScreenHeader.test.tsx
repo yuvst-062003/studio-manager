@@ -68,6 +68,7 @@ const SCREENS_THAT_NEED_A_WAY_BACK = [
   'features/schedule/ChildCalendar.tsx',
   'features/privacy/PrivacyScreen.tsx',
   'features/techniques/TechniqueDetail.tsx',
+  'features/billing/redesign/PayScreen.tsx',
 ]
 
 describe('every screen behind the tabs has a way back', () => {

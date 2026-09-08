@@ -8,7 +8,7 @@
 // uPay's page to a human. So: register, read back the charges it created, then act.
 import type { BillingClient, ChargeOut, UpayForm } from '../../billing/billingClient'
 import type { MandateLink } from '../../billing/billingClient'
-import { DEMO_SIMULATOR } from '../../billing/PaymentsSection'
+import { DEMO_SIMULATOR } from '../../billing/billingClient'
 import { needsManagerReview } from './types'
 import type { PaymentMethod, StudentDraft, WizardPlan } from './types'
 

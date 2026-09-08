@@ -172,3 +172,166 @@ export function instalmentSplit(
   const base = Math.floor(totalAgorot / instalments)
   return { first: base + (totalAgorot - base * instalments), rest: base, count: instalments }
 }
+
+
+/* ── The parent's client, moved here 2026-09-08 ───────────────────────────────────────
+ *
+ * These four lived in `PaymentsSection.tsx` — a SCREEN that `ParentPayments` replaced on
+ * 2026-09-07 under the usual "stays on disk until the redesign is accepted" comment. Unlike
+ * the shop and profile pair, it was still here a day later, and the reason was not
+ * forgetfulness: four of that file's five exports had nothing to do with its screen, and
+ * nine files imported them. Deleting the dead half meant moving the live half, which nobody
+ * wanted to do inside a feature commit.
+ *
+ * They belong here. This file is the endpoint layer — `BillingClient`, its wire types and
+ * the money helpers — and every one of those nine importers was reaching for exactly that.
+ * The note above about there being "deliberately no `makeBillingClient` here any more" was
+ * true of the manager-scoped one it named; this is the `/me/`-scoped client the parent app
+ * actually ships, and it is now where it says it is.
+ */
+
+const JSON_HEADERS = { 'Content-Type': 'application/json' }
+
+export class BillingRequestError extends Error {
+  readonly code?: string
+  constructor(message: string, code?: string) {
+    super(message)
+    this.name = 'BillingRequestError'
+    this.code = code
+  }
+}
+
+async function json<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    let code: string | undefined
+    try {
+      const body: unknown = await response.json()
+      const detail = (body as { detail?: unknown } | null)?.detail
+      const detailCode = (detail as { code?: unknown } | null)?.code
+      if (typeof detailCode === 'string') code = detailCode
+    } catch {
+      // No JSON body (or already consumed) — code stays undefined, message is all that
+      // survives, same as every caller got before this existed.
+    }
+    throw new BillingRequestError(`${response.status} ${response.url}`, code)
+  }
+  return (await response.json()) as T
+}
+
+/** §19.6's sentinel. See `openOrder` below — it is never a uPay endpoint. */
+export const DEMO_SIMULATOR: UpayForm = { action: 'demo:ipn-simulator', fields: {} }
+
+/**
+ * §5.10 step 2 — the client builds the POST and auto-submits it. **Fields, not HTML**: the
+ * server sends values and this builds the form, so nothing server-authored is ever
+ * injected into the document.
+ *
+ * Exported because §6.1's plan step now opens uPay too (owner correction, 2026-08-30) and
+ * a second hand-rolled copy of this is a second place for the hidden-input handling to
+ * drift from the one the payments screen uses.
+ *
+ * `targetName`, added for the in-app payment overlay (2026-09-03 addendum): when given,
+ * the form's `target` is set to that name, so the browser navigates a same-named
+ * `<iframe>` instead of the top window -- the family never leaves the tab. Omitted, this
+ * is the same full-page navigation it has always been.
+ */
+export function submitUpayForm(form: UpayForm, targetName?: string): void {
+  const el = document.createElement('form')
+  el.method = 'POST'
+  el.action = form.action
+  if (targetName) el.target = targetName
+  for (const [name, value] of Object.entries(form.fields)) {
+    const input = document.createElement('input')
+    input.type = 'hidden'
+    input.name = name
+    input.value = value
+    el.append(input)
+  }
+  document.body.append(el)
+  el.submit()
+}
+
+/**
+ * The same shape as `makeBillingClient`, against the routes a PAYER may call.
+ *
+ * The manager-facing reads take `?payer_person_id=`; these take nobody, because the payer
+ * is the caller. That is the whole difference, and it is why the screen could not load
+ * before: every read it made answered 403.
+ */
+export function makeParentBillingClient(fetcher: Fetcher): BillingClient {
+  return {
+    async openCharges() {
+      const response = await fetcher('/api/v1/me/charges?status=open')
+      return (await json<{ items: ChargeOut[] }>(response)).items
+    },
+    async promises() {
+      const response = await fetcher('/api/v1/me/payment-promises')
+      return (await json<{ items: PaymentPromiseOut[] }>(response)).items
+    },
+    async createPromise(chargeIds, promiseMethod, prepayMonths, alreadyPaid = false, claimedPlanId) {
+      // `method` in the body, not in the path: the two routes are one row and one
+      // endpoint, so the server's `PROMISE_METHODS` check is the only place a third
+      // method could ever be refused.
+      return json<PaymentPromiseOut>(
+        await fetcher('/api/v1/me/payment-promises', {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({
+            charge_ids: chargeIds,
+            method: promiseMethod,
+            prepay_months: prepayMonths,
+            already_paid: alreadyPaid,
+            claimed_plan_id: claimedPlanId ?? null,
+          }),
+        }),
+      )
+    },
+    async balance() {
+      return json<PayerBalanceOut>(await fetcher('/api/v1/me/balance'))
+    },
+    async payments() {
+      return (await json<{ items: PaymentOut[] }>(await fetcher('/api/v1/me/payments'))).items
+    },
+    async products() {
+      // Manager-only, and nothing on `1b` reads it — the catalogue belongs to `3e`. An
+      // empty list rather than a 403 the screen would have to know how to survive.
+      return []
+    },
+    async createOrder(chargeIds, maxPayments, prepayMonths = 0) {
+      // `max_payments` and `prepay_months` are query parameters and `charge_ids` the body.
+      // The payer is never sent: the server takes it from the session, because a
+      // body-supplied payer would let anyone open an order over anyone's charges.
+      //
+      // `prepay_months` is a COUNT. The price of those months is the payer's monthly
+      // total, which only the server holds — this screen never posts an amount, and §5.10
+      // compares the IPN against the server's own sum for exactly that reason.
+      const query = new URLSearchParams({
+        max_payments: String(maxPayments),
+        prepay_months: String(prepayMonths),
+      })
+      return json<PaymentOrderOut>(
+        await fetcher(`/api/v1/payment-orders?${query.toString()}`, {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ charge_ids: chargeIds }),
+        }),
+      )
+    },
+    async orderForm(publicRef) {
+      const response = await fetcher(`/api/v1/payment-orders/${publicRef}/form`)
+      if (response.status === 409) {
+        // §19.6 — 'upay_form_fields RAISES for a demo studio: it gets no payment form at
+        // all, and its payment step renders §19.5's IPN simulator instead.' The backend
+        // half of that has always been here; without this branch the screen caught the
+        // refusal and rendered a generic error, so the demo studio's payment step was a
+        // dead end rather than the simulator the spec describes.
+        return DEMO_SIMULATOR
+      }
+      return json<UpayForm>(response)
+    },
+    async orderStatus(publicRef) {
+      return json<PaymentOrderOut>(await fetcher(`/api/v1/payment-orders/${publicRef}`))
+    },
+  }
+}
+

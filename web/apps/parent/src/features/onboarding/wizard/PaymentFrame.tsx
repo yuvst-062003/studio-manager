@@ -20,7 +20,7 @@ import {
   PAYMENT_OVERLAY_FRAME_NAME,
   PAYMENT_OVERLAY_MESSAGE_TYPE,
 } from '../../billing/PaymentOverlay'
-import { submitUpayForm } from '../../billing/PaymentsSection'
+import { submitUpayForm } from '../../billing/billingClient'
 import type { UpayForm } from '../../billing/billingClient'
 import { useDialog } from './useDialog'
 import { paymentFrameCopy } from './copy'

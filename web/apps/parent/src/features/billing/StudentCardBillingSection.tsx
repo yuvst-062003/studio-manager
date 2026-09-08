@@ -24,7 +24,7 @@ import { apiFetch, formatDateInStudioZone } from '@studio/core'
 import { DetailRow, MoneyDisplay, registerSlot } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { makeParentBillingClient } from './PaymentsSection'
+import { makeParentBillingClient } from './billingClient'
 import type { ChargeOut } from './billingClient'
 
 /** What this child still owes, in agorot, and the soonest date it falls due. */

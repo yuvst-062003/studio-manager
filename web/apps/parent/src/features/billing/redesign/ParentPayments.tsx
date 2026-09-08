@@ -24,7 +24,7 @@ import { apiFetch, formatAgorot, formatDateInStudioZone, formatMonthLabel } from
 import { LoadFailed } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { DEMO_SIMULATOR, makeParentBillingClient } from '../PaymentsSection'
+import { DEMO_SIMULATOR, makeParentBillingClient } from '../billingClient'
 import { PaymentOverlay } from '../PaymentOverlay'
 import type { PaymentOverlayRequest } from '../PaymentOverlay'
 import { methodKey } from '../PaymentHistoryScreen'

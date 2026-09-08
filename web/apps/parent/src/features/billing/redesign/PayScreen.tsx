@@ -40,6 +40,7 @@ import { Banknote, ChevronLeft, CreditCard, Lock } from 'lucide-react'
 import { fill } from '@studio/core'
 import { plural, t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { ScreenHeader } from '../../shell/ScreenHeader'
 import { instalmentSplit } from '../billingClient'
 import type { ChargeOut } from '../billingClient'
 import {
@@ -247,11 +248,10 @@ export function PayScreen({
       // `100vh`: Safari measures the latter as though its own toolbar were not there.
       className="flex flex-col min-h-[100dvh] pb-[calc(11rem+env(safe-area-inset-bottom,0px))] bg-[#faf8ff] dark:bg-slate-950"
     >
-      <header className="px-5 pt-8 pb-3">
-        <h1 className="text-2xl font-black text-[#0A1938] dark:text-slate-50 tracking-tight leading-none">
-          {t(locale, 'billing.pay.title')}
-        </h1>
-      </header>
+      {/* A1 — `#/payments` is not a tab and had no way back: reached from a profile sheet
+          and from the trainee card's debt row, both of which close behind it. The screen's
+          own `h1` moves INTO the header rather than sitting under a second one. */}
+      <ScreenHeader locale={locale} title={t(locale, 'billing.pay.title')} testId="pay-header" />
 
       <main className="px-5 flex flex-col gap-4">
         {/* ── what this payment comes to, and what it is made of ─────────────────

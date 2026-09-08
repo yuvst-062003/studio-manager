@@ -1,5 +1,3 @@
-export { PaymentsScreen } from './PaymentsScreen'
-export type { DebtRow, PaymentsScreenProps } from './PaymentsScreen'
 export { PaymentHistoryScreen } from './PaymentHistoryScreen'
 export { PaymentCompleteScreen } from './PaymentCompleteScreen'
 export { instalmentSplit, oldestMonths, selectionTotal } from './billingClient'

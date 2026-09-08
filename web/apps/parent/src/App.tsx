@@ -99,7 +99,7 @@ import { PlanSection } from './features/billing/redesign/PlanSection'
 // health declaration. Every piece of it existed behind `#/plan/<studentId>` and nothing in
 // the first-run sequence reached it, so a family finished signup with no plan at all.
 import type { MandateLink } from './features/billing/billingClient'
-import { makeParentBillingClient } from './features/billing/PaymentsSection'
+import { makeParentBillingClient } from './features/billing/billingClient'
 import { ClubShop } from './features/billing/redesign/ClubShop'
 import { ParentPayments } from './features/billing/redesign/ParentPayments'
 // §6.1 step 6 — the BLOCKING declaration. Mounted here because nothing imported it
@@ -932,9 +932,10 @@ function AuthedApp() {
             // No `access.parent` guard needed and none added: the routes behind this
             // screen resolve the payer from the session, so a person with no charges sees
             // an empty state rather than somebody else's money.
-            // The 2026-09-07 rebuild. `PaymentsScreen` + `PaymentsSection` are replaced by
-            // the screen that answers one question; both stay on disk until it is accepted
-            // end to end, the same way `ShopSection` and `ProfileSection` did.
+            // The 2026-09-07 rebuild. `PaymentsScreen` and `PaymentsSection` are gone —
+            // deleted 2026-09-08, a day after this screen replaced them, along with the
+            // four exports of theirs that had nothing to do with a screen and are now in
+            // `billingClient.ts` where their nine importers were already reaching.
             <ParentPayments locale={locale} />
           ) : planStudentId ? (
             // Same reasoning as the payments screen above: the route resolves the family
@@ -942,9 +943,11 @@ function AuthedApp() {
             // 404 and the section renders nothing rather than another family's plan.
             <PlanSection locale={locale} studentId={planStudentId} />
           ) : onShop ? (
-            // Checkpoint 4 of the parent-app redesign. `ShopSection` + `OrderItemsScreen`
-            // are replaced by the port of the prototype's `GearScreen`; both stay on disk
-            // until the redesign is accepted end to end.
+            // Checkpoint 4 of the parent-app redesign — the port of the prototype's
+            // `GearScreen`. `ShopSection` and `OrderItemsScreen` are long gone; this
+            // comment claimed they were "on disk until the redesign is accepted" for weeks
+            // after they were deleted, which is the rot the delete-with-the-replacement
+            // rule exists to prevent.
             <ClubShop locale={locale} />
           ) : techniquesRoute !== null ? (
             techniquesRoute.kind === 'detail' ? (
@@ -984,10 +987,10 @@ function AuthedApp() {
             // props rather than being read again inside the screen: `useSession()` is
             // called ONCE for this whole route (see F1/F10 above), and a second call in a
             // tab would put a second `/auth/refresh` on every visit to it.
-            // Checkpoint 5 of the parent-app redesign — the last of the four tabs.
-            // `ProfileSection` + `GuardianSettings` are replaced by the port of the
-            // prototype's `ProfileScreen`; both stay on disk until the redesign is
-            // accepted end to end.
+            // Checkpoint 5 of the parent-app redesign — the last of the four tabs, the
+            // port of the prototype's `ProfileScreen`. `ProfileSection` and
+            // `GuardianSettings` are gone; the promise that they were "on disk until the
+            // redesign is accepted" outlived both files by weeks.
             <ProfileScreen
               locale={locale}
               onLocaleChange={setLocale}

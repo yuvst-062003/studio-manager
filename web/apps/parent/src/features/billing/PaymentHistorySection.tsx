@@ -13,7 +13,7 @@ import { LoadFailed } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { PaymentHistoryScreen } from './PaymentHistoryScreen'
-import { makeParentBillingClient } from './PaymentsSection'
+import { makeParentBillingClient } from './billingClient'
 import type { ChargeOut, PaymentOut } from './billingClient'
 
 export function PaymentHistorySection({ locale }: { locale: Locale }) {
