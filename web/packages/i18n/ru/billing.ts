@@ -427,5 +427,16 @@ export const billing: Bundle = {
   'pay.lastPayment': 'Последний платёж',
   'pay.noPayments': 'Платежей пока нет',
   'pay.allPayments': 'Все платежи',
+  // Причины см. в ивритском файле.
+  'pay.nowTitle': 'К оплате сейчас',
+  'pay.receiptTotal': 'Итого',
+  'pay.remainder': 'Остаётся долг {{total}}',
+  'pay.showAll': 'Показать все',
+  'pay.forwardLine': '{{count}} мес. вперёд',
+  'pay.forwardLine.one': 'Один месяц вперёд',
+  'pay.cashMonthsTitle': 'На сколько месяцев вперёд?',
+  'pay.cashFloor': 'Клуб берёт минимум за {{count}} мес.',
+  'pay.cashFloor.one': 'Клуб берёт минимум за один месяц',
+  'pay.ceilingReached': 'Вы оплатили максимально вперёд — новые месяцы откроются позже.',
   'pay.secureNote': 'Защищённая транзакция по стандарту PCI-DSS',
 }

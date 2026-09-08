@@ -88,6 +88,17 @@ export type SubmitJoinDeps = {
   /** `GET /me/standing-order-links`, read AFTER the write — the children it names did
    *  not exist before it. */
   standingOrderLinks: () => Promise<readonly MandateLink[]>
+  /**
+   * `PUT /me/payment-methods` — how the family says they will pay, per child.
+   *
+   * **This is the whole of the "the payment option didn't get written" fix.** The promises
+   * below record three of the four methods and the order records none, because
+   * `payment_promise.method` has no card; the profile screen read the method off the
+   * promise list, so a card family was told `לא הוגדר` however often they answered.
+   */
+  savePaymentMethods: (
+    items: readonly { studentId: string; method: string }[],
+  ) => Promise<void>
 }
 
 export type SubmitJoinInput = {
@@ -211,6 +222,28 @@ export async function submitJoin(input: SubmitJoinInput): Promise<SubmitJoinResu
     outcomes.push(outcome)
     active.push({ outcome, studentId, method, charges, planId: draft.planId })
   })
+
+  // How the family says they will pay, recorded for EVERY active child before any money
+  // moves. `active` already excludes the children awaiting a manager's review, and a
+  // preference recorded for one of those would be a fact about a registration that has not
+  // happened.
+  //
+  // Swallowed on failure, deliberately: `register` has already landed by here, and losing
+  // a preference the family can set again in פרופיל is not worth failing a join over.
+  if (active.length > 0) {
+    try {
+      await deps.savePaymentMethods(
+        active.map((row) => ({
+          studentId: row.studentId,
+          // `credit` is the wizard's word for it; `upay_card` is `payment.method`'s, which
+          // is what the column holds and what `methodKey` already translates for display.
+          method: row.method === 'credit' ? 'upay_card' : row.method,
+        })),
+      )
+    } catch {
+      // Nothing downstream reads it, and no outcome changes.
+    }
+  }
 
   let checkout: UpayForm | null = null
   let checkoutUnavailable = false

@@ -464,6 +464,12 @@ export const people: Bundle = {
   'profile.paymentMethod': 'Payment method',
   'profile.paymentMethodNone': 'Not set',
   'profile.paymentMethodUpdate': 'Update',
+  // See the Hebrew file for why each of these exists.
+  'profile.paymentMethodFor': 'Payment method for {{name}}',
+  'profile.paymentMethodSave': 'Save',
+  'profile.paymentMethodSaving': 'Saving…',
+  'profile.paymentMethodMixed': 'Mixed',
+  'profile.paymentMethodFailed': 'We could not save that. Try again.',
   'profile.paymentMethodHint': "Card details are entered on the payment provider's secure page — the app never sees them and never stores them.",
   'profile.clubTitle': 'The club',
   'profile.contactTitle': 'Get in touch',

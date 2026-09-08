@@ -38,6 +38,7 @@ from app.models.billing import Charge, PaymentOrder, PaymentOrderCharge, Recurri
 from app.models.studio import Studio
 from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
 from app.services.billing.payment_promise import PaymentPromiseService
+from app.services.billing.prepay_ceiling import refuse_past_ceiling
 
 #: §5.10's "IPN never arrives" row: 'a nightly job flags orders pending for more than 24h'.
 ORDER_TTL_HOURS = 24
@@ -300,10 +301,11 @@ class OrderService:
             # It would subtract from what the family owes and open uPay for less than the
             # debt, leaving charges half-covered by a payment nobody could explain.
             raise RefusedError("prepay_months cannot be negative")
-        if prepay_months > MAX_PREPAY_MONTHS:
-            raise RefusedError(
-                f"prepay_months={prepay_months}: at most {MAX_PREPAY_MONTHS} may be bought forward"
-            )
+        # Was `prepay_months > MAX_PREPAY_MONTHS`, which capped ONE order and counted
+        # nothing already bought -- so twelve months forward, paid, then twelve more was
+        # twenty-four months of coverage and neither route noticed (owner review,
+        # 2026-09-08). The ceiling is now measured off the credit the family holds.
+        refuse_past_ceiling(self._session, payer_person_id, prepay_months)
         if not charge_ids and prepay_months == 0:
             raise RefusedError("an order needs at least one charge or a month bought forward")
         if not 1 <= max_payments <= MAX_INSTALLMENTS:

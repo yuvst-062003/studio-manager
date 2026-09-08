@@ -14,7 +14,7 @@
 // serve doors B, C and D. What each door reads and writes now lives there; what the wizard
 // draws, validates, persists and submits stays exactly here, unchanged.
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { refresh } from '@studio/core'
+import { apiFetch, refresh } from '@studio/core'
 import type { Locale } from '@studio/i18n'
 import type { BillingClient } from '../../billing/billingClient'
 import type { MandateLink } from '../../billing/billingClient'
@@ -249,6 +249,21 @@ export function JoinWizard({
         },
         billing: billingClient,
         standingOrderLinks,
+        //: How the family says they will pay. A `PUT` and not a promise, because
+        //: `payment_promise.method` has no card and this must record all four routes --
+        //: see `SubmitJoinDeps.savePaymentMethods` for the defect it closes.
+        savePaymentMethods: async (items) => {
+          const response = await apiFetch('/api/v1/me/payment-methods', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              items: items.map((row) => ({ student_id: row.studentId, method: row.method })),
+            }),
+          })
+          //: `submitJoin` swallows a rejection here on purpose; throwing is what makes the
+          //: failure reach that decision rather than passing silently as a resolved write.
+          if (!response.ok) throw new Error(String(response.status))
+        },
       },
     })
 

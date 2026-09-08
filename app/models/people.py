@@ -128,6 +128,12 @@ class Student(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
         ),
         # §5.14's dashboard counts and §11.5's retention job both scan by status.
         Index("ix_student_studio_id_status", "studio_id", "status"),
+        # `payment.method`'s vocabulary, deliberately -- see the column's own note.
+        CheckConstraint(
+            "payment_method IS NULL OR payment_method IN "
+            "('upay_card', 'cash', 'cheque', 'standing_order')",
+            name="student_payment_method",
+        ),
     )
 
     person_id: Mapped[uuid.UUID] = mapped_column(
@@ -167,6 +173,22 @@ class Student(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     price_plan_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("price_plan.id", ondelete="RESTRICT")
     )
+    #: How this child's family pays for them. Beside `price_plan_id` because it is the same
+    #: kind of fact — a billing arrangement that belongs to one student, per C11.
+    #:
+    #: **Per CHILD, not per payer.** That is what the join wizard already collects
+    #: (`methods: Record<draftId, PaymentMethod>`), and what הוראת קבע actually is: a
+    #: mandate is signed per child at that child's own price, which is why
+    #: `GET /me/standing-order-links` returns a LIST rather than a link.
+    #:
+    #: **`payment.method`'s vocabulary and NOT `payment_promise.method`'s.** The promise has
+    #: no card — a promise is a statement that money will arrive by hand, and a card order
+    #: is money already in motion — so a card family could never have a method recorded
+    #: anywhere, and the profile screen read `לא הוגדר` to them however often they answered.
+    #: That is the defect this column exists for.
+    #:
+    #: Nullable: an existing family has not been asked yet, and a `lead` never will be.
+    payment_method: Mapped[str | None] = mapped_column(String(20))
 
 
 class StudentPickupContact(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):

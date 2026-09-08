@@ -554,6 +554,14 @@ export const people: Bundle = {
   'profile.paymentMethodUpdate': 'עדכון',
   // Said out loud, because the prototype's own modal asks for card digits and this one
   // cannot: the card form is uPay's, on uPay's origin.
+  // ── the picker (owner review, 2026-09-08) ─────────────────────────────────
+  // אמצעי תשלום stopped being a label and became a button. הוראת קבע and צ׳קים
+  // are its DETAIL now, not two cards shouting at every family regardless.
+  'profile.paymentMethodFor': 'אמצעי תשלום עבור {{name}}',
+  'profile.paymentMethodSave': 'שמירה',
+  'profile.paymentMethodSaving': 'שומר…',
+  'profile.paymentMethodMixed': 'מעורב',
+  'profile.paymentMethodFailed': 'לא הצלחנו לשמור. נסו שוב.',
   'profile.paymentMethodHint': 'פרטי האשראי נמסרים בעמוד המאובטח של חברת הסליקה — האפליקציה לא רואה אותם ולא שומרת אותם.',
   // -- המועדון: the dojo and the contact actions, merged. Both answer "how do I reach the
   //    club", and two rows for one question is the kind of thing that fills a screen --

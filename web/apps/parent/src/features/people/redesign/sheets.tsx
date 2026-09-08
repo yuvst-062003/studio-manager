@@ -7,7 +7,7 @@ import { PushSetting } from '../../comms/PushSetting'
 import { makeParentCommsClient } from '../../comms/commsClient'
 import { AccessibilityMenu } from '@studio/ui'
 import { apiFetch, fill } from '@studio/core'
-import { plural, t } from '@studio/i18n'
+import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { CalendarSyncPopup } from './CalendarSyncPopup'
 import { Sheet } from './Sheet'
@@ -125,6 +125,12 @@ export function TraineesSheet({
  *  550 needs both, labelled — one bare link has them sign one mandate and underpay for the
  *  other child every month. */
 export type MandateLinkRow = {
+  /** Which child this mandate is for. **The id, never the name**: the picker shows a
+   *  link inside that child's own block, and matching on a display string would put a
+   *  mandate under the wrong child for two siblings who share a name — signing them up
+   *  at the wrong amount, silently, every month. `/me/standing-order-links` has always
+   *  returned it (`app/routers/billing.py:869`); this client simply dropped it. */
+  studentId: string
   studentName: string
   planName: string
   amountAgorot: number
@@ -162,9 +168,7 @@ export function PaymentsSheet({
   failed,
   onRetry,
   methodLabel,
-  methodIsCard,
-  mandateLinks,
-  cheque,
+  onEditMethod,
   money,
   monthLabel,
   onClose,
@@ -175,16 +179,12 @@ export function PaymentsSheet({
    *  `coverage` is `null` until BOTH the balance and the charges have landed. */
   failed: boolean
   onRetry: () => void
+  /** The shared word when every child agrees, `מעורב` when they do not, `null` when
+   *  nobody has answered. Derived in `ProfileScreen` from `GET /me/payment-methods` —
+   *  NOT from the promise list, which structurally cannot describe a card family. */
   methodLabel: string | null
-  /** Whether the family actually pays by card. The PCI note below is only true for them. */
-  methodIsCard: boolean
-  /** §5.10's הוראת קבע, moved here from the payments screen on 2026-09-07: a standing order
-   *  moves the money by itself, so it is set up once and never decided again. */
-  mandateLinks: readonly MandateLinkRow[]
-  /** `null` while the money reads are still in flight — the route is not offered until its
-   *  own numbers are known, because a cheque button priced at nothing is a promise for
-   *  nothing that a manager then has to decline. */
-  cheque: ChequeRoute | null
+  /** Opens `PaymentMethodSheet`. The row is the way in to both once-only routes now. */
+  onEditMethod: () => void
   money: (agorot: number) => string
   /** `(year, month)` → the localized month heading. `formatMonthLabel` gives 'אוגוסט 2026'
    *  in one string, so the sentence has one token and not a hand-ordered pair — Russian
@@ -192,12 +192,6 @@ export function PaymentsSheet({
   monthLabel: (year: number, month: number) => string
   onClose: () => void
 }) {
-  // `months × monthly` is integer arithmetic on two integers the server sent (G2), and it
-  // is computed ONCE here so the breakdown and the button cannot round it differently.
-  const chequeTotal = cheque
-    ? cheque.openAgorot + cheque.months * cheque.monthlyTotalAgorot
-    : 0
-
   return (
     <Sheet
       title={t(locale, 'people.profile.billingTitle')}
@@ -251,176 +245,27 @@ export function PaymentsSheet({
         </div>
       )}
 
-      <div
+      {/* ── אמצעי תשלום ───────────────────────────────────────────────────────────────
+          A BUTTON since 2026-09-08, not a label. It named the method and could not change
+          it, while הוראת קבע and צ׳קים sat underneath as always-open cards — shouting at
+          every family whether or not they used either. Both routes are now the detail of
+          whichever method is selected, inside `PaymentMethodSheet`. */}
+      <button
+        type="button"
         data-testid="sheet-payments-method"
-        className="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700"
+        onClick={onEditMethod}
+        className="w-full flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer text-start"
       >
-        {/* No 'עדכון' link to #/payments any more. That screen answers "what do I owe and
-            how do I pay it right now"; the two routes below are the ones set up ONCE, and
-            sending a parent to the monthly screen to arrange a standing order was pointing
-            at the wrong place from the moment they moved here. */}
+        <ChevronLeft className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
         <div className="text-start min-w-0">
-          <p className="text-xs text-slate-500 dark:text-slate-400">{t(locale, 'people.profile.paymentMethod')}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {t(locale, 'people.profile.paymentMethod')}
+          </p>
           <p className="text-sm font-bold text-slate-900 dark:text-slate-50 truncate">
             {methodLabel ?? t(locale, 'people.profile.paymentMethodNone')}
           </p>
         </div>
-      </div>
-
-      {/* ── הוראת קבע ─────────────────────────────────────────────────────────────────
-          Set up once, on the clearing company's own site, and then it moves the money by
-          itself. An empty list renders the instructions and no anchor, which is exactly
-          what this rendered before there was a per-plan source at all. */}
-      <section
-        data-testid="sheet-payments-standing-order"
-        className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700 text-start"
-      >
-        <h3 className="text-sm font-bold text-slate-900 dark:text-slate-50">
-          {t(locale, 'billing.method.standingOrder')}
-        </h3>
-        {mandateLinks.map((link) => (
-          <div
-            key={link.url}
-            data-testid="sheet-standing-order-row"
-            className="flex items-center justify-between gap-2 mt-2.5"
-          >
-            <a
-              href={link.url}
-              data-testid="sheet-standing-order-link"
-              // Two anchors reading 'קישור להקמת הוראת קבע' are two links a screen reader
-              // cannot tell apart, and telling them apart is the whole point of a
-              // per-child mandate.
-              aria-label={fill(t(locale, 'billing.standingOrder.linkFor'), {
-                name: link.studentName,
-              })}
-              // Without a target, following it navigates פרופיל away to a third party's
-              // page and the family loses the app.
-              rel="noopener noreferrer"
-              target="_blank"
-              className="text-xs font-bold text-[#0056c5] dark:text-blue-300 shrink-0 cursor-pointer"
-            >
-              {t(locale, 'billing.standingOrder.link')}
-            </a>
-            <span className="min-w-0">
-              <span className="block text-sm font-bold text-slate-900 dark:text-slate-50 truncate">
-                {link.studentName}
-              </span>
-              {/* The amount the mandate will charge every month. A uPay shared link is
-                  fixed at one amount and the page it opens does not say which. */}
-              <span className="block text-xs text-slate-500 dark:text-slate-400 truncate">
-                {[link.planName, money(link.amountAgorot)].filter(Boolean).join(' · ')}
-              </span>
-            </span>
-          </div>
-        ))}
-        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
-          {t(locale, 'billing.standingOrder.instructions')}
-        </p>
-        {/* G8 on the screen: the app cannot confirm these, so the charges stay open until
-            a manager reconciles them. Saying so is what stops a parent thinking it failed. */}
-        <p className="text-[11px] text-slate-500 dark:text-slate-400">
-          {t(locale, 'billing.standingOrder.notConfirmable')}
-        </p>
-      </section>
-
-      {/* ── צ׳קים ─────────────────────────────────────────────────────────────────────
-          A season, handed over once. Same promise row and same manager decision as cash —
-          the payment-routes spec §8's point is that cheques are cash with a different word
-          on the payment. */}
-      {cheque ? (
-        <section
-          data-testid="sheet-payments-cheque"
-          className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700 text-start"
-        >
-          <h3 className="text-sm font-bold text-slate-900 dark:text-slate-50">
-            {t(locale, 'billing.method.cheque')}
-          </h3>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-            {t(locale, 'billing.cheque.instructions')}
-          </p>
-          {cheque.pendingAgorot !== null ? (
-            <p
-              data-testid="sheet-cheque-pending"
-              className="text-xs font-bold text-amber-800 dark:text-amber-300 mt-2"
-            >
-              {t(locale, 'billing.cheque.requested')}
-            </p>
-          ) : cheque.blocked ? (
-            <p
-              data-testid="sheet-cheque-blocked"
-              className="text-xs text-slate-500 dark:text-slate-400 mt-2"
-            >
-              {t(locale, 'billing.promise.blocked')}
-            </p>
-          ) : (
-            <>
-              {cheque.declined ? (
-                <p
-                  data-testid="sheet-cheque-declined"
-                  role="alert"
-                  className="text-xs text-[#ba1a1a] dark:text-red-300 mt-2"
-                >
-                  {t(locale, 'billing.cheque.declined')}
-                </p>
-              ) : null}
-              {/* The breakdown, not one figure: ₪900 with no explanation is the number a
-                  parent phones the office about. */}
-              <dl className="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-300">
-                <div className="flex items-center justify-between gap-2">
-                  <dt>{t(locale, 'billing.prepay.openCharges')}</dt>
-                  <dd className="font-bold">
-                    <bdi>{money(cheque.openAgorot)}</bdi>
-                  </dd>
-                </div>
-                {cheque.months > 0 && cheque.monthlyTotalAgorot > 0 ? (
-                  <div className="flex items-center justify-between gap-2">
-                    <dt data-testid="sheet-cheque-term">
-                      {plural(locale, 'billing.pay.forward', cheque.months)}
-                    </dt>
-                    <dd className="font-bold">
-                      <bdi>{money(cheque.months * cheque.monthlyTotalAgorot)}</bdi>
-                    </dd>
-                  </div>
-                ) : null}
-                <div className="flex items-center justify-between gap-2 border-t border-slate-200 dark:border-slate-700 pt-1">
-                  <dt className="font-bold">{t(locale, 'billing.prepay.total')}</dt>
-                  <dd
-                    data-testid="sheet-cheque-total"
-                    className="font-bold text-slate-900 dark:text-slate-50"
-                  >
-                    <bdi>{money(chequeTotal)}</bdi>
-                  </dd>
-                </div>
-              </dl>
-              <button
-                type="button"
-                data-testid="sheet-cheque-request"
-                disabled={cheque.busy || chequeTotal <= 0}
-                onClick={cheque.onRequest}
-                className={`mt-2.5 w-full rounded-xl py-2.5 text-xs font-bold transition-transform ${
-                  cheque.busy || chequeTotal <= 0
-                    ? 'bg-slate-200 dark:bg-slate-700 text-slate-500 cursor-not-allowed'
-                    : 'bg-[#0056c5] text-white active:scale-95 cursor-pointer'
-                }`}
-              >
-                {t(locale, 'billing.cheque.request')}
-              </button>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
-                {t(locale, 'billing.prepay.note')}
-              </p>
-            </>
-          )}
-        </section>
-      ) : null}
-
-      {/* Only for a card payer. A family that wrote cheques for the season was being told
-          where their credit-card details are handled — a sentence about a thing they do not
-          do, on the one screen that is supposed to answer "am I sorted". */}
-      {methodIsCard || methodLabel === null ? (
-        <p className="text-[11px] text-slate-500 dark:text-slate-400 text-start">
-          {t(locale, 'people.profile.paymentMethodHint')}
-        </p>
-      ) : null}
+      </button>
 
       {/* The list a bulk payer actually wants: five cheques, not twelve monthly charges.
           `#/payments/history` already reads `payments`, not `charges`. */}

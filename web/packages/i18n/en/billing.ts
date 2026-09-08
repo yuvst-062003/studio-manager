@@ -424,5 +424,16 @@ export const billing: Bundle = {
   'pay.lastPayment': 'Last payment',
   'pay.noPayments': 'No payments yet',
   'pay.allPayments': 'All payments',
+  // See the Hebrew file for why each of these exists.
+  'pay.nowTitle': 'To pay now',
+  'pay.receiptTotal': 'Total',
+  'pay.remainder': '{{total}} still open',
+  'pay.showAll': 'Show all',
+  'pay.forwardLine': '{{count}} months ahead',
+  'pay.forwardLine.one': 'One month ahead',
+  'pay.cashMonthsTitle': 'How many months ahead?',
+  'pay.cashFloor': 'The club collects at least {{count}} months',
+  'pay.cashFloor.one': 'The club collects at least one month',
+  'pay.ceilingReached': 'You are paid ahead as far as we take — more months open up as the year goes on.',
   'pay.secureNote': 'Secured to the PCI-DSS standard',
 }

@@ -22,6 +22,9 @@ import type { AccountControlsProps } from '../../shell/AccountControls'
 import { ProfileHeader } from './ProfileTop'
 import { ProfileMenu } from './ProfileMenu'
 import type { MenuKey } from './ProfileMenu'
+import { PaymentMethodSheet } from './PaymentMethodSheet'
+import type { MethodKey, MethodRow } from './PaymentMethodSheet'
+import { methodKey } from '../../billing/PaymentHistoryScreen'
 import { ClubSheet, PaymentsSheet, SettingsSheet, TraineesSheet } from './sheets'
 import type { ChequeRoute, MandateLinkRow } from './sheets'
 import { PersonalDetailsSheet } from './PersonalDetails'
@@ -76,8 +79,17 @@ export function ProfileScreen({
   const [balance, setBalance] = useState<{ balanceAgorot: number; openChargeCount: number } | null>(
     null,
   )
-  const [methodLabel, setMethodLabel] = useState<string | null>(null)
-  const [methodIsCard, setMethodIsCard] = useState(false)
+  /**
+   * How the family pays, per child — `GET /me/payment-methods`.
+   *
+   * This USED to be derived from `/me/payment-promises` row zero, and that could never
+   * work: `payment_promise.method` is `IN ('cash','cheque','standing_order')`, so a card
+   * family has no promise and read `לא הוגדר` however many times they answered the
+   * wizard. The fact now has a column of its own.
+   */
+  const [methodRows, setMethodRows] = useState<readonly MethodRow[]>([])
+  const [savingMethods, setSavingMethods] = useState(false)
+  const [methodError, setMethodError] = useState<string | null>(null)
   const [charges, setCharges] = useState<readonly CoverageCharge[] | null>(null)
   // ── אמצעי תשלום, moved here from the payments screen on 2026-09-07 ──────────────────
   // הוראת קבע and צ׳קים are both set up ONCE — a mandate moves the money by itself and a
@@ -91,7 +103,9 @@ export function ProfileScreen({
   const [promises, setPromises] = useState<readonly PromiseRow[] | null>(null)
   const [chequeBusy, setChequeBusy] = useState(false)
 
-  const [open, setOpen] = useState<MenuKey | 'settings' | null>(null)
+  // `'method'` is not a menu row — it is only ever reached from inside the payments
+  // sheet, so it is a sheet key without a button of its own.
+  const [open, setOpen] = useState<MenuKey | 'settings' | 'method' | null>(null)
   const [savingDetails, setSavingDetails] = useState(false)
   const [detailsFailed, setDetailsFailed] = useState(false)
   // WHICH READ FAILED, not "did anything". The sheets open one at a time and each one
@@ -199,10 +213,23 @@ export function ProfileScreen({
         const body = (await response.json()) as { items?: PromiseRow[] }
         const rows = body.items ?? []
         setPromises(rows)
-        const method = rows[0]?.method ?? null
-        setMethodLabel(method ? t(locale, `billing.method.${method}`) : null)
-        // The PCI note is only true for a card payer; see `PaymentsSheet`.
-        setMethodIsCard(method === 'upay_card' || method === 'card')
+      })
+      .catch(() => live && setFailed((current) => ({ ...current, money: true })))
+
+    void apiFetch('/api/v1/me/payment-methods')
+      .then(async (response) => {
+        if (!live) return
+        if (!response.ok) return setFailed((current) => ({ ...current, money: true }))
+        const body = (await response.json()) as {
+          items: { student_id: string; student_name: string; method: MethodKey | null }[]
+        }
+        setMethodRows(
+          body.items.map((row) => ({
+            studentId: row.student_id,
+            studentName: row.student_name,
+            method: row.method,
+          })),
+        )
       })
       .catch(() => live && setFailed((current) => ({ ...current, money: true })))
 
@@ -214,10 +241,17 @@ export function ProfileScreen({
         if (!live) return
         if (!response.ok) return setFailed((current) => ({ ...current, money: true }))
         const body = (await response.json()) as {
-          items: { student_name: string; plan_name: string; amount_agorot: number; url: string }[]
+          items: {
+            student_id: string
+            student_name: string
+            plan_name: string
+            amount_agorot: number
+            url: string
+          }[]
         }
         setMandateLinks(
           body.items.map((row) => ({
+            studentId: row.student_id,
             studentName: row.student_name,
             planName: row.plan_name,
             amountAgorot: row.amount_agorot,
@@ -287,6 +321,54 @@ export function ProfileScreen({
   )
 
   const money = useCallback((agorot: number) => formatAgorot(agorot), [])
+
+  /**
+   * One word for the row, across every child.
+   *
+   * `מעורב` is a real answer and not a failure: a family may put one child on a mandate
+   * and pay another by card, which is exactly why the method is stored per child. The row
+   * says so rather than picking one child's answer and presenting it as the family's.
+   */
+  const methodLabel = useMemo(() => {
+    const answered = methodRows.map((row) => row.method).filter((m): m is MethodKey => m !== null)
+    if (answered.length === 0) return null
+    const distinct = new Set(answered)
+    if (distinct.size > 1) return t(locale, 'people.profile.paymentMethodMixed')
+    // `methodKey`'s own spelling — `upay_card` is `billing.method.card` — rather than a
+    // second mapping that would drift from the history screen's.
+    return t(locale, `billing.method.${methodKey([...distinct][0]!)}`)
+  }, [methodRows, locale])
+
+  /** Saves the picker. A refresh follows, so the row and the sheet cannot disagree about
+   *  what landed — and a failed write says so instead of closing as though it worked. */
+  const saveMethods = useCallback(
+    async (items: readonly { studentId: string; method: MethodKey }[]) => {
+      setSavingMethods(true)
+      setMethodError(null)
+      try {
+        const response = await apiFetch('/api/v1/me/payment-methods', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: items.map((row) => ({ student_id: row.studentId, method: row.method })),
+          }),
+        })
+        if (!response.ok) throw new Error(String(response.status))
+        setMethodRows((current) =>
+          current.map((row) => {
+            const picked = items.find((item) => item.studentId === row.studentId)
+            return picked ? { ...row, method: picked.method } : row
+          }),
+        )
+        setOpen('payments')
+      } catch {
+        setMethodError(t(locale, 'people.profile.paymentMethodFailed'))
+      } finally {
+        setSavingMethods(false)
+      }
+    },
+    [locale],
+  )
 
   /**
    * The cheque route's whole state, or `null` while its own reads are in flight.
@@ -431,12 +513,26 @@ export function ProfileScreen({
           failed={failed.money}
           onRetry={retry}
           methodLabel={methodLabel}
-          methodIsCard={methodIsCard}
-          mandateLinks={mandateLinks}
-          cheque={cheque}
+          onEditMethod={() => setOpen('method')}
           money={money}
           monthLabel={(year, month) => formatMonthLabel(year, month, locale)}
           onClose={close}
+        />
+      ) : null}
+
+      {open === 'method' ? (
+        <PaymentMethodSheet
+          rows={methodRows}
+          locale={locale}
+          mandateLinks={mandateLinks}
+          cheque={cheque}
+          money={money}
+          busy={savingMethods}
+          error={methodError}
+          onSave={saveMethods}
+          // Back to the payments sheet, not to the bare screen: the picker was opened
+          // from inside it, and closing to nothing loses the family their place.
+          onClose={() => setOpen('payments')}
         />
       ) : null}
 

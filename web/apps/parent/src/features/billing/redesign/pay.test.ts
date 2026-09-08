@@ -5,7 +5,17 @@
 // twice, a debt counted as though somebody else's claim had settled it, a family in good
 // standing sold months at a price nobody holds.
 import { describe, expect, it } from 'vitest'
-import { askFor, coveredAgorot, debtAgorot, owedMonths, payable } from './pay'
+import {
+  PREPAY_CEILING_MONTHS,
+  askFor,
+  cashMonthChips,
+  coveredAgorot,
+  debtAgorot,
+  owedMonths,
+  payable,
+  prepayHeadroomMonths,
+  receiptLines,
+} from './pay'
 import type { DebtRow, PayTerms } from './pay'
 import type { ChargeOut } from '../billingClient'
 
@@ -151,5 +161,134 @@ describe('the months a debt spans', () => {
         row({ id: 'b', period_year: null, period_month: null, due_date: '2026-10-31' }),
       ]),
     ).toBe(2)
+  })
+})
+
+// ── the receipt, the cash floor and the ceiling (owner review, 2026-09-08) ──────────
+//
+// Three defects, and each one is arithmetic before it is layout:
+//
+//  D1  a total with no list — "an item from the store plus מנוי" was one figure
+//  D2  cash offered the club's block and nothing else, so five months was unaskable
+//  D6  twelve months could be bought twice, because nobody counted what was held
+
+describe('what a family may still buy', () => {
+  it('is nothing for a payer with no monthly price', () => {
+    // They buy no months forward on any route, so a chip here would be one the server
+    // then refuses — the screen must not offer it at all.
+    expect(prepayHeadroomMonths(50_000, 0)).toBe(0)
+  })
+
+  it('counts the months already held against the ceiling', () => {
+    expect(prepayHeadroomMonths(10 * MONTHLY, MONTHLY)).toBe(2)
+  })
+
+  it('is the full season for a family holding nothing', () => {
+    expect(prepayHeadroomMonths(0, MONTHLY)).toBe(PREPAY_CEILING_MONTHS)
+  })
+
+  it('floors rather than truncating for a family already past it', () => {
+    // A plan re-priced downwards. `Math.trunc` would answer -1 here and let a chip
+    // through that the server's `//` would refuse — the two must round the same way.
+    expect(prepayHeadroomMonths(13 * MONTHLY, MONTHLY)).toBe(0)
+  })
+
+  it('ignores a part-month of credit rather than rounding it up into a chip', () => {
+    // 11 months and a bit. The eleventh is bought and the twelfth is not, so one month
+    // of room remains — rounding the part-month up would refuse a month they may have.
+    expect(prepayHeadroomMonths(11 * MONTHLY + 1, MONTHLY)).toBe(0)
+    expect(prepayHeadroomMonths(11 * MONTHLY, MONTHLY)).toBe(1)
+  })
+})
+
+describe('the cash chips', () => {
+  // The club's number is a FLOOR, not the answer (D2) — but the ceiling outranks it.
+  it.each([
+    [3, 12, [3, 6, 12]],
+    [3, 5, [3, 5]],
+    [3, 2, [1, 2]],
+    [4, 12, [4, 6, 12]],
+    [0, 12, [1, 2, 3, 6, 12]],
+    [3, 0, []],
+  ])('a floor of %i with %i months of room offers %j', (floor, headroom, expected) => {
+    expect(cashMonthChips(floor, headroom)).toEqual(expected)
+  })
+
+  it('never offers a chip the ceiling would refuse', () => {
+    for (let headroom = 0; headroom <= 14; headroom += 1) {
+      for (const chip of cashMonthChips(3, headroom)) {
+        expect(chip).toBeLessThanOrEqual(headroom)
+      }
+    }
+  })
+})
+
+describe('the receipt', () => {
+  const label = (c: ChargeOut) => c.proration_note ?? `kind:${c.kind}`
+
+  it('names a shop item by its own name and a month by its kind', () => {
+    // D1. `proration_note` is where BOTH shop routes write the item's name, which is what
+    // makes "חגורה כחולה" distinguishable from "מנוי" with no new field on the wire.
+    const debts = [
+      row({ id: 'a' }),
+      row({ id: 'b', kind: 'manual', proration_note: 'חגורה כחולה', amount_agorot: 12_000, period_month: null, period_year: null, student_id: null }),
+    ]
+    const ask = askFor('card', debts, 6, TERMS)
+    const lines = receiptLines(ask, debts, TERMS, label)
+    expect(lines.filter((l) => l.kind === 'charge').map((l) => l.label)).toEqual([
+      'kind:tuition',
+      'חגורה כחולה',
+    ])
+  })
+
+  it('sums to exactly what the button charges', () => {
+    // The whole point of the rebuild: nothing on the screen asks a parent to add two
+    // figures, so the rows and the total cannot be two computations that agree today.
+    const debts = [row({ id: 'a' }), row({ id: 'b', period_month: 10 })]
+    for (const ask of [askFor('card', debts, 6, TERMS), askFor('cash', debts, 0, TERMS, 1, 5)]) {
+      const summed = receiptLines(ask, debts, TERMS, label)
+        .filter((line) => line.kind !== 'remainder')
+        .reduce((total, line) => total + line.amountAgorot, 0)
+      expect(summed).toBe(ask.totalAgorot)
+    }
+  })
+
+  it('shows a remainder only when the selection is short of the debt', () => {
+    const debts = [row({ id: 'a' }), row({ id: 'b', period_month: 10 }), row({ id: 'c', period_month: 11 })]
+    const one = receiptLines(askFor('card', debts, 1, TERMS), debts, TERMS, label)
+    expect(one).toContainEqual({ kind: 'remainder', amountAgorot: 2 * MONTHLY })
+
+    const all = receiptLines(askFor('card', debts, 3, TERMS), debts, TERMS, label)
+    expect(all.some((line) => line.kind === 'remainder')).toBe(false)
+  })
+
+  it('leaves a charge another payment holds out of the rows and inside the remainder', () => {
+    // A greyed row beside a total that counts it is a contradiction. It is not being
+    // paid, so it is not a line — but it is still owed, so it is in the remainder.
+    const debts = [row({ id: 'a' }), row({ id: 'b', period_month: 10 }, true)]
+    const lines = receiptLines(askFor('card', debts, 6, TERMS), debts, TERMS, label)
+    expect(lines.some((line) => line.kind === 'charge' && line.id === 'b')).toBe(false)
+    expect(lines.find((line) => line.kind === 'remainder')?.amountAgorot).toBe(MONTHLY)
+  })
+
+  it('prices the forward months off the payer’s own monthly total', () => {
+    const debts = [row({ id: 'a' })]
+    const lines = receiptLines(askFor('cash', debts, 0, TERMS, 1, 5), debts, TERMS, label)
+    expect(lines).toContainEqual({ kind: 'forward', months: 5, amountAgorot: 5 * MONTHLY })
+  })
+})
+
+describe('what the cash button charges', () => {
+  it('takes the chosen month count rather than the club’s floor', () => {
+    // D2: five months, from a club that collects three.
+    const debts = [row({ id: 'a' })]
+    const ask = askFor('cash', debts, 0, TERMS, 1, 5)
+    expect(ask.forwardMonths).toBe(5)
+    expect(ask.totalAgorot).toBe(MONTHLY + 5 * MONTHLY)
+  })
+
+  it('still falls back to the club’s floor when nothing was chosen', () => {
+    const debts = [row({ id: 'a' })]
+    expect(askFor('cash', debts, 0, TERMS).forwardMonths).toBe(3)
   })
 })

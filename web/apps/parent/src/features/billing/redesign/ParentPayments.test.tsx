@@ -3,10 +3,11 @@
 //
 // The screen's three rules are the assertions:
 //
-//  1. the debt is every open charge and NOTHING on the screen moves it;
+//  1. the headline is what the button is about to charge, and the receipt under it says
+//     what that is made of — REVISED 2026-09-08, see PayScreen's own header for why;
 //  2. the button states the exact amount it is about to charge;
-//  3. when that amount jumps, a line on the screen says why — and on the cash side it
-//     names the club as the one who chose.
+//  3. when that amount jumps, the receipt says why — and on the cash side the copy still
+//     names the club as the one who set the minimum.
 //
 // The numbers are the owner's own: ₪208.33 owed, ₪250.00 a month. That case is here because
 // it is the one the old screen could not pay — a top line of ₪208.33 above buttons offering
@@ -114,29 +115,41 @@ async function open() {
 
 const payButton = () => screen.getByTestId('pay-button')
 
-describe('the number that never moves', () => {
-  it('is the debt, and it survives every choice on the screen', async () => {
+describe('the headline and the button are one number', () => {
+  it('moves with the method, and never disagrees with what is charged', async () => {
+    // The owner's report: "when I switch to cash the total amount above doesn't change,
+    // only the bottom". The screen deliberately froze the top figure at the debt, which
+    // fixed one reconciliation problem by creating its mirror.
     const user = await open()
-    const owed = screen.getByTestId('pay-owed-amount')
-    expect(owed).toHaveTextContent('208.33₪')
-    expect(within(screen.getByTestId('pay-owed')).getByText(t('he', 'billing.pay.owed'))).toBeInTheDocument()
+    const headline = () => screen.getByTestId('pay-now-amount').textContent ?? ''
 
-    // Three months on the card, then cash — the two choices that used to rewrite the
-    // figure a parent came to the screen to read.
-    await user.click(screen.getByTestId('pay-months-3'))
-    expect(screen.getByTestId('pay-owed-amount')).toHaveTextContent('208.33₪')
+    expect(headline()).toContain('208.33')
+    expect(payButton()).toHaveTextContent('208.33₪')
+
     await user.click(screen.getByTestId('pay-method-cash'))
-    expect(screen.getByTestId('pay-owed-amount')).toHaveTextContent('208.33₪')
+    // 208.33 owed + 3 months at 250 = 958.33, and BOTH figures say so.
+    expect(headline()).toContain('958.33')
+    expect(payButton()).toHaveTextContent('958.33₪')
   })
 
-  it('names the month and the child under it', async () => {
+  it('keeps the debt visible as a line inside the arithmetic', async () => {
+    // The old rule protected a real thing — a family must not lose sight of what they
+    // owe. It survives as a receipt row rather than as a frozen headline.
+    const user = await open()
+    await user.click(screen.getByTestId('pay-method-cash'))
+    const receipt = within(screen.getByTestId('pay-receipt'))
+    expect(receipt.getByText(/208\.33/)).toBeInTheDocument()
+    expect(screen.getByTestId('pay-receipt-total')).toHaveTextContent('958.33₪')
+  })
+
+  it('names the month and the child on the row', async () => {
     await open()
     // The seam: `/me/students` is the only source of a name here, and without it every row
     // said "09/2026" and a two-child family could not tell whose month was whose.
-    expect(screen.getByTestId('pay-owed')).toHaveTextContent('יובל כהן')
+    expect(screen.getByTestId('pay-receipt')).toHaveTextContent('יובל כהן')
   })
 
-  it('counts a charge another payment holds, and says which part that is', async () => {
+  it('leaves a charge another payment holds out of the receipt, and in the remainder', async () => {
     charges = [
       CHARGE,
       {
@@ -148,12 +161,45 @@ describe('the number that never moves', () => {
       },
     ]
     await open()
-    expect(screen.getByTestId('pay-owed-amount')).toHaveTextContent('458.33₪')
-    // Rule 1 costs something: the total counts money this parent cannot pay right now. The
-    // covered line is what stops that being a contradiction with nothing explaining it.
+    // It is not being paid, so it is not a row — but it is still owed, so it is named.
+    expect(screen.getAllByTestId('pay-receipt-row')).toHaveLength(1)
+    expect(screen.getByTestId('pay-remainder')).toHaveTextContent('250₪')
     expect(screen.getByTestId('pay-covered')).toHaveTextContent('250₪')
-    // …and the button offers only what is actually payable.
     expect(payButton()).toHaveTextContent('208.33₪')
+  })
+})
+
+describe('what am I paying for (the owner\'s first report)', () => {
+  it('separates a shop item from a month of tuition, by name', async () => {
+    // "An item from the store plus מנוי" was one figure with no way to tell the two apart.
+    // `proration_note` is where both shop routes write the item's name.
+    charges = [
+      CHARGE,
+      {
+        ...CHARGE,
+        id: 'ch-belt',
+        kind: 'manual',
+        period_year: null,
+        period_month: null,
+        student_id: null,
+        amount_agorot: 12_000,
+        proration_note: 'חגורה כחולה',
+      },
+    ]
+    await open()
+    const receipt = screen.getByTestId('pay-receipt')
+    expect(receipt).toHaveTextContent('חגורה כחולה')
+    expect(receipt).toHaveTextContent(t('he', 'billing.charge.kind.tuition'))
+    expect(screen.getByTestId('pay-receipt-total')).toHaveTextContent('328.33₪')
+    expect(payButton()).toHaveTextContent('328.33₪')
+  })
+
+  it('falls back to the charge kind when nothing ever named the charge', async () => {
+    charges = [{ ...CHARGE, kind: 'manual', proration_note: null, period_year: null, period_month: null }]
+    await open()
+    expect(screen.getByTestId('pay-receipt')).toHaveTextContent(
+      t('he', 'billing.charge.kind.manual'),
+    )
   })
 })
 
@@ -170,7 +216,7 @@ describe("the owner's #17 — ₪375 on the screen and ₪900 on the button", ()
 
   it('charges exactly what it says is owed, with nothing to reconcile', async () => {
     await open()
-    expect(screen.getByTestId('pay-owed-amount')).toHaveTextContent('375₪')
+    expect(screen.getByTestId('pay-now-amount')).toHaveTextContent('375₪')
     expect(payButton()).toHaveTextContent('375₪')
     expect(screen.queryByTestId('pay-forward-note')).toBeNull()
   })
@@ -181,9 +227,12 @@ describe("the owner's #17 — ₪375 on the screen and ₪900 on the button", ()
     // figure with nothing beside it. ₪375 + ₪900 = ₪1,275, and the button says so.
     const user = await open()
     await user.click(screen.getByTestId('pay-method-cash'))
-    expect(screen.getByTestId('pay-owed-amount')).toHaveTextContent('375₪')
-    expect(screen.getByTestId('pay-cash-term')).toHaveTextContent(
-      t('he', 'billing.pay.cashTerm').replace('{{count}}', '3'),
+    // The headline now says 1,275 too — that is the 2026-09-08 revision. The ₪375 is
+    // still on the screen, as the receipt row it belongs in.
+    expect(screen.getByTestId('pay-now-amount')).toHaveTextContent('1,275₪')
+    expect(within(screen.getByTestId('pay-receipt')).getByText(/375/)).toBeInTheDocument()
+    expect(screen.getByTestId('pay-cash-floor')).toHaveTextContent(
+      t('he', 'billing.pay.cashFloor').replace('{{count}}', '3'),
     )
     expect(payButton()).toHaveTextContent('1,275₪')
   })
@@ -268,14 +317,70 @@ describe('what the button says it will charge', () => {
     )
   })
 
-  it('names the CLUB when cash adds the months, because the club chose them', async () => {
+  it('still names the CLUB as the one who set the cash minimum', async () => {
     const user = await open()
     await user.click(screen.getByTestId('pay-method-cash'))
-    // The month chips are the card's question and disappear with it: leaving them on
-    // screen under cash would present the club's rule as something to answer.
+    // The CARD's month chips are its own question and disappear with it. Cash has chips of
+    // its own now (2026-09-08) — but the club's number is a floor, and the copy beside them
+    // still says whose floor it is rather than presenting it as the parent's choice.
     expect(screen.queryByTestId('pay-months')).toBeNull()
-    expect(screen.getByTestId('pay-cash-term')).toHaveTextContent('המועדון גובה 3')
+    expect(screen.getByTestId('pay-cash-floor')).toHaveTextContent('המועדון גובה 3')
     expect(payButton()).toHaveTextContent('958.33₪')
+  })
+
+  it('lets a family buy more months of cash than the club collects', async () => {
+    // The owner's report: "when I press cash I can only pay for 3 months ahead, and not
+    // more. What if the person wants 5 months?" The club's three was the whole offer.
+    const user = await open()
+    await user.click(screen.getByTestId('pay-method-cash'))
+    await user.click(screen.getByTestId('pay-cash-months-6'))
+    // ₪208.33 owed + 6 × ₪250 = ₪1,708.33.
+    expect(payButton()).toHaveTextContent('1,708.33₪')
+    expect(screen.getByTestId('pay-now-amount')).toHaveTextContent('1,708.33₪')
+  })
+
+  it('offers no chip below the club floor', async () => {
+    const user = await open()
+    await user.click(screen.getByTestId('pay-method-cash'))
+    expect(screen.queryByTestId('pay-cash-months-1')).toBeNull()
+    expect(screen.queryByTestId('pay-cash-months-2')).toBeNull()
+    expect(screen.getByTestId('pay-cash-months-3')).toBeInTheDocument()
+  })
+})
+
+describe('the ceiling — twelve months and no further', () => {
+  it('withdraws the forward offer from a family already a season ahead', async () => {
+    // The owner's report: "don't allow a user to pay more months if he already paid for a
+    // season (12 months)". Nothing counted what was held, so twelve could be bought twice.
+    charges = []
+    creditAgorot = 12 * MONTHLY
+    const user = await open()
+    await user.click(screen.getByTestId('pay-method-cash'))
+    expect(screen.queryByTestId('pay-cash-months')).toBeNull()
+    // Said out loud. Chips that are simply absent read as a screen that failed to load.
+    expect(screen.getByTestId('pay-ceiling-reached')).toBeInTheDocument()
+  })
+
+  it('offers a family two months from the ceiling exactly two, floor or no floor', async () => {
+    charges = []
+    creditAgorot = 10 * MONTHLY
+    const user = await open()
+    await user.click(screen.getByTestId('pay-method-cash'))
+    // The club collects three at a time; there is only room for two. The ceiling wins —
+    // refusing money a family is holding out would be the wrong end of the club's rule.
+    expect(screen.getByTestId('pay-cash-months-2')).toBeInTheDocument()
+    expect(screen.queryByTestId('pay-cash-months-3')).toBeNull()
+  })
+
+  it('blocks a card chip whose forward half would pass the ceiling, but never the debt', async () => {
+    creditAgorot = 12 * MONTHLY
+    await open()
+    // One month: settles the debt and buys nothing forward, so it stands.
+    expect(screen.getByTestId('pay-months-1').querySelector('input')).not.toBeDisabled()
+    // Six: five months forward, and there is no room for any of them.
+    expect(screen.getByTestId('pay-months-6').querySelector('input')).toBeDisabled()
+    // …and the button charges the debt alone rather than an amount the server refuses.
+    expect(payButton()).toHaveTextContent('208.33₪')
   })
 })
 
@@ -361,8 +466,10 @@ describe('the states either side of owing money', () => {
     charges = []
     creditAgorot = MONTHLY
     await open()
-    expect(screen.getByTestId('pay-owed-amount')).toHaveTextContent('0₪')
-    expect(screen.getByText(t('he', 'billing.pay.clearTitle'))).toBeInTheDocument()
+    // Nothing owed, so the card route's default chip buys one month forward: the headline
+    // is that month, and `clearTitle` is gone from the top because there IS something to
+    // pay for now. The strip below still says what is already covered.
+    expect(screen.getByTestId('pay-now-amount')).toHaveTextContent('250₪')
     // Nothing owed is not nothing to do: a family in good standing can still hand the club
     // a term, which is the whole of what prepayment on the card route is for.
     expect(payButton()).toBeEnabled()

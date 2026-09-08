@@ -7,15 +7,25 @@
 //
 // Three rules, and they are the whole of the rebuild:
 //
-//  1. **The top number is the debt and it never moves.** Choosing a method does not change
-//     what the family owes. It is the first thing on the screen and it is the only place
-//     `debtAgorot` is rendered.
+//  1. **The top number is what the button charges, and it is a receipt.** REVISED
+//     2026-09-08. It was "the debt, and it never moves" — a rule written against the
+//     ₪208.33 case above, and one that created the mirror defect: ₪375 at the top above a
+//     button charging ₪1,275, with nothing on screen explaining the gap. Both versions are
+//     protecting the same thing, that a reader is never asked to assemble a total out of
+//     two figures. Freezing the top number was one way; showing the sum is the other, and
+//     it is the one that also answers "what am I paying FOR" — which the frozen version
+//     could not, because a debt of a shop item plus a month was a single figure.
+//     `debtAgorot` is still rendered, as a line inside the arithmetic.
 //  2. **The button always states the real amount.** One figure, computed once, in `pay.ts`
 //     where a test holds it — never a total the reader has to assemble out of two.
-//  3. **When the number jumps, the screen says why.** The line under the chips is read off
-//     the same `Ask` the button charges, and on the cash side it names the CLUB as the one
-//     who chose three months. The club's rule stopped being presented as the parent's
-//     choice.
+//  3. **When the number jumps, the screen says why.** The receipt is read off the same
+//     `Ask` the button charges, and the cash side still names the CLUB as the one who set
+//     the minimum. The club's rule is a floor the parent may exceed (2026-09-08), never
+//     the whole offer — but it is still the club's, and the copy says so.
+//
+// **A family may not pay more than twelve months ahead** (2026-09-08). `headroom` mirrors
+// `prepay_headroom_months` on the server, so every chip this screen offers is one
+// `refuse_past_ceiling` will accept. The screen is the courtesy; the server is the rule.
 //
 // **הוראת קבע and צ׳קים are not here**, and their absence is the point. Both are set up
 // once — a standing order moves the money by itself and cheques buy a whole season — so
@@ -25,13 +35,24 @@
 // **The layout is step 3 of the join wizard's**, not step 4: light ground, white rounded
 // cards, a summary strip and a sticky bottom button. Step 4 is dark and celebratory — it
 // reports an outcome, and this screen asks for one.
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Banknote, ChevronLeft, CreditCard, Lock } from 'lucide-react'
 import { fill } from '@studio/core'
 import { plural, t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { instalmentSplit } from '../billingClient'
-import { INSTALMENT_CHIPS, MONTH_CHIPS, askFor, coveredAgorot, debtAgorot, owedMonths } from './pay'
+import type { ChargeOut } from '../billingClient'
+import {
+  INSTALMENT_CHIPS,
+  MONTH_CHIPS,
+  askFor,
+  cashMonthChips,
+  coveredAgorot,
+  debtAgorot,
+  owedMonths,
+  prepayHeadroomMonths,
+  receiptLines,
+} from './pay'
 import type { Ask, DebtRow, PayMethod, PayTerms } from './pay'
 
 /** The newest payment that actually stands, projected for the strip at the foot. */
@@ -106,12 +127,79 @@ export function PayScreen({
    *  family asks for, never something the screen assumes on their behalf. */
   const [instalments, setInstalments] = useState(1)
 
+  /**
+   * How many months forward this family may still buy (owner review, 2026-09-08).
+   *
+   * Derived from two numbers this screen already had, and mirrors
+   * `prepay_headroom_months` on the server — so a chip that is offered here is one
+   * `refuse_past_ceiling` will accept, rather than a second opinion about the same family.
+   */
+  const headroom = useMemo(
+    () => prepayHeadroomMonths(creditAgorot, terms.monthlyTotalAgorot),
+    [creditAgorot, terms.monthlyTotalAgorot],
+  )
+
+  /** The cash term. The club's floor is where it STARTS, not what it is: a family who
+   *  wants five months of cash had no way to say so before. */
+  const cashChips = useMemo(
+    () => cashMonthChips(terms.cashMonths, headroom),
+    [terms.cashMonths, headroom],
+  )
+  const [cashMonths, setCashMonths] = useState<number | null>(null)
+  // `null` until the family picks, so a chip list that arrives late (the terms are a
+  // fetch) does not leave the selection pinned to a stale first render.
+  const chosenCashMonths = cashMonths !== null && cashChips.includes(cashMonths)
+    ? cashMonths
+    : (cashChips[0] ?? 0)
+
+  /** Whether a card chip's FORWARD half would carry the family past the ceiling. Debt is
+   *  never blocked — see the chip's own comment. */
+  const monthsBlocked = (chip: number) => chip - Math.min(chip, owed) > headroom
+  /**
+   * The chip actually in force.
+   *
+   * The default is "the smallest chip that settles the debt", which can itself be blocked
+   * for a family who is both behind and paid ahead. Without this clamp the screen would
+   * open on a selection the button then charges and the server refuses — a dead end that
+   * costs the parent a round trip to discover.
+   */
+  const effectiveMonths = monthsBlocked(months)
+    ? ([...MONTH_CHIPS].reverse().find((chip) => !monthsBlocked(chip)) ?? owed)
+    : months
+
   const debt = useMemo(() => debtAgorot(debts), [debts])
   const covered = useMemo(() => coveredAgorot(debts), [debts])
   const ask = useMemo(
-    () => askFor(method, debts, months, terms, instalments),
-    [method, debts, months, terms, instalments],
+    () => askFor(method, debts, effectiveMonths, terms, instalments, chosenCashMonths),
+    [method, debts, effectiveMonths, terms, instalments, chosenCashMonths],
   )
+
+  /**
+   * What a charge is called. Spec §3.3, and the whole of the "what am I paying for" fix.
+   *
+   * `proration_note` is where BOTH shop routes write the item's name and where the billing
+   * run writes its proration explanation, so it is the label when it is there. The kind is
+   * the floor for a charge nothing ever named — an amount with no explanation was what the
+   * old screen showed for every one of them.
+   */
+  const labelOf = useCallback((charge: ChargeOut) => {
+    const base = charge.proration_note ?? t(locale, `billing.charge.kind.${charge.kind}`)
+    const month =
+      charge.period_year != null && charge.period_month != null
+        ? monthLabel(charge.period_year, charge.period_month)
+        : null
+    return [base, month].filter(Boolean).join(' · ')
+  }, [locale, monthLabel])
+
+  const lines = useMemo(
+    () => receiptLines(ask, debts, terms, labelOf),
+    [ask, debts, terms, labelOf],
+  )
+  const chargeLines = lines.filter((line) => line.kind === 'charge')
+  /** Six months of debt across three children is eighteen rows, and a wall of them is a
+   *  worse answer to "what am I paying for" than a summary with a way in. */
+  const [showAllLines, setShowAllLines] = useState(false)
+  const collapsed = chargeLines.length > 5 && !showAllLines
   /** What each card payment comes to. `instalmentSplit` is integer arithmetic on agorot
    *  and puts the remainder on the FIRST payment, so the parts sum to the total exactly —
    *  which is why the copy names the first separately when it differs. */
@@ -166,25 +254,114 @@ export function PayScreen({
       </header>
 
       <main className="px-5 flex flex-col gap-4">
-        {/* ── the debt. One number, and nothing on this screen moves it ─────────── */}
-        <section data-testid="pay-owed" className={`${CARD} p-5 text-center`}>
-          <p className="text-[13px] font-bold text-[#444650] dark:text-slate-400">
-            {debt > 0 ? t(locale, 'billing.pay.owed') : t(locale, 'billing.pay.clearTitle')}
+        {/* ── what this payment comes to, and what it is made of ─────────────────
+            The headline is the figure the BUTTON charges, and it moves with the method.
+
+            It used to be the debt, frozen — a rule written after a screen showed ₪208.33
+            above buttons offering ₪500, ₪750 and ₪3,000. That rule was protecting the
+            reader from assembling a total out of two figures, and freezing the top number
+            was one way to do it; showing the sum is the other, and it is the one that also
+            answers "what am I paying for". The debt is still here, as a line INSIDE the
+            arithmetic, where it cannot contradict the total above it. */}
+        <section data-testid="pay-now" className={`${CARD} p-5`}>
+          <p className="text-[13px] font-bold text-[#444650] dark:text-slate-400 text-center">
+            {ask.totalAgorot > 0
+              ? t(locale, 'billing.pay.nowTitle')
+              : t(locale, 'billing.pay.clearTitle')}
           </p>
           <p
-            data-testid="pay-owed-amount"
-            className={`mt-1 text-[38px] font-black tracking-tight tabular-nums ${
-              debt > 0 ? 'text-[#ba1a1a] dark:text-red-300' : 'text-emerald-700 dark:text-emerald-300'
+            data-testid="pay-now-amount"
+            className={`mt-1 text-[38px] font-black tracking-tight tabular-nums text-center ${
+              ask.totalAgorot > 0
+                ? 'text-[#0A1938] dark:text-slate-50'
+                : 'text-emerald-700 dark:text-emerald-300'
             }`}
           >
             {/* `<bdi>` for the same reason `MoneyDisplay` wraps every figure: `₪208.33` in
                 a right-to-left paragraph is free to reorder to `208.33₪`, and the fix for
                 that — a `direction: ltr` wrapper — is what actually causes it. */}
-            <bdi>{money(debt)}</bdi>
+            <bdi>{money(ask.totalAgorot)}</bdi>
           </p>
-          <p className="mt-1 text-[12px] text-[#444650] dark:text-slate-400">
-            {debt > 0 ? subtitle : t(locale, 'billing.pay.clearBody')}
-          </p>
+
+          {lines.length > 0 ? (
+            <dl
+              data-testid="pay-receipt"
+              className="mt-4 pt-3 border-t border-[#dee2f4] dark:border-slate-800 flex flex-col gap-2"
+            >
+              {(collapsed ? chargeLines.slice(0, 5) : chargeLines).map((line) => (
+                <div key={line.id} data-testid="pay-receipt-row" className="flex items-baseline justify-between gap-3">
+                  <dt className="text-[13px] text-[#161b28] dark:text-slate-200 min-w-0">
+                    {/* The child beside the label, not inside it — one carrier per fact. */}
+                    {line.studentName ? (
+                      <span className="text-[#444650] dark:text-slate-400">{line.studentName} · </span>
+                    ) : null}
+                    {line.label}
+                  </dt>
+                  <dd className="text-[13px] font-bold tabular-nums shrink-0 text-[#161b28] dark:text-slate-100">
+                    <bdi>{money(line.amountAgorot)}</bdi>
+                  </dd>
+                </div>
+              ))}
+              {collapsed ? (
+                <button
+                  type="button"
+                  data-testid="pay-receipt-show-all"
+                  onClick={() => setShowAllLines(true)}
+                  className="self-start bg-transparent border-0 p-0 text-[12px] font-bold text-[#0056c5] dark:text-blue-300 cursor-pointer hover:underline"
+                >
+                  {t(locale, 'billing.pay.showAll')}
+                </button>
+              ) : null}
+
+              {lines
+                .filter((line) => line.kind === 'forward')
+                .map((line) => (
+                  <div
+                    key="forward"
+                    data-testid="pay-receipt-forward"
+                    className="flex items-baseline justify-between gap-3"
+                  >
+                    <dt className="text-[13px] text-[#161b28] dark:text-slate-200">
+                      {plural(locale, 'billing.pay.forwardLine', line.months)}
+                    </dt>
+                    <dd className="text-[13px] font-bold tabular-nums shrink-0 text-[#161b28] dark:text-slate-100">
+                      <bdi>{money(line.amountAgorot)}</bdi>
+                    </dd>
+                  </div>
+                ))}
+
+              <div className="flex items-baseline justify-between gap-3 pt-2 border-t border-[#dee2f4] dark:border-slate-800">
+                <dt className="text-[13px] font-bold text-[#001849] dark:text-slate-100">
+                  {t(locale, 'billing.pay.receiptTotal')}
+                </dt>
+                <dd
+                  data-testid="pay-receipt-total"
+                  className="text-[15px] font-black tabular-nums text-[#001849] dark:text-slate-100"
+                >
+                  <bdi>{money(ask.totalAgorot)}</bdi>
+                </dd>
+              </div>
+
+              {lines
+                .filter((line) => line.kind === 'remainder')
+                .map((line) => (
+                  // Without this the receipt is a complete-looking document that quietly
+                  // omits money the family still owes.
+                  <p
+                    key="remainder"
+                    data-testid="pay-remainder"
+                    className="text-[12px] text-[#444650] dark:text-slate-400"
+                  >
+                    {fill(t(locale, 'billing.pay.remainder'), { total: money(line.amountAgorot) })}
+                  </p>
+                ))}
+            </dl>
+          ) : (
+            <p className="mt-1 text-[12px] text-[#444650] dark:text-slate-400 text-center">
+              {debt > 0 ? subtitle : t(locale, 'billing.pay.clearBody')}
+            </p>
+          )}
+
           {covered > 0 ? (
             // A row greyed out beside a total that counts it is a contradiction with
             // nothing on screen explaining it. This names the part already in motion.
@@ -259,15 +436,23 @@ export function PayScreen({
             </legend>
             <div className="grid grid-cols-4 gap-2">
               {MONTH_CHIPS.map((chip) => {
-                const active = months === chip
+                const active = effectiveMonths === chip
+                // The forward half of this chip — the part the ceiling is about. Debt is
+                // never blocked: a family paid a year ahead who still owes an old month
+                // must be able to clear it. Same predicate the server refuses on, so a
+                // chip that is live here is one `refuse_past_ceiling` will accept.
+                const blocked = monthsBlocked(chip)
                 return (
                   <label
                     key={chip}
                     data-testid={`pay-months-${chip}`}
-                    className={`cursor-pointer rounded-xl py-2.5 text-center text-[15px] font-bold transition-all has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#0056c5] ${
-                      active
-                        ? 'bg-[#001849] text-white shadow-md'
-                        : 'bg-[#e9edff] dark:bg-slate-800 text-[#161b28] dark:text-slate-200'
+                    aria-disabled={blocked || undefined}
+                    className={`rounded-xl py-2.5 text-center text-[15px] font-bold transition-all has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#0056c5] ${
+                      blocked
+                        ? 'bg-[#f1f2f7] dark:bg-slate-900 text-[#a9aab4] dark:text-slate-600 cursor-not-allowed'
+                        : active
+                          ? 'bg-[#001849] text-white shadow-md cursor-pointer'
+                          : 'bg-[#e9edff] dark:bg-slate-800 text-[#161b28] dark:text-slate-200 cursor-pointer'
                     }`}
                   >
                     <input
@@ -278,6 +463,7 @@ export function PayScreen({
                       // spoken name says what the digit counts.
                       aria-label={plural(locale, 'billing.pay.months', chip)}
                       checked={active}
+                      disabled={blocked}
                       onChange={() => setMonths(chip)}
                       className="sr-only"
                     />
@@ -383,12 +569,62 @@ export function PayScreen({
                     {t(locale, 'billing.cash.declined')}
                   </p>
                 ) : null}
-                {ask.forwardMonths > 0 ? (
+                {/* ── how many months forward. The club's number is where this STARTS.
+                    It used to be the whole offer, so a family who wanted five months of
+                    cash had no control on the screen to say so. */}
+                {cashChips.length > 0 ? (
+                  <fieldset data-testid="pay-cash-months" className="border-0 p-0 m-0 mb-1">
+                    <legend className="text-[14px] font-bold text-[#001849] dark:text-slate-100 mb-2">
+                      {t(locale, 'billing.pay.cashMonthsTitle')}
+                    </legend>
+                    <div className="flex flex-wrap gap-2">
+                      {cashChips.map((chip) => {
+                        const active = chosenCashMonths === chip
+                        return (
+                          <label
+                            key={chip}
+                            data-testid={`pay-cash-months-${chip}`}
+                            className={`cursor-pointer rounded-xl py-2 px-4 text-center text-[15px] font-bold transition-all has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#0056c5] ${
+                              active
+                                ? 'bg-[#001849] text-white shadow-md'
+                                : 'bg-[#e9edff] dark:bg-slate-800 text-[#161b28] dark:text-slate-200'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="pay-cash-months"
+                              // A bare digit is an accessible name of "3" — true of a page
+                              // number and a price alike. This says what the digit counts.
+                              aria-label={plural(locale, 'billing.pay.forwardLine', chip)}
+                              checked={active}
+                              onChange={() => setCashMonths(chip)}
+                              className="sr-only"
+                            />
+                            <span className="tabular-nums">{chip}</span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                    {terms.cashMonths > 0 ? (
+                      // Still naming the CLUB as the one who set the minimum. The screen
+                      // stopped presenting the club's rule as the parent's choice, and it
+                      // must not start again now that the parent has a choice beside it.
+                      <p
+                        data-testid="pay-cash-floor"
+                        className="mt-2 text-[12px] text-[#444650] dark:text-slate-400"
+                      >
+                        {plural(locale, 'billing.pay.cashFloor', terms.cashMonths)}
+                      </p>
+                    ) : null}
+                  </fieldset>
+                ) : terms.monthlyTotalAgorot > 0 ? (
+                  // Said out loud. Chips that are simply absent read as a screen that
+                  // failed to load them.
                   <p
-                    data-testid="pay-cash-term"
-                    className="text-[13px] font-bold text-[#001849] dark:text-slate-100"
+                    data-testid="pay-ceiling-reached"
+                    className="text-[12px] text-[#444650] dark:text-slate-400 bg-[#e9edff] dark:bg-slate-800 rounded-xl p-2.5"
                   >
-                    {plural(locale, 'billing.pay.cashTerm', ask.forwardMonths)}
+                    {t(locale, 'billing.pay.ceilingReached')}
                   </p>
                 ) : null}
                 <p className="text-[12px] text-[#444650] dark:text-slate-400">

@@ -62,6 +62,7 @@ function makeDeps(options: {
   createOrder?: ReturnType<typeof vi.fn>
   orderForm?: ReturnType<typeof vi.fn>
   standingOrderLinks?: readonly MandateLink[]
+  savePaymentMethods?: ReturnType<typeof vi.fn>
 } = {}): SubmitJoinDeps {
   return {
     register: options.registerFails
@@ -78,6 +79,8 @@ function makeDeps(options: {
       orderForm: options.orderForm ?? vi.fn().mockResolvedValue(FORM),
     } as SubmitJoinDeps['billing'],
     standingOrderLinks: vi.fn().mockResolvedValue(options.standingOrderLinks ?? []),
+    savePaymentMethods: (options.savePaymentMethods ??
+      vi.fn().mockResolvedValue(undefined)) as SubmitJoinDeps['savePaymentMethods'],
   }
 }
 
@@ -312,5 +315,82 @@ describe('submitJoin', () => {
 
     expect(deps.billing.createPromise).not.toHaveBeenCalled()
     expect(deps.billing.createOrder).not.toHaveBeenCalled()
+  })
+})
+
+// ── the method the family picked is actually recorded (owner review, 2026-09-08) ──────
+//
+// "Even though I finished the full wizard the payment option didn't get written."
+//
+// It could not be. `payment_promise.method` is `IN ('cash','cheque','standing_order')`, so
+// three of the four methods wrote a promise and the fourth wrote a `payment_order` — and
+// the profile screen derived the method from the promise list. A card family read
+// `לא הוגדר` however many times they answered.
+
+describe('recording how the family says they will pay', () => {
+  it('records the method for a CARD child, which no promise could carry', async () => {
+    const savePaymentMethods = vi.fn().mockResolvedValue(undefined)
+    const deps = makeDeps({ charges: [charge('ch1', 's1')], savePaymentMethods })
+
+    await submitJoin(
+      input({ students: [student('c1')], methods: { c1: 'credit' }, deps }),
+    )
+
+    // `credit` is the wizard's word; `upay_card` is `payment.method`'s, which is what the
+    // column holds and what `methodKey` already translates.
+    expect(savePaymentMethods).toHaveBeenCalledWith([{ studentId: 's1', method: 'upay_card' }])
+  })
+
+  it('records every child, on whichever route each of them takes', async () => {
+    const savePaymentMethods = vi.fn().mockResolvedValue(undefined)
+    const deps = makeDeps({
+      charges: [charge('ch1', 's1'), charge('ch2', 's2')],
+      savePaymentMethods,
+    })
+
+    await submitJoin(
+      input({
+        students: [student('c1'), student('c2')],
+        methods: { c1: 'standing_order', c2: 'cash' },
+        deps,
+      }),
+    )
+
+    expect(savePaymentMethods).toHaveBeenCalledWith([
+      { studentId: 's1', method: 'standing_order' },
+      { studentId: 's2', method: 'cash' },
+    ])
+  })
+
+  it('says nothing about a child the manager still has to review', async () => {
+    // No write of any kind mentions them. A preference recorded for a child whose health
+    // answers are flagged would be a fact about a registration that has not happened.
+    const savePaymentMethods = vi.fn().mockResolvedValue(undefined)
+    const deps = makeDeps({ charges: [charge('ch1', 's1')], savePaymentMethods })
+
+    await submitJoin(
+      input({
+        students: [student('c1', { healthAnswers: { heart: true } })],
+        methods: { c1: 'cash' },
+        deps,
+      }),
+    )
+
+    expect(savePaymentMethods).not.toHaveBeenCalled()
+  })
+
+  it('does not fail the join when the method write fails', async () => {
+    // The registration has already landed by this point. Losing a preference is not worth
+    // failing a join over, and the family can set it in פרופיל.
+    const deps = makeDeps({
+      charges: [charge('ch1', 's1')],
+      savePaymentMethods: vi.fn().mockRejectedValue(new Error('offline')),
+    })
+
+    const result = await submitJoin(
+      input({ students: [student('c1')], methods: { c1: 'credit' }, deps }),
+    )
+
+    expect(result.outcomes[0]!.state).toBe('card_pending')
   })
 })

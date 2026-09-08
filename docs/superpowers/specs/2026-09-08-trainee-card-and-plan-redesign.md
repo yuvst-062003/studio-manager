@@ -111,7 +111,7 @@ ScreenHeader({ title, subtitle?, onBack?, locale })
 - Sticky to the top of the phone column, above the scroll, so a long card keeps its exit.
 
 This spec adopts it on the trainee card and the plan screen. The other four screens are
-listed in §11 and are separate work.
+listed in §12 and are separate work.
 
 ### 4.2 The card itself
 
@@ -525,7 +525,78 @@ home pill as a third entrance to `#/plan/`.
 
 ---
 
-## 11. Deliberately not in this
+## 11. The old screens are deleted, not shadowed
+
+Owner, 2026-09-08: the screens this replaces come off disk in the same commit that replaces
+them.
+
+**This is a departure from what this app has done four times**, and the departure is
+deliberate. `ClubShop`, `ParentPayments` and `ProfileScreen` each landed beside the screen
+they replaced, with a source comment saying the old one "stays on disk until the redesign is
+accepted end to end". Three of those four have since been deleted — `ProfileSection`,
+`ShopSection` and `OrderItemsScreen` no longer exist — and the only trace left is `App.tsx`
+comments naming files that are gone. The pattern's cost is real: an unrendered screen is
+where a stale link hides, `routes.reachable.test.ts` cannot tell the difference, and nobody
+remembers to come back.
+
+**What that costs, said plainly.** There is no dark-launch period and no route flip to roll
+back with. The checkpoint screenshots in §12 *are* the acceptance, and a rollback is
+`git revert` of one commit. That is acceptable here because both screens are behind the tab
+bar with a combined three entry points, and neither is on a first-run path.
+
+### 11.1 Deleted with the trainee card (lane 1)
+
+| File | Why it can go |
+| --- | --- |
+| `features/people/StudentCard.tsx` | The container itself. Its one runtime export is replaced; its type export moves — see below. |
+| `features/people/StudentCardSection.tsx` | The data container. One importer, `App.tsx`. |
+| `features/people/StudentCard.test.tsx` | Tests the deleted container. Replaced, not ported: it asserts the old header/ledger shape. |
+| `features/people/StudentCardData.test.tsx` | Same. |
+
+**`StudentCardSectionProps` is a rename, not a deletion.** Five files import that type —
+`register.ts`, the three `sections/*.tsx`, and `features/people/index.ts` — and every
+registered section is typed by it. It moves to the new card's file and all five imports
+update in the same commit. The slot registry, the `region` field and every lane-owned
+section survive: this is the frame being replaced, not the composition (§4.2).
+
+`sections/GuardiansSection.tsx` is rewritten in place rather than deleted — it keeps its
+slot key and its order, so no other lane's file reopens.
+
+### 11.2 Deleted with the plan screen (lane 2)
+
+| File | Why it can go |
+| --- | --- |
+| `features/billing/TrainingPlanScreen.tsx` | Replaced. One importer, `TrainingPlanSection.tsx`, deleted with it. |
+| `features/billing/TrainingPlanSection.tsx` | Replaced by the new container. One importer, `App.tsx`. |
+| `features/billing/TrainingPlanScreen.test.tsx` | Tests the deleted screen's three-section shape. |
+
+`trainingPlanClient.ts` **survives**. It is the endpoint layer, not the screen, and the new
+container calls the same five methods.
+
+### 11.3 What is explicitly NOT deleted
+
+- **`features/billing/PaymentsSection.tsx`** — nine live importers, and it holds
+  `makeParentBillingClient`, `DEMO_SIMULATOR` and `submitUpayForm`, which `ClubShop`,
+  `ParentPayments`, `PaymentOverlay` and the join wizard all use. It is superseded *as a
+  screen* and load-bearing *as a module*, and untangling that is the payments lane's work
+  (§3), not this one's.
+- **`features/billing/PaymentsScreen.tsx`** — imported by `PaymentsSection` and the billing
+  barrel. Same owner, same reason.
+- **The stale `App.tsx` comments** naming `ShopSection`, `OrderItemsScreen` and
+  `ProfileSection`. They are wrong today — those files are already gone — but they are the
+  shop and profile lanes' history, and correcting them here would put this work in three
+  other lanes' file for no behaviour change.
+
+### 11.4 The check
+
+After each lane, `grep` for the deleted symbols across `web/apps/parent/src` and expect
+nothing outside the lane's own diff. `npm run typecheck` is the real gate: a missed importer
+of `StudentCardSectionProps` is a compile error, not a silent fallback — which is the whole
+reason the type moves rather than being duplicated at the new path.
+
+---
+
+## 12. Deliberately not in this
 
 - **`ScreenHeader` on the other four screens.** Belts, technique detail, directions and
   לוח הילד share A1. The component is built to be adopted; adopting
@@ -543,17 +614,24 @@ home pill as a third entrance to `#/plan/`.
 
 ---
 
-## 12. Order of work
+## 13. Order of work
 
 Three lanes. The first two are independent of the payments redesign and of each other.
 
 1. **The frame and the card** — `ScreenHeader`, the card header, `DetailRow`'s restyle,
-   `GET /me/students/{id}/guardians`, the relation-aware row. Screenshot checkpoint.
+   `GET /me/students/{id}/guardians`, the relation-aware row. **Deletes** §11.1's four files
+   and moves `StudentCardSectionProps` with its five importers, in the same commit.
+   Screenshot checkpoint.
 2. **The plan screen's shape** — `GET /me/training-plans`, `planCopy.ts`, the landing-style
    cards, upgrade/downgrade, the effect lines, the banner, the removal of
-   תמיד כלול. Screenshot checkpoint.
+   תמיד כלול. **Deletes** §11.2's three files in the same commit. Screenshot checkpoint.
 3. **The money and home** — the four routes, `plan_id` on the mandate links, the plan names
    on `PlanChangeOut`, the home pill. **Blocked** until §3's payments work is on `main`.
+
+**The deletion lands with the replacement, never after it.** A commit that adds the new
+screen and leaves the old one for a follow-up is the pattern §11 exists to break: the
+follow-up is what nobody does. The screenshot checkpoint is taken on the branch *after* the
+deletion, so what is reviewed is what ships.
 
 Each lane runs `./scripts/lane-check.sh` and ticks `docs/plan/state.yaml` in the same commit
 as its work.

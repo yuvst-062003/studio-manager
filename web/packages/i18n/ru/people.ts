@@ -466,6 +466,12 @@ export const people: Bundle = {
   'profile.paymentMethod': 'Способ оплаты',
   'profile.paymentMethodNone': 'Не задан',
   'profile.paymentMethodUpdate': 'Изменить',
+  // Причины см. в ивритском файле.
+  'profile.paymentMethodFor': 'Способ оплаты для {{name}}',
+  'profile.paymentMethodSave': 'Сохранить',
+  'profile.paymentMethodSaving': 'Сохраняем…',
+  'profile.paymentMethodMixed': 'Смешанный',
+  'profile.paymentMethodFailed': 'Не удалось сохранить. Попробуйте ещё раз.',
   'profile.paymentMethodHint': 'Данные карты вводятся на защищённой странице платёжной компании — приложение их не видит и не хранит.',
   'profile.clubTitle': 'Клуб',
   'profile.contactTitle': 'Связаться',

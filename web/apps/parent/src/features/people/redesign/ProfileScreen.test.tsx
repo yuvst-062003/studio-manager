@@ -241,8 +241,9 @@ describe('סנכרון יומן inside הגדרות', () => {
 // mandate moves the money by itself and a season of cheques is handed over in one go — so
 // neither is a monthly decision, and on the payments screen they competed every month with
 // the one that is.
-describe('אמצעי תשלום, moved into the תשלומים sheet', () => {
+describe('אמצעי תשלום — the picker, and the two routes inside it', () => {
   const LINK = {
+    student_id: 's1',
     student_name: 'יובל כהן',
     plan_name: 'פעמיים בשבוע',
     amount_agorot: 25_000,
@@ -257,7 +258,11 @@ describe('אמצעי תשלום, moved into the תשלומים sheet', () => {
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input)
         calls.push({ url, init })
-        const body = url.includes('/me/standing-order-links')
+        const body = url.includes('/me/payment-methods')
+          ? JSON.stringify({
+              items: [{ student_id: 's1', student_name: 'יובל כהן', method: null }],
+            })
+          : url.includes('/me/standing-order-links')
           ? JSON.stringify({ items: [LINK] })
           : url.includes('/me/prepay-terms')
             ? JSON.stringify({
@@ -282,19 +287,31 @@ describe('אמצעי תשלום, moved into the תשלומים sheet', () => {
     return screen.findByTestId('sheet-payments')
   }
 
+  /** אמצעי תשלום is a BUTTON now (2026-09-08), and the two once-only routes live behind
+   *  it — as the detail of whichever method is selected, rather than as two cards shown
+   *  to every family whether they use them or not. */
+  async function openMethod(method: 'standing_order' | 'cheque' | 'cash' | 'upay_card') {
+    await openPayments()
+    await userEvent.click(screen.getByTestId('sheet-payments-method'))
+    await screen.findByTestId('sheet-method')
+    await userEvent.click(screen.getByTestId(`method-s1-${method}`))
+  }
+
   it('offers one mandate link per child, at the amount it will charge', async () => {
     // A uPay shared link is fixed at ONE amount and the page it opens does not say which,
     // so a bare link has a family sign one mandate and underpay for the other child every
     // month. The name and the figure beside it are the whole reason it is a list.
     stubMoney()
-    const sheet = await openPayments()
-    expect(sheet).toContainElement(screen.getByTestId('sheet-payments-standing-order'))
+    await openMethod('standing_order')
     const link = screen.getByTestId('sheet-standing-order-link')
     expect(link).toHaveAttribute('href', LINK.url)
     // Opens away from the app, so following it does not lose פרופיל.
     expect(link).toHaveAttribute('target', '_blank')
     expect(link).toHaveAttribute('rel', 'noopener noreferrer')
-    expect(screen.getByTestId('sheet-standing-order-row')).toHaveTextContent('יובל כהן')
+    // The child is named by the block the link sits in, and by the link's own accessible
+    // name — two anchors reading 'קישור להקמת הוראת קבע' are two a screen reader cannot
+    // tell apart. The row carries the plan and the amount the mandate will charge.
+    expect(link).toHaveAccessibleName(expect.stringContaining('יובל כהן'))
     expect(screen.getByTestId('sheet-standing-order-row')).toHaveTextContent('250₪')
   })
 
@@ -302,14 +319,14 @@ describe('אמצעי תשלום, moved into the תשלומים sheet', () => {
     // ₪208.33 open and twelve months at ₪250.00. Shown broken down rather than as one
     // figure, because ₪3,208.33 with no explanation is the number a parent phones about.
     stubMoney()
-    await openPayments()
+    await openMethod('cheque')
     expect(screen.getByTestId('sheet-cheque-total')).toHaveTextContent('3,208.33₪')
     expect(screen.getByTestId('sheet-cheque-term')).toBeInTheDocument()
   })
 
   it('raises a cheque promise over the open charges and the term', async () => {
     const calls = stubMoney()
-    await openPayments()
+    await openMethod('cheque')
     await userEvent.click(screen.getByTestId('sheet-cheque-request'))
     await waitFor(() => {
       const posted = calls.find(
@@ -335,3 +352,123 @@ describe('אמצעי תשלום, moved into the תשלומים sheet', () => {
     expect(method.querySelector('a[href="#/payments"]')).toBeNull()
   })
 })
+
+// ── the method a family picked is finally readable (owner review, 2026-09-08) ─────────
+//
+// It was derived from `/me/payment-promises` row zero, and `payment_promise.method` is
+// `IN ('cash','cheque','standing_order')` — so a card family had no promise and read
+// `לא הוגדר` however many times they answered the wizard. It has a column of its own now,
+// and these assert the whole path: `fetch → state → sheet`, not props built by hand.
+
+describe('what the אמצעי תשלום row says', () => {
+  function stubMethods(items: unknown[], onPut?: (body: unknown) => void) {
+    const calls: { url: string; init?: RequestInit }[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        calls.push({ url, init })
+        if (url.includes('/me/payment-methods')) {
+          if (init?.method === 'PUT') {
+            onPut?.(JSON.parse(String(init.body)))
+            return new Response('{"items":[]}', { status: 200 })
+          }
+          return new Response(JSON.stringify({ items }), { status: 200 })
+        }
+        if (url.includes('/me/prepay-terms')) {
+          return new Response(
+            JSON.stringify({
+              cash_prepay_months: 3,
+              cheque_prepay_months: 12,
+              monthly_total_agorot: 25_000,
+            }),
+            { status: 200 },
+          )
+        }
+        if (url.includes('/me/balance')) {
+          return new Response(
+            JSON.stringify({ balance_agorot: 0, open_charge_count: 0, credit_agorot: 0 }),
+            { status: 200 },
+          )
+        }
+        return new Response('{"items":[]}', { status: 200 })
+      }),
+    )
+    return calls
+  }
+
+  async function openPaymentsSheet() {
+    renderScreen()
+    await userEvent.click(await screen.findByTestId('profile-row-payments'))
+    return screen.findByTestId('sheet-payments')
+  }
+
+  it('reads a CARD family through the real client, where no promise could exist', async () => {
+    // The exact case the old derivation could never answer. No promises are returned here.
+    stubMethods([{ student_id: 's1', student_name: 'יובל כהן', method: 'upay_card' }])
+    await openPaymentsSheet()
+    expect(screen.getByTestId('sheet-payments-method')).toHaveTextContent(
+      t('he', 'billing.method.card'),
+    )
+  })
+
+  it('says מעורב when the children do not agree', async () => {
+    // A real answer, not a failure: the method is per child precisely so a family can put
+    // one on a mandate and pay another by card.
+    stubMethods([
+      { student_id: 's1', student_name: 'יובל כהן', method: 'upay_card' },
+      { student_id: 's2', student_name: 'נועה כהן', method: 'standing_order' },
+    ])
+    await openPaymentsSheet()
+    expect(screen.getByTestId('sheet-payments-method')).toHaveTextContent(
+      t('he', 'people.profile.paymentMethodMixed'),
+    )
+  })
+
+  it('still says לא הוגדר when nobody has answered', async () => {
+    stubMethods([{ student_id: 's1', student_name: 'יובל כהן', method: null }])
+    await openPaymentsSheet()
+    expect(screen.getByTestId('sheet-payments-method')).toHaveTextContent(
+      t('he', 'people.profile.paymentMethodNone'),
+    )
+  })
+
+  it('opens the picker and saves a change, in the vocabulary the column holds', async () => {
+    let posted: unknown = null
+    stubMethods([{ student_id: 's1', student_name: 'יובל כהן', method: null }], (body) => {
+      posted = body
+    })
+    await openPaymentsSheet()
+
+    await userEvent.click(screen.getByTestId('sheet-payments-method'))
+    await screen.findByTestId('sheet-method')
+    await userEvent.click(screen.getByTestId('method-s1-cash'))
+    await userEvent.click(screen.getByTestId('method-save'))
+
+    await waitFor(() => {
+      expect(posted).toEqual({ items: [{ student_id: 's1', method: 'cash' }] })
+    })
+    // …and the row behind it now reads the new answer rather than the stale one.
+    await waitFor(() => {
+      expect(screen.getByTestId('sheet-payments-method')).toHaveTextContent(
+        t('he', 'billing.method.cash'),
+      )
+    })
+  })
+
+  it('shows only the selected method’s detail, not every route at once', async () => {
+    // The report: the two routes were always-open cards under an inert label, shouting at
+    // every family whether or not they used either.
+    stubMethods([{ student_id: 's1', student_name: 'יובל כהן', method: null }])
+    await openPaymentsSheet()
+    expect(screen.queryByTestId('sheet-payments-cheque')).toBeNull()
+
+    await userEvent.click(screen.getByTestId('sheet-payments-method'))
+    await screen.findByTestId('sheet-method')
+    await userEvent.click(screen.getByTestId('method-s1-cash'))
+    expect(screen.getByTestId('method-detail-cash-s1')).toBeInTheDocument()
+    expect(screen.queryByTestId('method-detail-standing-order-s1')).toBeNull()
+    expect(screen.queryByTestId('sheet-payments-cheque')).toBeNull()
+  })
+})
+

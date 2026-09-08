@@ -539,5 +539,22 @@ export const billing: Bundle = {
   'pay.lastPayment': 'התשלום האחרון',
   'pay.noPayments': 'אין עדיין תשלומים',
   'pay.allPayments': 'כל התשלומים',
+  // ── the receipt (owner review, 2026-09-08) ──────────────────────────────────
+  // D1: a total with no list. "An item from the store plus מנוי" was one figure, and a
+  // parent had no way to see which part was which. D3: the headline is now what the
+  // BUTTON charges, so the two can never disagree — the debt is a line inside it.
+  'pay.nowTitle': 'לתשלום עכשיו',
+  'pay.receiptTotal': 'סה״כ',
+  'pay.remainder': 'נותר חוב פתוח {{total}}',
+  'pay.showAll': 'הצג הכל',
+  'pay.forwardLine': '{{count}} חודשים מראש',
+  'pay.forwardLine.one': 'חודש אחד מראש',
+  // ── cash as a floor, not a block (D2) ───────────────────────────────────────
+  'pay.cashMonthsTitle': 'כמה חודשים מראש?',
+  'pay.cashFloor': 'המועדון גובה {{count}} חודשים לפחות',
+  'pay.cashFloor.one': 'המועדון גובה חודש אחד לפחות',
+  // ── the ceiling (D6) ────────────────────────────────────────────────────────
+  // Said out loud rather than leaving the chips simply absent, which reads as a bug.
+  'pay.ceilingReached': 'שילמתם מראש עד הסוף — אפשר לשלם חודשים נוספים כשהמנוי יתקדם.',
   'pay.secureNote': 'עסקה מאובטחת ע״פ תקן PCI-DSS',
 }

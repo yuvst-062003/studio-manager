@@ -29,6 +29,20 @@ export type PayMethod = 'card' | 'cash'
 /** §5.10's card chips. The ceiling the club's own rule is measured against. */
 export const MONTH_CHIPS = [1, 2, 3, 6] as const
 
+/**
+ * How far ahead a family may ever be (owner review, 2026-09-08 — "don't allow a user to
+ * pay more months if he already paid for a season").
+ *
+ * **The same twelve `app/services/billing/prepay_ceiling.py` refuses on**, and the client
+ * half exists so a parent is never offered a chip the server would decline. It is not the
+ * authority: `refuse_past_ceiling` is, and this is its mirror.
+ */
+export const PREPAY_CEILING_MONTHS = 12
+
+/** The values a cash term is drawn from. Not `MONTH_CHIPS`: cash buys months FORWARD and
+ *  a club may collect a year of them, which the card's ladder stops short of. */
+const CASH_LADDER = [1, 2, 3, 6, 12] as const
+
 /** §5.10's other chip group, restored for bug #16. `1..3`, not `1..MAX_INSTALLMENTS`:
  *  twelve is what `app/integrations/upay/form.py` will *accept*, and three is what §5.10
  *  offers a parent — the screen this one replaced offered exactly these. */
@@ -84,6 +98,118 @@ export type Ask = {
   instalments: number
 }
 
+/**
+ * One line of the receipt under the headline.
+ *
+ * Three kinds because they are three different promises: a `charge` closes something that
+ * exists, a `forward` month buys one that does not, and a `remainder` is what this payment
+ * deliberately leaves behind. A single `{label, amount}` shape would have the screen
+ * deciding which is which by reading the label back out.
+ */
+export type ReceiptLine =
+  | {
+      kind: 'charge'
+      id: string
+      /** What the charge is. Built by the caller, which is the only place `t` lives. */
+      label: string
+      /** Beside the label, never inside it: one carrier per fact, so the component can
+       *  align a name where a name goes instead of parsing it out of a sentence. */
+      studentName: string
+      amountAgorot: number
+    }
+  | { kind: 'forward'; months: number; amountAgorot: number }
+  | { kind: 'remainder'; amountAgorot: number }
+
+/**
+ * How many more months this payer may buy forward.
+ *
+ * The mirror of `prepay_headroom_months` on the server, **in money and not in months** for
+ * the reason that one gives: a family whose plan was re-priced holds credit that is not a
+ * whole number of months, and two roundings of that is how a chip a parent can press
+ * becomes an error they cannot read.
+ */
+export function prepayHeadroomMonths(creditAgorot: number, monthlyTotalAgorot: number): number {
+  if (monthlyTotalAgorot <= 0) return 0
+  const ceiling = PREPAY_CEILING_MONTHS * monthlyTotalAgorot
+  // `Math.floor` and NOT `Math.trunc`. A family past the ceiling has a negative numerator,
+  // where `trunc` rounds towards zero and `//` in Python rounds away — the two would then
+  // disagree about exactly the family this rule exists for.
+  return Math.max(0, Math.floor((ceiling - creditAgorot) / monthlyTotalAgorot))
+}
+
+/**
+ * The cash terms this family may choose from.
+ *
+ * The club's number is a **floor** rather than the answer (owner review: "what if the
+ * person wants 5 months?"). The screen used to present it as the whole offer, so a family
+ * who wanted longer had no way to say so.
+ *
+ * **The ceiling outranks the floor.** A family two months from the ceiling is offered two,
+ * not turned away because the club collects three at a time — that rule exists to stop a
+ * family paying one month at a time in cash, and a family ten months ahead is plainly not
+ * that family. At zero headroom there is no forward offer at all and cash returns to
+ * settling what is open, which is how it behaved before prepayment existed.
+ */
+export function cashMonthChips(floor: number, headroom: number): readonly number[] {
+  if (headroom <= 0) return []
+  const lo = Math.max(floor, 1)
+  const ladder = (low: number) => CASH_LADDER.filter((month) => month >= low && month <= headroom)
+  // `headroom` joins the chips so the largest offer is always the most they may actually
+  // buy — a floor of 3 with 5 months of room offers 3 and 5, not 3 alone.
+  const chips = headroom < lo ? [...ladder(1), headroom] : [...ladder(lo), lo, headroom]
+  return [...new Set(chips)].sort((a, b) => a - b)
+}
+
+/**
+ * The rows under the headline — what this payment is actually for.
+ *
+ * The screen this replaced showed one figure and a subtitle of "month · child", so a debt
+ * of a shop item plus a month of tuition was a single number with no way to tell the two
+ * apart. That is the defect; these are the rows.
+ *
+ * Walks `ask.chargeIds` — the charges THIS payment settles, not every open one — so the
+ * rows and the total cannot disagree. It never recomputes the total: the caller renders
+ * `ask.totalAgorot`, which is still the one number computed in one place.
+ */
+export function receiptLines(
+  ask: Ask,
+  debts: readonly DebtRow[],
+  terms: PayTerms,
+  /** What to call a charge. Injected because the label needs `t(locale, …)` and this
+   *  module is deliberately free of i18n — the same reason `money` is a prop on the
+   *  screen rather than an import inside it. */
+  labelOf: (charge: ChargeOut) => string,
+): readonly ReceiptLine[] {
+  const byId = new Map(debts.map((row) => [row.charge.id, row]))
+  const lines: ReceiptLine[] = []
+  let settled = 0
+  for (const id of ask.chargeIds) {
+    const row = byId.get(id)
+    if (row === undefined) continue
+    settled += row.charge.amount_agorot
+    lines.push({
+      kind: 'charge',
+      id,
+      label: labelOf(row.charge),
+      studentName: row.studentName,
+      amountAgorot: row.charge.amount_agorot,
+    })
+  }
+  if (ask.forwardMonths > 0) {
+    lines.push({
+      kind: 'forward',
+      months: ask.forwardMonths,
+      amountAgorot: ask.forwardMonths * terms.monthlyTotalAgorot,
+    })
+  }
+  // Everything still open that this payment does not touch — including the rows another
+  // payment holds, which are left out above on purpose. Without it the receipt is a
+  // complete-looking document that quietly omits money the family still owes.
+  const remainder = debtAgorot(debts) - settled
+  if (remainder > 0) lines.push({ kind: 'remainder', amountAgorot: remainder })
+  return lines
+}
+
 /** Every open charge, whoever is holding it. The number that never moves. */
 export function debtAgorot(debts: readonly DebtRow[]): number {
   return selectionTotal(debts.map((row) => row.charge))
@@ -133,11 +259,17 @@ export function askFor(
   months: number,
   terms: PayTerms,
   instalments = 1,
+  /** How many months forward the family chose on the CASH route. Defaulted to the club's
+   *  own number so every existing caller keeps its behaviour: before the owner's review
+   *  the club's floor was the whole offer, and a family who wanted five months of cash
+   *  had no control on the screen to say so. Ignored by the card route, whose months mean
+   *  something else — months of training covered, oldest debt first. */
+  cashMonths = terms.cashMonths,
 ): Ask {
   const canPrepay = terms.monthlyTotalAgorot > 0
   const open = payable(debts)
   if (method === 'cash') {
-    const forwardMonths = canPrepay ? Math.max(0, terms.cashMonths) : 0
+    const forwardMonths = canPrepay ? Math.max(0, cashMonths) : 0
     return {
       method,
       chargeIds: open.map((charge) => charge.id),

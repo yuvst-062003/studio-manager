@@ -19,7 +19,9 @@ from app.models.billing import Charge, Payment, PaymentAllocation
 from app.models.people import Student
 from app.services.billing import BillingService
 from app.services.billing.errors import RefusedError
+from app.services.billing.orders import OrderService
 from app.services.billing.payment_promise import PaymentPromiseService
+from app.services.billing.prepay_ceiling import prepay_headroom_months
 from app.services.billing.payments import PaymentService
 from app.services.billing.run import BillingRunService
 from sqlalchemy import func, select
@@ -444,3 +446,137 @@ def test_a_parents_own_balance_carries_credit_too(
     tenant_session.commit()
     balance = client.get("/api/v1/me/balance", headers=parent.headers).json()
     assert balance["credit_agorot"] == 60_000
+
+
+# -- the ceiling (owner review, 2026-09-08) -------------------------------------
+#
+# "Don't allow a user to pay more months if he already paid for a season (12 months)."
+#
+# The rule did not exist. `MAX_PREPAY_MONTHS = 12` was enforced per ORDER, so twelve months
+# bought twice was twenty-four months paid ahead and nothing anywhere noticed. The measure
+# it is enforced against is `payer_credit` -- money received minus money allocated -- which
+# is what "paid ahead" already means everywhere else in this module.
+
+
+def test_twelve_months_bought_twice_is_refused_the_second_time(
+    tenant_session, studio, a_priced_student
+):
+    """The defect as reported. The per-order cap counted nothing already bought."""
+    OrderService(tenant_session).create(
+        studio.id,
+        payer_person_id=a_priced_student.payer_person_id,
+        charge_ids=[],
+        max_payments=1,
+        prepay_months=12,
+        at=T0,
+    )
+    # The first order is PAID -- credit is money that arrived, not money that was asked for.
+    _paid(tenant_session, studio, a_priced_student, 12 * MONTHLY_AGOROT)
+    tenant_session.commit()
+
+    with pytest.raises(RefusedError, match="ahead"):
+        OrderService(tenant_session).create(
+            studio.id,
+            payer_person_id=a_priced_student.payer_person_id,
+            charge_ids=[],
+            max_payments=1,
+            prepay_months=1,
+            at=T0,
+        )
+
+
+def test_the_month_that_lands_exactly_on_the_ceiling_is_accepted(
+    tenant_session, studio, a_priced_student
+):
+    """Ten months held, two more asked for. The boundary is inclusive: twelve is the most
+    a family may be covered for, not the first number refused."""
+    _paid(tenant_session, studio, a_priced_student, 10 * MONTHLY_AGOROT)
+    tenant_session.commit()
+
+    order = OrderService(tenant_session).create(
+        studio.id,
+        payer_person_id=a_priced_student.payer_person_id,
+        charge_ids=[],
+        max_payments=1,
+        prepay_months=2,
+        at=T0,
+    )
+    assert order.prepay_months == 2
+
+
+def test_the_month_past_the_ceiling_is_refused(tenant_session, studio, a_priced_student):
+    _paid(tenant_session, studio, a_priced_student, 10 * MONTHLY_AGOROT)
+    tenant_session.commit()
+
+    with pytest.raises(RefusedError, match="ahead"):
+        OrderService(tenant_session).create(
+            studio.id,
+            payer_person_id=a_priced_student.payer_person_id,
+            charge_ids=[],
+            max_payments=1,
+            prepay_months=3,
+            at=T0,
+        )
+
+
+def test_a_cash_promise_is_held_to_the_same_ceiling(tenant_session, studio, a_priced_student):
+    """Both routes or neither. A ceiling the card respects and cash does not is not a rule,
+    it is a detour."""
+    _paid(tenant_session, studio, a_priced_student, 12 * MONTHLY_AGOROT)
+    tenant_session.commit()
+
+    with pytest.raises(RefusedError, match="ahead"):
+        PaymentPromiseService(tenant_session).create(
+            studio.id,
+            payer_person_id=a_priced_student.payer_person_id,
+            charge_ids=[],
+            at=T0,
+            method="cash",
+            prepay_months=1,
+        )
+
+
+def test_settling_an_open_charge_is_never_blocked_by_the_ceiling(
+    tenant_session, app_session, studio, a_priced_student
+):
+    """The ceiling is about months bought FORWARD. A family paid twelve months ahead who
+    still owes an old month must be able to clear it -- refusing that would leave a debt
+    nobody on either side could settle."""
+    september = _charge(app_session, studio, a_priced_student, 9)
+    _paid(tenant_session, studio, a_priced_student, 12 * MONTHLY_AGOROT)
+    tenant_session.commit()
+
+    order = OrderService(tenant_session).create(
+        studio.id,
+        payer_person_id=a_priced_student.payer_person_id,
+        charge_ids=[september],
+        max_payments=1,
+        prepay_months=0,
+        at=T0,
+    )
+    assert order.expected_amount_agorot == MONTHLY_AGOROT
+
+
+def test_headroom_is_zero_for_a_payer_with_no_monthly_price(
+    tenant_session, studio, an_unpriced_student
+):
+    """They buy no months forward on any route, so the ceiling never binds on them and the
+    screen must not render a chip it would then have to disable."""
+    assert prepay_headroom_months(tenant_session, an_unpriced_student.payer_person_id) == 0
+
+
+def test_headroom_counts_what_is_already_held(tenant_session, studio, a_priced_student):
+    _paid(tenant_session, studio, a_priced_student, 10 * MONTHLY_AGOROT)
+    tenant_session.commit()
+    assert prepay_headroom_months(tenant_session, a_priced_student.payer_person_id) == 2
+
+
+def test_headroom_floors_rather_than_truncating_for_a_payer_past_the_ceiling(
+    tenant_session, studio, a_priced_student
+):
+    """A plan re-priced downwards leaves a family holding more than twelve months of the
+    NEW price. `//` on a negative numerator rounds away from zero, and the outer `max`
+    is what turns that into "no room" rather than "minus one months of room"."""
+    _paid(tenant_session, studio, a_priced_student, 13 * MONTHLY_AGOROT)
+    tenant_session.commit()
+    assert prepay_headroom_months(tenant_session, a_priced_student.payer_person_id) == 0

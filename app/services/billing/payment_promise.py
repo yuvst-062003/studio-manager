@@ -24,6 +24,7 @@ from app.models.person import Guardian, Person, RoleAssignment
 from app.services.audit import AuditService
 from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
 from app.services.billing.payments import PaymentService
+from app.services.billing.prepay_ceiling import refuse_past_ceiling
 
 
 class PaymentPromiseService:
@@ -98,6 +99,10 @@ class PaymentPromiseService:
             raise RefusedError(f"method must be one of {', '.join(PROMISE_METHODS)}")
         if prepay_months < 0:
             raise RefusedError("prepay_months cannot be negative")
+        # Both routes or neither (owner review, 2026-09-08). A ceiling the card respects
+        # and cash does not is not a rule, it is a detour -- and cash is the route whose
+        # month count a parent now chooses, so it is the likelier one to be walked past.
+        refuse_past_ceiling(self._session, payer_person_id, prepay_months)
         claimed = 0
         if claimed_plan_id is not None:
             plan = self._session.get(PricePlan, claimed_plan_id)
