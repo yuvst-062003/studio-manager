@@ -22,6 +22,7 @@ import uuid
 from app.models.structure import GroupStaff
 from sqlalchemy import select
 from tests.conftest import sign_in
+from tests.structure.conftest import bearer
 
 STAFF = "/api/v1/staff"
 
@@ -75,7 +76,7 @@ def test_an_invited_coach_can_work_in_the_staff_app_after_a_rotation(
     redeemed = client.post(
         "/api/v1/auth/accept-invitation",
         json={"token": token},
-        headers={"Authorization": f"Bearer {signed.json()['access_token']}"},
+        headers=bearer(signed.json()["access_token"]),
     )
     assert redeemed.status_code == 200, redeemed.text
     body = redeemed.json()
@@ -129,7 +130,7 @@ def test_the_groups_the_invitation_named_are_the_coachs_on_arrival(
     redeemed = client.post(
         "/api/v1/auth/accept-invitation",
         json={"token": token},
-        headers={"Authorization": f"Bearer {signed.json()['access_token']}"},
+        headers=bearer(signed.json()["access_token"]),
     )
     assert redeemed.status_code == 200, redeemed.text
     person_id = uuid.UUID(redeemed.json()["studios"][0]["person_id"])
@@ -160,7 +161,7 @@ def test_an_invited_manager_reaches_the_staff_screen_the_invitation_promised(
     redeemed = client.post(
         "/api/v1/auth/accept-invitation",
         json={"token": token},
-        headers={"Authorization": f"Bearer {signed.json()['access_token']}"},
+        headers=bearer(signed.json()["access_token"]),
     )
     assert redeemed.status_code == 200, redeemed.text
 

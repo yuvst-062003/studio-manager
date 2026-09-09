@@ -359,6 +359,7 @@ def test_accepting_a_staff_invitation_makes_the_person_staff(
     """The §5.3 binding, end to end: sign in as a stranger, accept with the token, and
     the pre-created role assignments are theirs."""
     from tests.conftest import sign_in
+    from tests.structure.conftest import bearer
 
     created = client.post(
         f"{STAFF}/invitations",
@@ -374,7 +375,7 @@ def test_accepting_a_staff_invitation_makes_the_person_staff(
     accepted = client.post(
         "/api/v1/auth/accept-invitation",
         json={"token": created["token"]},
-        headers={"Authorization": f"Bearer {token}"},
+        headers=bearer(token),
     )
     assert accepted.status_code == 200, accepted.text
 

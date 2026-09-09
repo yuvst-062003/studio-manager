@@ -46,7 +46,25 @@ class Caller:
         # test asserting an invitation with `expires_at=T0 + timedelta(days=7)` is still
         # current drifts stale the moment real time passes T0 + 7 days, the same class of
         # bug tests/attendance/conftest.py's own Caller.headers already guards against.
-        return {"Authorization": f"Bearer {self.token}", "X-Dev-Now": T0.isoformat()}
+        return bearer(self.token)
+
+
+def bearer(token: str) -> dict[str, str]:
+    """Auth header for a raw access token, WITH the clock pinned to T0.
+
+    Exists because forgetting the pin is a time bomb rather than a failure: a test that
+    builds `{"Authorization": ...}` by hand passes for as long as real time stays inside
+    whatever TTL it depends on, then starts failing on a day nobody changed anything.
+
+    That is not hypothetical. Four staff-invitation tests did exactly this and went red on
+    2026-09-09 -- an invitation created at T0 (2026-08-25) carries
+    `expires_at = T0 + 14 days = 2026-09-08`, and the un-pinned accept request arrived at
+    the real 2026-09-09, one day past it. Nothing in the product was wrong; the tests had
+    quietly aged out. `Caller.headers` had guarded against this since it was written, and
+    the guard only helps the calls that go through it -- so this is the same header for the
+    calls that cannot.
+    """
+    return {"Authorization": f"Bearer {token}", "X-Dev-Now": T0.isoformat()}
 
 
 @pytest.fixture
