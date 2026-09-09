@@ -420,6 +420,8 @@ export const people: Bundle = {
   'error.generic': 'Something went wrong. Try again',
   'search.placeholder': 'Search by student or parent name',
   'filter.resultCount': '{{count}} of {{total}}',
+  'filter.class': 'Class',
+  'filter.classAny': 'All classes',
   'tabs.allStudents': 'All students',
   'tabs.myClasses': 'My classes · {{count}}',
   'tabs.allClasses': 'All classes · {{count}}',

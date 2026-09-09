@@ -422,6 +422,20 @@ export const reports: Bundle = {
   'retention.emptyAll': 'אין עדיין מספיק ותק לחישוב שימור',
 
   'belts.title': 'קידומי חגורה בתקופה',
+  // ── הכנסות לפי חוג (2026-09-09) ───────────────────────────────────────────────
+  // The one report where per-class pricing changes a decision rather than a layout.
+  'byClass.title': 'הכנסות לפי חוג',
+  'byClass.caption': 'הכנסות והרשמות לפי חוג לחודש הנבחר',
+  'byClass.col.class': 'חוג',
+  'byClass.col.students': 'חניכים',
+  'byClass.col.total': 'סך הכל',
+  'byClass.col.settled': 'נגבה',
+  // NOT "כל החוגים" — these are charges that belong to no class at all.
+  'byClass.unassigned': 'ללא שיוך לחוג',
+  'byClass.total': 'סה״כ מועדון:',
+  // Deliberately not the sum of the column above — ילד בשני חוגים נספר פעם אחת.
+  'byClass.totalStudents': '{{count}} חניכים',
+  'byClass.empty': 'אין חיובים בחודש הזה',
   'belts.chartLabel': 'קידומי חגורה לפי דרגה',
   'belts.promotions': '{{count}} קידומים',
   'belts.empty': 'לא הוענקו חגורות בתקופה',

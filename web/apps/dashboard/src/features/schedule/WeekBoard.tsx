@@ -475,7 +475,7 @@ export function WeekBoard({
 
   /** `3a` item 7. Empty string means "all" — one falsy check per axis rather than three
    *  nullable ids, because the select's own empty option is a string too. */
-  const [filter, setFilter] = useState({ group: '', coach: '', hall: '' })
+  const [filter, setFilter] = useState({ group: '', class: '', coach: '', hall: '' })
   /** The class currently picked up off the board, waiting for a slot. */
   const [movingId, setMovingId] = useState<string | null>(null)
   const [moveFailed, setMoveFailed] = useState(false)
@@ -556,17 +556,28 @@ export function WeekBoard({
    * offering what is present means a filter can narrow the view but never blank it.
    */
   const options = useMemo(() => {
-    const groups = new Map<string, string>()
+    const groupOptions = new Map<string, string>()
+    const classes = new Map<string, string>()
     const coaches = new Map<string, string>()
     const halls = new Map<string, string>()
     for (const row of sessions) {
-      groups.set(row.group_id, row.group_name)
+      groupOptions.set(row.group_id, row.group_name)
+      // Only classes actually ON this week: offering one with no lessons here would be a
+      // filter that can only blank the board, which is the rule the group filter follows.
+      // Read straight off the row -- `GET /sessions` names each lesson's class now, so the
+      // board needs no group list to answer "show me judo".
+      if (row.class_id && row.class_name) classes.set(row.class_id, row.class_name)
       if (row.location_name) halls.set(row.location_name, row.location_name)
       for (const person of row.staff) coaches.set(person.person_id, person.display_name)
     }
     const sorted = (map: Map<string, string>) =>
       [...map].sort((a, b) => a[1].localeCompare(b[1]))
-    return { groups: sorted(groups), coaches: sorted(coaches), halls: sorted(halls) }
+    return {
+      groups: sorted(groupOptions),
+      classes: sorted(classes),
+      coaches: sorted(coaches),
+      halls: sorted(halls),
+    }
   }, [sessions])
 
   /**
@@ -582,6 +593,7 @@ export function WeekBoard({
     () =>
       sessions.filter((row) => {
         if (filter.group && row.group_id !== filter.group) return false
+        if (filter.class && row.class_id !== filter.class) return false
         if (filter.hall && row.location_name !== filter.hall) return false
         if (filter.coach && !row.staff.some((p) => p.person_id === filter.coach)) return false
         return true
@@ -589,7 +601,7 @@ export function WeekBoard({
     [sessions, filter],
   )
 
-  const filtered = Boolean(filter.group || filter.coach || filter.hall)
+  const filtered = Boolean(filter.group || filter.class || filter.coach || filter.hall)
 
   // Escape puts a picked-up class back. Registered only while something is held, so this
   // never competes with the popover's own Escape handling.
@@ -795,6 +807,27 @@ export function WeekBoard({
         <legend className="studio-visually-hidden">
           {t(locale, 'schedule.week.filter.legend')}
         </legend>
+        {/* Owner, 2026-09-09: "Calendar — filter by class." Before the group filter, because
+            a class is the wider question: a studio running judo and karate on the same
+            evenings wants one discipline, not one timetable slot. Drawn only when the week
+            actually holds more than one class. */}
+        {options.classes.length > 1 ? (
+          <label>
+            {t(locale, 'schedule.week.filter.class')}
+            <select
+              data-testid="week-filter-class"
+              onChange={(event) => setFilter((f) => ({ ...f, class: event.target.value }))}
+              value={filter.class}
+            >
+              <option value="">{t(locale, 'schedule.week.filter.all')}</option>
+              {options.classes.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         {options.groups.length > 1 ? (
           <label>
             {t(locale, 'schedule.week.filter.group')}
@@ -850,7 +883,7 @@ export function WeekBoard({
           <Button
             variant="ghost"
             data-testid="week-filter-clear"
-            onClick={() => setFilter({ group: '', coach: '', hall: '' })}
+            onClick={() => setFilter({ group: '', class: '', coach: '', hall: '' })}
           >
             {t(locale, 'schedule.week.filter.clear')}
           </Button>

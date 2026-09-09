@@ -328,6 +328,7 @@ class StudentService:
         viewer_group_ids: list[uuid.UUID] | None,
         status: str | None = None,
         group_id: uuid.UUID | None = None,
+        class_id: uuid.UUID | None = None,
         health_status: str | None = None,
         q: str | None = None,
         after: uuid.UUID | None = None,
@@ -349,6 +350,25 @@ class StudentService:
                     select(Enrollment.student_id).where(
                         Enrollment.group_id == group_id, Enrollment.ended_on.is_(None)
                     )
+                )
+            )
+        if class_id:
+            # "Who trains judo", which a group filter cannot answer: a group is one
+            # timetable slot, so the question had to be asked once per group and the
+            # answers added up -- with a child in two judo groups counted twice.
+            #
+            # `IN (subquery)` rather than a JOIN, for the same reason the billing run keys
+            # on the DISTINCT class: a join over enrollments fans out one child into one row
+            # per group, and the list would show them twice. The set membership collapses it
+            # without a DISTINCT that would also have to be kept in step with the ORDER BY.
+            #
+            # ANDed with `group_id` above rather than replacing it: a filter that quietly
+            # widened another would show MORE rows than the one it replaced.
+            stmt = stmt.where(
+                Student.id.in_(
+                    select(Enrollment.student_id)
+                    .join(Group, Group.id == Enrollment.group_id)
+                    .where(Group.class_id == class_id, Enrollment.ended_on.is_(None))
                 )
             )
         if q:

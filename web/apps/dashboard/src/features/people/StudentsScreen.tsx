@@ -186,13 +186,22 @@ export function StudentsScreen({
   }
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('')
+  //: Which class the roster is narrowed to, '' for all of them. Owner, 2026-09-09:
+  //: "Students — filter by class." Sent to the server rather than applied here: the list is
+  //: cursor-paginated, so filtering a fetched page would hide the children on the next one.
+  const [classId, setClassId] = useState('')
+  const [classes, setClasses] = useState<{ id: string; name: string }[]>([])
   // Which query the page in state answers. Derived rather than a `loading` flag set
   // synchronously in the effect body: that is a cascading render, and eslint's
   // `react-hooks/set-state-in-effect` is right to refuse it. Comparing the answered query
   // to the current one says the same thing without the extra render.
   const [answered, setAnswered] = useState<string | null>(null)
   const [version, setVersion] = useState(0)
-  const asked = `${query}\u0000${status}\u0000${version}`
+  // Every input the load actually varies on. `classId` belongs here for the same reason
+  // `status` does: leave it out and `loaded` compares the answer to a question that was
+  // not asked, so the count and the empty-state never render again after the first
+  // class is chosen.
+  const asked = `${query}\u0000${status}\u0000${classId}\u0000${version}`
   const loaded = answered === asked
 
   // B2.1's subtitle and B2.2's "{{count}} מתוך {{total}}" both need a real total, and
@@ -225,22 +234,37 @@ export function StudentsScreen({
 
   useEffect(() => {
     let live = true
-    const key = `${query}\u0000${status}\u0000${version}`
+    void apiFetch('/api/v1/classes')
+      .then((response) => (response.ok ? response.json() : { items: [] }))
+      .then((body: { items: { id: string; name: string }[] }) => live && setClasses(body.items))
+      .catch(() => live && setClasses([]))
+    return () => {
+      live = false
+    }
+  }, [])
+
+  useEffect(() => {
+    let live = true
+    const key = `${query}\u0000${status}\u0000${classId}\u0000${version}`
     client
-      .students({ q: query, status })
+      .students({ q: query, status, class_id: classId || undefined })
       .then((fresh) => {
         if (!live) return
         setPage(fresh)
         setAnswered(key)
         setBaselineCount((current) =>
-          current === null && !query && !status && !fresh.has_more ? fresh.items.length : current,
+          // The baseline is only the baseline when NOTHING is filtered -- a count taken
+          // while a class filter was on would make every later "3 of 12" wrong.
+          current === null && !query && !status && !classId && !fresh.has_more
+            ? fresh.items.length
+            : current,
         )
       })
       .catch(() => live && setAnswered(key))
     return () => {
       live = false
     }
-  }, [client, query, status, version])
+  }, [client, query, status, classId, version])
 
   const nameOfStudent = (id: string) => {
     const row = page.items.find((student) => student.id === id)
@@ -250,7 +274,7 @@ export function StudentsScreen({
   const loadMore = () => {
     if (!page.next_cursor) return
     client
-      .students({ q: query, status, after: page.next_cursor })
+      .students({ q: query, status, class_id: classId || undefined, after: page.next_cursor })
       // `appendPage` from @studio/core — never a hand-rolled merge, which is where a
       // cursor list starts duplicating rows.
       .then((next) => setPage((current) => appendPage(current, next)))
@@ -323,6 +347,23 @@ export function StudentsScreen({
             </option>
           ))}
         </SelectField>
+        {/* Drawn only when the club HAS more than one class: a filter offering one choice
+            narrows nothing and costs a control on a row that is already busy. */}
+        {classes.length > 1 ? (
+          <SelectField
+            data-testid="students-class-filter"
+            label={t(locale, 'people.filter.class')}
+            onChange={(event) => setClassId(event.target.value)}
+            value={classId}
+          >
+            <option value="">{t(locale, 'people.filter.classAny')}</option>
+            {classes.map((klass) => (
+              <option key={klass.id} value={klass.id}>
+                {klass.name}
+              </option>
+            ))}
+          </SelectField>
+        ) : null}
         {loaded ? (
           <span className="people-filter-result" data-testid="students-result-count">
             {baselineCount !== null

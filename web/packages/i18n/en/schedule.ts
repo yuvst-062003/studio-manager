@@ -41,6 +41,7 @@ export const schedule: Bundle = {
   // `3a` item 7 + `1e`'s completed counter.
   'week.filter.legend': 'Filter the board',
   'week.filter.group': 'Group',
+  'week.filter.class': 'Class',
   'week.filter.coach': 'Coach',
   'week.filter.hall': 'Hall',
   'week.filter.all': 'All',

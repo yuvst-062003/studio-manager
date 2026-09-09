@@ -36,6 +36,7 @@ from app.models.schedule import (
     StudioClosure,
     TrainingYear,
 )
+from app.models.structure import Class as StudioClass
 from app.models.structure import Group, Location
 from app.schemas.schedule import (
     ProtectedSessionOut,
@@ -745,11 +746,19 @@ class ScheduleService:
         # becomes an error about a type nothing can be. `.tuples()` fixes the typing and
         # breaks at runtime — `dict()` cannot consume a `TupleResult` — so the unpacking is
         # written out, which satisfies both.
-        group_names: dict[uuid.UUID, str] = {
-            group_id: name
-            for group_id, name in self.session.execute(
-                select(Group.id, Group.name).where(Group.id.in_({r.group_id for r in rows}))
+        # The class travels WITH the group here, in the same query rather than a second one:
+        # a lesson names its group, and every screen that wants to say or filter by "judo"
+        # would otherwise have to fetch the whole group list and join it client-side.
+        group_facts: dict[uuid.UUID, tuple[str, uuid.UUID, str]] = {
+            group_id: (name, class_id, class_name)
+            for group_id, name, class_id, class_name in self.session.execute(
+                select(Group.id, Group.name, Group.class_id, StudioClass.name)
+                .join(StudioClass, StudioClass.id == Group.class_id)
+                .where(Group.id.in_({r.group_id for r in rows}))
             ).all()
+        }
+        group_names: dict[uuid.UUID, str] = {
+            group_id: fact[0] for group_id, fact in group_facts.items()
         }
         location_ids = {r.location_id for r in rows if r.location_id is not None}
         location_names: dict[uuid.UUID, str] = (
@@ -817,6 +826,8 @@ class ScheduleService:
                 id=row.id,
                 group_id=row.group_id,
                 group_name=group_names.get(row.group_id, ""),
+                class_id=(group_facts[row.group_id][1] if row.group_id in group_facts else None),
+                class_name=(group_facts[row.group_id][2] if row.group_id in group_facts else None),
                 training_year_id=row.training_year_id,
                 starts_at=row.starts_at,
                 ends_at=row.ends_at,
@@ -859,6 +870,7 @@ class ScheduleService:
         from_date: date,
         to_date: date,
         group_id: uuid.UUID | None = None,
+        class_id: uuid.UUID | None = None,
         coach_person_id: uuid.UUID | None = None,
         visible_group_ids: set[uuid.UUID] | None = None,
         cursor: uuid.UUID | None = None,
@@ -881,6 +893,16 @@ class ScheduleService:
         )
         if group_id is not None:
             stmt = stmt.where(Session.group_id == group_id)
+        if class_id is not None:
+            # "Show me judo this week." A group is one timetable slot, so without this the
+            # question had to be asked once per group and the weeks merged by eye.
+            #
+            # Filtered HERE and not in the client: this list is cursor-paginated, so
+            # filtering a fetched page would silently drop the lessons that live on the
+            # next one and show a manager an incomplete week.
+            stmt = stmt.where(
+                Session.group_id.in_(select(Group.id).where(Group.class_id == class_id))
+            )
         if visible_group_ids is not None:
             # An empty set has to produce an impossible predicate rather than no predicate.
             stmt = stmt.where(Session.group_id.in_(visible_group_ids or {uuid.UUID(int=0)}))

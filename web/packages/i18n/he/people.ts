@@ -490,6 +490,8 @@ export const people: Bundle = {
   // B2.2 — the filter bar's own result count, on its inline-end edge, so a filtered
   // view says how much it is hiding.
   'filter.resultCount': '{{count}} מתוך {{total}}',
+  'filter.class': 'חוג',
+  'filter.classAny': 'כל החוגים',
   'tabs.allStudents': 'כל החניכים',
   'tabs.myClasses': 'הכיתות שלי · {{count}}',
   'tabs.allClasses': 'כל הכיתות · {{count}}',

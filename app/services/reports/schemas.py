@@ -52,6 +52,42 @@ class MonthlyReportSummary(BaseModel):
     pending_agorot: int
 
 
+class ClassMonthRow(BaseModel):
+    """One class's share of a month -- or, with `class_id` null, the charges that name no
+    class at all.
+
+    That null row is deliberately part of the list rather than filtered out of it:
+    registration fees, manual charges and every tuition charge raised before per-class
+    pricing carry no class, and hiding them would leave the rows failing to add up to the
+    club's income with nothing on screen saying why.
+    """
+
+    class_id: uuid.UUID | None = None
+    class_name: str | None = None
+    #: DISTINCT students billed for this class in this month.
+    students: int
+    total_agorot: int
+    settled_agorot: int
+    overdue_agorot: int
+    pending_agorot: int
+
+
+class ReportByClassOut(BaseModel):
+    """`4g`'s monthly figures, split per class.
+
+    **`total.students` is NOT the sum of the rows.** A child billed for judo and karate is
+    one human in two rows, so the total counts them once -- adding the rows up would report
+    a membership the club does not have, overstated by exactly the multi-class families
+    per-class pricing created. The money totals DO add up, because two charges are two real
+    amounts.
+    """
+
+    period_year: int
+    period_month: int
+    rows: list[ClassMonthRow]
+    total: ClassMonthRow
+
+
 class PeriodWindowOut(BaseModel):
     """The window the server actually reported on, echoed back.
 

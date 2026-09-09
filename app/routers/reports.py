@@ -22,7 +22,11 @@ from app.core.tenancy import TenantSessionDep
 from app.services.reports import ReportService, build_overview
 from app.services.reports.csv_export import overview_csv, overview_filename
 from app.services.reports.periods import PeriodKind, Window
-from app.services.reports.schemas import MonthlyReportSummary, ReportsOverviewOut
+from app.services.reports.schemas import (
+    MonthlyReportSummary,
+    ReportByClassOut,
+    ReportsOverviewOut,
+)
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -54,6 +58,28 @@ class StudentChargeDetails(BaseModel):
 
     student_id: uuid.UUID
     charges: list[ChargeDetail]
+
+
+@router.get("/{studio_id}/by-class")
+def get_report_by_class(
+    studio_id: uuid.UUID,
+    year: Annotated[int, Query(ge=2000, le=2100)],
+    month: Annotated[int, Query(ge=1, le=12)],
+    _: ManagerOrOwner,
+    session: TenantSessionDep,
+) -> ReportByClassOut:
+    """The month, split per class -- what judo earned and what karate earned.
+
+    Manager and owner only, like every other figure on this router: invariant 3 gives a
+    coach no financial read, and this is the club's income.
+
+    The same period and the same three money buckets as `/monthly`, computed from the same
+    rows, so the two screens cannot disagree about one month. What is NOT the same is the
+    headcount: `total.students` counts each child once even when they are billed for two
+    classes, while the per-class rows each count them. Summing the rows would overstate
+    membership by exactly the multi-class families per-class pricing created.
+    """
+    return ReportByClassOut(**ReportService(session).by_class(year, month))
 
 
 @router.get("/{studio_id}/monthly")

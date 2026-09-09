@@ -88,6 +88,48 @@ export type ReportsOverview = {
   has_data: boolean
 }
 
+/** One class's share of a month, or — with `class_id` null — the charges naming no class. */
+export type ClassMonthRow = {
+  class_id: string | null
+  class_name: string | null
+  students: number
+  total_agorot: number
+  settled_agorot: number
+  overdue_agorot: number
+  pending_agorot: number
+}
+
+export type ReportByClass = {
+  period_year: number
+  period_month: number
+  rows: ClassMonthRow[]
+  /** The server's own totals. `students` is a DISTINCT over the month, NOT the sum of
+   *  `rows` — a child billed for two classes is one human in two rows. */
+  total: ClassMonthRow
+}
+
+export function byClassPath(studioId: string, year: number, month: number): string {
+  return `/api/v1/reports/${studioId}/by-class?year=${year}&month=${month}`
+}
+
+export async function fetchByClass(
+  studioId: string,
+  year: number,
+  month: number,
+): Promise<ReportByClass> {
+  const response = await apiFetch(byClassPath(studioId, year, month))
+  if (!response.ok) throw new Error(String(response.status))
+  const body = (await response.json()) as ReportByClass
+  // The shape is checked rather than trusted. A 200 carrying something else — a stub that
+  // answers every path alike, a proxy returning the wrong route's body — would otherwise
+  // reach the panel and throw INSIDE render, taking the whole reports screen down with it.
+  // Rejecting here routes it to the caller's catch, which is what "best effort" means.
+  if (!Array.isArray(body?.rows) || typeof body?.total !== 'object' || body.total === null) {
+    throw new Error('by-class: unexpected payload')
+  }
+  return body
+}
+
 export function overviewPath(studioId: string, period: PeriodKind): string {
   return `/api/v1/reports/${studioId}/overview?period=${period}`
 }

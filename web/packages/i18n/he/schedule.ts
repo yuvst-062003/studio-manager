@@ -71,6 +71,7 @@ export const schedule: Bundle = {
   // screen, so a filter is never offered that would empty the board.
   'week.filter.legend': 'סינון הלוח',
   'week.filter.group': 'קבוצה',
+  'week.filter.class': 'חוג',
   'week.filter.coach': 'מאמן',
   'week.filter.hall': 'אולם',
   'week.filter.all': 'הכל',

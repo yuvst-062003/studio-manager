@@ -26,6 +26,9 @@ export interface SessionRow {
   id: string
   group_id: string
   group_name: string
+  /** Which class this lesson belongs to — the calendar filters on it. */
+  class_id: string | null
+  class_name: string | null
   training_year_id: string
   starts_at: string
   ends_at: string
@@ -108,6 +111,8 @@ export interface ScheduleClient {
     from: string
     to: string
     groupId?: string
+    /** Every group of one class at once — "show me judo this week". */
+    classId?: string
     coachPersonId?: string
   }): Promise<SessionRow[]>
   getSchedule(groupId: string): Promise<ScheduleRule[]>
@@ -174,7 +179,7 @@ export function makeScheduleClient(fetcher: Fetcher): ScheduleClient {
         isActive: group.is_active,
       }))
     },
-    async listSessions({ from, to, groupId, coachPersonId }) {
+    async listSessions({ from, to, groupId, classId, coachPersonId }) {
       // Paged to the end of the range, because the callers ask for a whole training year.
       // `GET /sessions` defaults to 50 rows and two rules a week across §16's default year
       // is about 104, so a single request rendered the first fifty and silently dropped
@@ -186,6 +191,10 @@ export function makeScheduleClient(fetcher: Fetcher): ScheduleClient {
       do {
         const params = new URLSearchParams({ from, to, limit: '200' })
         if (groupId) params.set('group_id', groupId)
+        // Sent to the server, never applied to `all` afterwards: this loop pages through a
+        // whole training year, and a client-side filter would still fetch every lesson of
+        // every class to throw most of them away.
+        if (classId) params.set('class_id', classId)
         if (coachPersonId) params.set('coach_person_id', coachPersonId)
         if (cursor) params.set('cursor', cursor)
         const body = await json<{ items: SessionRow[]; next_cursor: string | null }>(

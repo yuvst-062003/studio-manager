@@ -32,6 +32,10 @@ export type StudentFilters = {
   q?: string
   status?: string
   group_id?: string
+  /** "Who trains judo" — every group of one class at once, each child listed once. The
+   *  server does the de-duplication; a client-side filter over a cursor-paginated list
+   *  would drop the children who live on a later page. */
+  class_id?: string
   health_status?: string
   after?: string
 }

@@ -11,6 +11,8 @@ const SESSION_ROW = {
   id: 's1',
   group_id: 'g1',
   group_name: 'מתחילים',
+  class_id: 'c-judo',
+  class_name: "ג'ודו",
   training_year_id: 'y1',
   starts_at: '2026-11-03T15:00:00Z',
   ends_at: '2026-11-03T16:00:00Z',

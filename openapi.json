@@ -2206,6 +2206,63 @@
         "title": "ClassListResponse",
         "type": "object"
       },
+      "ClassMonthRow": {
+        "description": "One class's share of a month -- or, with `class_id` null, the charges that name no\nclass at all.\n\nThat null row is deliberately part of the list rather than filtered out of it:\nregistration fees, manual charges and every tuition charge raised before per-class\npricing carry no class, and hiding them would leave the rows failing to add up to the\nclub's income with nothing on screen saying why.",
+        "properties": {
+          "class_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Id"
+          },
+          "class_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Name"
+          },
+          "overdue_agorot": {
+            "title": "Overdue Agorot",
+            "type": "integer"
+          },
+          "pending_agorot": {
+            "title": "Pending Agorot",
+            "type": "integer"
+          },
+          "settled_agorot": {
+            "title": "Settled Agorot",
+            "type": "integer"
+          },
+          "students": {
+            "title": "Students",
+            "type": "integer"
+          },
+          "total_agorot": {
+            "title": "Total Agorot",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "students",
+          "total_agorot",
+          "settled_agorot",
+          "overdue_agorot",
+          "pending_agorot"
+        ],
+        "title": "ClassMonthRow",
+        "type": "object"
+      },
       "ClassOut": {
         "properties": {
           "color": {
@@ -11377,6 +11434,37 @@
         "title": "ReorderLadderIn",
         "type": "object"
       },
+      "ReportByClassOut": {
+        "description": "`4g`'s monthly figures, split per class.\n\n**`total.students` is NOT the sum of the rows.** A child billed for judo and karate is\none human in two rows, so the total counts them once -- adding the rows up would report\na membership the club does not have, overstated by exactly the multi-class families\nper-class pricing created. The money totals DO add up, because two charges are two real\namounts.",
+        "properties": {
+          "period_month": {
+            "title": "Period Month",
+            "type": "integer"
+          },
+          "period_year": {
+            "title": "Period Year",
+            "type": "integer"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ClassMonthRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "total": {
+            "$ref": "#/components/schemas/ClassMonthRow"
+          }
+        },
+        "required": [
+          "period_year",
+          "period_month",
+          "rows",
+          "total"
+        ],
+        "title": "ReportByClassOut",
+        "type": "object"
+      },
       "ReportDeliveryRequest": {
         "description": "Request to send a monthly report via email.",
         "properties": {
@@ -12571,6 +12659,29 @@
               }
             ],
             "title": "Cancel Reason"
+          },
+          "class_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Id"
+          },
+          "class_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Name"
           },
           "ends_at": {
             "format": "date-time",
@@ -21650,7 +21761,7 @@
     "/api/v1/health": {
       "get": {
         "description": "Liveness. Deliberately carries no tenant data and needs no auth.\n\n`revision` is best-effort and never affects `status`: this endpoint answers \"is this\nprocess alive\", and a database it cannot reach does not make it dead. Letting the\nfailure propagate would turn every database blip into a page.",
-        "operationId": "read_health_api_v1_health_head",
+        "operationId": "read_health_api_v1_health_get",
         "responses": {
           "200": {
             "content": {
@@ -21670,7 +21781,7 @@
       },
       "head": {
         "description": "Liveness. Deliberately carries no tenant data and needs no auth.\n\n`revision` is best-effort and never affects `status`: this endpoint answers \"is this\nprocess alive\", and a database it cannot reach does not make it dead. Letting the\nfailure propagate would turn every database blip into a page.",
-        "operationId": "read_health_api_v1_health_head",
+        "operationId": "read_health_api_v1_health_get",
         "responses": {
           "200": {
             "content": {
@@ -27054,6 +27165,72 @@
         ]
       }
     },
+    "/api/v1/reports/{studio_id}/by-class": {
+      "get": {
+        "description": "The month, split per class -- what judo earned and what karate earned.\n\nManager and owner only, like every other figure on this router: invariant 3 gives a\ncoach no financial read, and this is the club's income.\n\nThe same period and the same three money buckets as `/monthly`, computed from the same\nrows, so the two screens cannot disagree about one month. What is NOT the same is the\nheadcount: `total.students` counts each child once even when they are billed for two\nclasses, while the per-class rows each count them. Summing the rows would overstate\nmembership by exactly the multi-class families per-class pricing created.",
+        "operationId": "get_report_by_class_api_v1_reports__studio_id__by_class_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "studio_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Studio Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "maximum": 2100,
+              "minimum": 2000,
+              "title": "Year",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "maximum": 12,
+              "minimum": 1,
+              "title": "Month",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportByClassOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Report By Class",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
     "/api/v1/reports/{studio_id}/charges/{student_id}": {
       "get": {
         "description": "Fetch all charges for a student for invoice generation.\n\nReturns charge details across all periods, sorted by period (newest first).\nOnly accessible to owner and manager roles.",
@@ -27936,6 +28113,23 @@
                 }
               ],
               "title": "Group Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "class_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Class Id"
             }
           },
           {
@@ -29155,6 +29349,23 @@
                 }
               ],
               "title": "Group Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "class_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Class Id"
             }
           },
           {

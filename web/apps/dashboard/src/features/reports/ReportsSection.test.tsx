@@ -416,6 +416,13 @@ describe('the KPI strip', () => {
 
 // ── the screen ───────────────────────────────────────────────────────────────────────
 
+/** Just the `/overview` requests. The screen also fetches הכנסות לפי חוג, which is a
+ *  separate report on a separate period and must not be counted as an overview call. */
+function overviewCalls(): string[] {
+  const calls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls
+  return calls.map((call) => String(call[0])).filter((url) => url.includes('/overview'))
+}
+
 describe('the reports screen', () => {
   it('renders the strip and all three charts from one request', async () => {
     mockOverview(overview())
@@ -425,7 +432,11 @@ describe('the reports screen', () => {
     expect(screen.getByTestId('revenue-chart')).toBeInTheDocument()
     expect(screen.getByTestId('retention-panel')).toBeInTheDocument()
     expect(screen.getByTestId('belt-chart')).toBeInTheDocument()
-    expect(globalThis.fetch).toHaveBeenCalledTimes(1)
+    // ONE overview request feeds all four, which is what this test is about. The screen
+    // also asks for הכנסות לפי חוג, which is a different report over a different period
+    // and legitimately its own call — so the count is scoped to `/overview` rather than to
+    // every request the screen makes.
+    expect(overviewCalls()).toHaveLength(1)
   })
 
   it('keeps the four money cards, under the chart they belong to', async () => {
@@ -632,9 +643,10 @@ describe('the reports screen', () => {
     await waitFor(() => expect(screen.getByTestId('reports-kpis')).toBeInTheDocument())
 
     await userEvent.click(screen.getByLabelText('עונה'))
-    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(2))
-    const calls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls
-    expect(String(calls.at(-1)?.[0])).toContain('period=season')
+    // Scoped to the overview: the by-class panel does not follow the period switcher, so
+    // counting every request would make this assertion about the wrong report.
+    await waitFor(() => expect(overviewCalls()).toHaveLength(2))
+    expect(String(overviewCalls().at(-1))).toContain('period=season')
   })
 
   it('lands on the empty state for a season the studio never operated in', async () => {

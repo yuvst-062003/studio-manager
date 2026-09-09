@@ -51,6 +51,12 @@ class SessionOut(BaseModel):
     id: uuid.UUID
     group_id: uuid.UUID
     group_name: str
+    #: Which class this lesson belongs to. A lesson has always named its GROUP -- one
+    #: timetable slot -- so a calendar could not say or filter by "judo" without fetching
+    #: every group and joining them client-side. `None` only if the group vanished between
+    #: the two halves of one query.
+    class_id: uuid.UUID | None = None
+    class_name: str | None = None
     training_year_id: uuid.UUID
     starts_at: datetime
     ends_at: datetime

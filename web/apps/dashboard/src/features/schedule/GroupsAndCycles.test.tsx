@@ -34,6 +34,8 @@ const SESSION = {
   id: 's1',
   group_id: 'g1',
   group_name: 'מתחילים',
+  class_id: 'c-judo',
+  class_name: "ג'ודו",
   training_year_id: 'y1',
   starts_at: '2026-11-17T16:30:00Z',
   ends_at: '2026-11-17T18:30:00Z',

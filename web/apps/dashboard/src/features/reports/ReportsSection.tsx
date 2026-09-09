@@ -42,11 +42,12 @@ import {
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { BeltPromotionsChart } from './BeltPromotionsChart'
+import { ByClassPanel } from './ByClassPanel'
 import { KpiStrip } from './KpiStrip'
 import { RetentionPanel } from './RetentionPanel'
 import { RevenueChart } from './RevenueChart'
-import { PERIODS, fetchOverview, overviewCsvPath } from './client'
-import type { PeriodKind, ReportsOverview, RevenueMonth } from './client'
+import { PERIODS, fetchByClass, fetchOverview, overviewCsvPath } from './client'
+import type { PeriodKind, ReportByClass, ReportsOverview, RevenueMonth } from './client'
 import './reports.css'
 
 /** B5.4 — a window that never had activity draws no columns for the months before it
@@ -187,6 +188,25 @@ export function ReportsSection({
   const [confirming, setConfirming] = useState(false)
   const [exportState, setExportState] = useState<'idle' | 'failed' | 'nothing'>('idle')
   const [sendState, setSendState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
+  //: הכנסות לפי חוג. A MONTH is the only period this answers for, because `charge` carries
+  //: `period_year`/`period_month` and nothing wider -- a season or a year would have to be
+  //: summed from months, and inventing that here would make two report screens compute the
+  //: same money two different ways. So the panel shows the current month whatever the
+  //: period switcher says, and its caption says which month it is.
+  const [byClass, setByClass] = useState<ReportByClass | null>(null)
+
+  useEffect(() => {
+    let live = true
+    const today = new Date()
+    void fetchByClass(studioId, today.getFullYear(), today.getMonth() + 1)
+      .then((data) => live && setByClass(data))
+      // Best-effort, like the belts chart: one panel that could not load must not take the
+      // whole reports screen down with it.
+      .catch(() => live && setByClass(null))
+    return () => {
+      live = false
+    }
+  }, [studioId, attempt])
 
   useEffect(() => {
     let live = true
@@ -475,6 +495,13 @@ export function ReportsSection({
                   undatedDepartures={overview.kpi?.undated_departures ?? 0}
                 />
               </Card>
+              {/* הכנסות לפי חוג — beside retention rather than in the main column, because
+                  it answers a narrower question than the revenue chart it sits next to. */}
+              {byClass !== null ? (
+                <Card caption={t(locale, 'reports.byClass.title')}>
+                  <ByClassPanel locale={locale} rows={byClass.rows} total={byClass.total} />
+                </Card>
+              ) : null}
               <Card caption={t(locale, 'reports.belts.title')}>
                 {belts.length === 0 ? (
                   <EmptyState title={t(locale, 'reports.belts.empty')} />

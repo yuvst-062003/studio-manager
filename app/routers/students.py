@@ -243,6 +243,8 @@ def list_students(
     session: TenantSessionDep,
     status_filter: str | None = Query(default=None, alias="status"),
     group_id: uuid.UUID | None = None,
+    #: "Who trains judo" -- every group of one class at once, each child listed once.
+    class_id: uuid.UUID | None = None,
     health_status: str | None = None,
     q: str | None = Query(default=None, max_length=100),
     after: uuid.UUID | None = None,
@@ -254,6 +256,7 @@ def list_students(
         viewer_group_ids=scope,
         status=status_filter,
         group_id=group_id,
+        class_id=class_id,
         health_status=health_status,
         q=q,
         after=after,

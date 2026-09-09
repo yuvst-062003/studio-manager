@@ -25,6 +25,8 @@ const RULES: ScheduleRule[] = [
 const base = {
   group_id: 'g1',
   group_name: 'מתחילים',
+  class_id: 'c-judo',
+  class_name: "ג'ודו",
   training_year_id: 'y1',
   location_id: null,
   location_name: null,

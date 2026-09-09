@@ -420,6 +420,8 @@ export const people: Bundle = {
   'error.generic': 'Что-то пошло не так. Попробуйте ещё раз',
   'search.placeholder': 'Поиск по имени ученика или родителя',
   'filter.resultCount': '{{count}} из {{total}}',
+  'filter.class': 'Класс',
+  'filter.classAny': 'Все классы',
   'tabs.allStudents': 'Все ученики',
   'tabs.myClasses': 'Мои классы · {{count}}',
   'tabs.allClasses': 'Все классы · {{count}}',

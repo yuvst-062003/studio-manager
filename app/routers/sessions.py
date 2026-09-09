@@ -137,6 +137,8 @@ def list_sessions(
     from_date: Annotated[date, Query(alias="from")],
     to_date: Annotated[date, Query(alias="to")],
     group_id: uuid.UUID | None = None,
+    #: Every group of one class at once -- "show me judo this week".
+    class_id: uuid.UUID | None = None,
     coach_person_id: uuid.UUID | None = None,
     # `mine` = "the groups my own children are enrolled in", for a caller who may also be
     # staff. See `_visible_groups`. A Literal so the only other value is a 422 rather than a
@@ -150,6 +152,7 @@ def list_sessions(
         from_date=from_date,
         to_date=to_date,
         group_id=group_id,
+        class_id=class_id,
         coach_person_id=coach_person_id,
         visible_group_ids=_visible_groups(request, service, guardian_only=scope == "mine"),
         cursor=cursor,

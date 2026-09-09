@@ -1710,7 +1710,7 @@ export interface paths {
          *     process alive", and a database it cannot reach does not make it dead. Letting the
          *     failure propagate would turn every database blip into a page.
          */
-        get: operations["read_health_api_v1_health_head"];
+        get: operations["read_health_api_v1_health_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1723,7 +1723,7 @@ export interface paths {
          *     process alive", and a database it cannot reach does not make it dead. Letting the
          *     failure propagate would turn every database blip into a page.
          */
-        head: operations["read_health_api_v1_health_head"];
+        head: operations["read_health_api_v1_health_get"];
         patch?: never;
         trace?: never;
     };
@@ -4211,6 +4211,35 @@ export interface paths {
         put?: never;
         /** Remind Coach */
         post: operations["remind_coach_api_v1_reminders_sessions__session_id__coach_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{studio_id}/by-class": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Report By Class
+         * @description The month, split per class -- what judo earned and what karate earned.
+         *
+         *     Manager and owner only, like every other figure on this router: invariant 3 gives a
+         *     coach no financial read, and this is the club's income.
+         *
+         *     The same period and the same three money buckets as `/monthly`, computed from the same
+         *     rows, so the two screens cannot disagree about one month. What is NOT the same is the
+         *     headcount: `total.students` counts each child once even when they are billed for two
+         *     classes, while the per-class rows each count them. Summing the rows would overstate
+         *     membership by exactly the multi-class families per-class pricing created.
+         */
+        get: operations["get_report_by_class_api_v1_reports__studio_id__by_class_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -7043,6 +7072,32 @@ export interface components {
             items: components["schemas"]["ClassOut"][];
             /** Next Cursor */
             next_cursor?: string | null;
+        };
+        /**
+         * ClassMonthRow
+         * @description One class's share of a month -- or, with `class_id` null, the charges that name no
+         *     class at all.
+         *
+         *     That null row is deliberately part of the list rather than filtered out of it:
+         *     registration fees, manual charges and every tuition charge raised before per-class
+         *     pricing carry no class, and hiding them would leave the rows failing to add up to the
+         *     club's income with nothing on screen saying why.
+         */
+        ClassMonthRow: {
+            /** Class Id */
+            class_id?: string | null;
+            /** Class Name */
+            class_name?: string | null;
+            /** Overdue Agorot */
+            overdue_agorot: number;
+            /** Pending Agorot */
+            pending_agorot: number;
+            /** Settled Agorot */
+            settled_agorot: number;
+            /** Students */
+            students: number;
+            /** Total Agorot */
+            total_agorot: number;
         };
         /** ClassOut */
         ClassOut: {
@@ -11113,6 +11168,25 @@ export interface components {
             ordered_ids: string[];
         };
         /**
+         * ReportByClassOut
+         * @description `4g`'s monthly figures, split per class.
+         *
+         *     **`total.students` is NOT the sum of the rows.** A child billed for judo and karate is
+         *     one human in two rows, so the total counts them once -- adding the rows up would report
+         *     a membership the club does not have, overstated by exactly the multi-class families
+         *     per-class pricing created. The money totals DO add up, because two charges are two real
+         *     amounts.
+         */
+        ReportByClassOut: {
+            /** Period Month */
+            period_month: number;
+            /** Period Year */
+            period_year: number;
+            /** Rows */
+            rows: components["schemas"]["ClassMonthRow"][];
+            total: components["schemas"]["ClassMonthRow"];
+        };
+        /**
          * ReportDeliveryRequest
          * @description Request to send a monthly report via email.
          */
@@ -11776,6 +11850,10 @@ export interface components {
             attendance_taken: boolean;
             /** Cancel Reason */
             cancel_reason: string | null;
+            /** Class Id */
+            class_id?: string | null;
+            /** Class Name */
+            class_name?: string | null;
             /**
              * Ends At
              * Format: date-time
@@ -16397,7 +16475,7 @@ export interface operations {
             };
         };
     };
-    read_health_api_v1_health_head: {
+    read_health_api_v1_health_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -16417,7 +16495,7 @@ export interface operations {
             };
         };
     };
-    read_health_api_v1_health_head: {
+    read_health_api_v1_health_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -19837,6 +19915,40 @@ export interface operations {
             };
         };
     };
+    get_report_by_class_api_v1_reports__studio_id__by_class_get: {
+        parameters: {
+            query: {
+                year: number;
+                month: number;
+            };
+            header?: never;
+            path: {
+                studio_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportByClassOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_student_charges_api_v1_reports__studio_id__charges__student_id__get: {
         parameters: {
             query?: never;
@@ -20329,6 +20441,7 @@ export interface operations {
                 from: string;
                 to: string;
                 group_id?: string | null;
+                class_id?: string | null;
                 coach_person_id?: string | null;
                 scope?: "mine" | null;
                 cursor?: string | null;
@@ -21058,6 +21171,7 @@ export interface operations {
             query?: {
                 status?: string | null;
                 group_id?: string | null;
+                class_id?: string | null;
                 health_status?: string | null;
                 q?: string | null;
                 after?: string | null;
