@@ -14,7 +14,7 @@
  * overrides the way it overrides lucide's own — a CSS declaration beats a presentation
  * attribute. Same for `fill="none"` against the active `fill-…` classes.
  */
-export function TechniqueIcon({ className }: { className?: string }) {
+export function TechniqueIcon({ className, solid = false }: { className?: string; solid?: boolean }) {
   return (
     <svg
       aria-hidden="true"
@@ -28,12 +28,19 @@ export function TechniqueIcon({ className }: { className?: string }) {
       viewBox="0 0 24 24"
       width="24"
     >
-      <circle cx="8" cy="5" r="2.2" />
+      {/* `solid` fills the two HEADS and nothing else — the tab bar's active state is the
+          outline-to-solid swap every heavily-used app relies on, and the four lucide glyphs
+          beside this one take `fill-current` on the whole mark. This one cannot: the other
+          four are closed outlines, and this is two figures joined by four OPEN strokes. A
+          blanket fill closes them against the viewBox edge and the throw becomes a blot —
+          which is the same reason the bar never tinted this glyph when the others took a
+          10% wash. Filling the heads reads as solid at 24px and keeps the limbs legible. */}
+      <circle cx="8" cy="5" r="2.2" fill={solid ? 'currentColor' : 'none'} />
       <path d="M8 7.4v4.2l4 2.4" />
       <path d="M4.5 20.5 8 11.6" />
       <path d="M12 14h5.5" />
       <path d="m17.5 14 2.5 5" />
-      <circle cx="18.6" cy="10.4" r="1.8" />
+      <circle cx="18.6" cy="10.4" r="1.8" fill={solid ? 'currentColor' : 'none'} />
     </svg>
   )
 }

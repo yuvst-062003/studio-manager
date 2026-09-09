@@ -183,7 +183,13 @@ function sortByWhenThenWho(rows: HomeSession[]): HomeSession[] {
  * fetched.
  */
 export function buildWeekStrip(todayKey: string, sessions: readonly HomeSession[]): StripDay[] {
-  const withSessions = new Set(sessions.map((session) => studioDayKey(session.startsAt)))
+  // A count per day, not a set of days that have any. The strip draws one dot either way,
+  // but the chip's accessible name says "two sessions", and a boolean cannot.
+  const perDay = new Map<string, number>()
+  for (const session of sessions) {
+    const dayKey = studioDayKey(session.startsAt)
+    perDay.set(dayKey, (perDay.get(dayKey) ?? 0) + 1)
+  }
   return Array.from({ length: 7 }, (_, index) => {
     const dayKey = shiftDay(todayKey, index - 2)
     return {
@@ -191,7 +197,7 @@ export function buildWeekStrip(todayKey: string, sessions: readonly HomeSession[
       dayOfMonth: dayOfMonthOf(dayKey),
       weekday: weekdayOf(dayKey),
       isToday: dayKey === todayKey,
-      hasSessions: withSessions.has(dayKey),
+      sessionCount: perDay.get(dayKey) ?? 0,
     }
   })
 }

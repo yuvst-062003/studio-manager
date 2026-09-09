@@ -16,7 +16,6 @@ import {
   CalendarDays,
   CalendarX,
   CheckCircle2,
-  Clock,
   MapPin,
   Plus,
   Trophy,
@@ -113,7 +112,7 @@ export function HomeSchedule({
                 aria-pressed={isSelected}
                 onClick={() => onSelectDay(day.dayKey)}
                 data-testid={`home-day-${day.dayKey}`}
-                className={`day-chip flex flex-col items-center py-1.5 rounded-2xl transition-all cursor-pointer ${
+                className={`day-chip relative flex flex-col items-center py-1.5 rounded-2xl transition-all cursor-pointer ${
                   isSelected
                     ? 'bg-[#001849] text-white shadow-xs font-semibold'
                     : 'hover:bg-slate-50 text-slate-800 dark:text-slate-50'
@@ -138,11 +137,41 @@ export function HomeSchedule({
                   className={`text-sm font-bold ${
                     isSelected
                       ? 'text-white text-base mt-0.5'
-                      : `mt-0.5 ${day.hasSessions ? 'text-slate-800 dark:text-slate-50' : 'text-slate-400 dark:text-slate-600'}`
+                      : `mt-0.5 ${day.sessionCount > 0 ? 'text-slate-800 dark:text-slate-50' : 'text-slate-400 dark:text-slate-600'}`
                   }`}
                 >
                   {day.dayOfMonth}
                 </span>
+                {/* The same dot the month view draws, and for the same reason: which days
+                    have training is the one thing this row exists to answer, and until now
+                    it said so only by darkening the numeral — a difference between two
+                    greys, which is colour alone and easy to miss.
+
+                    Shown on the SELECTED chip too, unlike the month view's. That modal is a
+                    picker you open, choose in and close; this strip stays on screen as the
+                    thing you scan, and a marker that vanishes on the day you are looking at
+                    breaks the row it is meant to make scannable. White on the navy chip. */}
+                {day.sessionCount > 0 ? (
+                  <span
+                    aria-hidden="true"
+                    data-testid={`home-day-dot-${day.dayKey}`}
+                    className={`absolute bottom-1 start-0 end-0 mx-auto w-1 h-1 rounded-full ${
+                      isSelected ? 'bg-white' : 'bg-[#0056c5] dark:bg-blue-300'
+                    }`}
+                  />
+                ) : null}
+                {/* The dot's meaning, for anyone who cannot see it. Joins the chip's own
+                    text in the accessible name rather than replacing it with an aria-label,
+                    which would drop the date the chip already announces. */}
+                {day.sessionCount > 0 ? (
+                  <span className="sr-only">
+                    {day.sessionCount === 1
+                      ? t(locale, 'schedule.home.oneSessionPlanned')
+                      : fill(t(locale, 'schedule.home.manySessionsPlanned'), {
+                          count: day.sessionCount,
+                        })}
+                  </span>
+                ) : null}
               </button>
             )
           })}
@@ -158,9 +187,6 @@ export function HomeSchedule({
               {headline}
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-normal">{countLabel}</p>
-          </div>
-          <div className="w-8 h-8 rounded-full bg-blue-50 text-[#0056c5] flex items-center justify-center">
-            <Clock className="w-4 h-4 text-[#0056c5]" />
           </div>
         </div>
 

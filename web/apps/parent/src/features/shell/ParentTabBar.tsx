@@ -34,6 +34,34 @@
 //      four, so the cost was the entries themselves and the label check at 360px that the
 //      library's spec asked for.
 //
+// 2026-09-09 — THE BAR NO LONGER TOUCHES THE BOTTOM EDGE (owner's pick, from a rendered
+// comparison of four directions). Two things changed and they are separable:
+//
+//   SHAPE. It floats: inset from both sides, lifted clear of the home indicator, and
+//   translucent, so the schedule keeps running underneath it. That is Apple's iOS 26
+//   system language and the nav Instagram shipped in February 2026. The glass is held at
+//   /75 rather than the /95 it replaced, and keeps a hairline border: `backdrop-filter`
+//   cannot adapt to what scrolls beneath it the way Apple's material does, so the opacity
+//   is the whole of the contrast guarantee and it is deliberately conservative. Anything
+//   thinner needs measuring against a real screen, not taste.
+//
+//   SIGNAL. The active glyph goes OUTLINE TO SOLID, and a capsule slides behind it. The
+//   swap is the convention Instagram, Threads, X, YouTube and Spotify all trained families
+//   on — filled means you are here — and it does the work colour alone was doing badly:
+//   in dark mode the old active state was one blue against near-black.
+//
+// Two consequences worth naming. `ACTIVE_INK` is now ONE colour rather than the
+// prototype's three: with a capsule and a solid glyph carrying the state, three near-identical
+// navies were an inconsistency with nothing left to justify it. And the row is a
+// five-column GRID rather than `justify-between`, because the capsule is positioned
+// arithmetically off the active index — content-width slots would put it under the wrong
+// tab, and equal columns also give every tab the same 44px target instead of handing the
+// widest label the most room.
+//
+// The shells did NOT change. `ParentShell`'s `pb-[calc(7rem+…)]` already clears a floating
+// bar with room to spare, and it is what keeps the LAST row reachable; content still passes
+// under the glass mid-scroll, which is the only time the blur is doing anything.
+//
 // The `dark:` variants are the prototype's, unchanged. They follow the app's own theme
 // preference rather than the OS because tailwind.css redefines the `dark` variant against
 // `[data-theme]`, which is what `@studio/ui`'s ThemeProvider writes — see the note there.
@@ -57,31 +85,23 @@ const HREF: Record<ParentTab, string> = {
   profile: '#/profile',
 }
 
-/* The prototype gives three of the four tabs a slightly different active navy. Kept as
-   written rather than unified: they are the design's, and a port that "tidies" them is a
-   port that stopped being a comparison. */
-const ACTIVE_INK: Record<ParentTab, string> = {
-  home: 'text-[#001849] dark:text-blue-400',
-  shop: 'text-[#2563eb] dark:text-blue-400',
-  updates: 'text-[#1351d8] dark:text-blue-400',
-  // The library is the prototype's only tab that the prototype does not have, so it has no
-  // navy of its own to keep. It takes Home's, which is the bar's base ink.
-  techniques: 'text-[#001849] dark:text-blue-400',
-  profile: 'text-[#001849] dark:text-blue-400',
-}
+/* ONE active colour. The prototype's three (`#001849`, `#2563eb`, `#1351d8`) were kept
+   verbatim while the port was still a comparison; the capsule and the solid glyph now carry
+   the active state, so three near-identical navies are a difference nobody can see and
+   nobody chose. `#0056c5` is the app's own brand blue — the one `--brand` the rest of the
+   product already uses — rather than a fourth navy invented here. */
+const ACTIVE_INK = 'text-[#0056c5] dark:text-blue-300'
 
-const ACTIVE_ICON: Record<ParentTab, string> = {
-  home: 'stroke-[2.4] fill-[#001849]/10 dark:fill-blue-400/20 text-[#001849] dark:text-blue-400',
-  shop: 'stroke-[2.4] fill-blue-50 dark:fill-blue-400/20 text-[#2563eb] dark:text-blue-400',
-  updates: 'stroke-[2.4] fill-[#1351d8]/15 dark:fill-blue-400/20 text-[#1351d8] dark:text-blue-400',
-  // No fill: the mark is two figures and four strokes, and filling the two circles turns
-  // a throw into a pair of dots. The other four are closed outlines that can hold a tint.
-  techniques: 'stroke-[2.4] text-[#001849] dark:text-blue-400',
-  profile: 'stroke-[2.4] fill-[#001849]/10 dark:fill-blue-400/20 text-[#001849] dark:text-blue-400',
-}
+/* Outline → solid. `fill-current` closes the four lucide marks; `TechniqueIcon` takes a
+   `solid` prop instead, because filling two figures and four open strokes turns a throw
+   into a blot — see its own comment. */
+const ACTIVE_GLYPH = 'fill-current stroke-[1.6]'
 
+/* A step darker than the `slate-400` this replaced. The bar is translucent now, so an idle
+   label sits over whatever scrolled under it rather than over flat white, and 400 was the
+   lightest that ever passed 4.5:1 against a fixed ground. */
 const IDLE_INK =
-  'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 font-medium'
+  'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-medium'
 
 const ICONS = {
   home: Home,
@@ -124,6 +144,11 @@ export function ParentTabBar({
    *  badge showing zero is a permanent mark that stops meaning anything. */
   updatesBadgeCount?: number
 }) {
+  // -1 when no tab matches — a route outside the bar, which `active: ParentTab | null`
+  // already allowed. The capsule is not rendered at all then, rather than parked under
+  // the first tab claiming a page nobody is on.
+  const activeIndex = active === null ? -1 : ORDER.indexOf(active)
+
   return (
     // THE HOME INDICATOR'S CLEARANCE.
     //
@@ -146,9 +171,41 @@ export function ParentTabBar({
     <nav
       aria-label={t(locale, 'common.tabs.parentBarLabel')}
       data-testid="tab-bar"
-      className="tw-scope fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-100 dark:border-slate-800 pt-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom,0px))] px-6 z-40 shadow-[0_-4px_16px_rgba(0,0,0,0.04)] dark:shadow-[0_-4px_16px_rgba(0,0,0,0.4)] transition-colors"
+      // FLOATING, AND THE CLEARANCE THAT MAKES IT SAFE.
+      //
+      // `bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))]` — the 12px gap is what
+      // makes it read as floating, and the inset is added to it rather than substituted
+      // for it: on every iPhone since the X the bottom 34px belong to the home indicator,
+      // and a bar that used the inset AS its gap sits flush against it on exactly the
+      // devices that have one. The inset is 0 everywhere else, so this is one expression
+      // and not a phone-only branch. `index.html` asks for the room with
+      // `viewport-fit=cover`; without that `env()` is always 0 and this reads as 12px.
+      //
+      // `inset-x-3` with `max-w-md mx-auto`: the 12px inset bounds it on a phone, the
+      // max-width centres it on anything wider.
+      className="tw-scope fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] inset-x-3 max-w-md mx-auto rounded-[26px] border border-slate-900/10 dark:border-white/10 bg-white/75 dark:bg-slate-900/70 backdrop-blur-xl backdrop-saturate-150 px-1.5 py-2 z-40 shadow-[0_10px_30px_rgba(2,6,23,0.16),0_1px_2px_rgba(2,6,23,0.08)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.45)] transition-colors"
     >
-      <div className="flex items-center justify-between">
+      {/* A GRID, not `justify-between`. The capsule below is placed off the active INDEX,
+          so the slots have to be equal for it to land under the right tab — and equal
+          slots also give every tab the same 44px target rather than handing the widest
+          label the most room. */}
+      <div className="relative grid grid-cols-5">
+        {activeIndex >= 0 ? (
+          <span
+            aria-hidden="true"
+            data-testid="tab-indicator"
+            // `inset-inline-start`, not a `translateX`: transforms are not
+            // direction-aware, and .claude/rules/ui-rtl-a11y.md asks for logical
+            // properties. This one is correct in RTL and LTR without a sign to flip.
+            //
+            // Inline `style` and not a Tailwind class, because the offset is COMPUTED —
+            // Tailwind generates utilities by scanning for literal class strings, so a
+            // constructed `start-[40%]` would produce no CSS at all. The same trap the
+            // clearance note above the shell warns about.
+            className="pointer-events-none absolute inset-y-0 w-1/5 rounded-2xl bg-[#0056c5]/10 dark:bg-white/10 transition-[inset-inline-start] duration-300 ease-out motion-reduce:transition-none"
+            style={{ insetInlineStart: `${activeIndex * 20}%` }}
+          />
+        ) : null}
         {ORDER.map((tab) => {
           const isActive = active === tab
           const Glyph = ICONS[tab]
@@ -162,18 +219,27 @@ export function ParentTabBar({
               // Deviation 3 — the count belongs in the name, not only in the mark.
               aria-label={badge > 0 ? `${label} ${badgeLabel(badge)}` : undefined}
               data-testid={`tab-${tab}`}
-              className={`flex flex-col items-center gap-1 text-[11px] transition-all cursor-pointer ${
-                isActive ? `${ACTIVE_INK[tab]} font-bold` : IDLE_INK
+              className={`relative z-10 flex flex-col items-center gap-1 py-1 text-[11px] transition-colors cursor-pointer ${
+                isActive ? `${ACTIVE_INK} font-bold` : IDLE_INK
               }`}
             >
               <div className="relative">
-                <Glyph className={`w-6 h-6 ${isActive ? ACTIVE_ICON[tab] : 'stroke-[1.7]'}`} />
+                {tab === 'techniques' ? (
+                  <TechniqueIcon
+                    className={`w-6 h-6 ${isActive ? 'stroke-[2.6]' : 'stroke-[1.7]'}`}
+                    solid={isActive}
+                  />
+                ) : (
+                  <Glyph className={`w-6 h-6 ${isActive ? ACTIVE_GLYPH : 'stroke-[1.7]'}`} />
+                )}
                 {badge > 0 ? (
                   <span
                     aria-hidden="true"
                     data-testid="tab-updates-badge"
-                    // Deviation 2 — `-end-1.5`, not the prototype's `-right-1.5`.
-                    className="absolute -top-1 -end-1.5 bg-[#e02424] text-white rounded-full text-[10px] min-w-4 h-4 px-1 flex items-center justify-center font-bold border-2 border-white dark:border-slate-900 shadow-xs"
+                    // Deviation 2 — `-end-1.5`, not the prototype's `-right-1.5`. The ring
+                    // is the GLASS colour rather than a flat white, or the badge would
+                    // carry a white halo over a translucent bar.
+                    className="absolute -top-1 -end-1.5 bg-[#e02424] text-white rounded-full text-[10px] min-w-4 h-4 px-1 flex items-center justify-center font-bold border-2 border-white/80 dark:border-slate-900/80 shadow-xs"
                   >
                     {badgeLabel(badge)}
                   </span>

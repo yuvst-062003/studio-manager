@@ -120,8 +120,8 @@ describe('the studio day, not the UTC day', () => {
       noReason,
     )
     const strip = buildWeekStrip('2026-03-15', rows)
-    expect(strip.find((d) => d.dayKey === '2026-03-15')!.hasSessions).toBe(true)
-    expect(strip.find((d) => d.dayKey === '2026-03-14')!.hasSessions).toBe(false)
+    expect(strip.find((d) => d.dayKey === '2026-03-15')!.sessionCount).toBe(1)
+    expect(strip.find((d) => d.dayKey === '2026-03-14')!.sessionCount).toBe(0)
   })
 
   it('reads a weekday from a day key without the midnight slip', () => {
@@ -148,7 +148,7 @@ describe('buildWeekStrip', () => {
   it('marks exactly the days the family actually trains', () => {
     const rows = expandSessions([lesson()], [child('c1', 'דנה', ['קבוצה 2'])], {}, noReason)
     const strip = buildWeekStrip('2026-08-23', rows)
-    expect(strip.filter((d) => d.hasSessions).map((d) => d.dayKey)).toEqual(['2026-08-25'])
+    expect(strip.filter((d) => d.sessionCount > 0).map((d) => d.dayKey)).toEqual(['2026-08-25'])
   })
 })
 

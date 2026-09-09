@@ -121,5 +121,8 @@ export type StripDay = {
   /** Does any of the family's children train that day? The prototype's strip has no such
    *  mark; ours does, because a strip that looks identical on every day is a strip that
    *  answers nothing. */
-  hasSessions: boolean
+  /** How many sessions that day holds. A COUNT and not a boolean, because the strip now
+   *  has to say the number out loud even though it draws a dot: a mark that only exists
+   *  visually is information a screen reader never gets. */
+  sessionCount: number
 }

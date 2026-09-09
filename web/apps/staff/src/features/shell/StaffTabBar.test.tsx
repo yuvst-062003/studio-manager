@@ -59,7 +59,7 @@ describe('StaffTabBar', () => {
 
   it('goes dark only when the timer tab is active', () => {
     render(<StaffTabBar active="timer" locale="he" />)
-    expect(screen.getByTestId('tab-bar').className).toMatch(/bg-\[#090d16\]\/95/)
+    expect(screen.getByTestId('tab-bar').className).toMatch(/bg-\[#090d16\]\/70/)
   })
 
   it.each(['schedule', 'students', 'tasks', 'account'] as const)(
@@ -67,19 +67,53 @@ describe('StaffTabBar', () => {
     (tab) => {
       render(<StaffTabBar active={tab} locale="he" />)
       const className = screen.getByTestId('tab-bar').className
-      expect(className).not.toMatch(/bg-\[#090d16\]\/95/)
-      expect(className).toMatch(/bg-white/)
+      expect(className).not.toMatch(/bg-\[#090d16\]\/70/)
+      expect(className).toMatch(/bg-white\/75/)
     },
   )
 
   it('goes light again when nothing is active', () => {
     render(<StaffTabBar active={null} locale="he" />)
-    expect(screen.getByTestId('tab-bar').className).not.toMatch(/bg-\[#090d16\]\/95/)
+    expect(screen.getByTestId('tab-bar').className).not.toMatch(/bg-\[#090d16\]\/70/)
   })
 
-  it("clears the home indicator with env(safe-area-inset-bottom) in the bar's own bottom padding", () => {
+  it('clears the home indicator by ADDING the inset to the gap it floats above', () => {
+    // The bar stopped touching the bottom edge on 2026-09-09, so the clearance moved from
+    // its own bottom PADDING to its bottom OFFSET. The physics did not move with it: the
+    // inset is still ADDED to the 12px gap rather than substituted for it, because on a
+    // device with a home indicator a bar that used the inset AS its gap sits flush against
+    // the very thing it is meant to clear.
     render(<StaffTabBar active="schedule" locale="he" />)
     const className = screen.getByTestId('tab-bar').className
-    expect(className).toMatch(/pb-\[calc\([^)]*env\(safe-area-inset-bottom/)
+    expect(className).toMatch(/bottom-\[calc\(0\.75rem\+env\(safe-area-inset-bottom/)
+  })
+
+  it('floats: inset from both edges rather than pinned across them', () => {
+    render(<StaffTabBar active="schedule" locale="he" />)
+    const className = screen.getByTestId('tab-bar').className
+    expect(className).toMatch(/inset-x-3/)
+    expect(className).not.toMatch(/bottom-0/)
+  })
+
+  it('puts the capsule under the active tab, and nowhere when no tab is active', () => {
+    // The capsule is placed off the active INDEX against five equal columns. `timer` is
+    // third, so 40%. A route outside the bar renders no capsule at all rather than parking
+    // it under the first tab, claiming a screen nobody is on.
+    const { rerender } = render(<StaffTabBar active="timer" locale="he" />)
+    expect(screen.getByTestId('tab-indicator')).toHaveStyle({ insetInlineStart: '40%' })
+    rerender(<StaffTabBar active={null} locale="he" />)
+    expect(screen.queryByTestId('tab-indicator')).toBeNull()
+  })
+
+  it('fills only the glyphs that survive being filled', () => {
+    // lucide ships no solid variants, and a mark whose meaning lives inside its outline
+    // loses that meaning to a fill: Calendar is a frame around a grid, CheckSquare a box
+    // around a tick. Users is a silhouette and survives.
+    const { rerender } = render(<StaffTabBar active="students" locale="he" />)
+    expect(screen.getByTestId('tab-students').querySelector('svg')?.getAttribute('class'))
+      .toMatch(/fill-current/)
+    rerender(<StaffTabBar active="schedule" locale="he" />)
+    expect(screen.getByTestId('tab-schedule').querySelector('svg')?.getAttribute('class'))
+      .not.toMatch(/fill-current/)
   })
 })

@@ -52,6 +52,30 @@
 // `index.html` already asks for the room with `viewport-fit=cover`; without that, `env()`
 // is always 0 and this reads as a no-op.
 //
+// 2026-09-09 — FLOATING GLASS, matching the parent app (owner's pick, both apps at once).
+// `ParentTabBar`'s header carries the full argument for the shape and the signal; what
+// follows is only what is DIFFERENT here, and both differences are this bar's own design
+// rather than an omission:
+//
+//   THE PER-TAB INKS STAY. The parent bar collapsed three near-identical navies into one,
+//   because nobody could see the difference. This bar's blue/emerald alternation is not
+//   that: it is visible, it is the prototype's, and flattening it would be a design change
+//   nobody asked for. So the capsule takes the ACTIVE TAB'S OWN tint and the split survives
+//   the redesign intact.
+//
+//   THREE GLYPHS TAKE NO FILL. The active state elsewhere goes outline-to-solid, and lucide
+//   ships no solid variants — which only matters for a mark whose meaning lives INSIDE its
+//   outline. `Calendar` is a frame around a grid, `Timer` a circle around two hands,
+//   `CheckSquare` a box around a tick: fill any of them and the interior strokes vanish into
+//   the fill and the glyph becomes a rounded block. `Users` and `Settings` are silhouettes
+//   and survive it. So `SOLID_OK` says which, per glyph, and the capsule plus the weight
+//   carries the other three — the same reason the parent app's judo mark fills only its
+//   heads.
+//
+// THE TIMER INVERSION SURVIVES. §3's rule — the bar follows the timer screen's chrome when
+// that tab is open — is now dark GLASS against light glass rather than a flat fill, which
+// is the same rule expressed in the new material.
+//
 // No `dark:` variant anywhere in this file. The downloaded prototype carries zero
 // occurrences of it across its whole `src/` tree — this bar's only chrome inversion is the
 // timer one above, not the app's light/dark theme preference. tailwind.css's own note about
@@ -75,14 +99,41 @@ const HREF: Record<StaffTab, string> = {
 
 /** The prototype's own per-tab active inks, kept as written: three different colours
  *  (blue, emerald, blue again) rather than one unified active colour. A port that
- *  "tidies" them into one is a port that stopped being a comparison. */
+ *  "tidies" them into one is a port that stopped being a comparison — and the 2026-09-09
+ *  redesign kept them for the reason its note gives. */
 const ACTIVE_INK: Record<StaffTab, string> = {
-  schedule: 'text-blue-600',
-  students: 'text-emerald-600',
+  schedule: 'text-blue-600 dark:text-blue-300',
+  students: 'text-emerald-600 dark:text-emerald-300',
   // Only ever rendered while the bar itself is dark — see the module note above.
-  timer: 'text-blue-400',
-  tasks: 'text-emerald-600',
-  account: 'text-blue-600',
+  timer: 'text-blue-500 dark:text-blue-400',
+  tasks: 'text-emerald-600 dark:text-emerald-300',
+  account: 'text-blue-600 dark:text-blue-300',
+}
+
+/** The capsule behind the active tab, tinted to that tab's own ink so the blue/emerald
+ *  split survives. Literal class strings, never constructed: Tailwind generates utilities
+ *  by scanning source files, so `bg-${colour}-600/10` would produce no CSS at all. */
+const ACTIVE_CAPSULE: Record<StaffTab, string> = {
+  schedule: 'bg-blue-600/10 dark:bg-blue-300/15',
+  students: 'bg-emerald-600/10 dark:bg-emerald-300/15',
+  timer: 'bg-blue-500/10 dark:bg-blue-400/20',
+  tasks: 'bg-emerald-600/10 dark:bg-emerald-300/15',
+  account: 'bg-blue-600/10 dark:bg-blue-300/15',
+}
+
+/** Whether the active glyph may be FILLED, per glyph — see the module note. A mark whose
+ *  meaning lives inside its outline loses that meaning to a fill. */
+const SOLID_OK: Record<StaffTab, boolean> = {
+  // A frame around a date grid. Filled, the grid disappears and it is a rounded block.
+  schedule: false,
+  // Two silhouettes. Fills cleanly.
+  students: true,
+  // A circle around two hands. Filled, it is a dot.
+  timer: false,
+  // A box around a tick. Filled, the tick goes with it.
+  tasks: false,
+  // A gear. The centre circle is cut by the fill rule, so it survives as a solid gear.
+  account: true,
 }
 
 const LABEL_KEY: Record<StaffTab, string> = {
@@ -121,30 +172,50 @@ export function StaffTabBar({
   tasksBadgeCount?: number
 }) {
   const isTimerActive = active === 'timer'
+  // -1 when no tab matches — `active: StaffTab | null` already allowed a route outside the
+  // bar. The capsule is then not rendered at all, rather than parked under the first tab
+  // claiming a screen nobody is on.
+  const activeIndex = active === null ? -1 : ORDER.indexOf(active)
 
   return (
     <nav
       aria-label={t(locale, 'common.tabs.staffBarLabel')}
       data-testid="tab-bar"
-      // The ambient colour idle tabs inherit — see the module note's structural
-      // deviation. `transition-colors` covers the swap when the coach opens or leaves
-      // the timer.
-      className={`tw-scope fixed inset-x-0 bottom-0 mx-auto max-w-md z-40 border-t shadow-2xl transition-colors duration-300 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] px-2 ${
+      // Floating, and the clearance that makes it safe — `ParentTabBar`'s own note carries
+      // the argument for adding `env(safe-area-inset-bottom)` to the 12px gap rather than
+      // substituting it. One shape at both sites, as the note above already required.
+      //
+      // `transition-colors` still covers the timer swap, which is now a change of glass
+      // rather than of fill.
+      className={`tw-scope fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] inset-x-3 mx-auto max-w-md rounded-[26px] border px-1.5 py-2 z-40 backdrop-blur-xl backdrop-saturate-150 shadow-[0_10px_30px_rgba(2,6,23,0.16),0_1px_2px_rgba(2,6,23,0.08)] transition-colors duration-300 ${
         isTimerActive
           ? // Follows the THEME now (owner, 2026-09-07), like the timer screen it matches.
             // It used to be unconditionally dark, so a coach on the light theme got a black
             // bar under a screen that is no longer black.
-            'bg-white/95 border-slate-200 text-slate-500 dark:bg-[#090d16]/95 dark:border-slate-800 dark:text-slate-400'
-          : 'bg-white border-slate-200 text-slate-500'
+            'bg-white/75 border-slate-900/10 text-slate-500 dark:bg-[#090d16]/70 dark:border-white/10 dark:text-slate-400 dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)]'
+          : 'bg-white/75 border-slate-900/10 text-slate-500 dark:bg-slate-900/70 dark:border-white/10 dark:text-slate-400 dark:shadow-[0_10px_30px_rgba(0,0,0,0.45)]'
       }`}
     >
-      <div className="flex h-16 items-center justify-around">
+      {/* A GRID, not `justify-around`: the capsule is placed off the active INDEX, so the
+          slots must be equal for it to land under the right tab. */}
+      <div className="relative grid grid-cols-5 items-center">
+        {activeIndex >= 0 && active !== null ? (
+          <span
+            aria-hidden="true"
+            data-testid="tab-indicator"
+            // `inset-inline-start`, not `translateX`: transforms are not direction-aware,
+            // and .claude/rules/ui-rtl-a11y.md asks for logical properties. Inline `style`
+            // because the offset is COMPUTED — Tailwind scans for literal class strings, so
+            // a constructed `start-[40%]` would generate no CSS at all.
+            className={`pointer-events-none absolute inset-y-0 w-1/5 rounded-2xl transition-[inset-inline-start] duration-300 ease-out motion-reduce:transition-none ${ACTIVE_CAPSULE[active]}`}
+            style={{ insetInlineStart: `${activeIndex * 20}%` }}
+          />
+        ) : null}
         {ORDER.map((tab) => {
           const isActive = active === tab
           const Glyph = ICONS[tab]
           const badge = tab === 'tasks' ? tasksBadgeCount : 0
           const label = t(locale, LABEL_KEY[tab])
-          const isTimerGlyph = tab === 'timer'
           return (
             <a
               key={tab}
@@ -153,40 +224,30 @@ export function StaffTabBar({
               // Deviation 3 — the count belongs in the name, not only in the mark.
               aria-label={badge > 0 ? `${label} ${badgeLabel(badge)}` : undefined}
               data-testid={`tab-${tab}`}
-              className={`flex flex-1 flex-col items-center justify-center gap-1 py-1 text-[11px] font-semibold tracking-tight transition-all cursor-pointer ${
+              className={`relative z-10 flex flex-col items-center justify-center gap-1 py-1 text-[11px] font-semibold tracking-tight transition-colors cursor-pointer ${
                 isActive
-                  ? `${ACTIVE_INK[tab]} ${tab === 'timer' ? 'font-black' : 'font-bold'} scale-105`
-                  : isTimerGlyph
-                    ? 'hover:text-blue-400'
-                    : 'hover:text-slate-700'
+                  ? `${ACTIVE_INK[tab]} ${tab === 'timer' ? 'font-black' : 'font-bold'}`
+                  : 'hover:text-slate-700 dark:hover:text-slate-200'
               }`}
             >
-              {isTimerGlyph ? (
-                // The prototype's one glyph that gets its own pill when active, not just
-                // an ink change — timer is the tab that opens a whole different surface,
-                // and the pill previews that before the tap.
-                <div
-                  className={`relative -mb-0.5 flex h-7 w-7 items-center justify-center rounded-full ${
-                    isActive ? 'bg-blue-500/20 text-blue-400' : ''
-                  }`}
-                >
-                  <Glyph className="h-5 w-5" strokeWidth={isActive ? 2.4 : 1.8} />
-                </div>
-              ) : (
-                <div className="relative">
-                  <Glyph className="h-5 w-5" strokeWidth={isActive ? 2.3 : 1.8} />
-                  {badge > 0 ? (
-                    <span
-                      aria-hidden="true"
-                      data-testid="tab-tasks-badge"
-                      // Deviation 2 — `-end-2`, not the prototype's `-right-2`.
-                      className="absolute -top-1.5 -end-2 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] font-black text-white shadow-sm ring-2 ring-white"
-                    >
-                      {badgeLabel(badge)}
-                    </span>
-                  ) : null}
-                </div>
-              )}
+              <div className="relative">
+                <Glyph
+                  className={`h-5 w-5 ${isActive && SOLID_OK[tab] ? 'fill-current' : ''}`}
+                  strokeWidth={isActive ? 2.3 : 1.8}
+                />
+                {badge > 0 ? (
+                  <span
+                    aria-hidden="true"
+                    data-testid="tab-tasks-badge"
+                    // Deviation 2 — `-end-2`, not the prototype's `-right-2`. The ring is
+                    // the GLASS colour rather than a flat white, or the badge would carry a
+                    // white halo over a translucent bar.
+                    className="absolute -top-1.5 -end-2 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] font-black text-white shadow-sm ring-2 ring-white/80 dark:ring-slate-900/80"
+                  >
+                    {badgeLabel(badge)}
+                  </span>
+                ) : null}
+              </div>
               <span>{label}</span>
             </a>
           )
