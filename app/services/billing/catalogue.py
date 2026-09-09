@@ -444,10 +444,16 @@ class CatalogueService:
         price_agorot: int,
         description: str | None,
         sizes: Sequence[str] | None = None,
+        class_id: uuid.UUID | None = None,
     ) -> Product:
         """`sizes` defaults to empty, which is the honest answer for an item nobody was
         asked about -- a חגורה has no sizes and neither does a caller that omitted the
-        field."""
+        field.
+
+        `class_id` defaults to None for the same reason and with a sharper consequence: an
+        item with no class is not sold to anybody (2026-09-09). The parent shop filters on
+        it, so an item created without one is invisible until a manager files it -- which is
+        the safe direction, and deliberately not "visible to every family in the club"."""
         self._require_money(price_agorot, "price_agorot")
         product = Product(
             studio_id=studio_id,
@@ -455,6 +461,7 @@ class CatalogueService:
             price_agorot=price_agorot,
             description=description,
             sizes=self.normalise_sizes(sizes),
+            class_id=class_id,
             is_active=True,
         )
         self._session.add(product)

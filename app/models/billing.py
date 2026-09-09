@@ -107,6 +107,26 @@ class PricePlan(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     never rewrites history. §5.15's rollover reviews prices with old plans **closed, not
     overwritten** -- a charge raised last year must still be explicable by the plan that
     was in force when it was raised.
+
+    **2026-09-09 -- HALF OF C11 IS REVERSED, deliberately and on the owner's sign-off.**
+    A plan may now name a `class_id`, and `student_class_price` says which plan a child is
+    on FOR A GIVEN CLASS. Read the paragraph above again before changing anything here,
+    because the half that stays is the half that matters:
+
+      * WHAT WAS ASKED FOR: judo and karate cost different amounts, and a child doing both
+        pays both, added together.
+      * WHAT C11 STILL FORBIDS: a child in the competition group AND the teenagers group
+        being charged twice for what is one discipline. C11's failure was a plan hanging
+        off `group_id`; the run now keys on the DISTINCT CLASS, so two groups of one class
+        are one charge and always will be.
+
+    The structural guarantee is not this docstring -- it is
+    `uq_student_class_price_student_id_class_id`. At most one price may exist per
+    (student, class), so a second cannot be written, let alone billed.
+
+    `sessions_per_week` keeps its meaning WITHIN a class. A child who trains twice a week
+    at judo is on judo's twice-a-week plan; adding karate does not make them a four-a-week
+    judo student.
     """
 
     __tablename__ = "price_plan"
@@ -162,6 +182,53 @@ class PricePlan(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     #: renders with its instructions and no anchor, and the dashboard badges the gap.
     standing_order_link_url: Mapped[str | None] = mapped_column(Text)
 
+    #: Which class this plan prices. NULL means it prices the studio the way every plan did
+    #: before 2026-09-09, which is what keeps every existing plan valid and every existing
+    #: charge explicable.
+    #:
+    #: A plan is still scoped by TRAINING VOLUME -- `sessions_per_week` -- and that is now
+    #: read within the class rather than across the club. See the C11 note in the docstring.
+    class_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("class.id", ondelete="RESTRICT")
+    )
+
+
+class StudentClassPrice(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
+    """Which plan a child is on, for one class. The per-class half of 2026-09-09.
+
+    **This table is the double-charge guard.** `uq_student_class_price_student_id_class_id`
+    is unique on (student, class), so one child can hold at most one price per class. The
+    billing run reads one row per DISTINCT class the student is enrolled in, which is what
+    makes "two judo groups" one charge and "judo plus karate" two.
+
+    **`student.price_plan_id` is not replaced and not deprecated.** It is the fallback the
+    run uses when no row here exists for that (student, class), which is what lets this ship
+    without repricing the whole club on a single evening: a child the migration could not
+    place -- because they are already in two classes -- keeps billing exactly as they did
+    yesterday until a human prices them.
+    """
+
+    __tablename__ = "student_class_price"
+    __tenant_table_args__ = (
+        Index(
+            "uq_student_class_price_student_id_class_id",
+            "student_id",
+            "class_id",
+            unique=True,
+        ),
+        Index("ix_student_class_price_studio_id_student_id", "studio_id", "student_id"),
+    )
+
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("student.id", ondelete="CASCADE"), nullable=False
+    )
+    class_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("class.id", ondelete="RESTRICT"), nullable=False
+    )
+    price_plan_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("price_plan.id", ondelete="RESTRICT"), nullable=False
+    )
+
 
 class Product(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     """§4.3 -- 'a catalog of sellable items (גי, חגורה, כפפות, דמי ביטוח).'
@@ -184,6 +251,16 @@ class Product(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     **Still no per-size price.** One item, one `price_agorot`: a size is what the club hands
     over, not what the family is charged. Per-size pricing is a `product_size` table, which
     is a different decision and not this one.
+
+    **`class_id` -- an item belongs to ONE class** (owner, 2026-09-09: "every class can have
+    his own unique items"). Until this existed the catalogue was one list per studio and
+    `GET /me/products` returned all of it, so a karate family was offered a judo gi.
+
+    **NULL is not "club-wide". NULL is UNASSIGNED**, and the parent shop hides it. The owner
+    chose "every item belongs to exactly one class" over a club-wide tier, so an item with no
+    class is not a thing every family may buy -- it is a thing nobody has filed yet. The
+    column is nullable only because the rows that existed before it did have no answer, and
+    inventing one would have been the migration guessing on the club's behalf.
     """
 
     __tablename__ = "product"
@@ -213,6 +290,15 @@ class Product(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     #: rows against a routing decision. The object is deleted with the row's own service, not
     #: by a cascade -- the store is not the database.
     image_object_key: Mapped[str | None] = mapped_column(String(500))
+    #: Which class sells this item. See the class note in the docstring: NULL means nobody
+    #: has filed it yet, and the parent shop treats that as not-for-sale rather than
+    #: for-sale-to-everyone.
+    #:
+    #: `RESTRICT` on delete, never CASCADE: a class that goes away must not take its items
+    #: with it, because a charge already raised for one still has to render its name.
+    class_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("class.id", ondelete="RESTRICT")
+    )
 
 
 class Charge(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
@@ -245,17 +331,24 @@ class Charge(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
         # creates no duplicates'. Partial, because only periodic charges have a period --
         # a manual charge may legitimately repeat.
         #
-        # **Keyed on student_id, not enrollment_id -- that is C11.** Tuition is priced per
-        # student by training volume, so a child in two groups gets ONE charge. Keying this
-        # on the enrollment is precisely what would let the second enrollment raise a second
-        # charge, which is why the index is the structural half of the rule rather than a
-        # nicety beside it.
+        # **Keyed on student_id and CLASS, never on enrollment_id.** Tuition is priced per
+        # student per class, so a child in two GROUPS of one class gets ONE charge -- C11's
+        # surviving half -- while judo and karate get one each (owner, 2026-09-09). Keying
+        # this on the enrollment is what would let the second GROUP raise a second charge,
+        # which is the bug C11 was written about, and it stays impossible: the key names the
+        # class, and a class is what a group belongs to.
         Index(
-            "uq_charge_student_period_kind",
+            "uq_charge_student_period_kind_class",
             "student_id",
             "period_year",
             "period_month",
             "kind",
+            # COALESCE, and it is load-bearing. Postgres treats NULLs as DISTINCT in a
+            # unique index, so a bare `class_id` in this key would let two rows with no
+            # class exist for one student and month -- weakening the rule for every charge
+            # raised before 2026-09-09, which is all of them. Folding NULL onto a fixed
+            # sentinel keeps those under exactly the rule they were written under.
+            text("COALESCE(class_id, '00000000-0000-0000-0000-000000000000'::uuid)"),
             unique=True,
             postgresql_where=text("student_id IS NOT NULL AND period_year IS NOT NULL"),
         ),
@@ -324,6 +417,13 @@ class Charge(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     #: to what it points at as well. A club retires a product with `is_active`, which is why
     #: `Product` has no delete path at all -- and if one is ever added, a charge naming that
     #: product must block it rather than lose what the family bought.
+    #: Which class this charge is for, when it is one class's tuition. NULL for every
+    #: charge raised before 2026-09-09 and for charges that are not a class's -- a shop
+    #: item, a registration fee, a manual credit. The unique index above folds NULL onto a
+    #: sentinel so those keep the one-per-student-per-month rule they were raised under.
+    class_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("class.id", ondelete="RESTRICT")
+    )
     product_id: Mapped[uuid.UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("product.id", ondelete="RESTRICT")
     )

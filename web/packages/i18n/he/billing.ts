@@ -463,6 +463,11 @@ export const billing: Bundle = {
   'product.sizeAdd': 'הוספת מידה',
   'product.sizeNew': 'מידה חדשה',
   'product.sizeRemove': 'הסרת מידה',
+  'product.class': 'שיוך לחוג',
+  'product.classUnset': 'בחרו חוג',
+  // The parent shop shows an item only to families training in its class, so an item with
+  // no class is not sold to anybody. Said on the row rather than left to be discovered.
+  'product.classMissing': 'לא משויך לחוג — לא מוצג להורים',
   'product.sizesNone': 'ללא מידות',
   'product.sizesRequired': 'פריט עם מידות חייב לכלול לפחות מידה אחת',
   'product.sizeDuplicate': 'המידה כבר ברשימה',

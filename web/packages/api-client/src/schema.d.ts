@@ -1710,7 +1710,7 @@ export interface paths {
          *     process alive", and a database it cannot reach does not make it dead. Letting the
          *     failure propagate would turn every database blip into a page.
          */
-        get: operations["read_health_api_v1_health_head"];
+        get: operations["read_health_api_v1_health_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1723,7 +1723,7 @@ export interface paths {
          *     process alive", and a database it cannot reach does not make it dead. Letting the
          *     failure propagate would turn every database blip into a page.
          */
-        head: operations["read_health_api_v1_health_head"];
+        head: operations["read_health_api_v1_health_get"];
         patch?: never;
         trace?: never;
     };
@@ -10524,6 +10524,8 @@ export interface components {
         };
         /** ProductIn */
         ProductIn: {
+            /** Class Id */
+            class_id?: string | null;
             /** Description */
             description?: string | null;
             /** Name */
@@ -10535,6 +10537,8 @@ export interface components {
         };
         /** ProductOut */
         ProductOut: {
+            /** Class Id */
+            class_id?: string | null;
             /** Description */
             description: string | null;
             /**
@@ -10563,6 +10567,8 @@ export interface components {
          *     saveable correction.
          */
         ProductPatch: {
+            /** Class Id */
+            class_id?: string | null;
             /** Description */
             description?: string | null;
             /** Is Active */
@@ -16244,7 +16250,7 @@ export interface operations {
             };
         };
     };
-    read_health_api_v1_health_head: {
+    read_health_api_v1_health_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -16264,7 +16270,7 @@ export interface operations {
             };
         };
     };
-    read_health_api_v1_health_head: {
+    read_health_api_v1_health_get: {
         parameters: {
             query?: never;
             header?: never;

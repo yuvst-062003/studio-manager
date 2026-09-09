@@ -4,7 +4,13 @@ The idempotency is enforced by `charge`'s unique index rather than by the run's 
 bookkeeping, and that is the right place for it: a run that crashed halfway and is retried
 must not depend on its own records being intact to avoid double-charging a family.
 
-**One student, one tuition charge, however many groups they are enrolled in** (C11).
+**One tuition charge per student PER CLASS, however many groups of that class they are
+enrolled in.** C11's half that stays: two groups of one discipline is one charge, because
+`_billable_students` is DISTINCT over `group.class_id`. C11's half that the owner reversed
+on 2026-09-09: judo and karate are two charges, added together. A student nobody has priced
+per class yet still bills exactly once, from `student.price_plan_id` -- see the fallback
+note in `_billable_students`, which is the line that stops this change from re-creating the
+bug it replaces.
 Walking enrollments instead is the defect that bills a child in two groups twice, at two
 different prices, silently and forever.
 
@@ -22,10 +28,11 @@ from datetime import UTC, date, datetime, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.billing import BillingRun, Charge, Payment, PricePlan
+from app.models.billing import BillingRun, Charge, Payment, PricePlan, StudentClassPrice
 from app.models.people import Enrollment, Student, StudentFreeze
 from app.models.person import Guardian
 from app.models.schedule import Session as SessionRow
+from app.models.structure import Group
 from app.services.billing.errors import ConflictError
 from app.services.billing.payments import PaymentService
 from app.services.billing.service import BillingService
@@ -142,8 +149,10 @@ class BillingRunService:
         tally = _Tally()
         starts = date(period_year, period_month, 1)
         due = period_end(period_year, period_month)
-        for student_id, price_plan_id in self._billable_students(studio_id, starts, due, tally):
-            self._charge_one(studio_id, student_id, price_plan_id, starts, due, tally)
+        for student_id, price_plan_id, class_id in self._billable_students(
+            studio_id, starts, due, tally
+        ):
+            self._charge_one(studio_id, student_id, price_plan_id, class_id, starts, due, tally)
         # Step 7, after every charge for the period has been raised and INSIDE the same
         # transaction. See `_apply_credit`.
         self._apply_credit(tally)
@@ -171,6 +180,7 @@ class BillingRunService:
         *,
         on: date,
         tally: _Tally | None = None,
+        class_id: uuid.UUID | None = None,
     ) -> int:
         """One student's first tuition charge, raised the moment they are enrolled.
 
@@ -180,6 +190,13 @@ class BillingRunService:
         priced with nothing to pay until the 1st -- and §6.1's payment step, which has
         something to show only when a charge exists, stood itself down and never asked the
         family for money. Two doors into the same room, one of which skipped the till.
+
+        `class_id` names the class this first month is for, and defaults to None so every
+        existing caller keeps its behaviour exactly: a charge with no class folds onto the
+        unique index's sentinel and is the one-per-student-per-month row it always was. A
+        caller that knows the class should pass it, or the monthly run will raise a SECOND
+        charge for that class next time round -- the classless first month does not satisfy
+        the per-class key.
 
         Returns the number of charges created: 1, or 0 when the student is unpriced, has no
         primary guardian, or was already charged for this period. The run's own idempotency
@@ -192,6 +209,7 @@ class BillingRunService:
             studio_id,
             student_id,
             price_plan_id,
+            class_id,
             on.replace(day=1),
             period_end(on.year, on.month),
             counter,
@@ -336,11 +354,11 @@ class BillingRunService:
 
     def _billable_students(
         self, studio_id: uuid.UUID, starts: date, ends: date, tally: _Tally
-    ) -> list[tuple[uuid.UUID, uuid.UUID | None]]:
+    ) -> list[tuple[uuid.UUID, uuid.UUID | None, uuid.UUID | None]]:
         """§5.10 step 1 -- every **student** with at least one `active` enrollment, minus
         step 4's frozen ones.
 
-        `DISTINCT` on the student is C11 made structural: the join to `enrollment` is what
+        `DISTINCT` on the (student, CLASS) is what C11 became on 2026-09-09: the join to
         establishes eligibility, and without the distinct a child in two groups arrives
         twice and the second arrival is refused by the index rather than by the query --
         which turns an entirely normal case into a logged conflict.
@@ -358,16 +376,24 @@ class BillingRunService:
                 )
             ).scalars()
         )
+        # (student, class) -- one row per DISTINCT CLASS the student actually trains in.
+        #
+        # **This is the whole of the double-charge guard, and it is why the join reaches
+        # through `group` to `class` rather than stopping at the enrollment.** C11's failure
+        # was a child in the competition group AND the teenagers group billed twice for one
+        # discipline; `DISTINCT` over `group.class_id` collapses exactly that back to one,
+        # while leaving judo and karate as the two rows the owner asked for (2026-09-09).
         rows = self._session.execute(
-            select(Student.id, Student.price_plan_id)
+            select(Student.id, Group.class_id, Student.price_plan_id)
             .join(Enrollment, Enrollment.student_id == Student.id)
+            .join(Group, Group.id == Enrollment.group_id)
             .where(
                 Student.studio_id == studio_id,
                 Student.status == "active",
                 Enrollment.status == "active",
             )
             .distinct()
-            .order_by(Student.id)
+            .order_by(Student.id, Group.class_id)
         ).all()
         # §3.6 -- an active student who reaches this point with no active enrollment at all
         # (most often §5.15 rollover's `apply_students` ending one as "not returning") is
@@ -380,18 +406,69 @@ class BillingRunService:
                 select(Student.id).where(Student.studio_id == studio_id, Student.status == "active")
             ).scalars()
         )
-        enrolled_ids = {student_id for student_id, _ in rows}
+        enrolled_ids = {student_id for student_id, _, _ in rows}
         for student_id in sorted(active_ids - enrolled_ids, key=str):
             tally.no_active_enrollment.append(str(student_id))
-        billable: list[tuple[uuid.UUID, uuid.UUID | None]] = []
-        for student_id, price_plan_id in rows:
+
+        # Every per-class price this studio holds, read once. A per-row lookup would be a
+        # query per class per student in the one job that walks the whole club.
+        per_class: dict[tuple[uuid.UUID, uuid.UUID], uuid.UUID] = {
+            (student_id, class_id): plan_id
+            for student_id, class_id, plan_id in self._session.execute(
+                select(
+                    StudentClassPrice.student_id,
+                    StudentClassPrice.class_id,
+                    StudentClassPrice.price_plan_id,
+                ).where(StudentClassPrice.studio_id == studio_id)
+            ).all()
+        }
+        # Which students hold ANY per-class price. This set is what decides whether a
+        # student is billed the new way or the old way, and it is decided per STUDENT and
+        # never per row -- see the fallback note below.
+        priced_students = {student_id for student_id, _ in per_class}
+
+        billable: list[tuple[uuid.UUID, uuid.UUID | None, uuid.UUID | None]] = []
+        seen_legacy: set[uuid.UUID] = set()
+        for student_id, class_id, student_plan_id in rows:
             if student_id in frozen:
                 # §5.10 step 4: 'A frozen student generates nothing.' Recorded rather than
                 # silently dropped -- a family who was frozen and does not appear in the
                 # run's own record is a number nobody can explain next month.
-                tally.frozen.append(str(student_id))
+                if student_id not in seen_legacy:
+                    tally.frozen.append(str(student_id))
+                    seen_legacy.add(student_id)
                 continue
-            billable.append((student_id, price_plan_id))
+
+            if student_id not in priced_students:
+                # **THE FALLBACK, AND WHY IT IS PER STUDENT.**
+                #
+                # A student nobody has priced per class yet bills exactly as they did
+                # yesterday: ONE charge, from `student.price_plan_id`. Falling back per ROW
+                # instead would hand a child in two classes their single old price twice --
+                # which is precisely C11's bug, reintroduced by the very change written to
+                # avoid it, and it would fire on the first run after deploy for every
+                # multi-class family in the club.
+                #
+                # `seen_legacy` is what makes it once. The migration deliberately leaves
+                # multi-class students unpriced, so this path is not an edge case on the
+                # day this ships -- it is the majority.
+                if student_id in seen_legacy:
+                    continue
+                seen_legacy.add(student_id)
+                # No class on the charge: this is the legacy shape, and the unique index
+                # folds a NULL class onto its sentinel so the row keeps exactly the
+                # one-per-student-per-month rule it would have had yesterday.
+                billable.append((student_id, student_plan_id, None))
+                continue
+
+            plan_id = per_class.get((student_id, class_id))
+            if plan_id is None:
+                # Priced for one of their classes and not this one. Reported rather than
+                # billed at the other class's price or silently skipped: a half-priced
+                # family is a number the manager has to be able to see.
+                tally.unpriced.append(str(student_id))
+                continue
+            billable.append((student_id, plan_id, class_id))
         return billable
 
     def _charge_one(
@@ -399,6 +476,7 @@ class BillingRunService:
         studio_id: uuid.UUID,
         student_id: uuid.UUID,
         price_plan_id: uuid.UUID | None,
+        class_id: uuid.UUID | None,
         starts: date,
         due: date,
         tally: _Tally,
@@ -444,7 +522,7 @@ class BillingRunService:
                 note = f"בגין {remaining} מתוך {total} שיעורים"
 
         if self._raise_charge(
-            studio_id, payer_person_id, "tuition", amount, due, student_id, tally
+            studio_id, payer_person_id, "tuition", amount, due, student_id, tally, class_id
         ):
             tally.charged += 1
             if note is not None:
@@ -461,6 +539,7 @@ class BillingRunService:
         due: date,
         student_id: uuid.UUID,
         tally: _Tally,
+        class_id: uuid.UUID | None = None,
     ) -> bool:
         """One charge, inside its own SAVEPOINT. True when it was actually created.
 
@@ -478,6 +557,7 @@ class BillingRunService:
                         amount_agorot,
                         due,
                         student_id=student_id,
+                        class_id=class_id,
                     )
                 except ConflictError:
                     tally.already_charged += 1

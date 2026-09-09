@@ -1027,3 +1027,28 @@ def a_second_guardian(
     )
     app_session.commit()
     return person.id
+
+
+@pytest.fixture
+def family_class_id(app_session: Session, a_priced_student, an_enrolled_student) -> uuid.UUID:
+    """The class `a_priced_student` actually trains in.
+
+    Needed by every shop test since 2026-09-09: `GET /me/products` returns only the items of
+    classes the family is enrolled in, so a product created with no class is returned to
+    NOBODY. Before that the catalogue was studio-wide and a test could raise a bare product
+    and expect a parent to see it.
+
+    Depends on `an_enrolled_student` deliberately -- an unenrolled child trains in no class,
+    so a test that forgot the enrollment would otherwise get an empty shop and a confusing
+    failure rather than this fixture's clear one.
+    """
+    from app.models.people import Enrollment
+    from app.models.structure import Group
+
+    class_id = app_session.execute(
+        select(Group.class_id)
+        .join(Enrollment, Enrollment.group_id == Group.id)
+        .where(Enrollment.student_id == a_priced_student.student_id)
+    ).scalars().first()
+    assert class_id is not None, "the enrolled student's group must belong to a class"
+    return class_id

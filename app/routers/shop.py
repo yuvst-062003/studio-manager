@@ -35,6 +35,9 @@ from sqlalchemy import select
 from app.core.clock import now
 from app.core.tenancy import TenantSessionDep, require_current_studio_id
 from app.models.billing import Product
+from app.models.people import Enrollment, Student
+from app.models.person import Guardian
+from app.models.structure import Group
 from app.services.audit import AuditService
 from app.services.billing import BillingService, product_images
 from app.services.billing.catalogue import MAX_SIZE_LABEL
@@ -140,9 +143,39 @@ def _caller(request: Request) -> uuid.UUID:
 
 @router.get("/me/products", response_model=ShopProductListOut)
 def my_products(request: Request, session: TenantSessionDep) -> ShopProductListOut:
-    _caller(request)
+    payer = _caller(request)
+    # **The shop is per class since 2026-09-09** (owner: "every class can have his own
+    # unique items"). Until then this selected every active row in the studio, so a karate
+    # family was offered a judo gi.
+    #
+    # The classes this family may buy from: their own children's, through
+    # `guardian -> student -> enrollment -> group -> class`. An `active` enrollment only --
+    # a child who left judo last year is not a reason to keep selling judo kit to them.
+    my_classes = select(Group.class_id).where(
+        Group.id.in_(
+            select(Enrollment.group_id).where(
+                Enrollment.status == "active",
+                Enrollment.student_id.in_(
+                    select(Student.id).where(
+                        Student.id.in_(
+                            select(Guardian.student_id).where(Guardian.person_id == payer)
+                        )
+                    )
+                ),
+            )
+        )
+    )
+    # **An item with no class is not sold to everybody -- it is not sold at all.** The owner
+    # chose "every item belongs to exactly one class" over a club-wide tier, so NULL here
+    # means UNASSIGNED rather than universal. The migration leaves a row NULL only where it
+    # could not tell which class was meant; hiding it is the safe reading, and the dashboard
+    # is where a human gives it one.
     rows = (
-        session.execute(select(Product).where(Product.is_active.is_(True)).order_by(Product.name))
+        session.execute(
+            select(Product)
+            .where(Product.is_active.is_(True), Product.class_id.in_(my_classes))
+            .order_by(Product.name)
+        )
         .scalars()
         .all()
     )

@@ -20,7 +20,10 @@ from app.services.billing.errors import RefusedError
 from sqlalchemy import select
 
 
-def _product(app_session, studio, *, name: str, price: int, sizes: list[str]) -> uuid.UUID:
+def _product(
+    app_session, studio, *, name: str, price: int, sizes: list[str], class_id=None
+) -> uuid.UUID:
+    # `class_id` since 2026-09-09 -- see the parent catalogue's filter.
     row = Product(
         studio_id=studio.id,
         name=name,
@@ -28,6 +31,7 @@ def _product(app_session, studio, *, name: str, price: int, sizes: list[str]) ->
         price_agorot=price,
         is_active=True,
         sizes=sizes,
+        class_id=class_id,
     )
     app_session.add(row)
     app_session.commit()
@@ -123,10 +127,12 @@ def test_the_service_refuses_an_over_long_label_and_an_over_long_list():
 
 # -- the payer's side ---------------------------------------------------------
 def test_the_catalogue_tells_a_parent_which_sizes_an_item_comes_in(
-    client, app_session, studio, a_priced_student, as_guardian_of
+    client, app_session, studio, a_priced_student, as_guardian_of, family_class_id
 ):
-    _product(app_session, studio, name="גי", price=18_000, sizes=["100", "110"])
-    _product(app_session, studio, name="חגורה", price=4_000, sizes=[])
+    _product(
+        app_session, studio, name="גי", price=18_000, sizes=["100", "110"], class_id=family_class_id
+    )
+    _product(app_session, studio, name="חגורה", price=4_000, sizes=[], class_id=family_class_id)
 
     parent = as_guardian_of(a_priced_student.student_id)
     items = {
@@ -138,7 +144,7 @@ def test_the_catalogue_tells_a_parent_which_sizes_an_item_comes_in(
 
 
 def test_a_sized_item_records_the_chosen_size_on_the_charge(
-    client, app_session, studio, a_priced_student, as_guardian_of
+    client, app_session, studio, a_priced_student, as_guardian_of, family_class_id
 ):
     """The size has to reach whoever fills the order, and `proration_note` is the only
     free-text field a charge has — see `_line_label`'s docstring on why that column."""
@@ -159,7 +165,7 @@ def test_a_sized_item_records_the_chosen_size_on_the_charge(
 
 
 def test_a_quantity_and_a_size_both_reach_the_line(
-    client, app_session, studio, a_priced_student, as_guardian_of
+    client, app_session, studio, a_priced_student, as_guardian_of, family_class_id
 ):
     gi = _product(app_session, studio, name="גי", price=18_000, sizes=["100"])
     parent = as_guardian_of(a_priced_student.student_id)
@@ -175,7 +181,7 @@ def test_a_quantity_and_a_size_both_reach_the_line(
 
 
 def test_a_sized_item_cannot_be_ordered_without_a_size(
-    client, app_session, studio, a_priced_student, as_guardian_of
+    client, app_session, studio, a_priced_student, as_guardian_of, family_class_id
 ):
     gi = _product(app_session, studio, name="גי", price=18_000, sizes=["100", "110"])
     parent = as_guardian_of(a_priced_student.student_id)
@@ -191,7 +197,7 @@ def test_a_sized_item_cannot_be_ordered_without_a_size(
 
 
 def test_a_sizeless_item_refuses_a_size(
-    client, app_session, studio, a_priced_student, as_guardian_of
+    client, app_session, studio, a_priced_student, as_guardian_of, family_class_id
 ):
     """The half that is easy to forget. "מידה 120" on a belt is a number on a handover
     sheet that means nothing and reads like an instruction."""
@@ -206,7 +212,7 @@ def test_a_sizeless_item_refuses_a_size(
 
 
 def test_a_size_the_club_does_not_offer_is_refused(
-    client, app_session, studio, a_priced_student, as_guardian_of
+    client, app_session, studio, a_priced_student, as_guardian_of, family_class_id
 ):
     """Membership, never free text: this string is about to be written onto a charge the
     club fulfils from."""
@@ -221,7 +227,7 @@ def test_a_size_the_club_does_not_offer_is_refused(
 
 
 def test_nothing_is_charged_when_one_line_is_refused(
-    client, app_session, studio, a_priced_student, as_guardian_of
+    client, app_session, studio, a_priced_student, as_guardian_of, family_class_id
 ):
     """The order is one request and one transaction. A parent who ordered a belt and a
     sizeless גי must not end up owing for the belt alone."""

@@ -33,8 +33,14 @@ def storage_root(monkeypatch, tmp_path):
     return tmp_path / "objects"
 
 
-def _product(app_session, studio, *, name: str = "גי", price: int = 18_000) -> uuid.UUID:
-    row = Product(studio_id=studio.id, name=name, description=None, price_agorot=price)
+def _product(
+    app_session, studio, *, name: str = "גי", price: int = 18_000, class_id=None
+) -> uuid.UUID:
+    # `class_id` since 2026-09-09 -- the parent catalogue filters on it, so an item with
+    # none is returned to nobody.
+    row = Product(
+        studio_id=studio.id, name=name, description=None, price_agorot=price, class_id=class_id
+    )
     app_session.add(row)
     app_session.commit()
     return row.id
@@ -120,7 +126,7 @@ def test_a_guardian_may_READ_a_product_photo_because_the_shop_renders_it(  # noq
 
 
 def test_a_guardian_may_NOT_upload_one(  # noqa: N802 -- NOT contrasts with the case above
-    client, app_session, studio, a_priced_student, as_guardian_of
+    client, app_session, studio, a_priced_student, as_guardian_of, family_class_id
 ) -> None:
     product_id = _product(app_session, studio)
     parent = as_guardian_of(a_priced_student.student_id)
@@ -129,12 +135,12 @@ def test_a_guardian_may_NOT_upload_one(  # noqa: N802 -- NOT contrasts with the 
 
 
 def test_the_parent_catalogue_carries_the_url(
-    client, app_session, studio, as_manager, a_priced_student, as_guardian_of
+    client, app_session, studio, as_manager, a_priced_student, as_guardian_of, family_class_id
 ) -> None:
     # The seam that matters: a column set by one route has to reach the screen through
     # another. Asserting the upload alone would prove nothing about the shop.
-    with_photo = _product(app_session, studio, name="גי")
-    without = _product(app_session, studio, name="חגורה", price=4_000)
+    with_photo = _product(app_session, studio, name="גי", class_id=family_class_id)
+    without = _product(app_session, studio, name="חגורה", price=4_000, class_id=family_class_id)
     upload(client, as_manager, with_photo, PNG)
 
     parent = as_guardian_of(a_priced_student.student_id)

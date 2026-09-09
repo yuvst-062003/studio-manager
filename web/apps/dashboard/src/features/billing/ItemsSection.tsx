@@ -19,6 +19,11 @@ import type { ProductOut } from './billingClient'
 export function ItemsSection({ locale }: { locale: Locale }) {
   const client = useMemo(() => makeDashboardBillingClient(apiFetch), [])
   const [products, setProducts] = useState<ProductOut[] | null>(null)
+  //: The classes an item may be filed under (2026-09-09). Read beside the products rather
+  //: than inside the form, so one failed read cannot leave the picker empty while the rest
+  //: of the screen looks fine — an empty list silently turns the class OPTIONAL, which is
+  //: how an item ends up filed under nothing and invisible to every parent.
+  const [classes, setClasses] = useState<readonly { id: string; name: string }[]>([])
   const [failed, setFailed] = useState(false)
   const [reloads, setReloads] = useState(0)
 
@@ -28,6 +33,13 @@ export function ItemsSection({ locale }: { locale: Locale }) {
       .products(true)
       .then((rows) => alive && setProducts(rows))
       .catch(() => alive && setFailed(true))
+    void apiFetch('/api/v1/classes')
+      .then(async (response) => {
+        if (!alive || !response.ok) return
+        const body = (await response.json()) as { items: { id: string; name: string }[] }
+        setClasses(body.items)
+      })
+      .catch(() => undefined)
     return () => {
       alive = false
     }
@@ -47,5 +59,13 @@ export function ItemsSection({ locale }: { locale: Locale }) {
     )
   }
   if (products === null) return null
-  return <ItemsScreen client={client} locale={locale} onChanged={onChanged} products={products} />
+  return (
+    <ItemsScreen
+      classes={classes}
+      client={client}
+      locale={locale}
+      onChanged={onChanged}
+      products={products}
+    />
+  )
 }

@@ -84,6 +84,7 @@ class BillingService:
         student_id: uuid.UUID | None = None,
         event_id: uuid.UUID | None = None,
         product_id: uuid.UUID | None = None,
+        class_id: uuid.UUID | None = None,
     ) -> Charge:
         """Create one charge and return it. The single entry point for every route that
         puts money on a family's balance: the monthly run (§5.10 step 1), a manual charge,
@@ -96,6 +97,13 @@ class BillingService:
         Raises `ConflictError` when the period is already billed -- §5.10 step 5's
         idempotence, enforced by the database rather than by a read-then-write that two
         concurrent runs would both pass.
+
+        `class_id` is what makes that idempotence PER CLASS since 2026-09-09: judo and
+        karate are two tuition charges in one month for one child, and the unique index
+        names the class so the second is not mistaken for a duplicate of the first. Keyword
+        only, like `student_id` and `event_id` and for the same reason -- four adjacent
+        `UUID | None` parameters is four ways to bind the wrong id positionally with no
+        type checker able to see it.
         """
         self._require_scope(studio_id)
         # G2, stated where it can be enforced. The annotation says `int` and Python does
@@ -118,6 +126,7 @@ class BillingService:
             # Set only by the shop's order route. It is what makes a family's purchase
             # history separable from a manager's manual charge -- see the column's own note.
             product_id=product_id,
+            class_id=class_id,
             # The due date is the only argument carrying a month, and the run dues every
             # tuition charge on the last day of the period it bills.
             period_year=due_date.year if periodic else None,

@@ -63,6 +63,24 @@ function renderScreen(client: DashboardBillingClient, products: ProductOut[] = [
   return onChanged
 }
 
+/** The same screen for a club that HAS classes, which is what turns the picker on. */
+const CLASSES = [
+  { id: 'c-judo', name: 'ג׳ודו' },
+  { id: 'c-karate', name: 'קראטה' },
+]
+
+function renderWithClasses(client: ReturnType<typeof makeClient>, products: ProductOut[] = []) {
+  render(
+    <ItemsScreen
+      classes={CLASSES}
+      client={client}
+      locale="he"
+      onChanged={vi.fn()}
+      products={products}
+    />,
+  )
+}
+
 async function fillItem(name: string, price: string) {
   await userEvent.type(screen.getByLabelText(t('he', 'billing.product.name')), name)
   await userEvent.type(screen.getByLabelText(t('he', 'billing.product.price')), price)
@@ -75,6 +93,66 @@ const addSize = async (label: string) => {
 
 const toggleSizes = () =>
   userEvent.click(screen.getByRole('switch', { name: t('he', 'billing.product.hasSizes') }))
+
+describe('an item belongs to exactly one class', () => {
+  // Owner, 2026-09-09: "every class can have his own unique items". The parent shop shows
+  // an item only to families training in its class, so the class is not decoration on this
+  // form -- it decides whether the item is visible to anybody at all.
+
+  it('files a new item under the class the manager picks', async () => {
+    const client = makeClient()
+    renderWithClasses(client)
+    await fillItem('גי', '180')
+    await userEvent.selectOptions(screen.getByTestId('item-class'), 'c-judo')
+    await userEvent.click(screen.getByRole('button', { name: t('he', 'billing.product.add') }))
+
+    expect(client.createProduct).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'גי', classId: 'c-judo' }),
+    )
+  })
+
+  it('refuses to save an item with no class, once classes exist', async () => {
+    // Not a default to the first class: filing an item under a class nobody chose is how a
+    // judo family gets offered karate kit. The refusal is the point.
+    const client = makeClient()
+    renderWithClasses(client)
+    await fillItem('חגורה', '40')
+    await userEvent.click(screen.getByRole('button', { name: t('he', 'billing.product.add') }))
+
+    expect(client.createProduct).not.toHaveBeenCalled()
+  })
+
+  it('does not ask for a class at all when the club has none yet', async () => {
+    // The setup wizard runs before any class exists. A mandatory picker with nothing in it
+    // would be an unsatisfiable form.
+    const client = makeClient()
+    renderScreen(client)
+    expect(screen.queryByTestId('item-class')).toBeNull()
+    await fillItem('חגורה', '40')
+    await userEvent.click(screen.getByRole('button', { name: t('he', 'billing.product.add') }))
+    expect(client.createProduct).toHaveBeenCalled()
+  })
+
+  it('loads an existing item back into the form under its own class', async () => {
+    const client = makeClient()
+    renderWithClasses(client, [
+      {
+        id: 'p1',
+        name: 'גי',
+        description: null,
+        price_agorot: 18_000,
+        is_active: true,
+        sizes: [],
+        class_id: 'c-karate',
+        image_url: null,
+      } as ProductOut,
+    ])
+    await userEvent.click(
+      screen.getByRole('button', { name: `${t('he', 'billing.product.edit')} גי` }),
+    )
+    expect(screen.getByTestId('item-class')).toHaveValue('c-karate')
+  })
+})
 
 describe('the items screen', () => {
   it('creates an item with the sizes it comes in', async () => {
@@ -91,6 +169,7 @@ describe('the items screen', () => {
       // G2 — a manager types 180 and the wire carries 18000.
       priceAgorot: 18_000,
       sizes: ['100', '110'],
+      classId: null,
     })
   })
 
@@ -105,6 +184,7 @@ describe('the items screen', () => {
       name: 'חגורה',
       priceAgorot: 4_000,
       sizes: [],
+      classId: null,
     })
   })
 
@@ -176,6 +256,7 @@ describe('the items screen', () => {
       name: 'גי',
       priceAgorot: 18_000,
       sizes: ['100', '120'],
+      classId: null,
     })
   })
 
@@ -300,7 +381,7 @@ describe('the pure helpers', () => {
 
   it('never sends sizes while the toggle is off, whatever the list holds', () => {
     // The one invariant that keeps `hasSizes=true, sizes=[]` unrepresentable on the wire.
-    expect(toInput({ name: 'גי', price: '180', hasSizes: false, sizes: ['100'] }).sizes).toEqual(
+    expect(toInput({ name: 'גי', price: '180', hasSizes: false, sizes: ['100'], classId: '' }).sizes).toEqual(
       [],
     )
   })

@@ -13,9 +13,18 @@ from app.models.billing import Charge, Product
 from sqlalchemy import select
 
 
-def _product(app_session, studio, *, name: str, price: int, active: bool = True) -> uuid.UUID:
+def _product(
+    app_session, studio, *, name: str, price: int, active: bool = True, class_id=None
+) -> uuid.UUID:
+    # `class_id` since 2026-09-09: the parent catalogue returns only the items of classes
+    # the family trains in, so a product raised without one is returned to nobody.
     row = Product(
-        studio_id=studio.id, name=name, description=None, price_agorot=price, is_active=active
+        studio_id=studio.id,
+        name=name,
+        description=None,
+        price_agorot=price,
+        is_active=active,
+        class_id=class_id,
     )
     app_session.add(row)
     app_session.commit()
@@ -23,11 +32,11 @@ def _product(app_session, studio, *, name: str, price: int, active: bool = True)
 
 
 def test_the_catalogue_lists_active_products_to_a_signed_in_payer(
-    client, app_session, studio, a_priced_student, as_guardian_of
+    client, app_session, studio, a_priced_student, as_guardian_of, family_class_id
 ):
-    _product(app_session, studio, name="גי", price=18_000)
-    _product(app_session, studio, name="חגורה", price=4_000)
-    _product(app_session, studio, name="ישן", price=1_000, active=False)
+    _product(app_session, studio, name="גי", price=18_000, class_id=family_class_id)
+    _product(app_session, studio, name="חגורה", price=4_000, class_id=family_class_id)
+    _product(app_session, studio, name="ישן", price=1_000, active=False, class_id=family_class_id)
 
     parent = as_guardian_of(a_priced_student.student_id)
     body = client.get("/api/v1/me/products", headers=parent.headers).json()
@@ -37,7 +46,7 @@ def test_the_catalogue_lists_active_products_to_a_signed_in_payer(
 
 
 def test_an_order_creates_manual_charges_priced_from_the_catalogue(
-    client, app_session, studio, a_priced_student, as_guardian_of
+    client, app_session, studio, a_priced_student, as_guardian_of, family_class_id
 ):
     gi = _product(app_session, studio, name="גי", price=18_000)
     belt = _product(app_session, studio, name="חגורה", price=4_000)
@@ -75,7 +84,7 @@ def test_an_order_creates_manual_charges_priced_from_the_catalogue(
 
 
 def test_an_inactive_product_reads_as_not_found(
-    client, app_session, studio, a_priced_student, as_guardian_of
+    client, app_session, studio, a_priced_student, as_guardian_of, family_class_id
 ):
     retired = _product(app_session, studio, name="ישן", price=1_000, active=False)
     parent = as_guardian_of(a_priced_student.student_id)
@@ -100,7 +109,7 @@ def test_anonymous_cannot_read_or_order(client, app_session, studio):
 
 
 def test_the_parents_note_travels_on_the_charge_label(
-    client, app_session, studio, a_priced_student, as_guardian_of
+    client, app_session, studio, a_priced_student, as_guardian_of, family_class_id
 ):
     """2026-08-30 — 'a parent buying a product should be able to write a note, and the
     manager should see it.' The note rides the charge's own line label, so every surface
@@ -122,7 +131,7 @@ def test_the_parents_note_travels_on_the_charge_label(
 
 
 def test_an_overlong_note_is_refused_not_truncated(
-    client, app_session, studio, a_priced_student, as_guardian_of
+    client, app_session, studio, a_priced_student, as_guardian_of, family_class_id
 ):
     gi = _product(app_session, studio, name="גי", price=18_000)
     parent = as_guardian_of(a_priced_student.student_id)
@@ -136,7 +145,7 @@ def test_an_overlong_note_is_refused_not_truncated(
 
 # -- what makes a purchase history possible ------------------------------------
 def test_an_order_names_the_product_it_bought(
-    client, app_session, studio, a_priced_student, as_guardian_of
+    client, app_session, studio, a_priced_student, as_guardian_of, family_class_id
 ):
     """The discriminator the parent app's ההזמנות שלי stands on.
 

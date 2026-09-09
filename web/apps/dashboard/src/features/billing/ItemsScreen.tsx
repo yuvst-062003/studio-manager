@@ -87,11 +87,17 @@ export function ItemsScreen({
   locale,
   onChanged,
   products,
+  classes = [],
 }: {
   client: DashboardBillingClient
   locale: Locale
   onChanged: () => void
   products: readonly ProductOut[]
+  /** The club's classes, for the picker. An item belongs to exactly one (owner,
+   *  2026-09-09), and `validateItem` makes the field mandatory as soon as this list is
+   *  non-empty — so a club with no classes yet is not blocked from adding items, and a
+   *  club with classes cannot file one under nothing by accident. */
+  classes?: readonly { id: string; name: string }[]
 }) {
   const [draft, setDraft] = useState<ItemDraft>(BLANK_ITEM)
   const [editing, setEditing] = useState<string | null>(null)
@@ -108,7 +114,7 @@ export function ItemsScreen({
   const visible = showRetired ? products : products.filter((row) => row.is_active)
 
   const save = async () => {
-    const found = validateItem(draft, locale)
+    const found = validateItem(draft, locale, classes)
     setErrors(found)
     if (Object.keys(found).length > 0) return
     setBusy(true)
@@ -181,6 +187,7 @@ export function ItemsScreen({
 
       <ItemForm
         busy={busy}
+        classes={classes}
         draft={draft}
         errors={errors}
         locale={locale}

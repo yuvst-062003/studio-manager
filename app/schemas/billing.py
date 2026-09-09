@@ -117,6 +117,9 @@ class ProductOut(BaseModel):
     description: str | None
     price_agorot: int
     is_active: bool
+    #: Which class sells this item (2026-09-09). NULL means UNASSIGNED, not club-wide: the
+    #: parent shop hides it and the dashboard is where a manager gives it a class.
+    class_id: uuid.UUID | None = None
     #: The sizes this item is ordered in, in the manager's own order. **Empty means the item
     #: has no sizes** -- a חגורה -- and there is no `has_sizes` flag beside it, because two
     #: fields describing one fact drift and `has_sizes=true, sizes=[]` would render a parent

@@ -180,7 +180,15 @@ def test_create_charge_takes_the_five_facts_a_charge_cannot_exist_without():
     nothing on the row said which was which. It is additive -- keyword-only with a default
     -- so it changes no existing call, and the five positional facts this test is named for
     are untouched. It is listed here anyway because the list is the seam: a parameter that
-    can appear without a person editing this file is a parameter nobody reviewed."""
+    can appear without a person editing this file is a parameter nobody reviewed.
+
+    `class_id` joined the same tail on 2026-09-09, for per-class tuition. It carries more
+    weight than the others: it is what makes the run's idempotence PER CLASS, so judo and
+    karate are two charges in one month rather than the second being refused as a duplicate
+    of the first. Additive and keyword-only, so no existing call changes -- but a caller
+    that OMITS it where a class is known raises a classless charge, which the unique index
+    folds onto its sentinel and which the next monthly run will therefore not recognise as
+    that class's month. That is why it is reviewed here rather than left to style."""
 
     assert _resolved_signature(_CREATE_CHARGE)["order"] == [
         "self",
@@ -192,6 +200,7 @@ def test_create_charge_takes_the_five_facts_a_charge_cannot_exist_without():
         "student_id",
         "event_id",
         "product_id",
+        "class_id",
     ]
 
 

@@ -78,6 +78,9 @@ export type WizardProduct = {
   name: string
   price_agorot: number
   sizes?: string[] | null
+  /** Which class sells this item (2026-09-09). `null` is UNASSIGNED, never club-wide —
+   *  the parent shop hides an unfiled item rather than offering it to everybody. */
+  class_id?: string | null
 }
 
 export type WizardProductInput = {
@@ -86,6 +89,10 @@ export type WizardProductInput = {
   description?: string | null
   sizes: string[]
   isActive?: boolean
+  /** Omitted leaves the item unfiled, which is the setup wizard's case: it runs before the
+   *  club has classes, so it cannot ask. The dashboard, which does have them, always
+   *  sends one. */
+  classId?: string | null
 }
 
 export type WizardItemsClient = {

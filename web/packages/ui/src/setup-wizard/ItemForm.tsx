@@ -28,6 +28,7 @@ import type { Locale } from '@studio/i18n'
 import { agorotFromShekels } from '@studio/core'
 import { Button } from '../primitives/Button'
 import { Card } from '../primitives/Card'
+import { SelectField } from '../primitives/SelectField'
 import { Switch } from '../primitives/Switch'
 import { TextField } from '../primitives/TextField'
 import type { WizardProduct, WizardProductInput } from './step-clients'
@@ -77,11 +78,14 @@ export type ItemDraft = {
   price: string
   hasSizes: boolean
   sizes: string[]
+  /** Which class sells it. `''` is "not filed yet" — the setup wizard leaves it that way
+   *  because it runs before the club has any classes. */
+  classId: string
 }
 
-export type ItemErrors = Partial<Record<'name' | 'price' | 'sizes', string>>
+export type ItemErrors = Partial<Record<'name' | 'price' | 'sizes' | 'classId', string>>
 
-export const BLANK_ITEM: ItemDraft = { name: '', price: '', hasSizes: false, sizes: [] }
+export const BLANK_ITEM: ItemDraft = { name: '', price: '', hasSizes: false, sizes: [], classId: '' }
 
 /** An existing product, back into the shape the form edits. `hasSizes` is DERIVED from the
  *  list, which is the whole reason the server does not carry it. */
@@ -92,6 +96,7 @@ export function draftFrom(product: WizardProduct): ItemDraft {
     price: String(product.price_agorot / 100),
     hasSizes: sizes.length > 0,
     sizes: [...sizes],
+    classId: product.class_id ?? '',
   }
 }
 
@@ -103,8 +108,19 @@ export function draftFrom(product: WizardProduct): ItemDraft {
  * cannot catch this — `sizes: []` is a perfectly legal sizeless item there — so it has to
  * be caught where the toggle lives.
  */
-export function validateItem(draft: ItemDraft, locale: Locale): ItemErrors {
+export function validateItem(
+  draft: ItemDraft,
+  locale: Locale,
+  /** The classes on offer. Empty or omitted means the caller cannot ask — the setup wizard
+   *  runs before the club has any — so the class is not required. The dashboard passes its
+   *  list and the field becomes mandatory, which is what "every item belongs to exactly one
+   *  class" means at the point of entry (owner, 2026-09-09). */
+  classes: readonly { id: string }[] = [],
+): ItemErrors {
   const errors: ItemErrors = {}
+  if (classes.length > 0 && !draft.classId) {
+    errors.classId = t(locale, 'billing.product.required')
+  }
   if (!draft.name.trim()) errors.name = t(locale, 'billing.product.required')
   if (!draft.price.trim() || agorotFromShekels(draft.price) <= 0) {
     errors.price = t(locale, 'billing.product.required')
@@ -127,6 +143,9 @@ export function toInput(draft: ItemDraft): WizardProductInput {
     name: draft.name.trim(),
     priceAgorot: agorotFromShekels(draft.price),
     sizes: draft.hasSizes ? draft.sizes : [],
+    // `null` and not `undefined` when unfiled: the PATCH route dumps with `exclude_unset`,
+    // so an omitted key means "leave it alone" while an explicit null means "unfile it".
+    classId: draft.classId || null,
   }
 }
 
@@ -139,8 +158,13 @@ export function ItemForm({
   onChange,
   onSubmit,
   submitLabel,
+  classes = [],
 }: {
   busy?: boolean
+  /** The classes this item may belong to. Empty means the caller cannot ask — the setup
+   *  wizard runs before the club has any — and the picker is then not drawn at all, which
+   *  is why it is not simply an empty dropdown. The dashboard passes its list. */
+  classes?: readonly { id: string; name: string }[]
   draft: ItemDraft
   errors: ItemErrors
   locale: Locale
@@ -187,6 +211,30 @@ export function ItemForm({
             value={draft.price}
           />
         </div>
+
+        {classes.length > 0 ? (
+          // Which class sells this item (owner, 2026-09-09: "every class can have his own
+          // unique items"). Above the sizes toggle rather than below it, because it decides
+          // WHO sees the item at all and the sizes only decide how it is ordered.
+          //
+          // The empty option stays selectable and is not a valid answer: `validateItem`
+          // refuses it whenever classes are on offer. A picker that silently defaulted to
+          // the first class would file items under a class nobody chose.
+          <SelectField
+            data-testid="item-class"
+            error={errors.classId}
+            label={t(locale, 'billing.product.class')}
+            onChange={(e) => onChange({ ...draft, classId: e.target.value })}
+            value={draft.classId}
+          >
+            <option value="">{t(locale, 'billing.product.classUnset')}</option>
+            {classes.map((klass) => (
+              <option key={klass.id} value={klass.id}>
+                {klass.name}
+              </option>
+            ))}
+          </SelectField>
+        ) : null}
 
         <Switch
           checked={draft.hasSizes}

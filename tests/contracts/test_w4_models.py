@@ -105,21 +105,34 @@ def test_the_billing_run_cannot_double_charge_a_period():
     This is invariant 5's structural half. Without the constraint, idempotency is a
     property of the code that anyone can regress; with it, the database refuses.
 
-    **Keyed on the student — C11.** This test asserted `enrollment_id` until the club's
-    real structure arrived: it prices per student by training volume, so a child in the
-    competition group *and* the teenagers group is one charge. An enrollment-keyed index
-    does not merely fail to prevent the double charge, it *permits* it, which is the worst
-    kind of green.
+    **Keyed on the student and the CLASS.** This test asserted `enrollment_id` until the
+    club's real structure arrived, then `student_id` alone under C11. On 2026-09-09 the
+    owner asked for per-class tuition -- judo and karate billed separately, added together
+    -- so the key gained the class. What did NOT change is the thing C11 was actually
+    about: a child in the competition group *and* the teenagers group is still ONE charge,
+    because both groups belong to one class and the key names the class, never the group or
+    the enrollment.
+
+    An enrollment-keyed index does not merely fail to prevent that double charge, it
+    *permits* it, which is the worst kind of green. `test_a_tuition_charge_covers_a_student_and_not_an_enrollment`
+    below is what keeps that door shut.
     """
     indexes = {index.name for index in Base.metadata.tables["charge"].indexes}
-    assert "uq_charge_student_period_kind" in indexes
+    assert "uq_charge_student_period_kind_class" in indexes
     index = next(
         i
         for i in Base.metadata.tables["charge"].indexes
-        if i.name == "uq_charge_student_period_kind"
+        if i.name == "uq_charge_student_period_kind_class"
     )
     assert index.unique is True
-    assert [c.name for c in index.columns] == ["student_id", "period_year", "period_month", "kind"]
+    # The fifth key element is an EXPRESSION, not a column: `COALESCE(class_id, <sentinel>)`.
+    # Postgres treats NULLs as distinct in a unique index, so a bare `class_id` here would
+    # let two classless rows exist for one student and month -- silently weakening the rule
+    # for every charge raised before per-class pricing, which is all of them.
+    named = [c.name for c in index.columns if getattr(c, "name", None)]
+    assert named[:4] == ["student_id", "period_year", "period_month", "kind"]
+    assert "COALESCE" in str(index.expressions[-1]).upper()
+    assert "class_id" in str(index.expressions[-1])
 
 
 def test_a_tuition_charge_covers_a_student_and_not_an_enrollment():
@@ -130,13 +143,25 @@ def test_a_tuition_charge_covers_a_student_and_not_an_enrollment():
 
 
 def test_a_price_plan_is_scoped_by_training_volume_and_never_by_group():
-    """C11 — '§5.10 attaches a `price_plan` to a group (falling back to the class)'; the
-    club prices by how often a child trains, independent of which groups those sessions
-    belong to. A group-scoped plan is what charges a child in two groups twice."""
+    """C11's surviving half, which is the half that was load-bearing.
+
+    The original decision refused BOTH a `group_id` and a `class_id`, because §5.10 once
+    attached a plan to "a group (falling back to the class)" and that is what charged a
+    child in two groups twice, at two different prices, silently and forever.
+
+    On 2026-09-09 the owner asked for per-class prices and `class_id` arrived. **`group_id`
+    did not, and must not.** The distinction is the entire safety argument: two GROUPS of
+    one discipline are one charge, two CLASSES are two. A `group_id` here would collapse
+    that back into the original bug, which is why this assertion outlives the one beside it.
+
+    `sessions_per_week` still means volume WITHIN a class -- a child who trains twice a week
+    at judo is on judo's twice-a-week plan, and adding karate does not make them a
+    four-a-week judo student.
+    """
     columns = Base.metadata.tables["price_plan"].c
     assert "sessions_per_week" in columns
     assert "group_id" not in columns
-    assert "class_id" not in columns
+    assert "class_id" in columns
 
 
 def test_the_price_is_chosen_on_the_student():

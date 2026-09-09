@@ -203,6 +203,7 @@ def _product_out(product: Product) -> ProductOut:
         price_agorot=product.price_agorot,
         is_active=product.is_active,
         sizes=list(product.sizes or ()),
+        class_id=product.class_id,
         image_url=product_images.image_url(product),
     )
 
@@ -396,6 +397,10 @@ class ProductIn(BaseModel):
     #: this field existed. Trimmed, de-duplicated and bounded by
     #: `CatalogueService.normalise_sizes`, which is the one place that decides.
     sizes: list[str] = Field(default_factory=list, max_length=MAX_SIZES)
+    #: Which class sells this item (2026-09-09). Optional, because an item may be filed
+    #: after it is created -- and NULL until it is, which the parent shop reads as
+    #: not-for-sale rather than for-sale-to-everybody.
+    class_id: uuid.UUID | None = None
 
 
 class ProductPatch(BaseModel):
@@ -410,6 +415,9 @@ class ProductPatch(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     price_agorot: int | None = Field(default=None, ge=0)
     description: str | None = Field(default=None, max_length=2000)
+    #: Filing an item under a class, or moving it. `exclude_unset` in the route is what
+    #: keeps "not sent" different from "set to null", so an item can also be UNfiled.
+    class_id: uuid.UUID | None = None
     is_active: bool | None = None
     sizes: list[str] | None = Field(default=None, max_length=MAX_SIZES)
 
@@ -473,6 +481,7 @@ def create_product(
             price_agorot=body.price_agorot,
             description=body.description,
             sizes=body.sizes,
+            class_id=body.class_id,
         )
     except RefusedError as exc:
         raise _refused(exc) from exc

@@ -22,6 +22,9 @@ export type ProductInput = {
   description?: string | null
   sizes: string[]
   isActive?: boolean
+  /** Which class sells the item (2026-09-09). `null` files it under nothing, which the
+   *  parent shop reads as not-for-sale. */
+  classId?: string | null
 }
 export type BillingRunOut = components['schemas']['BillingRunOut']
 export type UpayIpnRecordOut = components['schemas']['UpayIpnRecordOut']
@@ -370,6 +373,7 @@ export function makeDashboardBillingClient(fetcher: Fetcher): DashboardBillingCl
             price_agorot: input.priceAgorot,
             description: input.description ?? null,
             sizes: input.sizes,
+            class_id: input.classId ?? null,
           }),
         }),
       )
@@ -385,6 +389,9 @@ export function makeDashboardBillingClient(fetcher: Fetcher): DashboardBillingCl
       if (input.description !== undefined) body.description = input.description
       if (input.isActive !== undefined) body.is_active = input.isActive
       if (input.sizes !== undefined) body.sizes = input.sizes
+      // `null` is a real value here -- it UNfiles an item -- so the guard is `undefined`
+      // and not falsiness, or "remove this item's class" would silently do nothing.
+      if (input.classId !== undefined) body.class_id = input.classId
       return json<ProductOut>(
         await fetcher(`/api/v1/products/${productId}`, {
           method: 'PATCH',
