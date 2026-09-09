@@ -24,10 +24,18 @@ export type WizardPricePlan = {
   sessions_per_week: number | null
   monthly_amount_agorot: number
   standing_order_link_url?: string | null
+  /** Which class this plan prices. The wizard reads it to show one class's plans at a
+   *  time; `null` is a plan created before per-class pricing, which no child can be
+   *  given. */
+  class_id?: string | null
 }
 
 export type WizardPricesClient = {
   pricePlans(): Promise<WizardPricePlan[]>
+  /** The club's classes, so the step can be walked ONE CLASS AT A TIME. Owner, 2026-09-09:
+   *  "the wizard is per class -- let him finish each class individually, don't combine,
+   *  because if he has several classes it will have too long a list." */
+  classes(): Promise<{ id: string; name: string }[]>
   createPricePlan(input: {
     name: string
     /** null is open membership — the column's third state, not a missing answer. */
@@ -35,6 +43,9 @@ export type WizardPricesClient = {
     monthlyAmountAgorot: number
     registrationFeeAgorot: number | null
     activeFrom: string
+    /** Which class this plan prices. The wizard now always knows, and a plan created
+     *  without one can be assigned to no child at all. */
+    classId?: string | null
   }): Promise<{ id: string }>
   setStandingOrderLink(planId: string, url: string | null): Promise<unknown>
 }
@@ -44,6 +55,11 @@ export function makeWizardPricesClient(fetcher: WizardFetcher): WizardPricesClie
     async pricePlans() {
       return (await json<{ items: WizardPricePlan[] }>(await fetcher('/api/v1/price-plans')))
         .items
+    },
+    async classes() {
+      return (
+        await json<{ items: { id: string; name: string }[] }>(await fetcher('/api/v1/classes'))
+      ).items
     },
     async createPricePlan(input) {
       return json<{ id: string }>(
@@ -56,6 +72,9 @@ export function makeWizardPricesClient(fetcher: WizardFetcher): WizardPricesClie
             monthly_amount_agorot: input.monthlyAmountAgorot,
             registration_fee_agorot: input.registrationFeeAgorot,
             active_from: input.activeFrom,
+            // Same omission as `createProduct` had: the plan was created with no class, and
+            // a plan with no class can be given to no child.
+            class_id: input.classId ?? null,
           }),
         }),
       )
@@ -97,6 +116,7 @@ export type WizardProductInput = {
 
 export type WizardItemsClient = {
   products(): Promise<WizardProduct[]>
+  classes(): Promise<{ id: string; name: string }[]>
   createProduct(input: WizardProductInput): Promise<unknown>
 }
 
@@ -105,6 +125,11 @@ export function makeWizardItemsClient(fetcher: WizardFetcher): WizardItemsClient
     async products() {
       return (await json<{ items: WizardProduct[] }>(await fetcher('/api/v1/products?limit=200')))
         .items
+    },
+    async classes() {
+      return (
+        await json<{ items: { id: string; name: string }[] }>(await fetcher('/api/v1/classes'))
+      ).items
     },
     async createProduct(input) {
       return json<unknown>(
@@ -116,6 +141,11 @@ export function makeWizardItemsClient(fetcher: WizardFetcher): WizardItemsClient
             price_agorot: input.priceAgorot,
             description: input.description ?? null,
             sizes: input.sizes,
+            // Was silently DROPPED. The body is built key by key, `class_id` was never one
+            // of them, and `WizardProductInput.classId` has existed since the field did --
+            // so the wizard created items that no parent could ever see, which is exactly
+            // the state the items screen now has to warn about.
+            class_id: input.classId ?? null,
           }),
         }),
       )

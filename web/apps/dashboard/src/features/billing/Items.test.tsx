@@ -49,6 +49,7 @@ const RETIRED: ProductOut = {
 function makeClient(over: Partial<DashboardBillingClient> = {}): DashboardBillingClient {
   return {
     products: vi.fn().mockResolvedValue([]),
+    classes: vi.fn().mockResolvedValue([]),
     createProduct: vi.fn().mockResolvedValue(GI),
     updateProduct: vi.fn().mockResolvedValue(GI),
     ...over,

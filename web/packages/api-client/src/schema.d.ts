@@ -3306,6 +3306,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/price-plans/{plan_id}/class": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Price Plan Class
+         * @description File an existing plan under a class -- an in-place edit on a versioned table, and
+         *     legitimately so.
+         *
+         *     §5.10 versions a plan so a price change never rewrites history, and `close` is how a
+         *     price change is done. This changes no amount and no date, so every charge the plan has
+         *     already raised stays explicable by it. What it fixes is that after "a class can have no
+         *     all-classes plan", every plan a club created before 2026-09-09 could be assigned to
+         *     nobody -- and the screen could warn about them but not repair one.
+         *
+         *     Audited for the same reason `set_standing_order_link` is: an in-place edit on a
+         *     versioned table is safe when the history lives in `audit_log`.
+         */
+        put: operations["set_price_plan_class_api_v1_price_plans__plan_id__class_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/price-plans/{plan_id}/close": {
         parameters: {
             query?: never;
@@ -10358,6 +10388,17 @@ export interface components {
              * Format: uuid
              */
             to_price_plan_id: string;
+        };
+        /**
+         * PlanClassIn
+         * @description Which class this plan prices. `null` unfiles it.
+         *
+         *     A plain nullable field rather than an `exclude_unset` partial: this route sets exactly
+         *     one thing, so "not sent" and "set to null" would be the same request said two ways.
+         */
+        PlanClassIn: {
+            /** Class Id */
+            class_id?: string | null;
         };
         /**
          * PlanOptionOut
@@ -18429,6 +18470,44 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PricePlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_price_plan_class_api_v1_price_plans__plan_id__class_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                plan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanClassIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

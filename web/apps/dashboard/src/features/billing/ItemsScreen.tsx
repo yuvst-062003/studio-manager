@@ -31,6 +31,7 @@ import type { Locale } from '@studio/i18n'
 import { BLANK_ITEM, ItemForm, draftFrom, sizesLabel, toInput, validateItem } from './ItemForm'
 import type { ItemDraft, ItemErrors } from './ItemForm'
 import type { DashboardBillingClient, ProductOut } from './billingClient'
+import { groupByClass } from './byClass'
 
 const columnStyle: CSSProperties = {
   display: 'flex',
@@ -77,6 +78,22 @@ const hintStyle: CSSProperties = {
   margin: 0,
 }
 
+/** A class heading over its own items. Quiet: it separates, it does not shout. */
+const classHeadingStyle: CSSProperties = {
+  fontSize: 'var(--text-caption)',
+  fontWeight: 700,
+  color: 'var(--text-muted)',
+  marginBlock: 'var(--space-4) var(--space-2)',
+}
+
+/** The unfiled heading DOES shout — those rows are invisible to every parent. */
+const warnHeadingStyle: CSSProperties = {
+  fontSize: 'var(--text-caption)',
+  fontWeight: 700,
+  color: 'var(--danger)',
+  marginBlock: 'var(--space-4) var(--space-2)',
+}
+
 /** The sizes as a row reads them. Empty is a real answer — a חגורה — and it is said in
  *  words rather than left blank, because a blank cell reads as "nobody filled this in". */
 // `sizesLabel` moved beside the form (2026-08-30); re-exported for this lane's importers.
@@ -112,6 +129,108 @@ export function ItemsScreen({
   const [photoError, setPhotoError] = useState<Record<string, string>>({})
 
   const visible = showRetired ? products : products.filter((row) => row.is_active)
+  // Grouped for display. `classes` is what the item form's picker offers, so both halves of
+  // this screen agree about which classes exist and in what order.
+  const { unfiled, groups: grouped } = groupByClass(visible, classes)
+
+  /** One item row. Extracted so the grouped and ungrouped layouts render the same card
+   *  rather than two copies that drift apart. */
+  const productCard = (product: ProductOut) => (
+    <Card key={product.id}>
+      <div style={rowStyle}>
+        <span style={nameStyle}>{product.name}</span>
+        {!product.is_active ? (
+          <StatusChip label={t(locale, 'billing.product.retired')} status="cancelled" />
+        ) : null}
+        <MoneyDisplay
+          agorot={product.price_agorot}
+          label={t(locale, 'billing.product.price')}
+        />
+        <Button
+          aria-label={`${t(locale, 'billing.product.edit')} ${product.name}`}
+          onClick={() => {
+            setEditing(product.id)
+            setDraft(draftFrom(product))
+            setErrors({})
+          }}
+          variant="secondary"
+        >
+          {t(locale, 'billing.product.edit')}
+        </Button>
+        <Button
+          aria-label={`${
+            product.is_active
+              ? t(locale, 'billing.product.retire')
+              : t(locale, 'billing.product.revive')
+          } ${product.name}`}
+          onClick={() => void setActive(product, !product.is_active)}
+          variant="ghost"
+        >
+          {product.is_active
+            ? t(locale, 'billing.product.retire')
+            : t(locale, 'billing.product.revive')}
+        </Button>
+      </div>
+      <p style={hintStyle}>
+        {t(locale, 'billing.product.sizes')}: {sizesLabel(product, locale)}
+      </p>
+
+      {/* The photo the parent app's shop renders. A SECOND step after the item
+          exists, because the object is keyed by the product's own id — so there is
+          nothing to upload against until the row has been created. */}
+      <div style={photoRowStyle}>
+        {product.image_url ? (
+          <ProductThumb productId={product.id} src={product.image_url} />
+        ) : (
+          <p style={hintStyle}>{t(locale, 'billing.product.photoNone')}</p>
+        )}
+        <label
+          style={{ fontSize: 'var(--text-caption)' }}
+          // The input carries the accessible name; the label names WHICH product, so
+          // a screen full of "Add a photo" is navigable.
+          aria-label={`${
+            product.image_url
+              ? t(locale, 'billing.product.photoReplace')
+              : t(locale, 'billing.product.photoAdd')
+          } ${product.name}`}
+        >
+          <span>
+            {product.image_url
+              ? t(locale, 'billing.product.photoReplace')
+              : t(locale, 'billing.product.photoAdd')}
+          </span>
+          <input
+            accept="image/png,image/jpeg,image/webp"
+            data-testid={`product-photo-${product.id}`}
+            disabled={photoBusy !== null}
+            onChange={(event) => {
+              const file = event.target.files?.[0] ?? null
+              // Cleared so choosing the SAME file twice fires `change` again — after a
+              // failed upload a manager retries with the file they already picked.
+              event.target.value = ''
+              if (file) void setPhoto(product, file)
+            }}
+            type="file"
+          />
+        </label>
+        {product.image_url ? (
+          <Button
+            aria-label={`${t(locale, 'billing.product.photoRemove')} ${product.name}`}
+            disabled={photoBusy !== null}
+            onClick={() => void setPhoto(product, null)}
+            variant="ghost"
+          >
+            {t(locale, 'billing.product.photoRemove')}
+          </Button>
+        ) : null}
+        {photoError[product.id] ? (
+          <p role="alert" style={{ ...hintStyle, color: 'var(--danger)' }}>
+            {photoError[product.id]}
+          </p>
+        ) : null}
+      </div>
+    </Card>
+  )
 
   const save = async () => {
     const found = validateItem(draft, locale, classes)
@@ -214,102 +333,40 @@ export function ItemsScreen({
       {visible.length === 0 ? (
         <EmptyState title={t(locale, 'billing.product.empty')} />
       ) : (
-        visible.map((product) => (
-          <Card key={product.id}>
-            <div style={rowStyle}>
-              <span style={nameStyle}>{product.name}</span>
-              {!product.is_active ? (
-                <StatusChip label={t(locale, 'billing.product.retired')} status="cancelled" />
-              ) : null}
-              <MoneyDisplay
-                agorot={product.price_agorot}
-                label={t(locale, 'billing.product.price')}
-              />
-              <Button
-                aria-label={`${t(locale, 'billing.product.edit')} ${product.name}`}
-                onClick={() => {
-                  setEditing(product.id)
-                  setDraft(draftFrom(product))
-                  setErrors({})
-                }}
-                variant="secondary"
-              >
-                {t(locale, 'billing.product.edit')}
-              </Button>
-              <Button
-                aria-label={`${
-                  product.is_active
-                    ? t(locale, 'billing.product.retire')
-                    : t(locale, 'billing.product.revive')
-                } ${product.name}`}
-                onClick={() => void setActive(product, !product.is_active)}
-                variant="ghost"
-              >
-                {product.is_active
-                  ? t(locale, 'billing.product.retire')
-                  : t(locale, 'billing.product.revive')}
-              </Button>
-            </div>
-            <p style={hintStyle}>
-              {t(locale, 'billing.product.sizes')}: {sizesLabel(product, locale)}
-            </p>
+        <>
+          {/* **Unfiled items are broken, not a category.** `class_id` NULL means the item
+              is in NOBODY's shop — the parent app filters on it — so this is a warning with
+              the rows attached, above the classes, and never a group named "—". Until this
+              existed a manager's item could be invisible to every family with nothing on
+              screen saying so. */}
+          {unfiled.length > 0 && classes.length > 0 ? (
+            <section aria-labelledby="items-unfiled" data-testid="items-unfiled">
+              <h2 id="items-unfiled" style={warnHeadingStyle}>
+                ⚠ {t(locale, 'billing.byClass.unfiled')}
+              </h2>
+              <p style={hintStyle}>{t(locale, 'billing.byClass.unfiledItems')}</p>
+              {unfiled.map((product) => productCard(product))}
+            </section>
+          ) : null}
 
-            {/* The photo the parent app's shop renders. A SECOND step after the item
-                exists, because the object is keyed by the product's own id — so there is
-                nothing to upload against until the row has been created. */}
-            <div style={photoRowStyle}>
-              {product.image_url ? (
-                <ProductThumb productId={product.id} src={product.image_url} />
-              ) : (
-                <p style={hintStyle}>{t(locale, 'billing.product.photoNone')}</p>
-              )}
-              <label
-                style={{ fontSize: 'var(--text-caption)' }}
-                // The input carries the accessible name; the label names WHICH product, so
-                // a screen full of "Add a photo" is navigable.
-                aria-label={`${
-                  product.image_url
-                    ? t(locale, 'billing.product.photoReplace')
-                    : t(locale, 'billing.product.photoAdd')
-                } ${product.name}`}
-              >
-                <span>
-                  {product.image_url
-                    ? t(locale, 'billing.product.photoReplace')
-                    : t(locale, 'billing.product.photoAdd')}
-                </span>
-                <input
-                  accept="image/png,image/jpeg,image/webp"
-                  data-testid={`product-photo-${product.id}`}
-                  disabled={photoBusy !== null}
-                  onChange={(event) => {
-                    const file = event.target.files?.[0] ?? null
-                    // Cleared so choosing the SAME file twice fires `change` again — after a
-                    // failed upload a manager retries with the file they already picked.
-                    event.target.value = ''
-                    if (file) void setPhoto(product, file)
-                  }}
-                  type="file"
-                />
-              </label>
-              {product.image_url ? (
-                <Button
-                  aria-label={`${t(locale, 'billing.product.photoRemove')} ${product.name}`}
-                  disabled={photoBusy !== null}
-                  onClick={() => void setPhoto(product, null)}
-                  variant="ghost"
+          {/* A club with no classes yet — the setup wizard's own state — gets one plain
+              list. A heading over every row, or a warning nobody can act on, would both be
+              noise there. */}
+          {classes.length === 0
+            ? visible.map((product) => productCard(product))
+            : grouped.map((group) => (
+                <section
+                  key={group.classId}
+                  aria-labelledby={`items-class-${group.classId}`}
+                  data-testid={`items-class-${group.classId}`}
                 >
-                  {t(locale, 'billing.product.photoRemove')}
-                </Button>
-              ) : null}
-              {photoError[product.id] ? (
-                <p role="alert" style={{ ...hintStyle, color: 'var(--danger)' }}>
-                  {photoError[product.id]}
-                </p>
-              ) : null}
-            </div>
-          </Card>
-        ))
+                  <h2 id={`items-class-${group.classId}`} style={classHeadingStyle}>
+                    <bdi>{group.className}</bdi>
+                  </h2>
+                  {group.rows.map((product) => productCard(product))}
+                </section>
+              ))}
+        </>
       )}
 
       {/* The no-stock and no-delete rules used to be spelled out here in two hint lines;

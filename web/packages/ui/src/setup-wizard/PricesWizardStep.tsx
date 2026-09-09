@@ -55,6 +55,13 @@ export function PricesWizardStep({
   client,
 }: WizardStepProps & { client: WizardPricesClient }) {
   const [plans, setPlans] = useState<WizardPricePlan[]>([])
+  /** The club's classes, and which one the manager is on. **One class at a time.** Owner,
+   *  2026-09-09: "the wizard is per class -- let him finish each class individually, don't
+   *  combine, because if he has several classes it will have too long a list." So this is a
+   *  sequence rather than a picker: the step shows one class, its own plans and nothing
+   *  else, and moves on when the manager says so. */
+  const [classes, setClasses] = useState<{ id: string; name: string }[]>([])
+  const [classIndex, setClassIndex] = useState(0)
   const [name, setName] = useState('')
   /** `undefined` means "not chosen yet"; `null` is a chosen open membership. */
   const [perWeek, setPerWeek] = useState<number | null | undefined>(undefined)
@@ -72,6 +79,25 @@ export function PricesWizardStep({
 
   useEffect(reload, [reload])
 
+  useEffect(() => {
+    let live = true
+    client
+      .classes()
+      .then((rows) => live && setClasses(rows))
+      .catch(() => live && setClasses([]))
+    return () => {
+      live = false
+    }
+  }, [client])
+
+  const currentClass = classes[classIndex] ?? null
+  const isLastClass = classIndex >= classes.length - 1
+  /** Only THIS class's plans. The whole point of walking them one at a time is that a club
+   *  with five classes never reads a list of everybody's plans at once. */
+  const plansHere = currentClass === null
+    ? plans
+    : plans.filter((plan) => plan.class_id === currentClass.id)
+
   async function create() {
     if (inFlight || perWeek === undefined || monthly.trim() === '') return
     setInFlight(true)
@@ -86,6 +112,9 @@ export function PricesWizardStep({
         monthlyAmountAgorot: agorotFromShekels(monthly),
         registrationFeeAgorot: null,
         activeFrom: new Date().toISOString().slice(0, 10),
+        // The class the manager is standing in. A plan created without one can be assigned
+        // to no child, which is the state this step used to leave every plan in.
+        classId: currentClass?.id ?? null,
       })
       // A second call rather than a field on the create shape, because the link is the ONE
       // in-place edit `price_plan` allows and it has its own audited route. A blank box
@@ -118,9 +147,31 @@ export function PricesWizardStep({
       <p className="setup-step__meta">{t(locale, 'billing.plan.wizardHint')}</p>
       <p className="setup-step__meta">{t(locale, 'billing.plan.linkNeverInherited')}</p>
 
-      {plans.length > 0 ? (
+      {/* Which class the manager is standing in, and how far through. Drawn only when there
+          is more than one -- a club with a single חוג gets no counter for a sequence of
+          one, which would be scaffolding around nothing. */}
+      {classes.length > 1 && currentClass !== null ? (
+        <p className="setup-step__meta" data-testid="wizard-prices-class">
+          {t(locale, 'billing.byClass.wizardProgress')
+            .replace('{{n}}', String(classIndex + 1))
+            .replace('{{total}}', String(classes.length))}
+          {' — '}
+          <bdi>
+            <strong>{currentClass.name}</strong>
+          </bdi>
+        </p>
+      ) : null}
+      {classes.length === 1 && currentClass !== null ? (
+        <p className="setup-step__meta" data-testid="wizard-prices-class">
+          <bdi>
+            <strong>{currentClass.name}</strong>
+          </bdi>
+        </p>
+      ) : null}
+
+      {plansHere.length > 0 ? (
         <Card>
-          {plans.map((plan) => (
+          {plansHere.map((plan) => (
             <div key={plan.id} style={rowStyle} data-testid="wizard-plan-row">
               <strong style={{ flex: 1, minInlineSize: 0 }}>
                 <bdi>{plan.name}</bdi>
@@ -199,10 +250,23 @@ export function PricesWizardStep({
       </Card>
 
       <div style={rowStyle}>
-        {/* The container never computes completeness -- the step reports its own outcome. */}
-        <Button variant="primary" data-testid="wizard-prices-done" onClick={onDone}>
-          {t(locale, 'common.setup.continue')}
-        </Button>
+        {/* **The next CLASS, not the next step.** A club with several classes finishes one
+            before it sees the next, which is the whole reason this step became a sequence.
+            Only the last class continues the wizard. */}
+        {!isLastClass && currentClass !== null ? (
+          <Button
+            variant="primary"
+            data-testid="wizard-prices-next-class"
+            onClick={() => setClassIndex((n) => n + 1)}
+          >
+            {t(locale, 'billing.byClass.wizardNext')}
+          </Button>
+        ) : (
+          /* The container never computes completeness -- the step reports its own outcome. */
+          <Button variant="primary" data-testid="wizard-prices-done" onClick={onDone}>
+            {t(locale, 'common.setup.continue')}
+          </Button>
+        )}
         <Button variant="secondary" data-testid="wizard-prices-skip" onClick={onSkip}>
           {t(locale, 'common.setup.skip')}
         </Button>

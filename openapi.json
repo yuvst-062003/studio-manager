@@ -9795,6 +9795,25 @@
         "title": "PlanChangeOut",
         "type": "object"
       },
+      "PlanClassIn": {
+        "description": "Which class this plan prices. `null` unfiles it.\n\nA plain nullable field rather than an `exclude_unset` partial: this route sets exactly\none thing, so \"not sent\" and \"set to null\" would be the same request said two ways.",
+        "properties": {
+          "class_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Id"
+          }
+        },
+        "title": "PlanClassIn",
+        "type": "object"
+      },
       "PlanOptionOut": {
         "description": "One of the club's plans, as the parent screen renders it.\n\n`is_offered` is §5.1's rule — offer a plan only if it raises the number of sessions\nthis student could attend in a week. A plan that is not offered is **shown with its\nreason, never hidden**: a Group 1 parent who hears \"400\" from another parent in the\nhall and finds nothing in the app phones the manager, and one line answers the question\nbefore it is asked. It turns itself on when the child moves up a group.",
         "properties": {
@@ -24931,6 +24950,79 @@
           }
         },
         "summary": "Create Price Plan",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/price-plans/{plan_id}/class": {
+      "put": {
+        "description": "File an existing plan under a class -- an in-place edit on a versioned table, and\nlegitimately so.\n\n§5.10 versions a plan so a price change never rewrites history, and `close` is how a\nprice change is done. This changes no amount and no date, so every charge the plan has\nalready raised stays explicable by it. What it fixes is that after \"a class can have no\nall-classes plan\", every plan a club created before 2026-09-09 could be assigned to\nnobody -- and the screen could warn about them but not repair one.\n\nAudited for the same reason `set_standing_order_link` is: an in-place edit on a\nversioned table is safe when the history lives in `audit_log`.",
+        "operationId": "set_price_plan_class_api_v1_price_plans__plan_id__class_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plan_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Plan Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanClassIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PricePlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Price Plan Class",
         "tags": [
           "billing"
         ]

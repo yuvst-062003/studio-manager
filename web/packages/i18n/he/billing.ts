@@ -360,11 +360,27 @@ export const billing: Bundle = {
   'classPrices.saveFailed': 'השמירה נכשלה. נסו שוב.',
   'classPrices.loadFailed': 'לא הצלחנו לטעון את המחירים',
   'classPrices.planFor': 'מסלול עבור {{class}}',
+  // ── שיוך לחוג: הכותרות והאזהרה (2026-09-09) ──────────────────────────────────
+  // An item or a plan with no class is not "club-wide" — it is UNUSABLE. An unfiled item
+  // is in nobody's shop and an unfiled plan can be given to no child, and until these
+  // strings existed both looked perfectly healthy on their list.
+  'byClass.unfiled': 'ללא שיוך לחוג',
+  'byClass.unfiledItems': 'אף הורה לא רואה את הפריטים האלה בחנות. בחרו חוג לכל אחד מהם.',
+  'byClass.unfiledPlans': 'לא ניתן לשייך את המסלולים האלה לחניך. בחרו חוג לכל אחד מהם.',
+  'byClass.fileHere': 'שיוך לחוג',
+  'byClass.filing': 'משייך…',
+  'byClass.fileFailed': 'השיוך נכשל. נסו שוב.',
+  // The wizard walks one חוג at a time (owner, 2026-09-09): "let him finish each class
+  // individually, don't combine, because with several classes it will have too long a list".
+  'byClass.wizardProgress': 'חוג {{n}} מתוך {{total}}',
+  'byClass.wizardNext': 'המשך לחוג הבא',
+  'byClass.wizardNoClasses': 'עדיין לא הוגדרו חוגים. חזרו לשלב הקבוצות.',
   'plan.perMonth': 'לחודש',
   'plan.class': 'שיוך לחוג',
   // A plan with no class prices the whole club, which is how every plan worked before
   // per-class pricing and what a club with one חוג still wants.
   'plan.classAll': 'כל החוגים',
+  'plan.classChoose': 'בחרו חוג',
   'plan.classHint': 'מחיר החוג הזה בלבד. ילד שמתאמן בשני חוגים משלם על שניהם.',
   'plan.monthlyHint': 'בשקלים. למשל 400',
   'plan.nameHint': 'לא חובה — בלי שם נשתמש בכמות האימונים',

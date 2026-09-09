@@ -109,6 +109,10 @@ export type DashboardBillingClient = {
   confirmMatch(ipnId: string, payerPersonId: string): Promise<void>
   ignoreIpn(ipnId: string): Promise<void>
   pricePlans(): Promise<PricePlanOut[]>
+  /** The club's classes. Here rather than only on the screens that fetch `/classes`
+   *  themselves, because the setup wizard's prices and items steps take this client and
+   *  now walk one class at a time. */
+  classes(): Promise<{ id: string; name: string }[]>
   /** Every class this child actively trains in, with the plan set for it or `null`, plus
    *  the student-level plan that any unset class falls back to. Driven by ENROLLMENTS, so
    *  a class nobody has priced still comes back — that is the row a manager has to see. */
@@ -127,6 +131,10 @@ export type DashboardBillingClient = {
   billingSettings(): Promise<BillingSettingsOut>
   saveBillingSettings(patch: Partial<BillingSettingsOut>): Promise<BillingSettingsOut>
   setStandingOrderLink(planId: string, url: string | null): Promise<PricePlanOut>
+  /** File an existing plan under a class, or unfile it with `null`. NOT a reprice: it
+   *  changes no amount and no date, so the charges this plan already raised stay
+   *  explicable by it. Repricing is `closePricePlan`, which versions instead. */
+  setPricePlanClass(planId: string, classId: string | null): Promise<PricePlanOut>
   closePricePlan(planId: string, closesOn: string, amountAgorot: number): Promise<PricePlanOut>
   createPricePlan(input: {
     name: string
@@ -269,6 +277,20 @@ export function makeDashboardBillingClient(fetcher: Fetcher): DashboardBillingCl
     },
     async pricePlans() {
       return (await json<{ items: PricePlanOut[] }>(await fetcher('/api/v1/price-plans'))).items
+    },
+    async classes() {
+      return (
+        await json<{ items: { id: string; name: string }[] }>(await fetcher('/api/v1/classes'))
+      ).items
+    },
+    async setPricePlanClass(planId, classId) {
+      return json<PricePlanOut>(
+        await fetcher(`/api/v1/price-plans/${planId}/class`, {
+          method: 'PUT',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ class_id: classId }),
+        }),
+      )
     },
     async studentClassPrices(studentId) {
       return json<StudentClassPricesOut>(

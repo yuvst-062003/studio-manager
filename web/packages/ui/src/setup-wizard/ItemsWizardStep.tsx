@@ -61,6 +61,13 @@ export function ItemsWizardStep({
   onSkip,
 }: WizardStepProps & { client: WizardItemsClient }) {
   const [items, setItems] = useState<WizardProduct[]>([])
+  /** **One class at a time.** Owner, 2026-09-09: "the wizard is per class -- let him finish
+   *  each class individually, don't combine, because if he has several classes it will have
+   *  too long a list." A club selling kit for four classes never reads all four lists at
+   *  once, and every item it creates is filed as it is created -- which is what stops this
+   *  step producing the unfiled items the items screen now has to warn about. */
+  const [classes, setClasses] = useState<{ id: string; name: string }[]>([])
+  const [classIndex, setClassIndex] = useState(0)
   const [draft, setDraft] = useState<ItemDraft>(BLANK_ITEM)
   const [errors, setErrors] = useState<ItemErrors>({})
   const [busy, setBusy] = useState(false)
@@ -77,6 +84,23 @@ export function ItemsWizardStep({
 
   useEffect(load, [load])
 
+  useEffect(() => {
+    let live = true
+    client
+      .classes()
+      .then((rows) => live && setClasses(rows))
+      .catch(() => live && setClasses([]))
+    return () => {
+      live = false
+    }
+  }, [client])
+
+  const currentClass = classes[classIndex] ?? null
+  const isLastClass = classIndex >= classes.length - 1
+  /** Only THIS class's items. */
+  const itemsHere =
+    currentClass === null ? items : items.filter((item) => item.class_id === currentClass.id)
+
   const add = async () => {
     const found = validateItem(draft, locale)
     setErrors(found)
@@ -84,7 +108,9 @@ export function ItemsWizardStep({
     setBusy(true)
     setFailed(false)
     try {
-      await client.createProduct(toInput(draft))
+      // Filed as it is created. `toInput` reads the draft's own picker, so a caller that
+      // has a class in hand wins over an empty draft field.
+      await client.createProduct({ ...toInput(draft), classId: currentClass?.id ?? null })
       setDraft(BLANK_ITEM)
       load()
     } catch {
@@ -98,6 +124,21 @@ export function ItemsWizardStep({
     <div style={columnStyle} data-testid="items-wizard-step">
       <SectionHeader title={t(locale, 'billing.product.wizardTitle')} />
       <p style={hintStyle}>{t(locale, 'billing.product.subtitle')}</p>
+
+      {/* Which class the manager is standing in. The counter appears only when there is more
+          than one -- a sequence of one needs no scaffolding. */}
+      {currentClass !== null ? (
+        <p style={hintStyle} data-testid="wizard-items-class">
+          {classes.length > 1
+            ? `${t(locale, 'billing.byClass.wizardProgress')
+                .replace('{{n}}', String(classIndex + 1))
+                .replace('{{total}}', String(classes.length))} — `
+            : ''}
+          <bdi>
+            <strong>{currentClass.name}</strong>
+          </bdi>
+        </p>
+      ) : null}
 
       {failed ? (
         <p role="alert" style={hintStyle}>
@@ -115,7 +156,7 @@ export function ItemsWizardStep({
         submitLabel={t(locale, 'billing.product.add')}
       />
 
-      {items.map((item) => (
+      {itemsHere.map((item) => (
         <Card key={item.id}>
           <div style={rowStyle}>
             <span style={{ flex: '1 1 auto', minInlineSize: 0 }}>{item.name}</span>
@@ -137,9 +178,21 @@ export function ItemsWizardStep({
           is which — which is the defect the primitive exists to remove. */}
       <ActionBar
         end={
-          <Button onClick={onDone} variant="primary">
-            {t(locale, 'billing.product.wizardDone')}
-          </Button>
+          /* The next CLASS, not the next step: a club finishes one class's kit before it
+             sees the next. Only the last class finishes the step. */
+          !isLastClass && currentClass !== null ? (
+            <Button
+              data-testid="wizard-items-next-class"
+              onClick={() => setClassIndex((n) => n + 1)}
+              variant="primary"
+            >
+              {t(locale, 'billing.byClass.wizardNext')}
+            </Button>
+          ) : (
+            <Button onClick={onDone} variant="primary">
+              {t(locale, 'billing.product.wizardDone')}
+            </Button>
+          )
         }
         start={
           <Button onClick={onSkip} variant="secondary">

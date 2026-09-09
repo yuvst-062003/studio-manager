@@ -322,6 +322,34 @@ class CatalogueService:
         self._session.flush()
         return plan
 
+    def set_plan_class(self, plan_id: uuid.UUID, class_id: uuid.UUID | None) -> PricePlan:
+        """File an existing plan under a class, or unfile it with `None`.
+
+        **Filing is not repricing, and that is why this is an edit at all.** §5.10 versions
+        a plan rather than editing it in place, so a price change CLOSES the old plan and
+        opens a new one -- a charge raised last year must stay explicable by the plan that
+        raised it. This changes no amount and no date; it records which class the plan was
+        always pricing. Forking a second version for it would leave two plans where the club
+        has one, and every child on the first one still pointing at the unfiled row.
+
+        It exists because the owner's "it's per class -- a class can have no all-classes
+        plan" turned every plan created before 2026-09-09 into a row that could be assigned
+        to nobody. Warning a manager about those without giving them a way to fix one would
+        be a dead end with a red label on it.
+
+        The class must belong to this studio: `TenantSession` filters the lookup, so another
+        studio's class reads as absent and the caller gets a 404 rather than a 403 that would
+        confirm it is real.
+        """
+        plan = self._session.get(PricePlan, plan_id)
+        if plan is None:
+            raise NotFoundError(f"no price plan {plan_id}")
+        if class_id is not None and self._session.get(StudioClass, class_id) is None:
+            raise NotFoundError(f"no class {class_id}")
+        plan.class_id = class_id
+        self._session.flush()
+        return plan
+
     def close_price_plan(
         self,
         plan_id: uuid.UUID,

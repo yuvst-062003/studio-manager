@@ -484,6 +484,56 @@ def set_standing_order_link(
     return _plan_out(plan)
 
 
+class PlanClassIn(BaseModel):
+    """Which class this plan prices. `null` unfiles it.
+
+    A plain nullable field rather than an `exclude_unset` partial: this route sets exactly
+    one thing, so "not sent" and "set to null" would be the same request said two ways.
+    """
+
+    class_id: uuid.UUID | None = None
+
+
+@router.put("/price-plans/{plan_id}/class", response_model=PricePlanOut)
+def set_price_plan_class(
+    _: ManagerOrOwner,
+    plan_id: uuid.UUID,
+    body: PlanClassIn,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> PricePlanOut:
+    """File an existing plan under a class -- an in-place edit on a versioned table, and
+    legitimately so.
+
+    §5.10 versions a plan so a price change never rewrites history, and `close` is how a
+    price change is done. This changes no amount and no date, so every charge the plan has
+    already raised stays explicable by it. What it fixes is that after "a class can have no
+    all-classes plan", every plan a club created before 2026-09-09 could be assigned to
+    nobody -- and the screen could warn about them but not repair one.
+
+    Audited for the same reason `set_standing_order_link` is: an in-place edit on a
+    versioned table is safe when the history lives in `audit_log`.
+    """
+    try:
+        plan = CatalogueService(session).set_plan_class(plan_id, body.class_id)
+    except NotFoundError as exc:
+        raise _not_found("price plan or class") from exc
+    AuditService.record(
+        session,
+        action="price_plan.set_class",
+        entity_type="price_plan",
+        entity_id=plan_id,
+        studio_id=require_current_studio_id(),
+        actor_person_id=_actor(request),
+        # An id, not a name: §11.7 keeps `diff` to identifiers, and the class's name is one
+        # join away for anyone reading the entry.
+        diff={"class_id": str(plan.class_id) if plan.class_id else None},
+    )
+    session.commit()
+    return _plan_out(plan)
+
+
 @router.post(
     "/price-plans/{plan_id}/close",
     response_model=PricePlanOut,

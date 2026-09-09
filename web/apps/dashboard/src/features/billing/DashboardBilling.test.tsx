@@ -47,6 +47,10 @@ function stub(overrides: Partial<DashboardBillingClient> = {}): DashboardBilling
     confirmMatch: vi.fn().mockResolvedValue(undefined),
     ignoreIpn: vi.fn().mockResolvedValue(undefined),
     pricePlans: vi.fn().mockResolvedValue([]),
+    // The wizard's prices and items steps walk one class at a time, so the client they
+    // take now lists them. Empty here: these tests are about a single step's own
+    // behaviour, and with no classes it renders exactly as it did before the sequence.
+    classes: vi.fn().mockResolvedValue([]),
     closePricePlan: vi.fn().mockResolvedValue({}),
     createPricePlan: vi.fn().mockResolvedValue({}),
     products: vi.fn().mockResolvedValue([]),
@@ -762,6 +766,58 @@ describe('the wizard\'s prices step', () => {
       />,
     )
   }
+
+  // -- one class at a time (owner, 2026-09-09) ---------------------------------
+  const TWO_CLASSES = [
+    { id: 'c-judo', name: "ג'ודו" },
+    { id: 'c-karate', name: 'קראטה' },
+  ]
+
+  it('shows one class at a time, and only that class\'s plans', async () => {
+    // "Let him finish each class individually, don't combine, because if he has several
+    // classes it will have too long a list." A club with four classes must never read all
+    // four sets of plans at once, which is what this step used to render.
+    const plans = [
+      { id: 'p1', name: "ג'ודו — פעמיים", sessions_per_week: 2, monthly_amount_agorot: 32_000, class_id: 'c-judo' },
+      { id: 'p2', name: 'קראטה — פעם', sessions_per_week: 1, monthly_amount_agorot: 22_000, class_id: 'c-karate' },
+    ]
+    renderStep({
+      client: stub({
+        classes: vi.fn().mockResolvedValue(TWO_CLASSES),
+        pricePlans: vi.fn().mockResolvedValue(plans),
+      }),
+    })
+    expect(await screen.findByTestId('wizard-prices-class')).toHaveTextContent("ג'ודו")
+    const rows = () => screen.queryAllByTestId('wizard-plan-row').map((r) => r.textContent ?? '')
+    expect(rows().some((text) => text.includes("ג'ודו — פעמיים"))).toBe(true)
+    expect(rows().some((text) => text.includes('קראטה — פעם'))).toBe(false)
+
+    // The step does not finish on the first class -- it moves to the next one.
+    expect(screen.queryByTestId('wizard-prices-done')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByTestId('wizard-prices-next-class'))
+
+    expect(screen.getByTestId('wizard-prices-class')).toHaveTextContent('קראטה')
+    expect(rows().some((text) => text.includes('קראטה — פעם'))).toBe(true)
+    expect(rows().some((text) => text.includes("ג'ודו — פעמיים"))).toBe(false)
+    // Last class: now it finishes.
+    expect(screen.getByTestId('wizard-prices-done')).toBeInTheDocument()
+  })
+
+  it('files the plan it creates under the class the manager is standing in', async () => {
+    // The step used to create every plan with NO class, which after "a class can have no
+    // all-classes plan" means a plan that can be assigned to nobody -- the wizard producing
+    // the exact rows the prices screen now has to warn about.
+    const createPricePlan = vi.fn().mockResolvedValue({ id: 'plan-1' })
+    renderStep({
+      client: stub({ classes: vi.fn().mockResolvedValue(TWO_CLASSES), createPricePlan }),
+    })
+    await screen.findByTestId('wizard-prices-class')
+    await userEvent.click(screen.getByTestId('wizard-plan-freq-2'))
+    await userEvent.type(screen.getByTestId('wizard-plan-amount'), '320')
+    await userEvent.click(screen.getByTestId('wizard-plan-save'))
+    await waitFor(() => expect(createPricePlan).toHaveBeenCalled())
+    expect(createPricePlan.mock.calls[0]?.[0]).toMatchObject({ classId: 'c-judo' })
+  })
 
   it('registers at the order WIZARD_STEP_ORDER gives prices', () => {
     // studio · groups · belts · prices · staff · students. A step registered at the wrong
