@@ -137,8 +137,13 @@ export function PlanSection({ locale, studentId }: { locale: Locale; studentId: 
   const payCard = useCallback(() => {
     run(async () => {
       if (money === null || money.openChargeIds.length === 0) return
-      const order = await billing.createOrder([...money.openChargeIds], 1)
-      const form = await billing.orderForm(order.public_ref)
+      // `orderRefFor`, not `createOrder`: `OrderService.create` refuses a charge one of the
+      // payer's own pending orders holds for `REPLACE_GRACE_MINUTES`, so this route — which
+      // kept no reference at all — answered 409 to every second attempt. Closing the
+      // overlay is the commonest way to make a first attempt, and it left the parent unable
+      // to pay for ten minutes with only a generic failure to read.
+      const publicRef = await billing.orderRefFor([...money.openChargeIds], 1, 0)
+      const form = await billing.orderForm(publicRef)
       setOverlay({ kind: 'checkout', form })
     })
   }, [billing, money, run])

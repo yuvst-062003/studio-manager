@@ -420,6 +420,9 @@ export const billing: Bundle = {
   'pay.nothingPayable': 'There is nothing to pay right now.',
   'pay.covered': 'A payment already open covers {{total}}',
   'pay.failed': 'We could not continue to payment. Please try again.',
+  'pay.orderAlreadyOpen':
+    'A payment for these months is already open. You can continue it, or change the amount in a few minutes.',
+  'pay.resumeOpenOrder': 'Continue the payment you started',
   'pay.paidAhead': 'Paid ahead',
   'pay.lastPayment': 'Last payment',
   'pay.noPayments': 'No payments yet',

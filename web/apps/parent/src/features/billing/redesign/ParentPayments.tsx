@@ -24,11 +24,11 @@ import { apiFetch, formatAgorot, formatDateInStudioZone, formatMonthLabel, useRe
 import { LoadFailed } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { DEMO_SIMULATOR, makeParentBillingClient } from '../billingClient'
+import { DEMO_SIMULATOR, OrderConflictError, makeParentBillingClient } from '../billingClient'
 import { PaymentOverlay } from '../PaymentOverlay'
 import type { PaymentOverlayRequest } from '../PaymentOverlay'
 import { methodKey } from '../PaymentHistoryScreen'
-import type { ChargeOut, PaymentOut, PaymentPromiseOut } from '../billingClient'
+import type { ChargeOut, PaymentOrderOut, PaymentOut, PaymentPromiseOut } from '../billingClient'
 import { PayScreen } from './PayScreen'
 import type { LastPayment } from './PayScreen'
 import type { Ask, DebtRow, PayTerms } from './pay'
@@ -42,22 +42,6 @@ type WireTerms = {
 type StudentRow = { id: string; first_name: string; last_name: string }
 
 const NO_TERMS: PayTerms = { cashMonths: 0, monthlyTotalAgorot: 0 }
-
-/**
- * The identity of one ask: the charges it settles, the months it buys forward, and how it
- * splits. Two asks with the same key may share one payment order; two with different keys
- * must not, which is what stops a resume from reopening a page for the wrong amount.
- *
- * **Charge ids are sorted.** The screen builds them oldest-first out of `askFor`, and the
- * server returns `charge_ids` in its own order — a match that depended on the two happening
- * to agree would be a resume that worked by luck and stopped working on a re-order nobody
- * would think to look at.
- */
-const orderKey = (
-  chargeIds: readonly string[],
-  forwardMonths: number,
-  instalments: number,
-): string => `${[...chargeIds].sort().join(',')}|${forwardMonths}|${instalments}`
 
 export function ParentPayments({ locale }: { locale: Locale }) {
   const billing = useMemo(() => makeParentBillingClient(apiFetch), [])
@@ -81,21 +65,29 @@ export function ParentPayments({ locale }: { locale: Locale }) {
   // screen under the spinner instead of flashing back to its skeleton.
   const refreshSignal = useRefreshSignal()
   /**
-   * A card order opened but not yet handed to the overlay, and the ask it was opened for.
+   * The family's own `pending` payment orders, read WITH the charges rather than when the
+   * pay button is pressed.
    *
-   * If the FORM fetch is what failed, the order still exists — so a retry that called
-   * `createOrder` again used to 409 on charges its own first attempt had claimed, and the
-   * parent could neither pay nor cancel. Reused only for the SAME ask: a different month
-   * count means the family wants a different order, not the stuck one, and reusing it
-   * there would open a payment page for the wrong amount.
+   * It has to be this read and not a later one, because it decides what the screen counts
+   * as payable. Inside `REPLACE_GRACE_MINUTES` the server reports a charge one of these
+   * orders holds as `is_covered_elsewhere` — correctly, since `create` would refuse a
+   * SECOND order over it — and `payable()` used to drop the row on that alone. The ask then
+   * named no charge at all and the card branch turned the month chip into a month bought
+   * FORWARD: the parent pressed the same button and paid ₪250 for October instead of
+   * ₪208.33 for September, which is not the payment they asked for and left September open.
+   *
+   * `orderRefFor` reopens the order rather than creating a second one, so a charge one of
+   * these holds is not covered — it is resumable, and the two are not the same word.
    */
-  const [pendingOrder, setPendingOrder] = useState<{ publicRef: string; key: string } | null>(null)
+  const [openOrders, setOpenOrders] = useState<readonly PaymentOrderOut[]>([])
+  /** The order the conflict copy offers to reopen. Set only when `orderRefFor` refuses. */
+  const [conflictRef, setConflictRef] = useState<string | null>(null)
 
   useEffect(() => {
     let live = true
     void (async () => {
       try {
-        const [charges, children, wireTerms, balance, payments, promiseRows, mandate] =
+        const [charges, children, wireTerms, balance, payments, promiseRows, mandate, mine] =
           await Promise.all([
             billing.openCharges(''),
             apiFetch('/api/v1/me/students')
@@ -114,19 +106,31 @@ export function ParentPayments({ locale }: { locale: Locale }) {
             apiFetch('/api/v1/me/standing-order')
               .then((r) => (r.ok ? (r.json() as Promise<{ active: boolean }>) : { active: false }))
               .catch(() => ({ active: false })),
+            // Empty on failure is the safe direction here, and the only one: it makes a
+            // charge read as covered rather than payable, so the worst case is the screen
+            // greying out a row the parent could have resumed — never one it opens a
+            // second payment page over.
+            billing.myOpenOrders().catch(() => [] as PaymentOrderOut[]),
           ])
         if (!live) return
         const nameOf = new Map(
           children.items.map((child) => [child.id, `${child.first_name} ${child.last_name}`]),
         )
+        setOpenOrders(mine)
+        // Which charges one of the family's OWN pending orders holds. `/me/payment-orders`
+        // returns only `pending` and only the caller's, so a charge held by a `paid` or
+        // `amount_mismatch` order — the two claims a parent genuinely cannot take back —
+        // never appears here and stays greyed out.
+        const resumable = new Set(mine.flatMap((order) => (order.charge_ids ?? []).map(String)))
         setDebts(
           charges.map((charge: ChargeOut) => ({
             charge,
             studentName: charge.student_id ? (nameOf.get(charge.student_id) ?? '') : '',
-            // Computed by the server from exactly the predicate its own refusal uses, so a
-            // row this screen greys out is a row the server would decline. Since
-            // 2026-09-07 that no longer includes the payer's OWN abandoned order.
-            coveredElsewhere: charge.is_covered_elsewhere,
+            // `is_covered_elsewhere` answers "would `create` refuse a second order over
+            // this?" and answers it correctly. It is not the same question as "can this
+            // family pay this now": their own open order is a page to REOPEN, and reading
+            // the server's flag as a block is what made the button quietly buy next month.
+            coveredElsewhere: charge.is_covered_elsewhere && !resumable.has(charge.id),
           })),
         )
         setTerms({
@@ -179,6 +183,7 @@ export function ParentPayments({ locale }: { locale: Locale }) {
       if (busy) return
       setBusy(true)
       setError(null)
+      setConflictRef(null)
       try {
         if (ask.method === 'cash') {
           // `alreadyPaid: false` explicitly — this is "I will pay", not "I already did",
@@ -192,34 +197,17 @@ export function ParentPayments({ locale }: { locale: Locale }) {
         // 1. It is part of the reuse KEY as well: an order opened for one payment and then
         // handed back for three would put the parent on a uPay page for terms they did not
         // pick, which is the same failure the month count is already keyed against.
-        const key = orderKey(ask.chargeIds, ask.forwardMonths, ask.instalments)
-        let publicRef = pendingOrder?.key === key ? pendingOrder.publicRef : null
-        if (publicRef === null) {
-          // An order of the family's OWN, still pending over exactly these charges, is the
-          // page to reopen — not a second one. `create` refuses for REPLACE_GRACE_MINUTES
-          // while it stands, and `pendingOrder` above cannot carry us there: it is cleared
-          // the moment a form opens, and dies outright when the screen unmounts or the PWA
-          // closes. So a parent who opened uPay and came back met `billing.pay.failed` with
-          // nothing on screen to say why, for ten minutes (owner report, 2026-09-08).
-          const resumable = (await billing.myOpenOrders()).find(
-            (order) =>
-              // Both carry a server-side default, so the generated client types them
-              // optional; an order that named no charges is a forward-only buy, not a
-              // reason to skip the comparison.
-              orderKey(
-                (order.charge_ids ?? []).map(String),
-                order.prepay_months ?? 0,
-                order.max_payments,
-              ) === key,
-          )
-          publicRef =
-            resumable?.public_ref ??
-            (await billing.createOrder([...ask.chargeIds], ask.instalments, ask.forwardMonths))
-              .public_ref
-        }
-        setPendingOrder({ publicRef, key })
+        //
+        // The whole of "which page do we open" is `orderRefFor`'s, and it asks the SERVER.
+        // This screen used to hold the last `public_ref` in state so a failed form fetch
+        // could retry against it — but that state is cleared the moment a form opens and
+        // dies with the screen, which is exactly when a parent walks away from a checkout.
+        const publicRef = await billing.orderRefFor(
+          [...ask.chargeIds],
+          ask.instalments,
+          ask.forwardMonths,
+        )
         const form = await billing.orderForm(publicRef)
-        setPendingOrder(null)
         if (form.action === DEMO_SIMULATOR.action) {
           // §19.6 — no live form exists in this deployment by design. The order is open
           // and the IPN is what settles it.
@@ -227,14 +215,49 @@ export function ParentPayments({ locale }: { locale: Locale }) {
           return
         }
         setOverlay({ kind: 'checkout', form })
-      } catch {
-        setError(t(locale, 'billing.pay.failed'))
+      } catch (thrown) {
+        if (thrown instanceof OrderConflictError) {
+          // Not a failure the family can retry their way out of, and not one to report as
+          // "something went wrong": they have a payment page open over these charges for a
+          // DIFFERENT ask — one month started, three months now selected — and `create`
+          // holds it for `REPLACE_GRACE_MINUTES` because uPay's IPN lands about five
+          // minutes after a real payment. Reopening it anyway would charge an amount they
+          // did not pick, so the copy names the situation and offers the page they have.
+          setConflictRef(
+            openOrders.find((order) =>
+              (order.charge_ids ?? []).some((id) => ask.chargeIds.includes(String(id))),
+            )?.public_ref ?? null,
+          )
+          setError(t(locale, 'billing.pay.orderAlreadyOpen'))
+        } else {
+          setError(t(locale, 'billing.pay.failed'))
+        }
       } finally {
         setBusy(false)
       }
     },
-    [billing, busy, locale, pendingOrder, refresh],
+    [billing, busy, locale, openOrders, refresh],
   )
+
+  /** Open the page the family already has, at the amount it was opened for. */
+  const resumeOpenOrder = useCallback(async () => {
+    if (conflictRef === null || busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      const form = await billing.orderForm(conflictRef)
+      if (form.action === DEMO_SIMULATOR.action) {
+        refresh()
+        return
+      }
+      setConflictRef(null)
+      setOverlay({ kind: 'checkout', form })
+    } catch {
+      setError(t(locale, 'billing.pay.failed'))
+    } finally {
+      setBusy(false)
+    }
+  }, [billing, busy, conflictRef, locale, refresh])
 
   if (failed) {
     return (
@@ -270,6 +293,7 @@ export function ParentPayments({ locale }: { locale: Locale }) {
         dateLabel={(iso) => formatDateInStudioZone(iso, locale)}
         monthLabel={(year, month) => formatMonthLabel(year, month, locale)}
         onPay={pay}
+        onResumeOpenOrder={conflictRef === null ? undefined : () => void resumeOpenOrder()}
         onOpenHistory={() => {
           globalThis.location.hash = '#/payments/history'
         }}

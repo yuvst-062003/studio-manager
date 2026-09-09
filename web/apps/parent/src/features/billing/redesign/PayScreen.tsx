@@ -84,6 +84,10 @@ export type PayScreenProps = {
   cashDeclined: boolean
   busy: boolean
   error: string | null
+  /** Offered beside `error` when the refusal was `billing.pay.orderAlreadyOpen`: the family
+   *  has a payment page open at a different amount, and this reopens it. Undefined the rest
+   *  of the time, which is what keeps the button out of every other error. */
+  onResumeOpenOrder?: () => void
   money: (agorot: number) => string
   dateLabel: (iso: string) => string
   monthLabel: (year: number, month: number) => string
@@ -104,6 +108,7 @@ export function PayScreen({
   cashDeclined,
   busy,
   error,
+  onResumeOpenOrder,
   money,
   dateLabel,
   monthLabel,
@@ -716,13 +721,23 @@ export function PayScreen({
         </section>
 
         {error ? (
-          <p
+          <div
             data-testid="pay-error"
             role="alert"
-            className="text-[13px] text-red-800 dark:text-red-300 bg-red-50 dark:bg-red-500/10 border border-red-300 dark:border-red-500/30 rounded-xl p-3"
+            className="flex flex-col items-start gap-2 text-[13px] text-red-800 dark:text-red-300 bg-red-50 dark:bg-red-500/10 border border-red-300 dark:border-red-500/30 rounded-xl p-3"
           >
-            {error}
-          </p>
+            <p className="m-0">{error}</p>
+            {onResumeOpenOrder ? (
+              <button
+                type="button"
+                data-testid="pay-resume-open-order"
+                onClick={onResumeOpenOrder}
+                className="bg-transparent border-0 p-0 text-[13px] font-bold text-[#0056c5] dark:text-blue-300 cursor-pointer hover:underline"
+              >
+                {t(locale, 'billing.pay.resumeOpenOrder')}
+              </button>
+            ) : null}
+          </div>
         ) : null}
       </main>
 

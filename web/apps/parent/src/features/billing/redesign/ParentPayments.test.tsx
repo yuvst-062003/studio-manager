@@ -54,6 +54,37 @@ function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status })
 }
 
+/** The ref the fake server hands back, and the one it then lists. One constant, because a
+ *  fake that created an order under one reference and listed it under another would let a
+ *  broken resume look like a working one. */
+const CREATED_REF = 'ref-1'
+
+/**
+ * `POST /payment-orders`, as the real one behaves: on success the order EXISTS, and
+ * `GET /me/payment-orders` returns it from that moment.
+ *
+ * The screen no longer remembers a `public_ref` in React state — it asks the server, which
+ * is the whole point of the fix (state dies when a parent leaves a checkout; the server does
+ * not). So a fake that forgot what it created would report every resume as a second order.
+ */
+function createOrder(path: string, init?: RequestInit): Response {
+  const response = orderResponse()
+  if (!response.ok) return response
+  const query = new URLSearchParams(path.split('?')[1] ?? '')
+  const body = JSON.parse(String(init?.body ?? '{}')) as { charge_ids?: string[] }
+  openOrders = [
+    ...openOrders,
+    {
+      public_ref: CREATED_REF,
+      status: 'pending',
+      charge_ids: body.charge_ids ?? [],
+      prepay_months: Number(query.get('prepay_months') ?? 0),
+      max_payments: Number(query.get('max_payments') ?? 1),
+    },
+  ]
+  return response
+}
+
 function respond(path: string, init?: RequestInit): Response {
   calls.push({ path, init })
   // Order matters: `/me/payment-promises` also starts with `/api/v1/me/payment`.
@@ -80,7 +111,7 @@ function respond(path: string, init?: RequestInit): Response {
   // Before `/api/v1/payment-orders`: this is the payer's own listing, not the create.
   if (path.startsWith('/api/v1/me/payment-orders')) return jsonResponse({ items: openOrders })
   if (path.endsWith('/form')) return formResponse()
-  if (path.startsWith('/api/v1/payment-orders')) return orderResponse()
+  if (path.startsWith('/api/v1/payment-orders')) return createOrder(path, init)
   return jsonResponse({ items: [] })
 }
 
@@ -101,7 +132,7 @@ beforeEach(async () => {
   creditAgorot = 0
   standingOrderActive = false
   openOrders = []
-  orderResponse = () => jsonResponse({ public_ref: 'ref-1' })
+  orderResponse = () => jsonResponse({ public_ref: CREATED_REF })
   formResponse = () =>
     jsonResponse({ action: 'https://app.upay.co.il/checkout', fields: { ref: 'ref-1' } })
   const { apiFetch } = await import('@studio/core')
@@ -569,6 +600,66 @@ describe('a payment the family opened and walked away from', () => {
       (call) => call.path.startsWith('/api/v1/payment-orders?') && call.init?.method === 'POST',
     )
     expect(created).toHaveLength(0)
+  })
+
+  it('resumes the abandoned order over a charge the server reports as covered', async () => {
+    // The state the SERVER actually reports inside `REPLACE_GRACE_MINUTES`, which the two
+    // tests above do not set up: `covered_charge_ids` counts the payer's own order until
+    // it is ten minutes old, so `/me/charges` comes back with `is_covered_elsewhere: true`
+    // for exactly the charge `/me/payment-orders` is offering back. Both are true at once,
+    // and any reload of the screen inside that window sees both.
+    //
+    // `payable()` drops a covered row, so `askFor` builds an ask over NO charges — and the
+    // card branch turns the month chip into a month bought FORWARD. The parent presses the
+    // same button for the same amount and buys next month instead of paying for September,
+    // which is not the payment they asked for and leaves September open.
+    charges = [{ ...CHARGE, is_covered_elsewhere: true }]
+    openOrders = [RESUMABLE]
+    const user = await open()
+    await user.click(payButton())
+
+    await waitFor(() =>
+      expect(calls.some((call) => call.path.endsWith('/form'))).toBe(true),
+    )
+    const created = calls.filter(
+      (call) => call.path.startsWith('/api/v1/payment-orders?') && call.init?.method === 'POST',
+    )
+    // No second order, and no order that buys a month forward instead of settling the one
+    // the family opened the payment page for.
+    expect(created.map((call) => call.path)).toEqual([])
+    expect(calls.some((call) => call.path === '/api/v1/payment-orders/ref-abandoned/form')).toBe(
+      true,
+    )
+  })
+
+  it('names the open payment instead of failing when the ask has changed', async () => {
+    // The case the fix above CREATES. September is payable again, so the family can now
+    // build an ask the open order does not match — one month started, three months now
+    // selected. `create` still refuses for `REPLACE_GRACE_MINUTES`, and it is right to:
+    // that is the window in which money may already be moving.
+    //
+    // Reopening the one-month page anyway would charge an amount they did not pick, so the
+    // only honest answer names the payment they have and offers it back. Before this it was
+    // `billing.pay.failed` — "try again" for something trying again cannot fix.
+    charges = [{ ...CHARGE, is_covered_elsewhere: true }]
+    openOrders = [RESUMABLE]
+    orderResponse = () => jsonResponse({ detail: { code: 'conflict', message: 'covered' } }, 409)
+    const user = await open()
+    // Three months: one settles September, two are bought forward — a different ask, so
+    // `orderRefFor` finds no match and reaches the server's refusal.
+    await user.click(screen.getByTestId('pay-months-3'))
+    await user.click(payButton())
+
+    await waitFor(() => expect(screen.getByTestId('pay-error')).toBeInTheDocument())
+    expect(screen.getByTestId('pay-error')).toHaveTextContent(
+      t('he', 'billing.pay.orderAlreadyOpen'),
+    )
+    // and the way out is on screen, not a ten-minute wait with nothing to read
+    await user.click(screen.getByTestId('pay-resume-open-order'))
+    await waitFor(() => expect(screen.getByTestId('payment-overlay')).toBeInTheDocument())
+    expect(calls.some((call) => call.path === '/api/v1/payment-orders/ref-abandoned/form')).toBe(
+      true,
+    )
   })
 
   it('still opens a fresh order when the pending one is for a different ask', async () => {

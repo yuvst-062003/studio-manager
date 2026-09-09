@@ -88,3 +88,53 @@ def test_a_parent_never_sees_another_familys_order(
     mine = client.get("/api/v1/me/payment-orders", headers=stranger.headers)
     assert mine.status_code == 200, mine.text
     assert mine.json()["items"] == []
+
+
+def test_a_covered_charge_still_names_the_order_that_covers_it(
+    client, app_session, studio, a_priced_student, as_guardian_of
+):
+    """The seam the parent app joins on, asserted from the server side.
+
+    Inside the grace window BOTH of these are true of one charge: `GET /me/charges` reports
+    it `is_covered_elsewhere`, because `create` would refuse a second order over it, and
+    `GET /me/payment-orders` names it, because the order holding it is the payer's own and
+    reopening it is exactly what they should do.
+
+    The flag alone cannot tell those apart, and reading it as a block is the bug: `payable()`
+    dropped the row, the ask named no charge, and the card branch turned the month chip into
+    a month bought FORWARD — the parent pressed the same button and paid for October instead
+    of September. `ParentPayments` now subtracts the second read from the first, so what has
+    to hold is that the second read still names the charge the first one covers.
+
+    Note what is NOT asserted: that the flag flips. It must not. `is_covered_elsewhere`
+    answers "would `create` refuse this?" and that answer is correct — the manager's ledger
+    reads the same field and an order holding a charge is a fact worth seeing there.
+    """
+    parent = as_guardian_of(a_priced_student.student_id)
+    charge = _charge_owed_by(studio, a_priced_student.student_id, parent.person_id)
+    app_session.add(charge)
+    app_session.commit()
+
+    opened = client.post(
+        "/api/v1/payment-orders",
+        json={"charge_ids": [str(charge.id)]},
+        headers=parent.headers,
+    )
+    assert opened.status_code == 201, opened.text
+
+    resumable = client.get("/api/v1/me/payment-orders", headers=parent.headers)
+    assert [row["charge_ids"] for row in resumable.json()["items"]] == [[str(charge.id)]]
+
+    mine = client.get("/api/v1/me/charges?status=open", headers=parent.headers)
+    assert mine.status_code == 200, mine.text
+    rows = {row["id"]: row for row in mine.json()["items"]}
+    # Still covered -- `create` would still refuse a second order over it.
+    assert rows[str(charge.id)]["is_covered_elsewhere"] is True
+    # And still resumable, which is what makes the first fact survivable: every charge the
+    # covered flag names is named back by an order the parent owns and may reopen.
+    held = {
+        charge_id
+        for row in resumable.json()["items"]
+        for charge_id in row["charge_ids"]
+    }
+    assert str(charge.id) in held

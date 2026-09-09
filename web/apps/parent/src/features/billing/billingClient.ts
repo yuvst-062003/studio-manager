@@ -103,6 +103,44 @@ export type BillingClient = {
    *  `createOrder` is refused while one of these still holds its charges, and the
    *  `public_ref` that would reopen it lived only in React state until this existed. */
   myOpenOrders(): Promise<PaymentOrderOut[]>
+  /** The payment page for one ask: the family's OWN open order when it matches, else a
+   *  new one. Every card route goes through this — see its implementation for why. */
+  orderRefFor(chargeIds: string[], instalments: number, prepayMonths: number): Promise<string>
+}
+
+/**
+ * The identity of one ask: the charges it settles, the months it buys forward, and how it
+ * splits. Two asks with the same key may share one payment order; two with different keys
+ * must not — reopening a one-month page for a family who asked for three would charge an
+ * amount they did not agree to.
+ *
+ * **Charge ids are sorted.** A screen builds them oldest-first and the server returns
+ * `charge_ids` in its own order; a match that depended on the two happening to agree would
+ * work by luck and stop working on a re-order nobody would think to look at.
+ *
+ * Lives here rather than on a screen because all three card routes key against it, and
+ * three spellings of "the same ask" is three chances for one to drift.
+ */
+export const orderKey = (
+  chargeIds: readonly string[],
+  forwardMonths: number,
+  instalments: number,
+): string => `${[...chargeIds].sort().join(',')}|${forwardMonths}|${instalments}`
+
+/**
+ * `POST /payment-orders` refused because the family already has an order over these
+ * charges that this ask does not match.
+ *
+ * Thrown rather than returned so a caller cannot forget it: the screen must say something
+ * other than its generic failure, because the parent CAN still pay — just not for the
+ * amount they have currently selected. `OrderService.create` holds their own pending order
+ * for `REPLACE_GRACE_MINUTES`, which is the window in which money may already be moving.
+ */
+export class OrderConflictError extends Error {
+  constructor() {
+    super('an open order of this payer already holds these charges')
+    this.name = 'OrderConflictError'
+  }
 }
 
 // There is deliberately no `makeBillingClient` here any more (ship-audit D5). The one
@@ -263,6 +301,16 @@ export function submitUpayForm(form: UpayForm, targetName?: string): void {
  * before: every read it made answered 403.
  */
 export function makeParentBillingClient(fetcher: Fetcher): BillingClient {
+  // Hoisted out of the object literal because `orderRefFor` calls it: a method reaching
+  // for `this` would break the moment a screen destructured the client, and this file is
+  // imported by three of them.
+  const openOrders = async (): Promise<PaymentOrderOut[]> => {
+    // Scoped to the caller by the server; no payer id is sent, for the same reason
+    // `createOrder` sends none — a `public_ref` opens a payment page.
+    const response = await fetcher('/api/v1/me/payment-orders')
+    if (!response.ok) return []
+    return (await response.json()).items as PaymentOrderOut[]
+  }
   return {
     async openCharges() {
       const response = await fetcher('/api/v1/me/charges?status=open')
@@ -336,12 +384,45 @@ export function makeParentBillingClient(fetcher: Fetcher): BillingClient {
     async orderStatus(publicRef) {
       return json<PaymentOrderOut>(await fetcher(`/api/v1/payment-orders/${publicRef}`))
     },
-    async myOpenOrders() {
-      // Scoped to the caller by the server; no payer id is sent, for the same reason
-      // `createOrder` sends none — a `public_ref` opens a payment page.
-      const response = await fetcher('/api/v1/me/payment-orders')
-      if (!response.ok) return []
-      return (await response.json()).items as PaymentOrderOut[]
+    myOpenOrders: openOrders,
+    async orderRefFor(chargeIds, instalments, prepayMonths) {
+      // **Ask the server what this family already has, before opening anything new.**
+      //
+      // `OrderService.create` refuses a charge one of the payer's own pending orders still
+      // holds, for `REPLACE_GRACE_MINUTES` — correctly, since uPay's IPN lands about five
+      // minutes after a real payment and releasing sooner would offer the same month for a
+      // second card payment while money is in flight. So the second attempt after a parent
+      // closes the checkout is a 409 unless it reopens the order it already has.
+      //
+      // Each card route used to remember that `public_ref` itself, in React state
+      // (`pendingOrder`) or a ref (`pendingRef`). Both are cleared the moment a form opens
+      // and gone entirely when the screen unmounts or the PWA closes — which is exactly the
+      // moment a parent walks away from a payment. The server never forgets, so it is asked
+      // every time and the local copies are gone.
+      const key = orderKey(chargeIds, prepayMonths, instalments)
+      const resumable = (await openOrders()).find(
+        (order) =>
+          // Both carry a server-side default, so the generated client types them optional;
+          // an order that names no charges is a forward-only buy, not a reason to skip the
+          // comparison.
+          orderKey((order.charge_ids ?? []).map(String), order.prepay_months ?? 0, order.max_payments) ===
+          key,
+      )
+      if (resumable) return resumable.public_ref
+      const query = new URLSearchParams({
+        max_payments: String(instalments),
+        prepay_months: String(prepayMonths),
+      })
+      const response = await fetcher(`/api/v1/payment-orders?${query.toString()}`, {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ charge_ids: chargeIds }),
+      })
+      // The one refusal a screen must not report as a generic failure: the family has an
+      // order open over these charges that this ask does not match, so they can still pay —
+      // just not for the amount currently selected.
+      if (response.status === 409) throw new OrderConflictError()
+      return (await json<PaymentOrderOut>(response)).public_ref
     },
   }
 }

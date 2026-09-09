@@ -423,6 +423,9 @@ export const billing: Bundle = {
   'pay.nothingPayable': 'Сейчас нечего оплачивать.',
   'pay.covered': 'Уже открытый платёж покрывает {{total}}',
   'pay.failed': 'Не удалось перейти к оплате. Попробуйте ещё раз.',
+  'pay.orderAlreadyOpen':
+    'Оплата за эти месяцы уже открыта. Можно продолжить её или изменить сумму через несколько минут.',
+  'pay.resumeOpenOrder': 'Продолжить начатую оплату',
   'pay.paidAhead': 'Оплачено вперёд',
   'pay.lastPayment': 'Последний платёж',
   'pay.noPayments': 'Платежей пока нет',

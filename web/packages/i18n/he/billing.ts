@@ -535,6 +535,12 @@ export const billing: Bundle = {
   'pay.nothingPayable': 'אין כרגע חיוב שאפשר לשלם.',
   'pay.covered': 'תשלום שכבר נפתח מכסה {{total}}',
   'pay.failed': 'לא הצלחנו להמשיך לתשלום. נסו שוב.',
+  // Not 'something went wrong': the family HAS a payment page open, for a different
+  // number of months than they have just selected. `OrderService.create` holds it for ten
+  // minutes because uPay's confirmation lands about five minutes after a real payment, so
+  // the honest answer names the payment they already opened and offers it back.
+  'pay.orderAlreadyOpen': 'כבר נפתח עבורכם תשלום על החודשים האלה. אפשר להמשיך אותו, או לנסות לשנות את הסכום בעוד כמה דקות.',
+  'pay.resumeOpenOrder': 'המשך לתשלום שכבר נפתח',
   'pay.paidAhead': 'שולם מראש',
   'pay.lastPayment': 'התשלום האחרון',
   'pay.noPayments': 'אין עדיין תשלומים',
