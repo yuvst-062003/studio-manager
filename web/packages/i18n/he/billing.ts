@@ -344,6 +344,11 @@ export const billing: Bundle = {
   'plan.badge.noneTitle': 'לא הוגדר מסלול — החניך לא מחויב',
   'plan.badge.column': 'מסלול',
   'plan.perMonth': 'לחודש',
+  'plan.class': 'שיוך לחוג',
+  // A plan with no class prices the whole club, which is how every plan worked before
+  // per-class pricing and what a club with one חוג still wants.
+  'plan.classAll': 'כל החוגים',
+  'plan.classHint': 'מחיר החוג הזה בלבד. ילד שמתאמן בשני חוגים משלם על שניהם.',
   'plan.monthlyHint': 'בשקלים. למשל 400',
   'plan.nameHint': 'לא חובה — בלי שם נשתמש בכמות האימונים',
   'plan.moreOptions': 'שם מותאם וקישור להוראת קבע',

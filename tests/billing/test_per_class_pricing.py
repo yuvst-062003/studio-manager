@@ -183,9 +183,13 @@ def test_a_child_in_two_classes_with_no_per_class_price_is_billed_once(
     charges = _tuition(tenant_session)
     assert len(charges) == 1
     # And at the OLD amount -- nobody's bill moves because of the migration alone.
-    legacy_plan_id = app_session.execute(
-        select(Student.price_plan_id).where(Student.id == a_priced_student.student_id)
-    ).scalars().one()
+    legacy_plan_id = (
+        app_session.execute(
+            select(Student.price_plan_id).where(Student.id == a_priced_student.student_id)
+        )
+        .scalars()
+        .one()
+    )
     plan = app_session.get(PricePlan, legacy_plan_id)
     assert charges[0].amount_agorot == plan.monthly_amount_agorot
 

@@ -122,6 +122,9 @@ export type DashboardBillingClient = {
     monthlyAmountAgorot: number
     registrationFeeAgorot: number | null
     activeFrom: string
+    /** Which class this plan prices. `null` prices the studio, as every plan did before
+     *  per-class pricing. */
+    classId?: string | null
   }): Promise<PricePlanOut>
   /** `include_inactive` because a retired item is edited back into life on the same
    *  screen — §11.4's shape for a catalogue: retired, never deleted, since charges already
@@ -355,6 +358,7 @@ export function makeDashboardBillingClient(fetcher: Fetcher): DashboardBillingCl
             monthly_amount_agorot: input.monthlyAmountAgorot,
             registration_fee_agorot: input.registrationFeeAgorot,
             active_from: input.activeFrom,
+            class_id: input.classId ?? null,
           }),
         }),
       )

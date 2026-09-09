@@ -11,6 +11,10 @@ import type { PricePlanOut } from './billingClient'
 export function PricesSection({ locale }: { locale: Locale }) {
   const client = useMemo(() => makeDashboardBillingClient(apiFetch), [])
   const [plans, setPlans] = useState<PricePlanOut[] | null>(null)
+  //: The classes a plan may price. Read here beside the plans, so one failed read cannot
+  //: leave the picker empty while the rest of the screen looks fine — an empty list makes
+  //: every new plan studio-wide, which is a silent wrong answer rather than a visible one.
+  const [classes, setClasses] = useState<readonly { id: string; name: string }[]>([])
   const [reloads, setReloads] = useState(0)
 
   useEffect(() => {
@@ -19,6 +23,13 @@ export function PricesSection({ locale }: { locale: Locale }) {
       .pricePlans()
       .then((rows) => alive && setPlans(rows))
       .catch(() => alive && setPlans([]))
+    void apiFetch('/api/v1/classes')
+      .then(async (response) => {
+        if (!alive || !response.ok) return
+        const body = (await response.json()) as { items: { id: string; name: string }[] }
+        setClasses(body.items)
+      })
+      .catch(() => undefined)
     return () => {
       alive = false
     }
@@ -27,5 +38,13 @@ export function PricesSection({ locale }: { locale: Locale }) {
   const onChanged = useCallback(() => setReloads((n) => n + 1), [])
 
   if (plans === null) return null
-  return <PricePlansScreen locale={locale} client={client} plans={plans} onChanged={onChanged} />
+  return (
+    <PricePlansScreen
+      classes={classes}
+      client={client}
+      locale={locale}
+      onChanged={onChanged}
+      plans={plans}
+    />
+  )
 }

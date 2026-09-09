@@ -7,9 +7,16 @@ still be explicable by the plan that was in force when it was raised, and an edi
 is what makes it inexplicable -- the amount on the row stops matching the amount the family
 was actually billed, with nothing recording that it ever changed.
 
-**C11 -- a plan is scoped by training volume and attaches to a student, never to a group.**
-There is no `group_id` and no `class_id` on this table. The club prices by how often a child
-trains, so a child in two groups who comes twice a week pays the twice-a-week price once.
+**C11, as it stands after 2026-09-09.** A plan is scoped by training volume and attaches to
+a student, and there is still **no `group_id`** -- that absence is the whole of what stops a
+child in two groups being billed twice, and it is not negotiable.
+
+What changed, on the owner's explicit sign-off, is `class_id`: judo and karate may price
+differently, and a child doing both pays both. `sessions_per_week` is read WITHIN a class, so
+a child who trains twice a week at judo is on judo's twice-a-week plan and adding karate does
+not make them a four-a-week judo student. `student_class_price` is where a child's plan for a
+given class lives; `student.price_plan_id` remains the fallback for anyone not yet priced per
+class, which is what let this ship without repricing the club in one evening.
 
 **The catalogue carries no stock counts.** §4.3 and §5.10 both say it outright: "inventory
 is a different product". Selling an item creates an ordinary `charge` with `kind='manual'`,
@@ -31,9 +38,11 @@ from sqlalchemy.orm import Session, aliased
 
 from app.core.config import settings
 from app.integrations.upay.form import UPAY_ENDPOINT
-from app.models.billing import PricePlan, Product
-from app.models.people import Student
+from app.models.billing import PricePlan, Product, StudentClassPrice
+from app.models.people import Enrollment, Student
 from app.models.person import Guardian, Person
+from app.models.structure import Class as StudioClass
+from app.models.structure import Group
 from app.services.billing.errors import ConflictError, NotFoundError, RefusedError
 from app.services.people.naming import format_person_name
 
@@ -215,6 +224,17 @@ def unpriced_students(session: Session, *, today: date) -> list[UnpricedStudent]
     ]
 
 
+@dataclass(frozen=True, slots=True)
+class ClassPriceRow:
+    """One class a child trains in, and what they pay for it -- or nothing yet."""
+
+    class_id: uuid.UUID
+    class_name: str
+    price_plan_id: uuid.UUID | None
+    price_plan_name: str | None
+    monthly_amount_agorot: int | None
+
+
 class CatalogueService:
     """Prices and sellable items. Takes the session on the constructor, like every service
     in this lane, and is exactly as tenant-scoped as the session it is handed."""
@@ -259,8 +279,14 @@ class CatalogueService:
         monthly_amount_agorot: int,
         registration_fee_agorot: int | None,
         active_from: date,
+        class_id: uuid.UUID | None = None,
     ) -> PricePlan:
-        """A new plan, open-ended. `active_to` is null until it is closed."""
+        """A new plan, open-ended. `active_to` is null until it is closed.
+
+        `class_id` since 2026-09-09: which class this plan prices. Defaults to None, which
+        prices the studio the way every plan did before -- so the setup wizard, which runs
+        before any class exists, is unchanged.
+        """
         self._require_money(monthly_amount_agorot, "monthly_amount_agorot")
         if registration_fee_agorot is not None:
             self._require_money(registration_fee_agorot, "registration_fee_agorot")
@@ -275,6 +301,7 @@ class CatalogueService:
             monthly_amount_agorot=monthly_amount_agorot,
             registration_fee_agorot=registration_fee_agorot,
             active_from=active_from,
+            class_id=class_id,
             active_to=None,
         )
         self._session.add(plan)
@@ -510,3 +537,104 @@ class CatalogueService:
             raise TypeError(f"{field} must be an integer count of agorot (G2)")
         if amount_agorot < 0:
             raise RefusedError(f"{field} cannot be negative")
+
+    # -- a child's price, per class (2026-09-09) -------------------------------
+    def student_class_prices(
+        self, student_id: uuid.UUID
+    ) -> tuple[list[ClassPriceRow], uuid.UUID | None]:
+        """Every class this child ACTIVELY trains in, with its plan where one is set.
+
+        Driven by enrollments and not by the price rows, so a class the child joined and
+        nobody has priced still appears -- that is the row a manager has to be able to see,
+        and it is exactly what the run reports as `unpriced` once any per-class price
+        exists for this child.
+
+        `DISTINCT` over `group.class_id`: two groups of one discipline are one row here for
+        the same reason they are one charge in the run.
+        """
+        student = self._session.get(Student, student_id)
+        if student is None:
+            raise NotFoundError(f"no student {student_id}")
+        priced = {
+            row.class_id: row.price_plan_id
+            for row in self._session.execute(
+                select(StudentClassPrice).where(StudentClassPrice.student_id == student_id)
+            ).scalars()
+        }
+        classes = self._session.execute(
+            select(StudioClass.id, StudioClass.name)
+            .join(Group, Group.class_id == StudioClass.id)
+            .join(Enrollment, Enrollment.group_id == Group.id)
+            .where(Enrollment.student_id == student_id, Enrollment.status == "active")
+            .distinct()
+            .order_by(StudioClass.name)
+        ).all()
+        plans = {
+            plan.id: plan
+            for plan in self._session.execute(
+                select(PricePlan).where(PricePlan.id.in_([p for p in priced.values() if p]))
+            ).scalars()
+        }
+        rows = []
+        for class_id, class_name in classes:
+            plan_id = priced.get(class_id)
+            plan = plans.get(plan_id) if plan_id else None
+            rows.append(
+                ClassPriceRow(
+                    class_id=class_id,
+                    class_name=class_name,
+                    price_plan_id=plan_id,
+                    price_plan_name=plan.name if plan else None,
+                    monthly_amount_agorot=plan.monthly_amount_agorot if plan else None,
+                )
+            )
+        return rows, student.price_plan_id
+
+    def set_student_class_prices(
+        self,
+        studio_id: uuid.UUID,
+        student_id: uuid.UUID,
+        items: Sequence[tuple[uuid.UUID, uuid.UUID | None]],
+    ) -> None:
+        """Set or clear this child's plan, per class.
+
+        A plan whose own `class_id` names a DIFFERENT class is refused. Without that check
+        the screen could file judo's price under karate, and the run would bill it without
+        complaint -- the amount would be real money, wrong, and explicable only by reading
+        two tables side by side.
+
+        `price_plan_id=None` DELETES the row rather than storing a null, which returns the
+        child to `student.price_plan_id`'s fallback. A null row would be a third state
+        meaning the same thing as no row, and the run would have to know about both.
+        """
+        student = self._session.get(Student, student_id)
+        if student is None:
+            raise NotFoundError(f"no student {student_id}")
+        for class_id, plan_id in items:
+            existing = self._session.execute(
+                select(StudentClassPrice).where(
+                    StudentClassPrice.student_id == student_id,
+                    StudentClassPrice.class_id == class_id,
+                )
+            ).scalar_one_or_none()
+            if plan_id is None:
+                if existing is not None:
+                    self._session.delete(existing)
+                continue
+            plan = self._session.get(PricePlan, plan_id)
+            if plan is None:
+                raise NotFoundError(f"no price plan {plan_id}")
+            if plan.class_id is not None and plan.class_id != class_id:
+                raise RefusedError("this plan prices a different class")
+            if existing is None:
+                self._session.add(
+                    StudentClassPrice(
+                        studio_id=studio_id,
+                        student_id=student_id,
+                        class_id=class_id,
+                        price_plan_id=plan_id,
+                    )
+                )
+            else:
+                existing.price_plan_id = plan_id
+        self._session.flush()

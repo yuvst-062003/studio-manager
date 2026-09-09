@@ -1710,7 +1710,7 @@ export interface paths {
          *     process alive", and a database it cannot reach does not make it dead. Letting the
          *     failure propagate would turn every database blip into a page.
          */
-        get: operations["read_health_api_v1_health_get"];
+        get: operations["read_health_api_v1_health_head"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1723,7 +1723,7 @@ export interface paths {
          *     process alive", and a database it cannot reach does not make it dead. Letting the
          *     failure propagate would turn every database blip into a page.
          */
-        head: operations["read_health_api_v1_health_get"];
+        head: operations["read_health_api_v1_health_head"];
         patch?: never;
         trace?: never;
     };
@@ -5131,6 +5131,31 @@ export interface paths {
          *     `student.current_belt_id` move together.
          */
         post: operations["award_student_belt_api_v1_students__student_id__belts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/students/{student_id}/class-prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Student Class Prices */
+        get: operations["read_student_class_prices_api_v1_students__student_id__class_prices_get"];
+        /**
+         * Set Student Class Prices
+         * @description Set or clear this child's plan for one or more classes.
+         *
+         *     A PUT over a list rather than a POST per row: the screen edits the whole picture at once
+         *     and a partial save would leave a child priced for judo and not karate with nothing
+         *     saying which half landed.
+         */
+        put: operations["set_student_class_prices_api_v1_students__student_id__class_prices_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -10423,7 +10448,11 @@ export interface components {
         };
         /**
          * PricePlanIn
-         * @description §5.10's plan, and C11 in a shape: `sessions_per_week` and **no group**.
+         * @description §5.10's plan: `sessions_per_week`, a class since 2026-09-09, and **still no group**.
+         *
+         *     The distinction is the safety argument, not pedantry. A GROUP-scoped plan is what
+         *     charged a child in two groups twice; a CLASS-scoped one bills judo and karate
+         *     separately, which is what the owner asked for, while two judo groups stay one charge.
          *
          *     Defined here rather than in `app/schemas/billing.py` because that file is W4's contract
          *     commit and this lane does not widen it -- the contract authored the read shapes both
@@ -10435,6 +10464,8 @@ export interface components {
              * Format: date
              */
             active_from: string;
+            /** Class Id */
+            class_id?: string | null;
             /** Monthly Amount Agorot */
             monthly_amount_agorot: number;
             /** Name */
@@ -12159,6 +12190,51 @@ export interface components {
              * Format: uuid
              */
             student_id: string;
+        };
+        /** StudentClassPriceIn */
+        StudentClassPriceIn: {
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** Price Plan Id */
+            price_plan_id: string | null;
+        };
+        /**
+         * StudentClassPriceOut
+         * @description One row per class the child actually trains in -- priced or not.
+         *
+         *     The unpriced ones are the point of returning them: a manager cannot set a price for a
+         *     class the screen never mentions, and `_billable_students` reports exactly these as
+         *     `unpriced` once the child holds any per-class price at all.
+         */
+        StudentClassPriceOut: {
+            /**
+             * Class Id
+             * Format: uuid
+             */
+            class_id: string;
+            /** Class Name */
+            class_name: string;
+            /** Monthly Amount Agorot */
+            monthly_amount_agorot: number | null;
+            /** Price Plan Id */
+            price_plan_id: string | null;
+            /** Price Plan Name */
+            price_plan_name: string | null;
+        };
+        /** StudentClassPricesIn */
+        StudentClassPricesIn: {
+            /** Items */
+            items: components["schemas"]["StudentClassPriceIn"][];
+        };
+        /** StudentClassPricesOut */
+        StudentClassPricesOut: {
+            /** Fallback Price Plan Id */
+            fallback_price_plan_id?: string | null;
+            /** Items */
+            items: components["schemas"]["StudentClassPriceOut"][];
         };
         /**
          * StudentConvertIn
@@ -16250,7 +16326,7 @@ export interface operations {
             };
         };
     };
-    read_health_api_v1_health_get: {
+    read_health_api_v1_health_head: {
         parameters: {
             query?: never;
             header?: never;
@@ -16270,7 +16346,7 @@ export interface operations {
             };
         };
     };
-    read_health_api_v1_health_get: {
+    read_health_api_v1_health_head: {
         parameters: {
             query?: never;
             header?: never;
@@ -21242,6 +21318,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StudentBeltOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_student_class_prices_api_v1_students__student_id__class_prices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentClassPricesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_student_class_prices_api_v1_students__student_id__class_prices_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice. */
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentClassPricesIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentClassPricesOut"];
                 };
             };
             /** @description Validation Error */

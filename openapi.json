@@ -9968,12 +9968,24 @@
         "type": "object"
       },
       "PricePlanIn": {
-        "description": "§5.10's plan, and C11 in a shape: `sessions_per_week` and **no group**.\n\nDefined here rather than in `app/schemas/billing.py` because that file is W4's contract\ncommit and this lane does not widen it -- the contract authored the read shapes both\nlanes share and left the write shapes to whoever built the routes.",
+        "description": "§5.10's plan: `sessions_per_week`, a class since 2026-09-09, and **still no group**.\n\nThe distinction is the safety argument, not pedantry. A GROUP-scoped plan is what\ncharged a child in two groups twice; a CLASS-scoped one bills judo and karate\nseparately, which is what the owner asked for, while two judo groups stay one charge.\n\nDefined here rather than in `app/schemas/billing.py` because that file is W4's contract\ncommit and this lane does not widen it -- the contract authored the read shapes both\nlanes share and left the write shapes to whoever built the routes.",
         "properties": {
           "active_from": {
             "format": "date",
             "title": "Active From",
             "type": "string"
+          },
+          "class_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Id"
           },
           "monthly_amount_agorot": {
             "minimum": 0.0,
@@ -13676,6 +13688,134 @@
           "charges"
         ],
         "title": "StudentChargeDetails",
+        "type": "object"
+      },
+      "StudentClassPriceIn": {
+        "properties": {
+          "class_id": {
+            "format": "uuid",
+            "title": "Class Id",
+            "type": "string"
+          },
+          "price_plan_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Plan Id"
+          }
+        },
+        "required": [
+          "class_id",
+          "price_plan_id"
+        ],
+        "title": "StudentClassPriceIn",
+        "type": "object"
+      },
+      "StudentClassPriceOut": {
+        "description": "One row per class the child actually trains in -- priced or not.\n\nThe unpriced ones are the point of returning them: a manager cannot set a price for a\nclass the screen never mentions, and `_billable_students` reports exactly these as\n`unpriced` once the child holds any per-class price at all.",
+        "properties": {
+          "class_id": {
+            "format": "uuid",
+            "title": "Class Id",
+            "type": "string"
+          },
+          "class_name": {
+            "title": "Class Name",
+            "type": "string"
+          },
+          "monthly_amount_agorot": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly Amount Agorot"
+          },
+          "price_plan_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Plan Id"
+          },
+          "price_plan_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Plan Name"
+          }
+        },
+        "required": [
+          "class_id",
+          "class_name",
+          "price_plan_id",
+          "price_plan_name",
+          "monthly_amount_agorot"
+        ],
+        "title": "StudentClassPriceOut",
+        "type": "object"
+      },
+      "StudentClassPricesIn": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StudentClassPriceIn"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "StudentClassPricesIn",
+        "type": "object"
+      },
+      "StudentClassPricesOut": {
+        "properties": {
+          "fallback_price_plan_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Price Plan Id"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StudentClassPriceOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "StudentClassPricesOut",
         "type": "object"
       },
       "StudentConvertIn": {
@@ -21468,7 +21608,7 @@
     "/api/v1/health": {
       "get": {
         "description": "Liveness. Deliberately carries no tenant data and needs no auth.\n\n`revision` is best-effort and never affects `status`: this endpoint answers \"is this\nprocess alive\", and a database it cannot reach does not make it dead. Letting the\nfailure propagate would turn every database blip into a page.",
-        "operationId": "read_health_api_v1_health_get",
+        "operationId": "read_health_api_v1_health_head",
         "responses": {
           "200": {
             "content": {
@@ -21488,7 +21628,7 @@
       },
       "head": {
         "description": "Liveness. Deliberately carries no tenant data and needs no auth.\n\n`revision` is best-effort and never affects `status`: this endpoint answers \"is this\nprocess alive\", and a database it cannot reach does not make it dead. Letting the\nfailure propagate would turn every database blip into a page.",
-        "operationId": "read_health_api_v1_health_get",
+        "operationId": "read_health_api_v1_health_head",
         "responses": {
           "200": {
             "content": {
@@ -29545,6 +29685,120 @@
         "summary": "Award Student Belt",
         "tags": [
           "belts"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/class-prices": {
+      "get": {
+        "operationId": "read_student_class_prices_api_v1_students__student_id__class_prices_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentClassPricesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Student Class Prices",
+        "tags": [
+          "billing"
+        ]
+      },
+      "put": {
+        "description": "Set or clear this child's plan for one or more classes.\n\nA PUT over a list rather than a POST per row: the screen edits the whole picture at once\nand a partial save would leave a child priced for judo and not karate with nothing\nsaying which half landed.",
+        "operationId": "set_student_class_prices_api_v1_students__student_id__class_prices_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional. Repeat a request safely after a network failure: the same key returns the original result rather than performing the write twice.",
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudentClassPricesIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentClassPricesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Student Class Prices",
+        "tags": [
+          "billing"
         ]
       }
     },

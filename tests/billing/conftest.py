@@ -1045,10 +1045,14 @@ def family_class_id(app_session: Session, a_priced_student, an_enrolled_student)
     from app.models.people import Enrollment
     from app.models.structure import Group
 
-    class_id = app_session.execute(
-        select(Group.class_id)
-        .join(Enrollment, Enrollment.group_id == Group.id)
-        .where(Enrollment.student_id == a_priced_student.student_id)
-    ).scalars().first()
+    class_id = (
+        app_session.execute(
+            select(Group.class_id)
+            .join(Enrollment, Enrollment.group_id == Group.id)
+            .where(Enrollment.student_id == a_priced_student.student_id)
+        )
+        .scalars()
+        .first()
+    )
     assert class_id is not None, "the enrolled student's group must belong to a class"
     return class_id

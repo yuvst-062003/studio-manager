@@ -222,7 +222,11 @@ def _run_out(run: BillingRun) -> BillingRunOut:
 
 # -- price plans --------------------------------------------------------------
 class PricePlanIn(BaseModel):
-    """§5.10's plan, and C11 in a shape: `sessions_per_week` and **no group**.
+    """§5.10's plan: `sessions_per_week`, a class since 2026-09-09, and **still no group**.
+
+    The distinction is the safety argument, not pedantry. A GROUP-scoped plan is what
+    charged a child in two groups twice; a CLASS-scoped one bills judo and karate
+    separately, which is what the owner asked for, while two judo groups stay one charge.
 
     Defined here rather than in `app/schemas/billing.py` because that file is W4's contract
     commit and this lane does not widen it -- the contract authored the read shapes both
@@ -237,6 +241,9 @@ class PricePlanIn(BaseModel):
     monthly_amount_agorot: int = Field(ge=0)
     registration_fee_agorot: int | None = Field(default=None, ge=0)
     active_from: date
+    #: Which class this plan prices. NULL prices the studio the way every plan did before
+    #: 2026-09-09, which is what keeps existing plans valid.
+    class_id: uuid.UUID | None = None
 
 
 class PricePlanCloseIn(BaseModel):
@@ -281,6 +288,7 @@ def create_price_plan(
             monthly_amount_agorot=body.monthly_amount_agorot,
             registration_fee_agorot=body.registration_fee_agorot,
             active_from=body.active_from,
+            class_id=body.class_id,
         )
     except RefusedError as exc:
         raise _refused(exc) from exc
@@ -295,6 +303,128 @@ def create_price_plan(
     )
     session.commit()
     return _plan_out(plan)
+
+
+# -- a child's price, per class (2026-09-09) -----------------------------------
+#
+# The half of per-class pricing that a human actually operates. The billing run reads
+# `student_class_price`; without these routes nothing could write it, so every family kept
+# billing through `student.price_plan_id`'s fallback and the feature was inert.
+#
+# Manager-or-owner and deliberately NOT coach-tagged: §3.2 gives a coach no financial read,
+# and invariant 3 enforces that against the tag.
+
+
+class StudentClassPriceOut(BaseModel):
+    """One row per class the child actually trains in -- priced or not.
+
+    The unpriced ones are the point of returning them: a manager cannot set a price for a
+    class the screen never mentions, and `_billable_students` reports exactly these as
+    `unpriced` once the child holds any per-class price at all.
+    """
+
+    class_id: uuid.UUID
+    class_name: str
+    price_plan_id: uuid.UUID | None
+    price_plan_name: str | None
+    monthly_amount_agorot: int | None
+
+
+class StudentClassPricesOut(BaseModel):
+    items: list[StudentClassPriceOut]
+    #: What this child bills today if nothing here is set -- `student.price_plan_id`. The
+    #: screen says it out loud, because "no per-class price" does not mean "pays nothing".
+    fallback_price_plan_id: uuid.UUID | None = None
+
+
+class StudentClassPriceIn(BaseModel):
+    class_id: uuid.UUID
+    #: NULL REMOVES this class's price rather than setting it to nothing, which is what
+    #: returns the child to the fallback. A separate DELETE route would be a second way to
+    #: express one intent.
+    price_plan_id: uuid.UUID | None
+
+
+class StudentClassPricesIn(BaseModel):
+    items: list[StudentClassPriceIn]
+
+
+@router.get("/students/{student_id}/class-prices", response_model=StudentClassPricesOut)
+def read_student_class_prices(
+    _: ManagerOrOwner, student_id: uuid.UUID, session: TenantSessionDep
+) -> StudentClassPricesOut:
+    service = CatalogueService(session)
+    try:
+        rows, fallback = service.student_class_prices(student_id)
+    except NotFoundError as exc:
+        raise _not_found("student") from exc
+    return StudentClassPricesOut(
+        items=[
+            StudentClassPriceOut(
+                class_id=row.class_id,
+                class_name=row.class_name,
+                price_plan_id=row.price_plan_id,
+                price_plan_name=row.price_plan_name,
+                monthly_amount_agorot=row.monthly_amount_agorot,
+            )
+            for row in rows
+        ],
+        fallback_price_plan_id=fallback,
+    )
+
+
+@router.put("/students/{student_id}/class-prices", response_model=StudentClassPricesOut)
+def set_student_class_prices(
+    _: ManagerOrOwner,
+    student_id: uuid.UUID,
+    body: StudentClassPricesIn,
+    request: Request,
+    session: TenantSessionDep,
+    idempotency_key: IdempotencyKey = None,
+) -> StudentClassPricesOut:
+    """Set or clear this child's plan for one or more classes.
+
+    A PUT over a list rather than a POST per row: the screen edits the whole picture at once
+    and a partial save would leave a child priced for judo and not karate with nothing
+    saying which half landed.
+    """
+    studio_id = require_current_studio_id()
+    service = CatalogueService(session)
+    try:
+        service.set_student_class_prices(
+            studio_id,
+            student_id,
+            [(row.class_id, row.price_plan_id) for row in body.items],
+        )
+    except NotFoundError as exc:
+        raise _not_found("student, class or plan") from exc
+    except RefusedError as exc:
+        raise _refused(exc) from exc
+    AuditService.record(
+        session,
+        action="student.class_prices.set",
+        entity_type="student",
+        entity_id=student_id,
+        studio_id=studio_id,
+        actor_person_id=_actor(request),
+        # Ids only -- §11.7. The amounts live on the plans these point at.
+        diff={"classes": len(body.items)},
+    )
+    session.commit()
+    rows, fallback = service.student_class_prices(student_id)
+    return StudentClassPricesOut(
+        items=[
+            StudentClassPriceOut(
+                class_id=row.class_id,
+                class_name=row.class_name,
+                price_plan_id=row.price_plan_id,
+                price_plan_name=row.price_plan_name,
+                monthly_amount_agorot=row.monthly_amount_agorot,
+            )
+            for row in rows
+        ],
+        fallback_price_plan_id=fallback,
+    )
 
 
 class StandingOrderLinkIn(BaseModel):

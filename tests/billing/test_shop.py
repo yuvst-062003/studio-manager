@@ -164,9 +164,7 @@ def test_an_order_names_the_product_it_bought(
         headers=parent.headers,
     )
 
-    charge = app_session.execute(
-        select(Charge).where(Charge.product_id == gi)
-    ).scalar_one()
+    charge = app_session.execute(select(Charge).where(Charge.product_id == gi)).scalar_one()
     assert charge.kind == "manual"
     assert charge.product_id == gi
 

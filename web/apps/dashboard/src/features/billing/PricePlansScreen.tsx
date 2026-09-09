@@ -5,12 +5,16 @@
 // plan that was in force when it was raised. `billing.plan.versionedHint` is that rule in
 // Hebrew and it belongs on the screen, not in a comment.
 //
-// **C11 — a plan is scoped by training volume, never by a group.** `sessions_per_week` is
-// what the club charges by, and there is no group picker here: a group-scoped plan is exactly
-// what charged a child in two groups twice, at two different prices, silently and forever.
+// **C11, as it stands after 2026-09-09.** `sessions_per_week` is what the club charges by,
+// and there is still NO GROUP PICKER: a group-scoped plan is exactly what charged a child in
+// two groups twice, at two different prices, silently and forever.
+//
+// There IS a class picker, on the owner's sign-off. The distinction is the whole safety
+// argument — two groups of one discipline stay one charge, judo and karate bill separately —
+// and it is why the control below says חוג and can never be allowed to say קבוצה.
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, Card, EmptyState, MoneyDisplay, StatusChip, TextField } from '@studio/ui'
+import { Button, Card, EmptyState, MoneyDisplay, SelectField, StatusChip, TextField } from '@studio/ui'
 import { PlanFrequencyPicker, PlanPreview, frequencyLabel } from './PlanFrequency'
 import { StandingOrderLinksPanel } from './StandingOrderLinksPanel'
 import { t } from '@studio/i18n'
@@ -65,14 +69,26 @@ export type PricePlansScreenProps = {
   client: DashboardBillingClient
   plans: readonly PricePlanOut[]
   onChanged: () => void
+  /** The club's classes. Empty means the club has none yet -- the picker is then not drawn
+   *  at all and every plan prices the studio, exactly as before per-class pricing. */
+  classes?: readonly { id: string; name: string }[]
 }
 
-export function PricePlansScreen({ locale, client, plans, onChanged }: PricePlansScreenProps) {
+export function PricePlansScreen({
+  locale,
+  client,
+  plans,
+  onChanged,
+  classes = [],
+}: PricePlansScreenProps) {
   const [openPlanId, setOpenPlanId] = useState<string | null>(null)
   const [name, setName] = useState('')
   /** `undefined` means not chosen yet; `null` is a chosen open membership. */
   const [perWeek, setPerWeek] = useState<number | null | undefined>(undefined)
   const [monthly, setMonthly] = useState('')
+  //: Which class this plan prices. '' until chosen, which prices the studio the way every
+  //: plan did before per-class pricing — the state a club with no classes stays in.
+  const [planClassId, setPlanClassId] = useState('')
   const [inFlight, setInFlight] = useState(false)
 
   async function create() {
@@ -88,11 +104,13 @@ export function PricePlansScreen({ locale, client, plans, onChanged }: PricePlan
         monthlyAmountAgorot: agorotFromShekels(monthly),
         registrationFeeAgorot: null,
         activeFrom: new Date().toISOString().slice(0, 10),
+        classId: planClassId || null,
       })
       onChanged()
       setName('')
       setPerWeek(undefined)
       setMonthly('')
+      setPlanClassId('')
     } finally {
       setInFlight(false)
     }
@@ -181,6 +199,26 @@ export function PricePlansScreen({ locale, client, plans, onChanged }: PricePlan
           was rebuilt, so one club saw two designs for one decision (reported 2026-08-29). */}
       <Card caption={t(locale, 'billing.plan.add')}>
         <PlanFrequencyPicker locale={locale} onChange={setPerWeek} value={perWeek} />
+        {classes.length > 0 ? (
+          // חוג, and never קבוצה. A group-scoped plan is the shape that billed a child in
+          // two groups twice; a class-scoped one is what the owner asked for. The words are
+          // load-bearing, which is why this comment sits on the control rather than in the
+          // header alone.
+          <SelectField
+            data-testid="plan-class"
+            hint={t(locale, 'billing.plan.classHint')}
+            label={t(locale, 'billing.plan.class')}
+            onChange={(event) => setPlanClassId(event.target.value)}
+            value={planClassId}
+          >
+            <option value="">{t(locale, 'billing.plan.classAll')}</option>
+            {classes.map((klass) => (
+              <option key={klass.id} value={klass.id}>
+                {klass.name}
+              </option>
+            ))}
+          </SelectField>
+        ) : null}
         <TextField
           hint={t(locale, 'billing.plan.monthlyHint')}
           inputMode="decimal"

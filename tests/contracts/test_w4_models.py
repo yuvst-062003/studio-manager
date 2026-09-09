@@ -114,8 +114,8 @@ def test_the_billing_run_cannot_double_charge_a_period():
     the enrollment.
 
     An enrollment-keyed index does not merely fail to prevent that double charge, it
-    *permits* it, which is the worst kind of green. `test_a_tuition_charge_covers_a_student_and_not_an_enrollment`
-    below is what keeps that door shut.
+    *permits* it, which is the worst kind of green. The test below --
+    `test_a_tuition_charge_covers_a_student_and_not_an_enrollment` -- keeps that door shut.
     """
     indexes = {index.name for index in Base.metadata.tables["charge"].indexes}
     assert "uq_charge_student_period_kind_class" in indexes
