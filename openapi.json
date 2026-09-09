@@ -10033,7 +10033,7 @@
         "type": "object"
       },
       "PricePlanOut": {
-        "description": "§5.10 step 1 prices from here. `active_to` is null for the current plan, which is\nwhat lets a mid-year price change leave last month's charges explainable.\n\n**No `group_id` and no `class_id`** — C11. A plan is scoped by training volume and\nchosen per student (`StudentOut.price_plan_id`); a group has no price.",
+        "description": "§5.10 step 1 prices from here. `active_to` is null for the current plan, which is\nwhat lets a mid-year price change leave last month's charges explainable.\n\n**No `group_id`, and there will not be one** — C11. A GROUP-scoped plan is the exact\nshape that once charged a child in two groups twice a month at two different prices,\nsilently and forever; that absence is still the whole of what stops it, and a contract\ntest enforces it.\n\n`class_id` is different and is now carried, on the owner's sign-off of 2026-09-09: judo\nand karate may price differently, and a child doing both pays both, because the run keys\non the DISTINCT CLASS. It is returned here because the picker that FILES a plan under a\nclass landed without anything that could read the answer back — so a plan could be filed\nand no screen could tell which class it belonged to, which left the per-class price\neditor unable to offer a class its own plans.",
         "properties": {
           "active_from": {
             "format": "date",
@@ -10051,6 +10051,18 @@
               }
             ],
             "title": "Active To"
+          },
+          "class_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Id"
           },
           "id": {
             "format": "uuid",
@@ -12973,6 +12985,15 @@
       },
       "ShopProductOut": {
         "properties": {
+          "class_id": {
+            "format": "uuid",
+            "title": "Class Id",
+            "type": "string"
+          },
+          "class_name": {
+            "title": "Class Name",
+            "type": "string"
+          },
           "description": {
             "anyOf": [
               {
@@ -13020,7 +13041,9 @@
           "id",
           "name",
           "description",
-          "price_agorot"
+          "price_agorot",
+          "class_id",
+          "class_name"
         ],
         "title": "ShopProductOut",
         "type": "object"
@@ -25471,8 +25494,27 @@
     },
     "/api/v1/products/handout-options": {
       "get": {
-        "description": "What staff `11a`'s picker renders. **Names only, never prices** (invariant 3).\n\nActive products only: a coach handing out an item the club stopped selling would create\na charge for a price nobody currently offers.",
+        "description": "What staff `11a`'s picker renders. **Names only, never prices** (invariant 3).\n\nActive products only: a coach handing out an item the club stopped selling would create\na charge for a price nobody currently offers.\n\n**`session_id` narrows the list to the lesson's own class** (2026-09-09). The club\ndecided an item belongs to exactly one class, and this picker never learned it -- so a\ncoach teaching judo was offered karate gloves, and offered the unfiled items no parent\ncan see in the shop either. Handing one of those over raises a charge for an item the\nfamily was never sold.\n\nScoped by the SESSION and not by a `class_id` the caller passes, for the same reason\n`awaiting-handout` is: a coach holds a lesson, and a route taking a class id would\ninvite a caller to name one their lesson is not. An unknown session is 404 rather than\nthe whole catalogue -- falling back to every item is how a filter stops filtering\nwithout anyone noticing.",
         "operationId": "list_handout_options_api_v1_products_handout_options_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "session_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -25483,6 +25525,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "List Handout Options",

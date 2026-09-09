@@ -40,6 +40,15 @@ export type ShopProduct = {
   /** Empty means the item HAS no sizes — a חגורה — which is a different thing from a size
    *  picker nobody has answered yet. There is deliberately no `hasSizes` flag beside it. */
   sizes: readonly string[]
+  /** Which class sells this item. Every item the shop can show HAS one — an item with no
+   *  class is sold to nobody and never reaches this screen — so neither of these is
+   *  optional. */
+  classId: string
+  /** The class's name, not its id: the screen renders a heading, and an id is not a
+   *  heading. Called `classLabel` rather than `className` on purpose — a field named
+   *  `className` sitting next to JSX `className` in the same file is a bug waiting for a
+   *  tired reader. */
+  classLabel: string
 }
 
 /** One line of the basket. Keyed by product AND size: two sizes of one גי are two lines. */

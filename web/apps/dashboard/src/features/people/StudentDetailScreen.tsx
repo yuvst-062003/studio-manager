@@ -9,9 +9,9 @@
 // reads as a financial field, so it never travels on the coach-reachable card.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { AttendanceStrip, BeltBar, Button, Card, PlanBadge, StatusChip } from '@studio/ui'
+import { AttendanceStrip, BeltBar, Button, Card, StatusChip } from '@studio/ui'
 import type { AttendanceStripItem } from '@studio/ui'
-import { usePlanBadges } from '../billing/usePlanBadges'
+import { ClassPricesCard } from '../billing/ClassPricesCard'
 import { formatDateInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -68,9 +68,6 @@ export function StudentDetailScreen({
   locale: Locale
   client: DashboardPeopleClient
 }) {
-  // Manager-scoped, like the price-plan read beside it. Resolves the plan id this screen
-  // already fetches into something a person can read.
-  const plans = usePlanBadges()
   const [student, setStudent] = useState<StudentDetail | null>(null)
   const [enrollments, setEnrollments] = useState<EnrollmentOut[]>([])
   const [history, setHistory] = useState<StatusHistoryOut[]>([])
@@ -202,33 +199,22 @@ export function StudentDetailScreen({
             </li>
           ))}
         </ul>
-      </Card>
-
-      <Card>
-        <h2>{t(locale, 'people.convert.pricePlan')}</h2>
-        {/* Was the raw `price_plan_id` UUID — right when L2 was written, because
-            `price_plan` was W4's table and did not exist yet to resolve against. It does
-            now, so a manager reads the plan rather than its primary key. Still never an
-            amount and never a picker: C11 keeps the price a manager-scoped id here. */}
-        <p data-testid="detail-price-plan">
-          {plan?.price_plan_id ? (
-            <>
-              <PlanBadge
-                loading={plans.loading}
-                locale={locale}
-                perWeek={plans.frequencies[studentId]}
-              />{' '}
-              <bdi>{plans.names[studentId] ?? plan.price_plan_id}</bdi>
-            </>
-          ) : (
-            '—'
-          )}
-        </p>
-        <p data-testid="detail-price-hint">{t(locale, 'people.convert.pricePlanHint')}</p>
+        {/* How much this child actually trains. It used to sit on the read-only plan card
+            the per-class editor replaced, and it belongs here rather than inside that
+            editor: it is a fact about ENROLMENTS, and §5.10 wants it visible so a mismatch
+            between what a child attends and what they are billed for is noticeable at the
+            moment the price is set. */}
         <p data-testid="detail-weekly-volume">
           {t(locale, 'people.convert.weeklyVolume')}: {plan?.weekly_volume ?? 0}
         </p>
       </Card>
+
+      {/* Was a read-only badge naming `student.price_plan_id`, which is now only the
+          FALLBACK — what a child pays for any class nobody has priced. The per-class editor
+          replaces it rather than sitting beside it: two boxes both showing a child's price
+          leaves a manager working out which one wins, and the fallback is still named here,
+          on every row it actually applies to, with its amount. */}
+      <ClassPricesCard locale={locale} studentId={studentId} />
 
       <Card>
         <h2>{t(locale, 'people.guardian.plural')}</h2>

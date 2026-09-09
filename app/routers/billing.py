@@ -52,6 +52,8 @@ from app.models.billing import (
     UpayIpnRecord,
 )
 from app.models.person import Guardian
+from app.models.schedule import Session as SessionRow
+from app.models.structure import Group
 from app.models.studio import Studio
 from app.schemas._pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, IdempotencyKey
 from app.schemas.billing import (
@@ -192,6 +194,11 @@ def _plan_out(plan: PricePlan) -> PricePlanOut:
         # payment URL has to be visible without clicking it. Not a secret and not scrubbed;
         # it is a page any payer is meant to reach.
         standing_order_link_url=plan.standing_order_link_url,
+        # Which class this plan prices. The column and its picker landed in 675c8c37 but
+        # this shape never carried it BACK, so a plan could be filed and no screen could
+        # read where -- which left the per-class price editor unable to offer a class its
+        # own plans, the one thing it exists to do.
+        class_id=plan.class_id,
     )
 
 
@@ -587,13 +594,51 @@ def list_products(
 
 
 @router.get("/products/handout-options", response_model=HandoutOptionsOut, tags=COACH)
-def list_handout_options(_: AnyStaff, session: TenantSessionDep) -> HandoutOptionsOut:
+def list_handout_options(
+    _: AnyStaff,
+    session: TenantSessionDep,
+    # A bare default rather than `Query(...)`: FastAPI reads a scalar parameter that is
+    # neither a path nor a body as a query parameter either way, and it is the form the
+    # other optional uuid query parameters in this file already use.
+    session_id: uuid.UUID | None = None,
+) -> HandoutOptionsOut:
     """What staff `11a`'s picker renders. **Names only, never prices** (invariant 3).
 
     Active products only: a coach handing out an item the club stopped selling would create
     a charge for a price nobody currently offers.
+
+    **`session_id` narrows the list to the lesson's own class** (2026-09-09). The club
+    decided an item belongs to exactly one class, and this picker never learned it -- so a
+    coach teaching judo was offered karate gloves, and offered the unfiled items no parent
+    can see in the shop either. Handing one of those over raises a charge for an item the
+    family was never sold.
+
+    Scoped by the SESSION and not by a `class_id` the caller passes, for the same reason
+    `awaiting-handout` is: a coach holds a lesson, and a route taking a class id would
+    invite a caller to name one their lesson is not. An unknown session is 404 rather than
+    the whole catalogue -- falling back to every item is how a filter stops filtering
+    without anyone noticing.
     """
-    rows, _cursor = CatalogueService(session).list_products(include_inactive=False, limit=200)
+    class_id: uuid.UUID | None = None
+    if session_id is not None:
+        # One join rather than a `require_session` from the attendance lane: all this route
+        # needs is the class, and `TenantSession` already makes another studio's lesson
+        # invisible -- so "not in this studio" and "does not exist" answer the same 404,
+        # which is the posture `require_session` documents for itself.
+        class_id = (
+            session.execute(
+                select(Group.class_id)
+                .join(SessionRow, SessionRow.group_id == Group.id)
+                .where(SessionRow.id == session_id)
+            )
+            .scalars()
+            .first()
+        )
+        if class_id is None:
+            raise _not_found("session")
+    rows, _cursor = CatalogueService(session).list_products(
+        include_inactive=False, limit=200, class_id=class_id
+    )
     return HandoutOptionsOut(items=[HandoutOptionOut(id=row.id, name=row.name) for row in rows])
 
 

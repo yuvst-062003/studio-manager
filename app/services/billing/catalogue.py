@@ -55,6 +55,20 @@ MAX_SIZES = 20
 MAX_SIZE_LABEL = 24
 
 
+class _Unset:
+    """`class_id`'s explicit NULL is an instruction, so it cannot also be the default.
+
+    Every other field on `update_product` reads `None` as "not sent" -- the route drops
+    unsent keys with `exclude_unset`, and no caller has a reason to blank a name or a price.
+    Unfiling is different: `class_id: null` means "take this item off sale everywhere", and
+    filing is the only way back for an item the migration could not place. One default
+    cannot carry both meanings, so this field gets a sentinel rather than a second method.
+    """
+
+
+_UNSET = _Unset()
+
+
 def validate_standing_order_link(url: str) -> str:
     """The two rules from the payment-routes spec §4, in one place.
 
@@ -446,10 +460,21 @@ class CatalogueService:
         include_inactive: bool = False,
         after: uuid.UUID | None = None,
         limit: int = 50,
+        class_id: uuid.UUID | None = None,
     ) -> tuple[list[Product], uuid.UUID | None]:
+        """`class_id` narrows the list to one class's items, and `None` means "every class"
+        rather than "the unfiled ones" -- the opposite of what NULL means ON a row.
+
+        The asymmetry is deliberate and worth stating, because the same value spells two
+        different things one line apart: a Product whose OWN `class_id` is NULL is unfiled
+        and sold to nobody, while a NULL ARGUMENT here is simply an unasked question. The
+        manager's own list asks it that way; the coach's picker does not.
+        """
         stmt = select(Product)
         if not include_inactive:
             stmt = stmt.where(Product.is_active.is_(True))
+        if class_id is not None:
+            stmt = stmt.where(Product.class_id == class_id)
         if after is not None:
             stmt = stmt.where(Product.id > after)
         rows = list(self._session.execute(stmt.order_by(Product.id).limit(limit + 1)).scalars())
@@ -504,6 +529,7 @@ class CatalogueService:
         description: str | None = None,
         is_active: bool | None = None,
         sizes: Sequence[str] | None = None,
+        class_id: uuid.UUID | None | _Unset = _UNSET,
     ) -> Product:
         """A partial update. Deactivation goes through `is_active`; there is no delete.
 
@@ -512,6 +538,13 @@ class CatalogueService:
         is an ordinary correction, and a falsy-skip would make it the one edit the screen
         could not save. The router's `exclude_unset` is what separates "sent empty" from
         "not sent".
+
+        **`class_id` moves an item between classes, and an explicit `None` unfiles it.**
+        `ProductPatch` has carried the field since it existed and its docstring promised
+        both, but this signature never grew the parameter -- so the route's `**fields`
+        splat raised `TypeError` and every attempt answered 500. An item the migration
+        could not place is NULL, NULL is sold to nobody, and filing it here was the only
+        way to put one back on sale.
         """
         product = self.get_product(product_id)
         if price_agorot is not None:
@@ -525,6 +558,8 @@ class CatalogueService:
             product.is_active = is_active
         if sizes is not None:
             product.sizes = self.normalise_sizes(sizes)
+        if not isinstance(class_id, _Unset):
+            product.class_id = class_id
         self._session.flush()
         return product
 

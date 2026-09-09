@@ -19,6 +19,11 @@ const PRODUCT = {
   sizes: [],
   image_url: null,
   is_active: true,
+  // `/me/products` has carried these since the shop went per class: every item it returns
+  // belongs to exactly one class, and the row names it so a family with children in two of
+  // them can tell two identically-named items apart.
+  class_id: 'class-judo',
+  class_name: 'ג׳ודו',
 }
 
 /** Every call the shop makes, and the two the payment routes make. */

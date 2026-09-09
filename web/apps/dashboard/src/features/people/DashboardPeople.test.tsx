@@ -724,13 +724,22 @@ describe('StudentDetailScreen — 4a', () => {
     expect(await screen.findByTestId('detail-weekly-volume')).toHaveTextContent('2')
   })
 
-  it('renders the price plan as an ID and a hint, never an amount', async () => {
-    // L2 — `price_plan` is W4's table and this lane never resolves it. A helpful "₪320"
-    // here would be the fabrication invariant 3 exists to prevent.
+  it('no longer carries a read-only plan card of its own', async () => {
+    // Was: "renders the price plan as an ID and a hint, never an amount" — L2's rule that
+    // this lane never resolves `price_plan_id`, because a fabricated "₪320" is exactly what
+    // invariant 3 exists to prevent.
+    //
+    // What changed, and why this is not the rule being quietly dropped: `student.price_plan_id`
+    // is now only the FALLBACK, and per-class prices are set by `ClassPricesCard` — a
+    // BILLING-lane component reading manager-only routes, which is where resolving a plan
+    // into an amount was always allowed. Invariant 3 is about what a COACH can see, and it
+    // is still enforced where it bites: the staff app's hand-over shape carries no money
+    // field at all. What this asserts now is that the people lane kept its hands off the
+    // price: no plan id, no hint, and no amount rendered by THIS screen.
     render(<StudentDetailScreen studentId="st1" locale="he" client={makeClient()} />)
-    expect(await screen.findByTestId('detail-price-hint')).toHaveTextContent(
-      t('he', 'people.convert.pricePlanHint'),
-    )
+    expect(await screen.findByTestId('student-detail')).toBeInTheDocument()
+    expect(screen.queryByTestId('detail-price-plan')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('detail-price-hint')).not.toBeInTheDocument()
     expect(document.body.textContent ?? '').not.toContain('₪')
   })
 

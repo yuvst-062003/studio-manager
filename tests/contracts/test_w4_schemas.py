@@ -222,11 +222,21 @@ def test_a_charge_names_a_student_and_never_an_enrollment():
 
 
 def test_a_price_plan_is_scoped_by_training_volume_and_never_by_a_group():
-    """The other half of C11, on the catalogue side. A plan priced per group is a plan
-    that bills a child once per group."""
+    """The other half of C11, on the catalogue side. A plan priced per GROUP is a plan that
+    bills a child once per group -- that is the original bug, and `group_id` must never
+    appear here.
+
+    `class_id` used to be refused alongside it and no longer is: the owner asked for
+    per-class prices on 2026-09-09, and two CLASSES really are two charges where two groups
+    of one discipline are one. This mirrors `test_w4_models.py`'s twin, which has said so
+    since the column landed -- and it is asserted as PRESENT rather than merely tolerated,
+    because the shape shipped without it: the picker that files a plan under a class landed
+    with nothing able to read the answer back, which left the per-class price editor unable
+    to offer a class its own plans.
+    """
     assert "sessions_per_week" in PricePlanOut.model_fields
     assert "group_id" not in PricePlanOut.model_fields
-    assert "class_id" not in PricePlanOut.model_fields
+    assert "class_id" in PricePlanOut.model_fields
 
 
 # -- §5.10's security requirements ---------------------------------------------

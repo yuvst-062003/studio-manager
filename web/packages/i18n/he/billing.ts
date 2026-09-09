@@ -343,6 +343,23 @@ export const billing: Bundle = {
   'plan.unlimited': 'ללא הגבלה',
   'plan.badge.noneTitle': 'לא הוגדר מסלול — החניך לא מחויב',
   'plan.badge.column': 'מסלול',
+  // ── מחירים לפי חוג (2026-09-09) ──────────────────────────────────────────────
+  // The screen that makes per-class pricing operable: prices could be DEFINED before this
+  // and assigned to nobody. `fallbackNote` is the load-bearing string -- without it "ללא
+  // מחיר מיוחד" reads as "pays nothing", which is the one wrong answer about money here.
+  'classPrices.title': 'מחירים לפי חוג',
+  'classPrices.hint': 'לכל חוג שהחניך מתאמן בו אפשר לקבוע מסלול נפרד. ילד שמתאמן בשני חוגים משלם על שניהם.',
+  'classPrices.none': 'ללא מחיר מיוחד',
+  'classPrices.fallbackNote': 'משלם לפי המסלול הכללי — {{amount}}',
+  'classPrices.noFallback': 'לא הוגדר מסלול כללי — החניך לא מחויב על החוג הזה',
+  'classPrices.generalPlan': 'המסלול הכללי',
+  'classPrices.empty': 'החניך לא רשום לאף חוג פעיל',
+  'classPrices.save': 'שמירת מחירים',
+  'classPrices.saving': 'שומר…',
+  'classPrices.saved': 'המחירים נשמרו',
+  'classPrices.saveFailed': 'השמירה נכשלה. נסו שוב.',
+  'classPrices.loadFailed': 'לא הצלחנו לטעון את המחירים',
+  'classPrices.planFor': 'מסלול עבור {{class}}',
   'plan.perMonth': 'לחודש',
   'plan.class': 'שיוך לחוג',
   // A plan with no class prices the whole club, which is how every plan worked before

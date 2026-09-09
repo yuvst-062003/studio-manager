@@ -34,6 +34,8 @@ type ProductRow = {
   price_agorot: number
   sizes?: string[]
   image_url?: string | null
+  class_id: string
+  class_name: string
 }
 
 export function ClubShop({ locale }: { locale: Locale }) {
@@ -79,6 +81,11 @@ export function ClubShop({ locale }: { locale: Locale }) {
             // and an absent one look different and mean different things.
             imageUrl: row.image_url ?? null,
             sizes: row.sizes ?? [],
+            // Carried through so a family with children in two classes can tell two
+            // identically-named items apart. Not optional on the wire: `/me/products`
+            // only ever returns items that belong to a class.
+            classId: row.class_id,
+            classLabel: row.class_name,
           })),
         )
       })

@@ -25,7 +25,12 @@ async function json<T>(response: Response): Promise<T> {
 }
 
 export type HandoutClient = {
-  options(): Promise<HandoutOption[]>
+  /** The items THIS lesson's class sells. Scoped by the session rather than by a class id
+   *  the caller resolves: a coach holds a lesson, and the server already knows which class
+   *  that lesson belongs to. Unscoped it returns the club's whole catalogue, which is what
+   *  it used to do for everybody -- a judo coach was offered karate gloves, and the unfiled
+   *  items no parent can see in the shop either. */
+  options(sessionId: string): Promise<HandoutOption[]>
   handOut(input: { productId: string; studentId: string; priceAgorot?: never }): Promise<void>
   /** What this lesson's families have already bought and are waiting for. Scoped to the
    *  SESSION, not to a child: per-student it would be one request per person on the mat to
@@ -39,8 +44,10 @@ export type HandoutClient = {
 
 export function makeHandoutClient(fetcher: Fetcher): HandoutClient {
   return {
-    async options() {
-      const response = await fetcher('/api/v1/products/handout-options')
+    async options(sessionId) {
+      const response = await fetcher(
+        `/api/v1/products/handout-options?session_id=${encodeURIComponent(sessionId)}`,
+      )
       return (await json<{ items: HandoutOption[] }>(response)).items
     },
     async handOut({ productId, studentId }) {

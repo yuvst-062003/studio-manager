@@ -91,8 +91,17 @@ class PricePlanOut(BaseModel):
     """§5.10 step 1 prices from here. `active_to` is null for the current plan, which is
     what lets a mid-year price change leave last month's charges explainable.
 
-    **No `group_id` and no `class_id`** — C11. A plan is scoped by training volume and
-    chosen per student (`StudentOut.price_plan_id`); a group has no price."""
+    **No `group_id`, and there will not be one** — C11. A GROUP-scoped plan is the exact
+    shape that once charged a child in two groups twice a month at two different prices,
+    silently and forever; that absence is still the whole of what stops it, and a contract
+    test enforces it.
+
+    `class_id` is different and is now carried, on the owner's sign-off of 2026-09-09: judo
+    and karate may price differently, and a child doing both pays both, because the run keys
+    on the DISTINCT CLASS. It is returned here because the picker that FILES a plan under a
+    class landed without anything that could read the answer back — so a plan could be filed
+    and no screen could tell which class it belonged to, which left the per-class price
+    editor unable to offer a class its own plans."""
 
     id: uuid.UUID
     name: str
@@ -109,6 +118,10 @@ class PricePlanOut(BaseModel):
     #: as a "link set" flag, so a typo is visible without clicking it; a NULL on an ACTIVE
     #: plan is what the dashboard badges as "link missing".
     standing_order_link_url: str | None = None
+    #: Which class this plan prices, or null for a plan that names none. Null is NOT a
+    #: club-wide tier the per-class editor offers -- the club's rule is per class -- it is
+    #: simply a plan nobody has filed yet, which is every plan created before 2026-09-09.
+    class_id: uuid.UUID | None = None
 
 
 class ProductOut(BaseModel):

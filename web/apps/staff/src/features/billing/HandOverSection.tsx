@@ -38,7 +38,7 @@ export function HandOverSection({
   useEffect(() => {
     let live = true
     void Promise.all([
-      handoutClient.options(),
+      handoutClient.options(sessionId),
       attendanceClient.sessionRoster(sessionId),
       // Best-effort: a club that sells nothing online, or a read that fails, leaves the
       // waiting-orders section off. The picker underneath is still correct, and failing the

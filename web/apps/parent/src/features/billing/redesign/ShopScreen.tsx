@@ -1,7 +1,7 @@
 // חנות המועדון -- ported from GearScreen.tsx. See types.ts for the full list of the
 // prototype's product fields that do not exist on this product (photos, categories, belt
 // colour, order-tracker state) and why none of them is guessable from what the API returns.
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { CheckCircle2, ChevronLeft, ShieldCheck, ShoppingBag, X } from 'lucide-react'
 import { fill } from '@studio/core'
 import { t } from '@studio/i18n'
@@ -66,8 +66,89 @@ export function ShopScreen({
   const cartTotalQty = cart.reduce((sum, line) => sum + line.quantity, 0)
   const cartTotalAgorot = cart.reduce((sum, line) => sum + line.priceAgorot * line.quantity, 0)
 
-  const catalog = products ?? []
+  // Memoised rather than a bare `??`: it feeds the grouping memo below, and a fresh []
+  // on every render would make that memo recompute every time and defeat itself.
+  const catalog = useMemo(() => products ?? [], [products])
   const showCatalog = state === 'ready' && catalog.length > 0
+
+  /** The catalogue split by class, in the order the server sent it — which is already
+   *  class-then-name, so this groups without re-sorting and without deciding an order of
+   *  its own.
+   *
+   *  **A heading appears only when the family actually has two classes to tell apart.** A
+   *  family with one child in one class would otherwise get a single heading over the whole
+   *  list, which says nothing they did not already know and costs a line of a phone screen.
+   *  Two classes is where the ambiguity starts: both may sell a `חגורה`, and until now the
+   *  two rows were indistinguishable. */
+  const classGroups = useMemo(() => {
+    const order: string[] = []
+    const byClass = new Map<string, { classId: string; classLabel: string; items: ShopProduct[] }>()
+    for (const product of catalog) {
+      let group = byClass.get(product.classId)
+      if (group === undefined) {
+        group = { classId: product.classId, classLabel: product.classLabel, items: [] }
+        byClass.set(product.classId, group)
+        order.push(product.classId)
+      }
+      group.items.push(product)
+    }
+    return order.map((classId) => byClass.get(classId)!)
+  }, [catalog])
+  const showClassHeadings = classGroups.length > 1
+
+  /** One product tile. Extracted so the grouped and ungrouped layouts render the same
+   *  card rather than two copies that drift. */
+  const productCard = (product: ShopProduct) => (
+    <article
+      key={product.id}
+      data-testid={`shop-product-${product.id}`}
+      className="product-item-card bg-white dark:bg-slate-900 rounded-2xl p-2.5 shadow-xs border border-slate-100 dark:border-slate-800 flex flex-col justify-between transition-all hover:shadow-md cursor-pointer active:scale-[0.98]"
+    >
+      <div>
+        {/* The manager's photo when there is one, the default tile when there
+            is not — which is the ordinary state of a catalogue nobody has
+            photographed yet, not an error. */}
+        {product.imageUrl ? (
+          <img
+            src={product.imageUrl}
+            alt=""
+            loading="lazy"
+            className="relative w-full aspect-square rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-800/70 mb-2.5 object-cover"
+          />
+        ) : (
+          <div
+            role="img"
+            aria-label={t(locale, 'billing.shop.noPhoto')}
+            className="relative w-full aspect-square rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-800/70 mb-2.5 flex items-center justify-center"
+          >
+            <ShoppingBag className="w-8 h-8 text-slate-300 dark:text-slate-600" aria-hidden="true" />
+          </div>
+        )}
+        <h3 className="font-black text-[15px] text-[#0A1938] dark:text-slate-50 leading-tight mb-1 line-clamp-1 text-start">
+          {product.name}
+        </h3>
+        {product.description !== null && (
+          <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1 mb-2.5 text-start">
+            {product.description}
+          </p>
+        )}
+      </div>
+      <div className="flex items-center justify-between pt-1 mt-auto gap-1.5">
+        <button
+          type="button"
+          data-testid={`shop-choose-${product.id}`}
+          onClick={() => openProduct(product)}
+          className="flex items-center gap-1 bg-[#EEF2FF] hover:bg-[#E0E7FE] text-[#2563EB] px-2.5 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+        >
+          <span>{t(locale, 'billing.shop.choose')}</span>
+          <span className="text-sm font-black">+</span>
+        </button>
+        <span className="font-extrabold text-[#0A1938] dark:text-slate-50 text-base">
+          {money(product.priceAgorot)}
+        </span>
+      </div>
+    </article>
+  )
 
   const openProduct = (product: ShopProduct) => {
     setSelectedProduct(product)
@@ -135,59 +216,30 @@ export function ShopScreen({
         <>
           {/* Product Catalog Grid */}
           <main className="px-5 mt-4 flex-1">
-            <div className="grid grid-cols-2 gap-3.5" data-testid="shop-grid">
-              {catalog.map((product) => (
-                <article
-                  key={product.id}
-                  data-testid={`shop-product-${product.id}`}
-                  className="product-item-card bg-white dark:bg-slate-900 rounded-2xl p-2.5 shadow-xs border border-slate-100 dark:border-slate-800 flex flex-col justify-between transition-all hover:shadow-md cursor-pointer active:scale-[0.98]"
+            {showClassHeadings ? (
+              classGroups.map((group) => (
+                <section
+                  key={group.classId}
+                  className="mb-5"
+                  aria-labelledby={`shop-class-${group.classId}`}
                 >
-                  <div>
-                    {/* The manager's photo when there is one, the default tile when there
-                        is not — which is the ordinary state of a catalogue nobody has
-                        photographed yet, not an error. */}
-                    {product.imageUrl ? (
-                      <img
-                        src={product.imageUrl}
-                        alt=""
-                        loading="lazy"
-                        className="relative w-full aspect-square rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-800/70 mb-2.5 object-cover"
-                      />
-                    ) : (
-                      <div
-                        role="img"
-                        aria-label={t(locale, 'billing.shop.noPhoto')}
-                        className="relative w-full aspect-square rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-800/70 mb-2.5 flex items-center justify-center"
-                      >
-                        <ShoppingBag className="w-8 h-8 text-slate-300 dark:text-slate-600" aria-hidden="true" />
-                      </div>
-                    )}
-                    <h3 className="font-black text-[15px] text-[#0A1938] dark:text-slate-50 leading-tight mb-1 line-clamp-1 text-start">
-                      {product.name}
-                    </h3>
-                    {product.description !== null && (
-                      <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1 mb-2.5 text-start">
-                        {product.description}
-                      </p>
-                    )}
+                  <h2
+                    id={`shop-class-${group.classId}`}
+                    data-testid={`shop-class-heading-${group.classId}`}
+                    className="text-xs font-black text-slate-500 dark:text-slate-400 mb-2 text-start uppercase tracking-wide"
+                  >
+                    {group.classLabel}
+                  </h2>
+                  <div className="grid grid-cols-2 gap-3.5" data-testid="shop-grid">
+                    {group.items.map((product) => productCard(product))}
                   </div>
-                  <div className="flex items-center justify-between pt-1 mt-auto gap-1.5">
-                    <button
-                      type="button"
-                      data-testid={`shop-choose-${product.id}`}
-                      onClick={() => openProduct(product)}
-                      className="flex items-center gap-1 bg-[#EEF2FF] hover:bg-[#E0E7FE] text-[#2563EB] px-2.5 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                    >
-                      <span>{t(locale, 'billing.shop.choose')}</span>
-                      <span className="text-sm font-black">+</span>
-                    </button>
-                    <span className="font-extrabold text-[#0A1938] dark:text-slate-50 text-base">
-                      {money(product.priceAgorot)}
-                    </span>
-                  </div>
-                </article>
-              ))}
-            </div>
+                </section>
+              ))
+            ) : (
+              <div className="grid grid-cols-2 gap-3.5" data-testid="shop-grid">
+                {catalog.map((product) => productCard(product))}
+              </div>
+            )}
           </main>
 
         </>

@@ -37,6 +37,7 @@ from app.core.tenancy import TenantSessionDep, require_current_studio_id
 from app.models.billing import Product
 from app.models.people import Enrollment, Student
 from app.models.person import Guardian
+from app.models.structure import Class as StudioClass
 from app.models.structure import Group
 from app.services.audit import AuditService
 from app.services.billing import BillingService, product_images
@@ -60,6 +61,13 @@ class ShopProductOut(BaseModel):
     #: which the shop draws as its own default tile rather than as a broken image. A route
     #: and not an object key; see `ProductOut.image_url`.
     image_url: str | None = None
+    #: Which class sells this item, carried on the row so a family with children in two of
+    #: them can tell two identically-named items apart (2026-09-09). **Never a wider read
+    #: than the filter below**: only rows the family may already buy get here, so naming
+    #: their class tells them nothing they did not know. Both are non-optional -- an item
+    #: with no class does not reach this shape at all.
+    class_id: uuid.UUID
+    class_name: str
 
 
 class ShopProductListOut(BaseModel):
@@ -170,15 +178,14 @@ def my_products(request: Request, session: TenantSessionDep) -> ShopProductListO
     # means UNASSIGNED rather than universal. The migration leaves a row NULL only where it
     # could not tell which class was meant; hiding it is the safe reading, and the dashboard
     # is where a human gives it one.
-    rows = (
-        session.execute(
-            select(Product)
-            .where(Product.is_active.is_(True), Product.class_id.in_(my_classes))
-            .order_by(Product.name)
-        )
-        .scalars()
-        .all()
-    )
+    # Ordered by CLASS first so the shop can render a heading per class without sorting the
+    # list again in the client -- and by name within one, which is the order it had before.
+    rows = session.execute(
+        select(Product, StudioClass.name)
+        .join(StudioClass, StudioClass.id == Product.class_id)
+        .where(Product.is_active.is_(True), Product.class_id.in_(my_classes))
+        .order_by(StudioClass.name, Product.name)
+    ).all()
     return ShopProductListOut(
         items=[
             ShopProductOut(
@@ -188,8 +195,10 @@ def my_products(request: Request, session: TenantSessionDep) -> ShopProductListO
                 price_agorot=row.price_agorot,
                 sizes=list(row.sizes or ()),
                 image_url=product_images.image_url(row),
+                class_id=row.class_id,
+                class_name=class_name,
             )
-            for row in rows
+            for row, class_name in rows
         ]
     )
 

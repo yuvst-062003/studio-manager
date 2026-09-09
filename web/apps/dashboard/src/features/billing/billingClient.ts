@@ -7,6 +7,8 @@ import type { components } from '@studio/api-client'
 
 export type ChargeOut = components['schemas']['ChargeOut']
 export type PricePlanOut = components['schemas']['PricePlanOut']
+export type StudentClassPricesOut = components['schemas']['StudentClassPricesOut']
+export type StudentClassPriceOut = components['schemas']['StudentClassPriceOut']
 export type ProductOut = components['schemas']['ProductOut']
 
 /**
@@ -107,6 +109,17 @@ export type DashboardBillingClient = {
   confirmMatch(ipnId: string, payerPersonId: string): Promise<void>
   ignoreIpn(ipnId: string): Promise<void>
   pricePlans(): Promise<PricePlanOut[]>
+  /** Every class this child actively trains in, with the plan set for it or `null`, plus
+   *  the student-level plan that any unset class falls back to. Driven by ENROLLMENTS, so
+   *  a class nobody has priced still comes back — that is the row a manager has to see. */
+  studentClassPrices(studentId: string): Promise<StudentClassPricesOut>
+  /** The whole picture at once. A partial save would leave a child priced for judo and not
+   *  karate with nothing on screen saying which half landed. `pricePlanId: null` CLEARS a
+   *  class's price and returns that class to the fallback — it does not store a null. */
+  setStudentClassPrices(
+    studentId: string,
+    items: readonly { classId: string; pricePlanId: string | null }[],
+  ): Promise<StudentClassPricesOut>
   /** The household drill (2026-08-30): a payer's open charges, labels included — the one
    *  read that shows a parent's shop-order note to a manager. */
   openCharges(payerPersonId: string): Promise<ChargeOut[]>
@@ -256,6 +269,24 @@ export function makeDashboardBillingClient(fetcher: Fetcher): DashboardBillingCl
     },
     async pricePlans() {
       return (await json<{ items: PricePlanOut[] }>(await fetcher('/api/v1/price-plans'))).items
+    },
+    async studentClassPrices(studentId) {
+      return json<StudentClassPricesOut>(
+        await fetcher(`/api/v1/students/${studentId}/class-prices`),
+      )
+    },
+    async setStudentClassPrices(studentId, items) {
+      return json<StudentClassPricesOut>(
+        await fetcher(`/api/v1/students/${studentId}/class-prices`, {
+          method: 'PUT',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({
+            // `price_plan_id: null` is a real value the server acts on — it deletes the
+            // row — so it is sent, never dropped.
+            items: items.map((row) => ({ class_id: row.classId, price_plan_id: row.pricePlanId })),
+          }),
+        }),
+      )
     },
     /** The household drill (2026-08-30) — a payer's open charges, labels included. The
      *  label is where a parent's shop-order note rides, and this read is the manager's
