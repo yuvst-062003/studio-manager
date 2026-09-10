@@ -499,8 +499,23 @@ selects, a bulk bar, a table with per-row WhatsApp / badge / edit icons, paginat
 drawer with four tabs (general / training / finance / health).
 
 **Port.** Take the four-tab drawer as the new shape of the student detail (§3.6). Take the
-discipline tabs as **class tabs** with live counts. Take the per-row WhatsApp action — it is a real
-`wa.me` link built from the student's phone and genuinely useful. Take the filter row's layout.
+discipline tabs as **class tabs**. Take the filter row's layout.
+
+**Two corrections found while building checkpoint 3**, both recorded here rather than discovered
+again later:
+
+- **The class tabs carry no counts.** The prototype puts one on every chip. `GET /api/v1/students`
+  returns a cursor page with no total, so the screen's own `baselineCount` is only knowable when
+  the whole roster fits in one page. A per-class count is therefore either N extra requests or an
+  invented number, and §0's rule is that every number is traced to an endpoint or deleted. A count
+  endpoint is the honest way to add them.
+- **The per-row WhatsApp action is not buildable yet.** An earlier draft of this section called it
+  "a real `wa.me` link built from the student's phone" — the prototype's is, ours cannot be:
+  `StudentSummaryOut` carries `guardian_display_names` and no phone number at all. It needs a
+  `guardian_phone` on the list response, which is a serializer change plus a regenerated
+  `api-client` — and `main` owns that package. **Deferred to checkpoint 15**, which already
+  touches the backend-adjacent screens, rather than bolted onto a screen checkpoint. The student
+  detail keeps its own WhatsApp link, where the phone *is* loaded.
 
 **Do not port**: its pagination (buttons 2, 3 and 12 have no handlers at all; the prev arrow is
 `disabled` and the rest are decorative); its "export data" button (toast, no file); its bulk SMS,
