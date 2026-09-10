@@ -496,7 +496,12 @@ describe('the dashboard can be switched between light, dark and system', () => {
 // weekly-calendar door and the closures door carried `aria-current="page"`, so the sidebar
 // said the manager was in two places at once. Caught on the checkpoint's own screenshot.
 describe('one door is current at a time', () => {
-  it('lights only the closures door on #/closures, not the weekly calendar too', async () => {
+  // Rewritten 2026-09-10 when `overflowDoors()` was retired. It used to assert that the
+  // CLOSURES door was the current one — but closures no longer has a door: §2.3 makes the
+  // calendar absorb `#/closures`, and the link now lives in the calendar's own header.
+  // So the invariant the test protects is unchanged (exactly one door is current, never
+  // two) while the door it names is the calendar's.
+  it('lights only the weekly-calendar door on #/closures, and nothing else', async () => {
     stubApi(SIGNED_IN)
     globalThis.location.hash = '#/closures'
     render(<App />)
@@ -504,7 +509,31 @@ describe('one door is current at a time', () => {
       expect(document.querySelectorAll('.studio-sidenav [aria-current="page"]').length).toBe(1),
     )
     expect(document.querySelector('.studio-sidenav [aria-current="page"]')).toHaveTextContent(
-      t('he', 'schedule.closure.title'),
+      t('he', 'common.dash.nav.weekly'),
     )
+  })
+
+  // The duplication the owner reported: `הגדרות` was both the ninth door and a pinned
+  // `settingsItem` at the foot of the sidebar, so one menu offered the same screen twice.
+  it('names הגדרות exactly once in the sidebar', async () => {
+    stubApi(SIGNED_IN)
+    globalThis.location.hash = '#/home'
+    render(<App />)
+    const nav = await screen.findByRole('navigation', { name: t('he', 'common.nav.menu') })
+    expect(
+      within(nav).getAllByRole('link', { name: new RegExp(t('he', 'common.dash.nav.settings')) }),
+    ).toHaveLength(1)
+  })
+
+  // The overflow group itself. It was labelled with `common.dash.nav.club` (מועדון) and
+  // held the ten absorbed destinations; every checkpoint that was meant to retire an entry
+  // had shipped while the entries stayed, so the sidebar carried nine doors and then a
+  // second menu of eight more.
+  it('has no second nav group below the doors', async () => {
+    stubApi(SIGNED_IN)
+    globalThis.location.hash = '#/home'
+    render(<App />)
+    const nav = await screen.findByRole('navigation', { name: t('he', 'common.nav.menu') })
+    expect(within(nav).queryByText(t('he', 'common.dash.nav.club'))).not.toBeInTheDocument()
   })
 })

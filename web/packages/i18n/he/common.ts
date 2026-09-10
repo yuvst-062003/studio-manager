@@ -685,4 +685,20 @@ export const common: Bundle = {
   'stepper.state.skipped': 'דולג',
   'stepper.state.current': 'השלב הנוכחי',
   'stepper.state.upcoming': 'טרם הגיע',
+  // Checkpoint 15b (2026-09-10) — the five-tab settings §3.19 asked for. The rail used to
+  // carry nine entries of which six only navigated away to screens that own themselves;
+  // the owner asked why settings held all of that. These are the tabs that remain.
+  'settings.section.appearance': 'מראה ושפה',
+  'settings.annual.title': 'פעולות שנתיות',
+  'settings.annual.hint': 'שתי פעולות שרצות פעם בשנה, לא בכל יום.',
+  'settings.annual.setup': 'אשף הקמה',
+  'settings.annual.rollover': 'גלגול שנה',
+  'settings.users.hint': 'הצוות, התפקידים וההרשאות מנוהלים במסך הצוות.',
+  'settings.users.open': 'פתיחת מסך הצוות',
+  // ImagePicker (2026-09-10) — the empty square that replaces the browser's Choose File.
+  'imagePicker.empty': 'הוספת תמונה',
+  'imagePicker.hint': 'לחצו כדי לבחור קובץ',
+  'imagePicker.replace': 'החלפת תמונה',
+  'imagePicker.remove': 'הסרת תמונה',
+  'imagePicker.preview': 'תצוגה מקדימה',
 }

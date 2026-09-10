@@ -266,9 +266,41 @@
   object-fit: cover;
 }
 
+/* The whole photo box is the file control now, so it fills its parent and says so with a
+ * pointer. `.item-card__photo` keeps the 3:2 ratio and the crop; this only makes it
+ * pressable. */
+.item-card__photo-drop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 100%;
+  block-size: 100%;
+  cursor: pointer;
+}
+
 .item-card__photo-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
   color: var(--text-muted);
   font-size: var(--text-caption);
+  text-align: center;
+}
+
+/* Visually hidden, NOT `display: none`: the input must stay focusable and stay in the
+ * accessibility tree, or the picker becomes mouse-only. This is the same treatment
+ * `shared/ImagePicker.tsx` gives its own input, for the same reason. */
+.item-card__photo-input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* The retired chip sits ON the photo, so a retired item reads as retired before the eye
@@ -316,14 +348,6 @@
   border-block-start: var(--border-width-hairline) solid var(--border);
   margin-block-start: auto;
   font-size: var(--text-caption);
-}
-
-.item-card__photo-pick {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  font-size: var(--text-caption);
-  color: var(--text-secondary);
 }
 
 .item-card__error {

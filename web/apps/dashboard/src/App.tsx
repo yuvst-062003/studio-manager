@@ -329,8 +329,10 @@ function useSideNavBadges(enabled: boolean): { debtHouseholds: number; missingDo
  * desktop. One source is the fix, and it is why this returns items rather than groups.
  *
  * D1 of the redesign takes 19 destinations to 9. Nothing is deleted: every absorbed
- * destination is reached from inside the door that now owns it, and until the checkpoint
- * that moves it there, from `overflowDoors()` below.
+ * destination is reached from inside the door that now owns it. That was scaffolded by an
+ * `overflowDoors()` group holding the absorbed entries until each checkpoint moved them —
+ * the scaffolding is gone as of 2026-09-10, and `sideNavGroups()` below lists where each
+ * one landed.
  */
 /** A door carries both forms: the sidebar renders `label`, the drawer reads `labelKey`. */
 type Door = SideNavItem & { labelKey: string }
@@ -341,14 +343,15 @@ function doors(
   locale: Locale,
   canSeeMoney: boolean,
   badges: { debtHouseholds: number; missingDocuments: number },
+  isPlatformAdmin: boolean,
 ): Door[] {
   const onGroups = hash.startsWith('#/groups') || hash.startsWith('#/classes')
-  // `routeFromHash` folds `#/closures` into the `schedule` route — one vertical, one route,
-  // and the feature folder decides between its own hashes. The NAV cannot use that fold:
-  // closures has a door of its own, so on `#/closures` both it and the weekly calendar lit
-  // up and the sidebar claimed the manager was in two places at once (seen on the
-  // checkpoint-7 capture). `onGroups` already carves out the same case for the groups door.
-  const onClosures = hash.startsWith('#/closures')
+  // No `onClosures` carve-out any more. It existed because closures had a door of its own
+  // in `overflowDoors()`, so on `#/closures` both that door and the weekly calendar lit up
+  // and the sidebar claimed the manager was in two places at once (seen on the checkpoint-7
+  // capture). Retiring the overflow group removed the competitor: §2.3 makes the calendar
+  // the door that OWNS closures, so it should be the current one there, and carving it out
+  // now would light nothing at all.
   const items: Door[] = [
     {
       key: 'home',
@@ -368,7 +371,7 @@ function doors(
       href: '#/schedule',
       icon: <Icon name="calendar" />,
       // D14 — events live in the calendar rather than in a door of their own.
-      active: (route === 'schedule' && !onGroups && !onClosures) || route === 'events',
+      active: (route === 'schedule' && !onGroups) || route === 'events',
     },
     {
       key: 'students',
@@ -460,105 +463,22 @@ function doors(
           : undefined,
     },
   )
-  return items
-}
-
-/**
- * The destinations D1 absorbed, kept linkable until the checkpoint that puts each one
- * inside the door that now owns it.
- *
- * This exists so that "nothing becomes unreachable" is true on the day the nav shrinks
- * rather than eight checkpoints later. `unreachable-screens.test.ts` guards the
- * components; this guards the doors. Each entry names the checkpoint that retires it.
- */
-function overflowDoors(
-  route: DashboardRoute,
-  hash: string,
-  locale: Locale,
-  canSeeMoney: boolean,
-  isPlatformAdmin: boolean,
-): Door[] {
-  const items: Door[] = []
-  if (canSeeMoney) {
-    items.push(
-      // Retired by checkpoint 7, which puts closures inside the calendar.
-      {
-        key: 'closures',
-        label: t(locale, 'schedule.closure.title'),
-        labelKey: 'schedule.closure.title',
-        href: '#/closures',
-        icon: <Icon name="calendar" />,
-        active: hash === '#/closures',
-      },
-      // Retired by checkpoint 14, which puts exams beside the ladder.
-      {
-        key: 'exams',
-        label: t(locale, 'events.exam.plural'),
-        labelKey: 'events.exam.plural',
-        href: '#/exams',
-        icon: <Icon name="belts" />,
-        active: route === 'exams',
-      },
-      // Retired by checkpoint 10, which puts prices inside the money door.
-      {
-        key: 'prices',
-        label: t(locale, 'common.dash.nav.prices'),
-        labelKey: 'common.dash.nav.prices',
-        href: '#/prices',
-        icon: <Icon name="belts" />,
-        active: route === 'prices',
-      },
-      // Retired by checkpoint 15, which puts these four inside settings.
-      {
-        key: 'documents',
-        label: t(locale, 'common.dash.nav.documents'),
-        labelKey: 'common.dash.nav.documents',
-        href: '#/documents',
-        icon: <Icon name="documents" />,
-        active: route === 'documents',
-      },
-      {
-        key: 'staff',
-        label: t(locale, 'common.dash.nav.staff'),
-        labelKey: 'common.dash.nav.staff',
-        href: '#/staff',
-        icon: <Icon name="profile" />,
-        active: route === 'staff',
-      },
-      {
-        key: 'rollover',
-        label: t(locale, 'common.dash.nav.rollover'),
-        labelKey: 'common.dash.nav.rollover',
-        href: '#/rollover',
-        icon: <Icon name="sync" />,
-        active: route === 'rollover',
-      },
-      {
-        key: 'setup',
-        label: t(locale, 'common.dash.nav.setup'),
-        labelKey: 'common.dash.nav.setup',
-        href: '#/setup',
-        icon: <Icon name="settings" />,
-        active: route === 'setup',
-      },
-      // Retired by checkpoint 2, which renders the alert centre on the dashboard.
-      {
-        key: 'alerts',
-        label: t(locale, 'people.alerts.title'),
-        labelKey: 'people.alerts.title',
-        href: '#/alerts',
-        icon: <Icon name="attendance" />,
-        active: route === 'alerts',
-      },
-    )
-  }
-  // §18.1's console. NOT gated on canSeeMoney: platform-admin is not a role in a studio,
-  // it is a row on the global `auth_identity` above every studio.
+  // §18.1's operator console. Gated on platform-admin and NOT on `canSeeMoney`:
+  // platform-admin is not a role inside a studio, it is a row on the global
+  // `auth_identity` that sits above every studio -- so a club owner does not get this and
+  // an operator gets it whichever club they happen to be looking at.
+  //
+  // A door of its own rather than a section of settings, because it belongs to neither
+  // this club nor any other: everything above this line is about ONE studio and this is
+  // about all of them. It moved here when `overflowDoors()` was retired; it was the only
+  // entry in that group that never had a checkpoint to retire it, because it never had
+  // anywhere else to go.
   if (isPlatformAdmin) {
     items.push({
       key: 'platform',
       label: t(locale, 'common.platform.title'),
       labelKey: 'common.platform.title',
+      hint: t(locale, 'common.platform.nav'),
       href: '#/platform',
       icon: <Icon name="settings" />,
       active: route === 'platform',
@@ -575,17 +495,33 @@ function sideNavGroups(
   badges: { debtHouseholds: number; missingDocuments: number },
   isPlatformAdmin: boolean,
 ): SideNavGroup[] {
+  // ONE group. `overflowDoors()` used to add a second, labelled מועדון, holding the ten
+  // destinations D1 absorbed so that none of them became unreachable on the day the nav
+  // shrank from nineteen doors to nine. Every checkpoint named in those entries has since
+  // shipped, and nobody removed them — so the sidebar carried nine doors, then a second
+  // menu of eight more, and the owner asked on 2026-09-10 why it was there and why it was
+  // not organised. It was scaffolding that outlived its building.
+  //
+  // Each absorbed destination now has a real link in the door that owns it, added in the
+  // same commit as this deletion rather than promised for a later one:
+  //   closures  → the calendar's own header (WeekBoard)
+  //   exams     → beside the ladder (BeltsIndex)
+  //   prices    → the collections header (CollectionsScreen)
+  //   setup     → settings, appearance tab, "once a year"
+  //   rollover  → settings, appearance tab, "once a year"
+  //   staff     → settings, the `users` tab links out (§3.19 asks for exactly this)
+  //   documents → the manager home's money band
+  //   attendance→ the manager home, twice
+  //   alerts    → the alert centre renders ON the home (D8), so the route is a duplicate
+  //               of a screen the manager already lands on
+  //   platform  → a door of its own below, for the one identity that has it
   const groups: SideNavGroup[] = [
     {
       key: 'main',
       label: t(locale, 'common.dash.nav.daily'),
-      items: doors(route, hash, locale, canSeeMoney, badges),
+      items: doors(route, hash, locale, canSeeMoney, badges, isPlatformAdmin),
     },
   ]
-  const overflow = overflowDoors(route, hash, locale, canSeeMoney, isPlatformAdmin)
-  if (overflow.length > 0) {
-    groups.push({ key: 'more', label: t(locale, 'common.dash.nav.club'), items: overflow })
-  }
   return groups
 }
 
@@ -793,13 +729,13 @@ export default function App() {
         <AppShell
           title={session.activeStudioName ?? ''}
           logoUrl={studioLogoUrl}
-          // Derived from the SAME `doors()` the sidebar reads, plus the overflow — the two
-          // structures drifted before the redesign and left three destinations reachable
-          // on a phone and not on a desktop. One source, so they cannot disagree again.
-          items={[
-            ...doors(route, hash, locale, canSeeMoney, badges),
-            ...overflowDoors(route, hash, locale, canSeeMoney, session.isPlatformAdmin),
-          ].map((item) => ({ key: item.key, labelKey: item.labelKey, href: item.href }))}
+          // The SAME `doors()` the sidebar reads, and now nothing else — the overflow
+          // group it used to concatenate is gone. Two hand-maintained structures drifted
+          // once already and left three destinations reachable on a phone and not on a
+          // desktop; one source is what stops that recurring.
+          items={doors(route, hash, locale, canSeeMoney, badges, session.isPlatformAdmin).map(
+            (item) => ({ key: item.key, labelKey: item.labelKey, href: item.href }),
+          )}
           locale={locale}
           // F9 — one search, every screen, keyboard-reachable ('/'). Manager-only, like the
           // route behind it. In the CHROME rather than in the page: as a child of the shell
@@ -818,17 +754,11 @@ export default function App() {
                 badges,
                 session.isPlatformAdmin,
               )}
-              settingsItem={
-                canSeeMoney
-                  ? {
-                      key: 'settings',
-                      label: t(locale, 'common.dash.nav.settings'),
-                      href: '#/settings',
-                      icon: <Icon name="settings" />,
-                      active: route === 'settings',
-                    }
-                  : undefined
-              }
+              // No `settingsItem`. It pinned a second הגדרות to the foot of the sidebar
+              // while `doors()` already returns one as the ninth door, so the word appeared
+              // twice in one menu — the duplication the owner reported on 2026-09-10. The
+              // pinned slot made sense when settings was NOT one of the doors; since the
+              // nav shrank to nine it has been a second link to the same screen.
               appearance={
                 // 3f's light/dark/system switch, in the sidebar rather than only in the
                 // drawer. `ThemeProvider` has always wrapped this app, so a preference set

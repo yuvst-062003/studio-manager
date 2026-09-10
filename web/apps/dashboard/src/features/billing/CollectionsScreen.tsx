@@ -202,6 +202,17 @@ export function CollectionsScreen({
     <div style={pageStyle} data-testid="collections">
       <header style={rowStyle}>
         <h1>{t(locale, 'billing.debt.title')}</h1>
+        {/* §2.3 — the money door absorbs `#/prices`. A price plan is the thing a charge is
+            made FROM, so it belongs beside the charges rather than in a settings rail,
+            which is where its only other link used to be. */}
+        <a
+          className="studio-btn"
+          data-testid="collections-prices-link"
+          data-variant="ghost"
+          href="#/prices"
+        >
+          {t(locale, 'common.dash.nav.prices')}
+        </a>
         <Button
           variant="secondary"
           data-testid="export-accountant"

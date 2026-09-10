@@ -22,6 +22,7 @@ import {
   Card,
   Checkbox,
   EmptyState,
+  Icon,
   MoneyDisplay,
   PageHeader,
   StatusChip,
@@ -120,13 +121,48 @@ export function ItemsScreen({
           exists, because the object is keyed by the product's own id — there is nothing to
           upload against until the row has been created. */}
       <div className="item-card__photo">
-        {product.image_url ? (
-          <ProductThumb productId={product.id} src={product.image_url} />
-        ) : (
-          <span className="item-card__photo-empty">
-            {t(locale, 'billing.product.photoNone')}
-          </span>
-        )}
+        {/* The square IS the control. It used to be a read-only box reading "אין תמונה —
+            יוצג ריבוע ברירת מחדל", with the actual upload sitting three controls away in
+            the action row as the browser's own grey English "Choose File" button. The owner
+            asked for the obvious shape on 2026-09-10: press the empty square, with a
+            picture icon in it.
+
+            A `<label>` and not a `<button>`: the label already forwards the press to the
+            file input it wraps, so the native file dialog opens with no click handler, and
+            the input stays keyboard-reachable and screen-reader-announced. The input
+            carries the accessible name naming WHICH product, so a grid full of items is
+            navigable rather than twelve identical "add a photo"s. */}
+        <label
+          className="item-card__photo-drop"
+          aria-label={`${
+            product.image_url
+              ? t(locale, 'billing.product.photoReplace')
+              : t(locale, 'billing.product.photoAdd')
+          } ${product.name}`}
+        >
+          {product.image_url ? (
+            <ProductThumb productId={product.id} src={product.image_url} />
+          ) : (
+            <span className="item-card__photo-empty">
+              <Icon name="image" size={26} />
+              {t(locale, 'billing.product.photoAdd')}
+            </span>
+          )}
+          <input
+            accept="image/png,image/jpeg,image/webp"
+            className="item-card__photo-input"
+            data-testid={`product-photo-${product.id}`}
+            disabled={photoBusy !== null}
+            onChange={(event) => {
+              const file = event.target.files?.[0] ?? null
+              // Cleared so choosing the SAME file twice fires `change` again — after a
+              // failed upload a manager retries with the file they already picked.
+              event.target.value = ''
+              if (file) void setPhoto(product, file)
+            }}
+            type="file"
+          />
+        </label>
         {!product.is_active ? (
           <span className="item-card__retired">
             <StatusChip label={t(locale, 'billing.product.retired')} status="cancelled" />
@@ -161,35 +197,6 @@ export function ItemsScreen({
         >
           {t(locale, 'billing.product.edit')}
         </Button>
-        <label
-          className="item-card__photo-pick"
-          // The input carries the accessible name; the label names WHICH product, so
-          // a screen full of "Add a photo" is navigable.
-          aria-label={`${
-            product.image_url
-              ? t(locale, 'billing.product.photoReplace')
-              : t(locale, 'billing.product.photoAdd')
-          } ${product.name}`}
-        >
-          <span>
-            {product.image_url
-              ? t(locale, 'billing.product.photoReplace')
-              : t(locale, 'billing.product.photoAdd')}
-          </span>
-          <input
-            accept="image/png,image/jpeg,image/webp"
-            data-testid={`product-photo-${product.id}`}
-            disabled={photoBusy !== null}
-            onChange={(event) => {
-              const file = event.target.files?.[0] ?? null
-              // Cleared so choosing the SAME file twice fires `change` again — after a
-              // failed upload a manager retries with the file they already picked.
-              event.target.value = ''
-              if (file) void setPhoto(product, file)
-            }}
-            type="file"
-          />
-        </label>
         {product.image_url ? (
           <Button
             aria-label={`${t(locale, 'billing.product.photoRemove')} ${product.name}`}

@@ -799,9 +799,28 @@ export function WeekBoard({
         actions={
           <ActionBar
             end={
-              <Button data-testid="session-create-open" onClick={() => setOpen(true)}>
-                {t(locale, 'schedule.session.create')}
-              </Button>
+              <>
+                {/* §2.3 — the calendar absorbs `#/closures`, and this is the link that
+                    makes that true. It used to be a door of its own in `overflowDoors()`;
+                    retiring that group without putting the link here would have left the
+                    closures screen routed and unreachable, which is the exact failure
+                    `unreachable-screens.test.ts` exists to catch. */}
+                {/* A link and not a `Button`: `Button` renders a real `<button>` and takes
+                    no `href`, and closures is a route — so an anchor is what makes the back
+                    button, a new tab and a bookmark work. Same reasoning `ClassesScreen`
+                    gives for the class wizard's entry point. */}
+                <a
+                  className="studio-btn"
+                  data-testid="week-closures"
+                  data-variant="ghost"
+                  href="#/closures"
+                >
+                  {t(locale, 'schedule.closure.title')}
+                </a>
+                <Button data-testid="session-create-open" onClick={() => setOpen(true)}>
+                  {t(locale, 'schedule.session.create')}
+                </Button>
+              </>
             }
             start={
               <>
