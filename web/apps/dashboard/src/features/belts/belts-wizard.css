@@ -155,3 +155,72 @@
 .belt-ladder tbody tr[data-over] {
   box-shadow: inset 0 2px 0 0 var(--fg);
 }
+
+/* ── §3.9's progression strip ────────────────────────────────────────────────────────
+ * Checkpoint 14. The prototype's curriculum tab draws a ladder as a horizontal run of
+ * coloured chips, and that IS a better read of a progression than a table: a ladder is an
+ * ORDER, and a row-per-rank table shows order as vertical position, which is the one thing
+ * a table is worst at making obvious.
+ *
+ * The table below it stays, because the table is where the ladder is EDITED. This is the
+ * display; that is the editor. */
+.belt-strip {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.belt-strip__rung {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+}
+
+.belt-strip__name {
+  font-weight: var(--weight-medium);
+}
+
+/* How many people are on this rung — the number `LadderRankOut` already carries. The
+ * prototype prints an invented training count in the same place. */
+.belt-strip__holders {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 1.5rem;
+  padding-inline: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--disabled-surface);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* §3.10's attendance control on the event roster. A bare button around a chip: the chip is
+ * the state and the button is only what makes it pressable, so the control has no
+ * appearance of its own to disagree with the chip's. */
+.event-attend {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
+.event-attend:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.event-attend:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-pill);
+}

@@ -127,6 +127,10 @@ export function BeltSystemScreen({
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
   const [refusal, setRefusal] = useState<string | null>(null)
+  /** §3.9's gap, closed: which rung is being renamed, and to what. */
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState('')
+  const [renameFailed, setRenameFailed] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
@@ -190,6 +194,30 @@ export function BeltSystemScreen({
     reload()
   }
 
+  /**
+   * Rename one rung. Everything else about it is sent unchanged: `BeltRankIn` is a whole
+   * body, not a patch of one field, so leaving `order_index` or `color_hex` out would move
+   * or blank the rung as a side effect of correcting a typo.
+   */
+  const rename = async (row: LadderRankOut) => {
+    setRenameFailed(false)
+    try {
+      await client.updateRank(row.id, {
+        class_id: classId,
+        name: editingName.trim(),
+        kyu: row.kyu,
+        order_index: row.order_index,
+        color_hex: row.color_hex,
+        secondary_color_hex: row.secondary_color_hex,
+      })
+    } catch {
+      setRenameFailed(true)
+      return
+    }
+    setEditingId(null)
+    reload()
+  }
+
   const save = async () => {
     if (!draft) return
     const body: BeltRankIn = {
@@ -228,6 +256,33 @@ export function BeltSystemScreen({
         <p style={hintStyle}>{t(locale, 'events.belt.perClassHint')}</p>
       </header>
 
+      {/* §3.9's port — the prototype's curriculum tab draws a ladder as a horizontal run of
+          coloured chips, and that IS a better read of a progression than a table: a ladder
+          is an ORDER, and a row-per-rank table shows order as vertical position, which is
+          the one thing a table is worst at making obvious.
+
+          The table stays, because the table is where the ladder is EDITED — reorder,
+          rename, delete. This is the display; that is the editor. */}
+      {ladder.length > 0 ? (
+        <ol className="belt-strip" data-testid="belt-strip">
+          {ladder.map((row) => (
+            <li className="belt-strip__rung" data-testid={`belt-strip-${row.id}`} key={row.id}>
+              {/* One BeltBar per rank here too — never a hand-built swatch. The ring is its
+                  guarantee and it has no prop that turns it off. */}
+              <BeltBar
+                colorHex={row.color_hex}
+                label={row.name}
+                secondaryColorHex={row.secondary_color_hex ?? undefined}
+              />
+              <span className="belt-strip__name">{row.name}</span>
+              {/* How many people are on this rung. The prototype prints a training count it
+                  invents; this is the number `LadderRankOut` already carries. */}
+              <span className="belt-strip__holders">{row.holders}</span>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+
       {/* `role="alert"` because this appears AFTER load, in response to a press: without it
           a screen-reader user presses save, nothing is announced, and the only signal that
           the write was refused is that the text above turned red — SC 1.4.1 and 4.1.3 in one
@@ -235,6 +290,12 @@ export function BeltSystemScreen({
       {refusal ? (
         <p role="alert" style={errorStyle}>
           {refusal}
+        </p>
+      ) : null}
+
+      {renameFailed ? (
+        <p data-testid="rank-rename-failed" role="alert" style={errorStyle}>
+          {t(locale, 'events.belt.renameFailed')}
         </p>
       ) : null}
 
@@ -301,7 +362,16 @@ export function BeltSystemScreen({
                     />
                   </td>
                   <th scope="row" style={cellStyle}>
-                    {row.name}
+                    {editingId === row.id ? (
+                      <TextField
+                        data-testid={`rank-rename-${row.id}`}
+                        label={t(locale, 'events.belt.name')}
+                        onChange={(event) => setEditingName(event.target.value)}
+                        value={editingName}
+                      />
+                    ) : (
+                      row.name
+                    )}
                   </th>
                   <td style={cellStyle}>{row.kyu ?? '—'}</td>
                   <td style={cellStyle}>{row.holders}</td>
@@ -317,6 +387,37 @@ export function BeltSystemScreen({
                           {t(locale, 'events.belt.moveDown')}
                         </Button>
                       ) : null}
+                      {/* §3.9's named gap: `PATCH /api/v1/belt-ranks/{id}` has been in the
+                          client since the ladder shipped and NO screen called it, so a rank
+                          could be created and deleted but never renamed. A club that
+                          mistyped חגורה כתומה had to delete the rung — which is refused
+                          while anybody holds it — or live with it. */}
+                      {editingId === row.id ? (
+                        <>
+                          <Button
+                            data-testid={`rank-save-${row.id}`}
+                            disabled={editingName.trim() === ''}
+                            onClick={() => void rename(row)}
+                          >
+                            {t(locale, 'events.belt.renameSave')}
+                          </Button>
+                          <Button onClick={() => setEditingId(null)} variant="ghost">
+                            {t(locale, 'events.belt.renameCancel')}
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          data-testid={`rank-rename-open-${row.id}`}
+                          onClick={() => {
+                            setEditingId(row.id)
+                            setEditingName(row.name)
+                            setRenameFailed(false)
+                          }}
+                          variant="ghost"
+                        >
+                          {t(locale, 'events.belt.rename')}
+                        </Button>
+                      )}
                       <Button onClick={() => void remove(row)} variant="destructive">
                         {t(locale, 'events.belt.delete')}
                       </Button>

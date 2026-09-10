@@ -139,6 +139,9 @@ export function EventPage({
   const [remindOutcome, setRemindOutcome] = useState<'sent' | 'quiet' | 'failed' | null>(null)
   const [event, setEvent] = useState<EventOut | null>(null)
   const [roster, setRoster] = useState<EventRegistrationOut[]>([])
+  /** Which row is in flight, and whether the last mark failed. */
+  const [marking, setMarking] = useState<string | null>(null)
+  const [markFailed, setMarkFailed] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [loadFailed, setLoadFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
@@ -173,6 +176,28 @@ export function EventPage({
 
   if (!event) {
     return <p style={tileLabelStyle}>{t(locale, 'events.list.loading')}</p>
+  }
+
+  /**
+   * Mark one student present, or take the mark back.
+   *
+   * The roster is updated from what the SERVER accepted rather than optimistically: an
+   * attendance mark is a fact about a child at a graded exam, and a row that flipped
+   * locally and failed on the wire is the one kind of wrong this screen must not be.
+   */
+  const mark = async (row: EventRegistrationOut) => {
+    setMarking(row.id)
+    setMarkFailed(false)
+    try {
+      await client.markAttendance(eventId, [
+        { student_id: row.student_id, attended: !row.attended },
+      ])
+      setRoster((await client.registrations(eventId)).items)
+    } catch {
+      setMarkFailed(true)
+    } finally {
+      setMarking(null)
+    }
   }
 
   const counts = tally(event, roster)
@@ -225,6 +250,12 @@ export function EventPage({
           </span>
         ) : null}
       </p>
+
+      {markFailed ? (
+        <p data-testid="event-attend-failed" role="alert" style={{ color: 'var(--danger)' }}>
+          {t(locale, 'events.roster.markFailed')}
+        </p>
+      ) : null}
 
       {loaded && roster.length === 0 ? (
         <EmptyState title={t(locale, 'events.roster.empty')} />
@@ -291,11 +322,36 @@ export function EventPage({
                     </td>
                   ) : null}
                   <td style={cellStyle}>
-                    {row.attended ? (
-                      <StatusChip label={t(locale, 'events.counts.attended')} status="paid" />
-                    ) : (
-                      <NotApplicable locale={locale} />
-                    )}
+                    {/* §3.10's named gap, closed: `POST /api/v1/events/{id}/attendance` has
+                        been in the client since events shipped and NO dashboard screen
+                        called it, so a manager standing at a grading with a laptop could
+                        see who was expected and not record who turned up.
+
+                        `aria-pressed` carries the mark, so which state a row is in lives in
+                        the accessibility tree and drives the chip from the same fact —
+                        never the colour alone. */}
+                    <button
+                      // `attended` is nullable: null means nobody has said either way,
+                      // which `aria-pressed` has no value for. `false` is the honest
+                      // reading — the mark is not set — and the chip beside it says
+                      // "mark attended" rather than "absent", so nothing claims the
+                      // student was missing.
+                      aria-pressed={row.attended === true}
+                      className="event-attend"
+                      data-testid={`event-attend-${row.id}`}
+                      disabled={marking !== null}
+                      onClick={() => void mark(row)}
+                      type="button"
+                    >
+                      {row.attended ? (
+                        <StatusChip label={t(locale, 'events.counts.attended')} status="paid" />
+                      ) : (
+                        <StatusChip
+                          label={t(locale, 'events.roster.markAttended')}
+                          status="unmarked"
+                        />
+                      )}
+                    </button>
                   </td>
                 </tr>
               ))}
