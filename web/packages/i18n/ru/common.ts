@@ -528,6 +528,12 @@ export const common: Bundle = {
   'dash.home.today.hall': 'Зал',
   'dash.home.today.coach': 'Тренер',
   'dash.home.today.noCoach': 'Тренер не назначен',
+  'dash.home.money.debtAction': 'Заняться сбором',
+  'dash.home.money.collectedAction': 'Детали платежей',
+  'dash.home.money.households': '{{count}} семей',
+  'dash.home.today.when.past': 'Завершено',
+  'dash.home.today.when.live': 'Идёт сейчас',
+  'dash.home.today.when.soon': 'Скоро',
 
   // -- §18.1's platform console (#/platform) --------------------------------------
   'platform.title': 'Консоль платформы',

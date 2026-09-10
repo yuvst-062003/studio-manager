@@ -586,6 +586,12 @@ export const common: Bundle = {
   'dash.home.today.hall': 'אולם',
   'dash.home.today.coach': 'מאמן',
   'dash.home.today.noCoach': 'לא שובץ מאמן',
+  'dash.home.money.debtAction': 'טיפול בגבייה',
+  'dash.home.money.collectedAction': 'פירוט תשלומים',
+  'dash.home.money.households': '{{count}} משפחות',
+  'dash.home.today.when.past': 'הסתיים',
+  'dash.home.today.when.live': 'מתקיים עכשיו',
+  'dash.home.today.when.soon': 'עוד מעט',
 
   // -- §18.1's platform console (#/platform) --------------------------------------
   // Operator-facing, not club-facing: this whole block is read by one person, the

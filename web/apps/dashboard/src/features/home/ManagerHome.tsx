@@ -1,22 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { formatTimeInStudioZone } from '@studio/core'
+import { fill, formatTimeInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import {
   Card,
   EmptyState,
+  Icon,
   LoadFailed,
   MoneyDisplay,
   PageHeader,
   RangeText,
   SectionHeader,
-  StatTile,
   StatusChip,
-  Table,
 } from '@studio/ui'
-import type { TableColumn } from '@studio/ui'
-import type { HomeClient, HomeData, HomeTodaySession } from './homeClient'
+import type { IconName } from '@studio/ui'
+import type { HomeClient, HomeData } from './homeClient'
 
 /**
  * The manager home — docs/design/proposals/manager-home.md.
@@ -33,6 +32,75 @@ import type { HomeClient, HomeData, HomeTodaySession } from './homeClient'
  * Regions resolve independently (`homeClient` uses `allSettled`), so one endpoint being
  * down costs one region rather than the page.
  */
+/**
+ * One executive KPI card, in the prototype's own composition.
+ *
+ * A muted label; a large value with a secondary figure on its baseline; a tinted icon
+ * badge on the far edge; a rule; then a foot carrying a note and the way in. The tone
+ * drives the value's colour and the badge's tint from the SEMANTIC band, so a debt figure
+ * is the same red here as everywhere else in the product — the surface palette re-values
+ * the greys around it and never these.
+ *
+ * It is a link, not a card with a link inside it: the whole tile is the target, the way
+ * `StatTile` already behaved, so the click area does not shrink to the words in the foot.
+ */
+function KpiCard({
+  label,
+  value,
+  secondary,
+  note,
+  action,
+  href,
+  icon,
+  tone,
+}: {
+  label: string
+  value: ReactNode
+  secondary?: string
+  note?: string
+  action: string
+  href: string
+  icon: IconName
+  tone: 'debt' | 'paid' | 'pending' | 'neutral'
+}) {
+  return (
+    <a className="dash-kpi" data-tone={tone} href={href}>
+      <span className="dash-kpi__head">
+        <span className="dash-kpi__text">
+          <span className="dash-kpi__label">{label}</span>
+          <span className="dash-kpi__figures">
+            <span className="dash-kpi__value">{value}</span>
+            {secondary ? <span className="dash-kpi__secondary">{secondary}</span> : null}
+          </span>
+        </span>
+        <span aria-hidden="true" className="dash-kpi__badge">
+          <Icon name={icon} />
+        </span>
+      </span>
+      <span className="dash-kpi__foot">
+        {note ? <span className="dash-kpi__note">{note}</span> : <span />}
+        <span className="dash-kpi__action">{action}</span>
+      </span>
+    </a>
+  )
+}
+
+/**
+ * Where a class sits against the clock: finished, on the mat now, or still to come.
+ *
+ * Read from the wall clock rather than from `today`, which says which DAY is drawn and
+ * nothing about which minute it is. Taken as an argument so the value is stable for one
+ * render and the function stays testable at a fixed instant.
+ */
+export function whenIs(
+  session: { startsAt: string; endsAt: string },
+  nowMs: number,
+): 'past' | 'live' | 'soon' {
+  if (Date.parse(session.endsAt) <= nowMs) return 'past'
+  if (Date.parse(session.startsAt) <= nowMs) return 'live'
+  return 'soon'
+}
+
 export function ManagerHome({
   locale,
   client,
@@ -62,6 +130,14 @@ export function ManagerHome({
   // reaching this state means the whole request threw — which is worth offering again.
   const [attempt, setAttempt] = useState(0)
   const day = useMemo(() => new Date(today), [today])
+  // Captured when the data lands, not read during render.
+  //
+  // `Date.now()` in a render body is impure and the lint rule refuses it — for the same
+  // reason this file's own header gives for taking `today` as a prop rather than calling
+  // `new Date()`: a component that reads the clock cannot be tested at a fixed instant,
+  // and re-renders would silently move it. Stamped alongside the load it describes, so
+  // every card on one render agrees about what "now" was.
+  const [nowMs, setNowMs] = useState(0)
 
   useEffect(() => {
     let alive = true
@@ -73,6 +149,7 @@ export function ManagerHome({
       .then((loaded) => {
         if (!alive) return
         setData(loaded)
+        setNowMs(Date.now())
         setFailed(false)
       })
       .catch(() => {
@@ -93,83 +170,68 @@ export function ManagerHome({
   // `data.attendance` is checked non-empty at the call site below before this is read.
   const attendanceAllUnmarked = (data?.attendance ?? []).every((group) => group.rate_percent === null)
 
-  // Only the rows with something in them. A zero row is noise on a screen whose whole job
-  // is to be scannable — but the region itself never hides, because "nothing needs
-  // attention" is information a manager came here for.
-  const attentionRows = attention
-    ? ([
-        { key: 'health', count: attention.missingHealth, tone: 'pending', href: '#/documents' },
-        { key: 'noCoach', count: attention.noCoach, tone: 'debt', href: '#/schedule' },
-        { key: 'unmarked', count: attention.unmarked, tone: 'pending', href: '#/attendance' },
-      ] as const).filter((row) => row.count > 0)
-    : []
-
-  const columns: TableColumn<HomeTodaySession>[] = [
-    {
-      id: 'group',
-      header: t(locale, 'common.dash.home.today.group'),
-      width: '40%',
-      cell: (row) => row.groupName,
-    },
-    {
-      id: 'time',
-      header: t(locale, 'common.dash.home.today.time'),
-      width: '20%',
-      // The first draft of this cell used two sibling `<bdi>` ends and rendered
-      // 16:00–17:00 as `17:00–16:00`. RangeText is that fix, extracted — it is the third
-      // place in this codebase to have shipped the same bidi bug.
-      cell: (row) => (
-        <RangeText
-          from={formatTimeInStudioZone(row.startsAt, locale)}
-          to={formatTimeInStudioZone(row.endsAt, locale)}
-        />
-      ),
-    },
-    {
-      id: 'hall',
-      header: t(locale, 'common.dash.home.today.hall'),
-      width: '15%',
-      cell: (row) => row.hall ?? '—',
-    },
-    {
-      id: 'coach',
-      header: t(locale, 'common.dash.home.today.coach'),
-      width: '25%',
-      // `3a`: an uncovered session must not render like a covered one. The shipped week
-      // board draws them identically, which is how two coachless classes went unnoticed.
-      cell: (row) =>
-        row.coach ?? (
-          <StatusChip label={t(locale, 'common.dash.home.today.noCoach')} status="debt" />
-        ),
-    },
-  ]
-
   return (
     <div className="dash-home">
       <PageHeader subtitle={studioName} title={t(locale, 'common.dash.home.title')} />
 
-      {money ? (
-        <div className="dash-home__money">
-          <StatTile
-            hint={t(locale, 'common.dash.home.money.debtHint')}
-            href="#/billing"
-            label={t(locale, 'common.dash.home.money.debt')}
-            tone="debt"
-            value={<MoneyDisplay agorot={money.debtAgorot} />}
-          />
-          <StatTile
-            href="#/billing"
-            label={t(locale, 'common.dash.home.money.collected')}
-            tone="paid"
-            value={<MoneyDisplay agorot={money.collectedAgorot} />}
-          />
-          <StatTile
-            hint={t(locale, 'common.dash.home.money.overdueHint')}
-            href="#/billing"
-            label={t(locale, 'common.dash.home.money.overdue')}
-            tone={money.debtHouseholds > 0 ? 'debt' : 'neutral'}
-            value={money.debtHouseholds}
-          />
+      {/* The KPI band — the prototype's four executive cards, with our own figures.
+          Each is: a muted label, a large value with a secondary figure beside it, a tinted
+          icon badge, a rule, and a foot carrying a note and the way in. The prototype's
+          other two cards are deliberately absent: one draws a percentage of a revenue
+          TARGET and one a club-occupancy percentage, and this product stores neither a
+          target nor a capacity (D2). Their slots go to two numbers a manager actually
+          chases and we genuinely hold. */}
+      {money || attention ? (
+        <div className="dash-home__kpis">
+          {money ? (
+            <KpiCard
+              action={t(locale, 'common.dash.home.money.debtAction')}
+              href="#/billing"
+              icon="payments"
+              label={t(locale, 'common.dash.home.money.debt')}
+              note={t(locale, 'common.dash.home.money.overdue')}
+              secondary={fill(t(locale, 'common.dash.home.money.households'), {
+                count: money.debtHouseholds,
+              })}
+              tone="debt"
+              value={<MoneyDisplay agorot={money.debtAgorot} />}
+            />
+          ) : null}
+          {money ? (
+            <KpiCard
+              action={t(locale, 'common.dash.home.money.collectedAction')}
+              href="#/billing"
+              icon="reports"
+              label={t(locale, 'common.dash.home.money.collected')}
+              tone="paid"
+              value={<MoneyDisplay agorot={money.collectedAgorot} />}
+            />
+          ) : null}
+          {attention ? (
+            // Missing declarations rather than uncovered sessions, and the choice matters:
+            // an uncovered class is ALREADY on this screen, as a red chip on its own row in
+            // today's list directly below. A missing declaration appears nowhere else on
+            // the home — it had a row in the attention list this band replaced, and losing
+            // it would have left the fact carried only by a badge in the nav.
+            <KpiCard
+              action={t(locale, 'common.dash.home.attention.all')}
+              href="#/documents"
+              icon="documents"
+              label={t(locale, 'common.dash.home.attention.health')}
+              tone={attention.missingHealth > 0 ? 'pending' : 'neutral'}
+              value={attention.missingHealth}
+            />
+          ) : null}
+          {attention ? (
+            <KpiCard
+              action={t(locale, 'common.dash.home.attendanceChart.all')}
+              href="#/attendance"
+              icon="attendance"
+              label={t(locale, 'common.dash.home.attention.unmarked')}
+              tone={attention.unmarked > 0 ? 'pending' : 'neutral'}
+              value={attention.unmarked}
+            />
+          ) : null}
         </div>
       ) : null}
 
@@ -200,16 +262,58 @@ export function ManagerHome({
                 action={<a href="#/schedule">{t(locale, 'common.dash.home.today.fullWeek')}</a>}
                 title={t(locale, 'common.dash.home.today.title')}
               />
-              <Table
-                caption={t(locale, 'common.dash.home.today.title')}
-                columns={columns}
-                empty={<EmptyState title={t(locale, 'common.dash.home.today.none')} />}
-                rowKey={(row) => row.id}
-                rows={todaysClasses}
-              />
+              {/* Cards, not a table. The prototype draws each class as its own block
+                  carrying a STATE — finished, on the mat now, still to come — which a
+                  row of cells cannot show without a column nobody reads. The state is
+                  computed from the wall clock against the session's own window. */}
+              {todaysClasses.length === 0 ? (
+                <EmptyState title={t(locale, 'common.dash.home.today.none')} />
+              ) : (
+                <ul className="dash-home__today" data-testid="home-today-list">
+                  {todaysClasses.map((row) => {
+                    const when = whenIs(row, nowMs)
+                    return (
+                      <li className="dash-home__class" data-when={when} key={row.id}>
+                        <div className="dash-home__class-when">
+                          <RangeText
+                            from={formatTimeInStudioZone(row.startsAt, locale)}
+                            to={formatTimeInStudioZone(row.endsAt, locale)}
+                          />
+                          <StatusChip
+                            label={t(locale, `common.dash.home.today.when.${when}`)}
+                            status={when === 'live' ? 'paid' : when === 'past' ? 'unmarked' : 'planned'}
+                          />
+                        </div>
+                        <div className="dash-home__class-body">
+                          <strong>
+                            <bdi>{row.groupName}</bdi>
+                          </strong>
+                          <span className="dash-home__class-meta">
+                            <bdi>{row.hall ?? '—'}</bdi>
+                          </span>
+                        </div>
+                        {/* `3a`: an uncovered session must not render like a covered one. */}
+                        {row.coach ? (
+                          <span className="dash-home__class-coach">
+                            <bdi>{row.coach}</bdi>
+                          </span>
+                        ) : (
+                          <StatusChip
+                            label={t(locale, 'common.dash.home.today.noCoach')}
+                            status="debt"
+                          />
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
             </Card>
           ) : null}
 
+        </div>
+
+        <div className="dash-home__side">
           {/* The attendance bars (owner request 2026-08-30): rate per group over the last
               30 days, from 4c's own endpoint. A group nobody marked draws NO bar and says
               so — 0% would be a claim about children who were never counted. */}
@@ -267,38 +371,6 @@ export function ManagerHome({
           ) : null}
         </div>
 
-        <div className="dash-home__side">
-          {attention ? (
-            <Card>
-              <SectionHeader
-                action={<a href="#/alerts">{t(locale, 'common.dash.home.attention.all')}</a>}
-                title={t(locale, 'common.dash.home.attention.title')}
-              />
-              {attentionRows.length === 0 ? (
-                <p className="dash-home__quiet">{t(locale, 'common.dash.home.attention.none')}</p>
-              ) : (
-                <ul className="dash-home__alerts">
-                  {attentionRows.map((row) => (
-                    <li key={row.key}>
-                      <a href={row.href}>{t(locale, `common.dash.home.attention.${row.key}`)}</a>
-                      {/* The word beside the colour, never the colour alone (SC 1.4.1). */}
-                      <StatusChip
-                        label={t(
-                          locale,
-                          row.tone === 'debt'
-                            ? 'common.dash.home.severity.danger'
-                            : 'common.dash.home.severity.pending',
-                        )}
-                        status={row.tone}
-                      />
-                      <span className="dash-home__count">{row.count}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-          ) : null}
-        </div>
       </div>
     </div>
   )

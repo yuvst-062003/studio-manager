@@ -183,3 +183,194 @@
   font-size: var(--text-title);
   margin-block: 0 var(--space-3);
 }
+
+/* ═══ The KPI band ════════════════════════════════════════════════════════════════
+ * The prototype's four executive cards. Four equal columns above 60rem — the same
+ * breakpoint the money band used — falling back to a floor-based wrap below it, so three
+ * figures never read as three different widths. */
+.dash-home__kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+@media (width <= 60rem) {
+  .dash-home__kpis {
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  }
+}
+
+.dash-kpi {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-4);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+  text-decoration: none;
+  color: var(--fg);
+  transition: border-color var(--motion-fast) var(--ease-standard);
+}
+
+.dash-kpi:hover {
+  border-color: var(--border-strong);
+}
+
+.dash-kpi:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.dash-kpi__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.dash-kpi__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.dash-kpi__label {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+}
+
+.dash-kpi__figures {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.dash-kpi__value {
+  font-size: var(--text-display);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--leading-tight);
+}
+
+.dash-kpi__secondary {
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+}
+
+/* The tinted icon badge. Its colour comes from the SEMANTIC band, so a debt card is the
+ * same red on this mint surface as on the blue staff app — the surface re-values the greys
+ * around it and never these. */
+.dash-kpi__badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border-radius: var(--radius-md);
+  background: var(--disabled-surface);
+  color: var(--text-muted);
+}
+
+.dash-kpi[data-tone='debt'] .dash-kpi__value,
+.dash-kpi[data-tone='debt'] .dash-kpi__secondary {
+  color: var(--debt);
+}
+
+.dash-kpi[data-tone='debt'] .dash-kpi__badge {
+  background: var(--debt-tint);
+  color: var(--debt);
+}
+
+.dash-kpi[data-tone='paid'] .dash-kpi__badge {
+  background: var(--paid-tint);
+  color: var(--paid);
+}
+
+.dash-kpi[data-tone='pending'] .dash-kpi__value {
+  color: var(--pending);
+}
+
+.dash-kpi[data-tone='pending'] .dash-kpi__badge {
+  background: var(--pending-tint);
+  color: var(--pending);
+}
+
+.dash-kpi__foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-block-start: var(--space-3);
+  border-block-start: var(--border-width-hairline) solid var(--border);
+  font-size: var(--text-caption);
+}
+
+.dash-kpi__note { color: var(--text-muted); }
+
+.dash-kpi__action {
+  font-weight: var(--weight-medium);
+  color: var(--accent);
+}
+
+.dash-kpi[data-tone='debt'] .dash-kpi__action { color: var(--debt); }
+
+/* ═══ Today's classes ═════════════════════════════════════════════════════════════
+ * Cards rather than table rows, each carrying its state against the clock. The stripe on
+ * the reading edge is what makes "on the mat now" findable in a column of six. */
+.dash-home__today {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.dash-home__class {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding-block: var(--space-3);
+  padding-inline: var(--space-4);
+  border: var(--border-width-hairline) solid var(--border);
+  border-inline-start: 3px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.dash-home__class[data-when='live'] {
+  border-inline-start-color: var(--paid);
+  background: var(--paid-tint);
+}
+
+.dash-home__class[data-when='past'] {
+  opacity: 0.72;
+}
+
+.dash-home__class-when {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-home__class-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-inline-end: auto;
+  min-inline-size: 0;
+}
+
+.dash-home__class-meta,
+.dash-home__class-coach {
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+}
