@@ -80,6 +80,31 @@ describe('the shape of the flow', () => {
     )
   })
 
+  it('draws a completion bar with the percentage on it, not just a rail of nodes', async () => {
+    // The rail says WHICH steps are done. Across seven of them a manager also wants how
+    // much of the whole is, which is a different question and was not on the screen.
+    renderWizard(null)
+    await screen.findByTestId('stepper')
+    expect(screen.getByTestId('stepper-track')).toHaveAttribute('aria-valuenow', '0')
+    expect(screen.getByTestId('stepper-percent')).toHaveTextContent('0')
+  })
+
+  it('counts the percentage by steps ANSWERED, not by where the manager is standing', async () => {
+    // Saving step 1 moves to step 2 — one of seven answered, 14%. Walking BACK to step 1
+    // must not undo that: `state` reads `current` for whatever step is open, which is
+    // exactly why the count is taken from `settled` instead.
+    const { client } = renderWizard(null)
+    await screen.findByTestId('wizard-class-name')
+    await userEvent.type(screen.getByTestId('wizard-class-name'), 'קרב מגע')
+    await userEvent.click(screen.getByTestId('wizard-details-save'))
+    await waitFor(() => expect(client.createClass).toHaveBeenCalled())
+
+    await waitFor(() => expect(screen.getByTestId('stepper-track')).toHaveAttribute('aria-valuenow', '14'))
+    await userEvent.click(screen.getByTestId('class-wizard-back'))
+    expect(await screen.findByTestId('class-wizard-step-details')).toBeInTheDocument()
+    expect(screen.getByTestId('stepper-track')).toHaveAttribute('aria-valuenow', '14')
+  })
+
   it('has no Back on the first step', async () => {
     renderWizard(null)
     await screen.findByTestId('class-wizard-step-details')

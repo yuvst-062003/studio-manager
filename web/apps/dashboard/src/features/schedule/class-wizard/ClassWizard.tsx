@@ -125,6 +125,10 @@ export function ClassWizard({
               : 'upcoming',
         // Every step but the first needs a class to write against.
         reachable: at === 0 || classId !== null,
+        // The percentage counts steps ANSWERED. `state` says `current` for the step being
+        // stood on, so a manager who walked back to step 2 after saving five would watch
+        // the bar drop a step for having looked at something.
+        settled: visited.has(id),
       })),
     [active, classId, locale, visited],
   )

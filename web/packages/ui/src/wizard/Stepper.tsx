@@ -12,6 +12,7 @@
 // still says 6/7, and it doesn't show what's missing" when `done` and `skipped` shared one
 // ✓ — so `state` is in `data-state`, the mark differs per state, and every node carries
 // text naming it for a screen reader.
+import { fill } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 
@@ -33,6 +34,33 @@ export interface StepperNode {
   stateLabel?: string
   /** False for a step the manager has not reached yet. */
   reachable: boolean
+  /**
+   * Whether this step is FINISHED WITH, for the percentage above the rail.
+   *
+   * It defaults to what `state` says and exists because `state` cannot always answer it:
+   * every wizard here overrides a node's state to `current` when the manager is standing on
+   * it, so a step they finished and then walked back to reads as `current` and would drop
+   * the percentage by a step for no reason. A caller that knows better — the class wizard's
+   * `visited` set, setup's stored `status` — says so here.
+   */
+  settled?: boolean
+}
+
+/** Done with, in the sense the percentage means: this step is not waiting for anything. A
+ *  skip is an ANSWER but not a finish, and it counts — a manager who skipped belts is not
+ *  going to come back to it in this pass. */
+function isSettled(node: StepperNode): boolean {
+  return node.settled ?? (node.state === 'done' || node.state === 'skipped')
+}
+
+/** Whole percent, and never a rounding that lies at either end: 99% for six of seven steps
+ *  would read as finished, and 1% for none of them as started. */
+export function completionPercent(nodes: StepperNode[]): number {
+  if (nodes.length === 0) return 0
+  const settled = nodes.filter(isSettled).length
+  if (settled === 0) return 0
+  if (settled === nodes.length) return 100
+  return Math.min(99, Math.max(1, Math.round((settled / nodes.length) * 100)))
 }
 
 /** The mark inside the node. A skip is an ANSWER but not a finish, so it is its own. */
@@ -69,12 +97,40 @@ export function Stepper({
   /** The `data-testid` stem, so a screen that already had a named rail keeps its names. */
   idPrefix?: string
 }) {
+  const percent = completionPercent(nodes)
+
   return (
     // The shell is the CONTAINER the narrow rules query. A media query would read the
     // viewport, and the viewport is the wrong number: the staff app mounts this wizard
     // inside a ~440px phone shell on a 1440px screen, so the rail is narrow while the
     // window is not. Only the rail's own width answers "do seven labels fit here".
     <div className="studio-stepper-shell">
+      {/* The completion line. The rail says WHICH steps are done; this says how much of the
+          whole is, which is the thing a manager standing on step 3 of 7 actually wants —
+          and it is one line across the full width, so it reads as progress rather than as
+          another row of nodes.
+
+          `role="progressbar"` carries the same number to a screen reader as the figure
+          beside the label carries on screen. The figure is not decoration: a bar with no
+          number is a length nobody can quote. */}
+      <div className="studio-stepper__progress">
+        <span className="studio-stepper__progress-label">{label}</span>
+        <span className="studio-stepper__progress-value" data-testid={`${idPrefix}-percent`}>
+          {fill(t(locale, 'common.stepper.percent'), { percent })}
+        </span>
+      </div>
+      <div
+        aria-label={t(locale, 'common.stepper.completion')}
+        aria-valuemax={100}
+        aria-valuemin={0}
+        aria-valuenow={percent}
+        className="studio-stepper__track"
+        data-testid={`${idPrefix}-track`}
+        role="progressbar"
+      >
+        <span className="studio-stepper__fill" style={{ inlineSize: `${percent}%` }} />
+      </div>
+
       {/* An ordered list, so a screen reader announces "3 of 7" without the rail saying it. */}
       <ol aria-label={label} className="studio-stepper" data-testid="stepper">
         {nodes.map((node, index) => (

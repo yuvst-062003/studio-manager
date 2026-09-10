@@ -926,10 +926,13 @@ describe('SetupWizard chrome — artboards 5c–5f (2026-08-29)', () => {
 
   it('fills the progress bar by steps ANSWERED, not by where the manager is standing', async () => {
     // A manager who paged back to step 1 has not undone anything, and a bar that shrank
-    // when they did would say they had.
+    // when they did would say they had. The bar is the shared `Stepper`'s now — the local
+    // one it replaced was a second bar on the same screen saying the same thing — and
+    // `settled` is what keeps the count off `state`, which reads `current` for the step
+    // being stood on whatever its stored status is.
     registerM1Stubs()
     render(<SetupWizard client={fakeClient()} locale="he" />)
-    expect(await screen.findByTestId('setup-progress')).toHaveAttribute('data-done', '0')
+    expect(await screen.findByTestId('setup-rail-track')).toHaveAttribute('aria-valuenow', '0')
   })
 })
 

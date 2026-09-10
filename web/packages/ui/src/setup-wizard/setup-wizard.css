@@ -157,19 +157,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* A determinate bar, filled to the step's fraction. It fills from the inline START, so it
- * grows leftwards in Hebrew and rightwards in English without a branch. */
-.setup-progress {
-  block-size: 3px;
-  background: var(--border);
-}
-
-.setup-progress__fill {
-  block-size: 100%;
-  background: var(--fg);
-  transition: inline-size var(--motion-base) var(--ease-standard);
-}
-
 /* Checkpoint 17 — one column, not two.
  *
  * The rail used to be a 15rem side track, which is the right shape for a vertical list of

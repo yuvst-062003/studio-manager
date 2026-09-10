@@ -678,6 +678,8 @@ export const common: Bundle = {
   'account.group.legal': 'מדיניות ותנאים',
   // The shared stepper (§3.21, §3.19, §3.17). Its state words are never the only signal —
   // the mark and the tint carry it on screen, and these carry it to a screen reader.
+  'stepper.completion': 'התקדמות באשף',
+  'stepper.percent': '{{percent}}% הושלמו',
   'stepper.locked': 'יש להשלים את השלבים הקודמים תחילה',
   'stepper.state.done': 'הושלם',
   'stepper.state.skipped': 'דולג',

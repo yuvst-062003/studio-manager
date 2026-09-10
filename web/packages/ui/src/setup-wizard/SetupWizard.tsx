@@ -145,7 +145,6 @@ export function SetupWizard({
   const StepBody = active?.render
   const position = current ? WIZARD_STEP_ORDER.indexOf(current) + 1 : 0
 
-  const done = steps.filter((step) => step.status !== 'pending').length
   const last = position === WIZARD_STEP_ORDER.length
 
   return (
@@ -201,18 +200,6 @@ export function SetupWizard({
           {t(locale, 'common.setup.openDashboard')}
         </Button>
       </header>
-
-      <div
-        aria-hidden="true"
-        className="setup-progress"
-        data-testid="setup-progress"
-        data-done={done}
-      >
-        <div
-          className="setup-progress__fill"
-          style={{ inlineSize: `${(done / WIZARD_STEP_ORDER.length) * 100}%` }}
-        />
-      </div>
 
       <div className="setup-body">
         <main data-testid="setup-step-body">
@@ -334,6 +321,10 @@ export function SetupWizard({
                       : ('upcoming' as const),
               stateLabel: statusLabel(locale, step.status),
               reachable: true,
+              // The percentage counts steps ANSWERED, not where the owner is standing. A
+              // manager who paged back to step 1 has not undone anything, and `state` says
+              // `current` for that step — which is why the count cannot be read off it.
+              settled: step.status !== 'pending',
             }))}
             onPick={(stepId) => setActiveId(stepId as WizardStepId)}
             stateVisible

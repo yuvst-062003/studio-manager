@@ -311,6 +311,10 @@ export function RolloverWizard({
             // been a quiet loss on the one rail whose words are load-bearing.
             stateLabel: t(locale, `schedule.rollover.status.${step?.status ?? 'pending'}`),
             reachable: step !== undefined,
+            // The percentage counts steps ANSWERED. `state` reads `current` for the one
+            // being worked on, and over a flow answered across days a manager reopening a
+            // finished step must not watch the bar fall back.
+            settled: step?.status === 'done' || step?.status === 'skipped',
           }
         })}
         onPick={(stepId) => setActiveId(stepId as RolloverStepId)}

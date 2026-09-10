@@ -1460,7 +1460,7 @@ waves:
         status: shipped
         on: 2026-09-10
       - id: W10.12
-        title: Announcements — the four-step wizard and the notification preview
+        title: Announcements — the feed, the composer drawer and the notification preview
         status: shipped
         on: 2026-09-10
       - id: W10.13

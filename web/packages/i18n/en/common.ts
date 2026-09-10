@@ -598,6 +598,8 @@ export const common: Bundle = {
   'account.group.system': 'System and preferences',
   'account.group.legal': 'Policies and terms',
   // The shared stepper (§3.21, §3.19, §3.17).
+  'stepper.completion': 'Wizard progress',
+  'stepper.percent': '{{percent}}% complete',
   'stepper.locked': 'Finish the earlier steps first',
   'stepper.state.done': 'Done',
   'stepper.state.skipped': 'Skipped',
