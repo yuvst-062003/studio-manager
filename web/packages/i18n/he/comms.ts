@@ -239,10 +239,12 @@ export const comms: Bundle = {
   'tag.groupName': '{שם_קבוצה}',
   'tag.className': '{שם_חוג}',
   'tag.studioName': '{שם_מועדון}',
+  // `blank` has no title and no body ON PURPOSE — it writes nothing into the
+  // boxes — so it has no `.title`/`.body` pair. Empty strings stood here and
+  // parity rejects those, because an empty value is indistinguishable from a
+  // translation nobody wrote.
   'template.blank.name': 'הודעה ריקה',
   'template.blank.hint': 'כתיבה מאפס',
-  'template.blank.title': '',
-  'template.blank.body': '',
   'template.closure.name': 'ביטול אימון',
   'template.closure.hint': 'סגירה או ביטול חד־פעמי',
   'template.closure.title': 'ביטול אימון',

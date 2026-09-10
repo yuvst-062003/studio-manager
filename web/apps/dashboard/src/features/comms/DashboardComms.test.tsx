@@ -665,11 +665,16 @@ describe('the feed is the screen', () => {
   it('names ONE channel, because one is live — D7', async () => {
     // The prototype shows Push, WhatsApp and SMS badges because it has three. Three here
     // would be three promises, two of them false.
+    //
+    // Counted rather than named: the WhatsApp and SMS strings were deleted along with the
+    // wizard's channel step, so there is no key left to assert the absence of — and
+    // asserting a key that does not exist is how this test would go on passing after
+    // somebody added a second badge.
     renderFeed()
     await screen.findByTestId('comms-feed')
-    const card = within(screen.getByTestId('announcement-x1'))
-    expect(card.getByText(t('he', 'comms.channel.push'))).toBeInTheDocument()
-    expect(card.queryByText(t('he', 'comms.channel.sms'))).not.toBeInTheDocument()
+    const card = screen.getByTestId('announcement-x1')
+    expect(within(card).getByText(t('he', 'comms.channel.push'))).toBeInTheDocument()
+    expect(card.querySelectorAll('.comms-channel-badge')).toHaveLength(1)
   })
 
   it('retries the FAILED sends, and says that rather than "send again"', async () => {

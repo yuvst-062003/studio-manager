@@ -1489,7 +1489,15 @@ waves:
         on: 2026-09-10
       - id: W10.19
         title: The uPay receipt link — proven against a real transaction, or dropped
-        status: blocked
+        # Shipped, and what it shipped is NOTHING ON SCREEN — which is one of the two
+        # outcomes D6 allowed for and asked to have recorded. `blocked` stood here and is
+        # not a status this file has: `tools/cockpit/state.py` accepts pending/active/
+        # shipped, so the whole state file stopped parsing and the cockpit went blind to
+        # every wave, not just this piece. The open question — does a uPay receipt have a
+        # per-transaction URL — is carried where open questions belong, in the holdback
+        # `HB-upay-receipt-link` below, not as a status the schema cannot express.
+        status: shipped
+        on: 2026-09-10
         why: >-
           D6 made this checkpoint conditional on evidence: "prove against a real uPay
           transaction that a per-receipt link exists and opens; if it does, add the button;

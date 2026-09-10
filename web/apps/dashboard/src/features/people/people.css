@@ -392,7 +392,13 @@
   flex-direction: column;
   overflow-y: auto;
   background: var(--surface);
-  box-shadow: var(--shadow-raised, 0 0 40px rgb(0 0 0 / 28%));
+  /* A literal shadow, like every other one in this tree. What stood here was a `var()` on
+   * a raised-shadow token that the design system does not define: the fallback made it
+   * look right, so nothing showed on screen, while the name stayed free for somebody to
+   * later define as something else and silently change this drawer. `tokens-are-defined`
+   * is the test that catches it — and it reads raw text, so the token cannot be named
+   * even in a comment. */
+  box-shadow: 0 0 40px rgb(0 0 0 / 28%);
 }
 
 /* Inside the drawer the card fills it rather than floating as a rounded panel. */
