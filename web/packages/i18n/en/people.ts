@@ -60,6 +60,8 @@ export const people: Bundle = {
   'status.membershipHistory': 'Membership history',
   'student.attendance': 'Attendance history',
   'student.attendanceEmpty': 'No attendance recorded yet',
+  'student.belt': 'Current belt',
+  'student.presentOf': 'Present at {{present}} of {{total}}',
   'student.weeklyVolume': 'Sessions per week',
   'student.statusHistory': 'Status history',
   'student.historyEmpty': 'No status changes',

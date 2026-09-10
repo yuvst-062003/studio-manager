@@ -63,6 +63,8 @@ export const people: Bundle = {
   'status.membershipHistory': 'История занятий в клубе',
   'student.attendance': 'История посещаемости',
   'student.attendanceEmpty': 'Посещаемость ещё не отмечалась',
+  'student.belt': 'Текущий пояс',
+  'student.presentOf': 'Присутствовал {{present}} из {{total}}',
   'student.weeklyVolume': 'Тренировок в неделю',
   'student.statusHistory': 'История статуса',
   'student.historyEmpty': 'Изменений статуса нет',

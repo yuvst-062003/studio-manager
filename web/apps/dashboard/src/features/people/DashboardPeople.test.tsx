@@ -873,15 +873,20 @@ describe('StudentDetailScreen — 4a', () => {
   // history — and the one question a manager asks about a child before phoning their
   // parent ("has she been coming?") had no answer on the screen.
 
-  it('shows the student’s attendance history, through the shared strip', async () => {
+  it('shows the attendance history as dated marks, not anonymous ticks', async () => {
+    // Was the shared `AttendanceStrip`. It drew one glyph per mark with no date on it, so a
+    // child who attended nine times rendered as nine identical ticks — one bit of
+    // information repeated nine times, saying nothing about WHICH lesson. The owner's
+    // verdict on seeing it was "the 9 ✅ is irrelevant", and it was.
+    //
+    // The prototype draws each mark as a dated cell carrying a word, and every part of that
+    // is already on the row: `device_marked_at` is the day the lesson happened.
     const client = makeClient()
     render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
 
     await openDetailTab('he', 'training')
-    expect(await screen.findByTestId('detail-attendance')).toBeInTheDocument()
-    // The SAME primitive parent `2c` and staff `9c` render, so the three surfaces cannot
-    // drift into three different pictures of one child's attendance.
-    expect(screen.getByTestId('attendance-strip')).toBeInTheDocument()
+    const section = await screen.findByTestId('detail-attendance')
+    expect(within(section).getAllByTestId('detail-mark')).toHaveLength(3)
     expect(client.attendance).toHaveBeenCalledWith('st1')
   })
 
@@ -894,15 +899,14 @@ describe('StudentDetailScreen — 4a', () => {
     await openDetailTab('he', 'training')
     const section = await screen.findByTestId('detail-attendance')
 
-    // `role="img"` with an accessible name is what `AttendanceMark` renders; the legend's
-    // copies of it are `aria-hidden`, so they are not in this list. Scoped to the section
-    // because the belt bar in the header is a labelled `img` too.
-    const labels = within(section)
-      .getAllByRole('img')
-      .map((node) => node.getAttribute('aria-label') ?? '')
-    expect(labels).toHaveLength(3)
-    expect(labels[0]).toContain(t('he', 'attendance.roster.present'))
-    expect(labels[2]).toContain(t('he', 'attendance.roster.absent'))
+    // Read off the VISIBLE word in each cell rather than an `aria-label` on a glyph — the
+    // log states each mark in words, so the assertion can read what a manager reads.
+    const states = within(section)
+      .getAllByTestId('detail-mark')
+      .map((node) => node.textContent ?? '')
+    expect(states).toHaveLength(3)
+    expect(states[0]).toContain(t('he', 'attendance.roster.present'))
+    expect(states[2]).toContain(t('he', 'attendance.roster.absent'))
   })
 
   it('says so when nothing has been marked, rather than drawing an empty strip', async () => {

@@ -910,10 +910,14 @@ export default function App() {
           {route === 'students' && studentRoute === 'new' ? (
             <AddStudentScreen locale={locale} client={peopleClient} />
           ) : null}
-          {route === 'students' && studentRoute && studentRoute !== 'new' ? (
-            <StudentDetailScreen studentId={studentRoute} locale={locale} client={peopleClient} />
-          ) : null}
-          {route === 'students' && !studentRoute ? (
+          {/* The list stays mounted and the card slides in OVER it — the prototype opens a
+              side popup, not a second screen, and that is the design.
+
+              Both halves are kept rather than one: `#/students/<id>` still addresses the
+              card, so a pasted link opens the list with the card already open. The
+              prototype cannot do that — it has no routing at all — and a drawer that
+              cannot be linked to is a drawer a manager cannot send to anyone. */}
+          {route === 'students' && studentRoute !== 'new' ? (
             <>
               {/* §5.4b + §5.4a — the two links a club shares, where people are managed. */}
               {canSeeMoney ? <SharingCards locale={locale} /> : null}
@@ -924,6 +928,17 @@ export default function App() {
                   globalThis.location.hash = `#/students/${id}`
                 }}
               />
+              {studentRoute ? (
+                <StudentDetailScreen
+                  client={peopleClient}
+                  key={studentRoute}
+                  locale={locale}
+                  onClose={() => {
+                    globalThis.location.hash = '#/students'
+                  }}
+                  studentId={studentRoute}
+                />
+              ) : null}
             </>
           ) : null}
           {route === 'alerts' ? <AlertCentre locale={locale} client={peopleClient} /> : null}

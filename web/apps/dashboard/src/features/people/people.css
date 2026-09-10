@@ -365,3 +365,122 @@
   align-items: baseline;
   gap: var(--space-2);
 }
+
+/* ═══ The drawer ══════════════════════════════════════════════════════════════════
+ * The card opens as a side popup over the list, which is how the prototype draws it.
+ * Pinned to the INLINE-START edge, so in this RTL app it slides in from the left the way
+ * the design does — and would come from the right in an LTR locale without a second rule. */
+.student-drawer__scrim {
+  position: fixed;
+  inset-block: 0;
+  inset-inline: 0;
+  background: var(--scrim);
+  z-index: 40;
+}
+
+.student-drawer {
+  position: fixed;
+  inset-block: 0;
+
+  /* inline-END, so in this RTL app the panel sits on the physical LEFT — which is where
+   * the prototype puts it, and which leaves the navigation on the right still visible and
+   * usable. inline-start would slide it over the sidebar and hide the way out. */
+  inset-inline-end: 0;
+  inline-size: min(42rem, 100%);
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--surface);
+  box-shadow: var(--shadow-raised, 0 0 40px rgb(0 0 0 / 28%));
+}
+
+/* Inside the drawer the card fills it rather than floating as a rounded panel. */
+.student-drawer > .student-card {
+  border: 0;
+  border-radius: 0;
+  min-block-size: 100%;
+}
+
+.student-card__close {
+  margin-inline-start: auto;
+  flex-shrink: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--text-title);
+  line-height: 1;
+  padding: var(--space-2);
+}
+
+.student-card__close:hover {
+  background: var(--ground);
+  color: var(--fg);
+}
+
+.student-card__close:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The dated attendance log. A grid of cells, each carrying a day, a date and a WORD —
+ * a row of identical ticks says one thing many times and nothing about which lesson. */
+.student-card__panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.student-card__present-count {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--paid);
+}
+
+.student-card__marks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+  gap: var(--space-2);
+}
+
+.student-card__mark {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: center;
+  padding-block: var(--space-2);
+  padding-inline: var(--space-2);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.student-card__mark-day,
+.student-card__mark-date {
+  font-size: var(--text-micro);
+  color: var(--text-muted);
+}
+
+.student-card__mark-state {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+}
+
+.student-card__mark[data-state='present'] .student-card__mark-state { color: var(--paid); }
+.student-card__mark[data-state='absent'] .student-card__mark-state { color: var(--debt); }
+.student-card__mark[data-state='notified'] .student-card__mark-state { color: var(--pending); }
+.student-card__mark[data-state='unmarked'] .student-card__mark-state { color: var(--text-muted); }
+
+.student-card__stack-inline {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+}

@@ -8,14 +8,15 @@
 // The volume comes from a manager-only route. `price_plan_id` is what invariant 3's detector
 // reads as a financial field, so it never travels on the coach-reachable card.
 import { useEffect, useState } from 'react'
+import { forwardRef } from 'react'
 import type { ReactNode } from 'react'
 import {
-  AttendanceStrip,
   BeltBar,
   Button,
   LoadFailed,
   SectionHeader,
   StatusChip,
+  useModalDialog,
 } from '@studio/ui'
 import type { AttendanceStripItem } from '@studio/ui'
 import { ClassPricesCard } from '../billing/ClassPricesCard'
@@ -63,6 +64,38 @@ const MARKS_ON_THE_CARD = 12
  *  first, before training, money, or health. */
 type DetailTab = 'general' | 'training' | 'finance' | 'health'
 
+/**
+ * The drawer the card lives in: a scrim, and a panel pinned to the inline-start edge.
+ *
+ * `onClose` absent means "render in place" — no scrim, no panel, just the card. That is
+ * what a narrow viewport gets, where a drawer over a table has nowhere to sit, and what the
+ * tests mount.
+ */
+const Shell = forwardRef<
+  HTMLDivElement,
+  { locale: Locale; onClose?: () => void; children: ReactNode }
+>(function Shell({ locale, onClose, children }, ref) {
+  if (!onClose) return <>{children}</>
+  return (
+    <>
+      {/* The scrim closes on click, as the prototype's does. It carries no role: it is
+          decoration plus a convenience, and the panel's own close button and Escape are
+          the paths that have to work. */}
+      <div className="student-drawer__scrim" data-testid="student-drawer-scrim" onClick={onClose} />
+      <div
+        aria-label={t(locale, 'people.student.one')}
+        aria-modal="true"
+        className="student-drawer"
+        data-testid="student-drawer"
+        ref={ref}
+        role="dialog"
+      >
+        {children}
+      </div>
+    </>
+  )
+})
+
 /** One labelled field box, as the prototype's drawer draws them: the label above, the
  *  value in a filled well beneath it. A `<dl>` row rather than a pair of divs — these are
  *  label/value pairs and the markup should say so. */
@@ -86,10 +119,15 @@ export function StudentDetailScreen({
   studentId,
   locale,
   client,
+  onClose,
 }: {
   studentId: string
   locale: Locale
   client: DashboardPeopleClient
+  /** Closing returns to the list. Optional so the card can still be rendered on its own —
+   *  a narrow viewport has no room for a drawer over a table, and the tests mount it
+   *  directly. Without it the scrim is not drawn and the panel fills its container. */
+  onClose?: () => void
 }) {
   const [student, setStudent] = useState<StudentDetail | null>(null)
   const [enrollments, setEnrollments] = useState<EnrollmentOut[]>([])
@@ -115,6 +153,11 @@ export function StudentDetailScreen({
   // Dashboard redesign — the card's existing sections sit under four tabs instead of one
   // long scroll. Purely a display grouping: nothing here changes what is fetched or when.
   const [tab, setTab] = useState<DetailTab>('general')
+  // Focus in, Tab trapped, Escape out, focus restored. `aria-modal` is a promise about the
+  // rest of the page being unavailable; the browser does nothing to keep it, so a drawer
+  // that sets the attribute and stops there tells a screen-reader user the page is inert
+  // while a keyboard user tabs straight through it into the table behind.
+  const dialogRef = useModalDialog(onClose !== undefined, onClose ?? (() => undefined))
 
   useEffect(() => {
     let live = true
@@ -200,6 +243,7 @@ export function StudentDetailScreen({
   const firstGroup = live[0]
 
   return (
+    <Shell locale={locale} onClose={onClose} ref={dialogRef}>
     <section className="student-card" data-testid="student-detail">
       {/* The header: avatar, name, its chips, and the one-line who-and-where beneath. */}
       <header className="student-card__header">
@@ -229,9 +273,21 @@ export function StudentDetailScreen({
             {primary?.display_name ? <bdi>{primary.display_name}</bdi> : null}
           </p>
         </div>
-        <a className="student-card__back" href="#/students">
-          {t(locale, 'people.student.plural')}
-        </a>
+        {onClose ? (
+          <button
+            aria-label={t(locale, 'common.a11y.close')}
+            className="student-card__close"
+            data-testid="student-drawer-close"
+            onClick={onClose}
+            type="button"
+          >
+            ✕
+          </button>
+        ) : (
+          <a className="student-card__back" href="#/students">
+            {t(locale, 'people.student.plural')}
+          </a>
+        )}
       </header>
 
       {student.status === 'frozen' && student.frozen_until ? (
@@ -335,18 +391,93 @@ export function StudentDetailScreen({
         {tab === 'training' ? (
           <>
             <SectionHeader title={t(locale, 'people.student.tab.training')} />
+            <dl className="student-card__fields">
+              <Field label={t(locale, 'people.student.groups')}>
+                {firstGroup ? (
+                  <span className="student-card__stack-inline">
+                    <bdi>{firstGroup.group_name}</bdi>
+                    <span className="student-card__muted">
+                      {firstGroup.attends_weekdays == null
+                        ? t(locale, 'people.weekdays.allDays')
+                        : firstGroup.attends_weekdays
+                            .map((day) => t(locale, `people.weekdays.${day}`))
+                            .join(' · ')}
+                    </span>
+                  </span>
+                ) : (
+                  '—'
+                )}
+              </Field>
+              <Field label={t(locale, 'people.student.belt')}>
+                {student.current_belt_name ? (
+                  <span className="student-card__belt">
+                    <BeltBar
+                      colorHex={student.current_belt_color_hex ?? '#000000'}
+                      label={student.current_belt_name}
+                    />
+                    <bdi>{student.current_belt_name}</bdi>
+                  </span>
+                ) : (
+                  '—'
+                )}
+              </Field>
+            </dl>
+
+            {/* The attendance log. Each mark is its own dated cell carrying a WORD, not a
+                tick: a row of identical ticks says one thing nine times, and says nothing
+                about which lesson. The summary above counts the same marks. */}
             <div className="student-card__panel" data-testid="detail-attendance">
-              <span className="student-card__field-label">
-                {t(locale, 'people.student.attendance')}
-              </span>
+              <div className="student-card__panel-head">
+                <span className="student-card__field-label">
+                  {t(locale, 'people.student.attendance')}
+                </span>
+                {strip.length > 0 ? (
+                  <span className="student-card__present-count">
+                    {fill(t(locale, 'people.student.presentOf'), {
+                      present: marks.slice(0, MARKS_ON_THE_CARD).filter((m) => m.status === 'present').length,
+                      total: strip.length,
+                    })}
+                  </span>
+                ) : null}
+              </div>
               {strip.length === 0 ? (
                 <p className="student-card__muted" data-testid="detail-attendance-empty">
                   {t(locale, 'people.student.attendanceEmpty')}
                 </p>
               ) : (
-                <AttendanceStrip items={strip} locale={locale} />
+                <ol className="student-card__marks">
+                  {marks
+                    .slice(0, MARKS_ON_THE_CARD)
+                    .reverse()
+                    .map((row) => {
+                      const state = STRIP_STATE[row.status] ?? 'unmarked'
+                      // The DEVICE clock, which is when the lesson was — `marked_at` is
+                      // when the queue reached the server, and for an offline coach those
+                      // are different days.
+                      const when = new Date(row.device_marked_at)
+                      return (
+                        <li
+                          className="student-card__mark"
+                          data-state={state}
+                          data-testid="detail-mark"
+                          key={row.id}
+                        >
+                          <span className="student-card__mark-day">
+                            {t(locale, `people.weekdays.${when.getDay()}`)}
+                          </span>
+                          <span className="student-card__mark-date" dir="ltr">
+                            {formatDateInStudioZone(row.device_marked_at, locale)}
+                          </span>
+                          <span className="student-card__mark-state">
+                            {t(locale, STRIP_LABEL[state])}
+                          </span>
+                        </li>
+                      )
+                    })}
+                </ol>
               )}
             </div>
+
             <div className="student-card__panel">
               <span className="student-card__field-label">
                 {t(locale, 'people.student.statusHistory')}
@@ -357,7 +488,7 @@ export function StudentDetailScreen({
                 <ol className="student-card__stack" data-testid="detail-history">
                   {history.map((row) => (
                     <li key={row.id}>
-                      <span>{t(locale, `people.status.${row.to_status}`)}</span>{' '}
+                      <span>{t(locale, `people.status.${row.to_status}`)}</span>
                       <span className="student-card__muted">
                         {formatDateInStudioZone(row.changed_at, locale)}
                       </span>
@@ -516,5 +647,6 @@ export function StudentDetailScreen({
         )}
       </div>
     </section>
+    </Shell>
   )
 }

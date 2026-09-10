@@ -88,6 +88,8 @@ export const people: Bundle = {
   // -- 4a's attendance section (dashboard) ---------------------------------------
   'student.attendance': 'היסטוריית נוכחות',
   'student.attendanceEmpty': 'עדיין לא נרשמה נוכחות',
+  'student.belt': 'דרגה נוכחית',
+  'student.presentOf': 'נוכח ב-{{present}} מתוך {{total}}',
   'student.weeklyVolume': 'אימונים בשבוע',
   'student.statusHistory': 'היסטוריית סטטוס',
   'student.historyEmpty': 'אין שינויי סטטוס',
