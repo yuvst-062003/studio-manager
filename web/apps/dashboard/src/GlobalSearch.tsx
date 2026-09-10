@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { apiFetch } from '@studio/core'
+import { Icon } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 
@@ -20,7 +21,43 @@ type SearchOut = {
 
 const EMPTY: SearchOut = { students: [], guardians: [], groups: [], staff: [] }
 
-const boxStyle: CSSProperties = { position: 'relative', maxInlineSize: '24rem' }
+const boxStyle: CSSProperties = {
+  position: 'relative',
+  maxInlineSize: '24rem',
+  // The header gives it room to be a real field rather than a browser default. It had no
+  // styling at all until 2026-09-10 -- a bare `<input type="search">` floating in the
+  // header, which is what the owner was looking at when they said the header should look
+  // like the prototype's.
+  inlineSize: 'min(24rem, 40vw)',
+}
+
+/** The field itself: a leading search glyph inside a bordered, rounded input -- the
+ *  prototype's own treatment, and the one every other control in this app already has. */
+const fieldStyle: CSSProperties = {
+  inlineSize: '100%',
+  // `paddingInlineStart` is where the icon sits, and it is LOGICAL: the app is RTL and the
+  // glyph belongs on the reading edge (`.claude/rules/ui-rtl-a11y.md`).
+  padding: 'var(--space-2) var(--space-3)',
+  paddingInlineStart: 'var(--space-6)',
+  border: 'var(--border-width-hairline) solid var(--border)',
+  borderRadius: 'var(--radius-md)',
+  background: 'var(--ground)',
+  color: 'var(--fg)',
+  font: 'inherit',
+  fontSize: 'var(--text-body)',
+}
+
+const iconStyle: CSSProperties = {
+  position: 'absolute',
+  insetInlineStart: 'var(--space-2)',
+  insetBlockStart: '50%',
+  transform: 'translateY(-50%)',
+  color: 'var(--text-secondary)',
+  // Decoration over a field that already carries its own accessible name, so it must never
+  // take a click that belongs to the input underneath it.
+  pointerEvents: 'none',
+  display: 'flex',
+}
 
 const resultsStyle: CSSProperties = {
   position: 'absolute',
@@ -117,9 +154,13 @@ export function GlobalSearch({ locale }: { locale: Locale }) {
       }}
       style={boxStyle}
     >
+      <span aria-hidden="true" style={iconStyle}>
+        <Icon name="search" size={16} />
+      </span>
       <input
         aria-label={t(locale, 'common.search.label')}
         data-testid="global-search"
+        style={fieldStyle}
         onChange={(event) => {
           const value = event.target.value
           setQuery(value)

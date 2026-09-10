@@ -93,6 +93,7 @@ export function AppShell({
   devBar,
   drawerFooter,
   headerEnd,
+  headerStart,
   sideNav,
   tabBar,
   children,
@@ -117,6 +118,20 @@ export function AppShell({
    * them, and read as part of the page rather than as part of the app.
    */
   headerEnd?: ReactNode
+  /**
+   * Chrome that belongs BESIDE the title rather than opposite it — the dashboard's
+   * current-view chip (2026-09-10).
+   *
+   * A second slot rather than more `headerEnd`, because the two sides say different things:
+   * `headerEnd` is app-wide apparatus a manager reaches for (search, the studio switcher),
+   * and this is a statement about where they already are. In RTL the title sits on the
+   * reading edge and `headerEnd` is pushed to the far one, so an "am I in the right place"
+   * cue placed there would be the furthest thing on the bar from the question.
+   *
+   * Optional and undefined by default: the staff and parent apps pass nothing and render
+   * exactly as they did.
+   */
+  headerStart?: ReactNode
   /** Desktop sidebar (dashboard). Hidden by its own CSS under 1024px. */
   sideNav?: ReactNode
   /** Bottom tab bar (phone apps). The main area pads itself so content clears it. A
@@ -163,6 +178,7 @@ export function AppShell({
               <img alt="" data-testid="shell-logo" src={logoUrl} style={logoStyle} />
             ) : null}
             <h1 style={titleStyle}>{title}</h1>
+            {headerStart}
             <span style={spacerStyle}>
               {headerEnd}
               {onSwitchStudio ? (

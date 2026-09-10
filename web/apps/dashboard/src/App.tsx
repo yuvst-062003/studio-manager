@@ -177,6 +177,30 @@ const STAFF_APP_URL = '/staff'
 /** Logical properties throughout, not `margin-top`/`max-width`: the app is RTL and
  *  .claude/rules/ui-rtl-a11y.md says so. `maxInlineSize` because §6.4 is desktop-first —
  *  ungapped, a 43-character token got an input stretched across the whole 1100px. */
+/** The current-view chip in the header (2026-09-10).
+ *
+ * The prototype's header names the screen you are on, beside the club's name. Ours named
+ * only the club — so every one of the nine destinations rendered an identical bar, and the
+ * owner's screenshot of it was a title and an unstyled search box.
+ *
+ * It reads from `doors()`, the SAME list the sidebar and the drawer read. A hand-written
+ * switch over routes here would be a fourth place that has to be told about a new screen,
+ * and the whole point of that function is that there is one.
+ */
+const viewChipStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 'var(--space-2)',
+  paddingBlock: 'var(--space-1)',
+  paddingInline: 'var(--space-3)',
+  border: 'var(--border-width-hairline) solid var(--border)',
+  borderRadius: 'var(--radius-pill, 999px)',
+  background: 'var(--ground)',
+  color: 'var(--text-secondary)',
+  fontSize: 'var(--text-caption)',
+  whiteSpace: 'nowrap',
+}
+
 const inviteStyle: CSSProperties = {
   display: 'grid',
   gap: 'var(--space-2)',
@@ -756,6 +780,29 @@ export default function App() {
           // route behind it. In the CHROME rather than in the page: as a child of the shell
           // it rendered inside <main> and moved with each screen's layout.
           headerEnd={canSeeMoney ? <GlobalSearch locale={locale} /> : null}
+          // Which of the nine doors is open, named. Derived from the same `doors()` the
+          // sidebar reads -- see `viewChipStyle`. Rendered only when a door claims the
+          // current route: a student card or an event page is reached from a row rather
+          // than from the menu, and naming its parent door there would be a lie about
+          // where the manager is.
+          headerStart={
+            (() => {
+              const current = doors(
+                route,
+                hash,
+                locale,
+                canSeeMoney,
+                badges,
+                session.isPlatformAdmin,
+              ).find((door) => door.active)
+              return current ? (
+                <span data-testid="header-view-chip" style={viewChipStyle}>
+                  {current.icon}
+                  <strong>{current.label}</strong>
+                </span>
+              ) : null
+            })()
+          }
           sideNav={
             <SideNav
               label={t(locale, 'common.nav.menu')}
