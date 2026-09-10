@@ -1464,12 +1464,18 @@ waves:
         title: Belts, exams, events
         status: planned
       - id: W10.15
-        title: Documents, staff, settings, setup, rollover
+        title: Documents, staff, settings, rollover
         status: planned
       - id: W10.16
         title: Platform
         status: planned
       - id: W10.17
+        title: The setup wizard, and the stepper built once for all three wizards
+        status: planned
+      - id: W10.18
+        title: The class wizard — seven steps, the one screen this port builds
+        status: planned
+      - id: W10.19
         title: The uPay receipt link — proven against a real transaction, or dropped
         status: planned
 holdbacks:

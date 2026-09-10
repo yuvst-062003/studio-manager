@@ -1088,6 +1088,34 @@ three-person staff list. `#/staff` (§3.18) is the real thing and the settings t
   loading" and "the fetch failed" are three identical screens. Worth fixing while it is being
   restyled.
 
+**The setup wizard is its own checkpoint (17), and this is why.** `SetupWizard.tsx` is not a screen
+in this app — it lives in `packages/ui/src/setup-wizard/` and is mounted by **both** the dashboard
+and the staff app, deliberately, because "an owner doing setup on a phone is a normal case rather
+than an error" (the file says so in its own header). A composition change here lands in the staff
+app on the same commit. That makes it the one checkpoint whose proof needs **two** screenshots of
+the same change, and it is why it is not folded into checkpoint 15 with the other settings screens.
+
+What it has today and must keep: a rail whose nodes are **buttons with a status word**, never colour
+alone; a `—` for skipped distinct from `✓` for done, because an owner reported that sharing one mark
+made "finished them all, still says 6/7" unreadable; resume onto the first *unanswered* step rather
+than step 1; `reopen` to un-answer a step ticked by mistake; a re-read on window focus so a step
+finished on the dashboard shows done on the phone; a `LoadFailed` with retry; and — for a step the
+running surface has not registered — a body that names where the step *is* edited and links there,
+rather than a dead rail button. Every one of those is a defect report that was already paid for.
+
+What it takes from the prototype: the **stepper**. The current rail is a vertical `<ol>` of dots;
+`ClassWizard`'s is a horizontal numbered progress indicator with a title and a subtitle per node and
+a connecting rule between them. That treatment is better and it is what §3.17 already asked for on
+rollover's behalf. **Build it once**, in `packages/ui`, as a stepper that takes nodes and renders
+them — status word included, which the prototype does not have — and let setup, rollover (§3.17) and
+the class wizard (§3.21) all mount it. Three wizards, one stepper, or this port has copied a
+progress bar three times.
+
+The step *order* does not change and is not the stepper's business: steps register themselves
+through the `setup-wizard` slot at fixed orders, and `SetupWizard.tsx` "is never reopened for them",
+which is the whole reason they are slot entries and not a switch. The stepper renders whatever the
+slot yields.
+
 ---
 
 ### 3.20 Billing — `#/billing`, `#/billing/reconciliation`, `#/prices`, `#/items`
@@ -1176,6 +1204,57 @@ the tab changes.
 
 ---
 
+### 3.21 The class wizard — new, `#/classes/new`
+
+Nothing exists today. This is the one screen in the port that is built rather than restyled, and
+the owner asked for it explicitly on 2026-09-10 alongside the setup wizard.
+
+**Prototype.** `ClassWizard.tsx` (1,146 lines), opened from `ProgramsView` by a "create a class"
+button and drawn as a modal over the programs grid. Seven steps across a numbered horizontal
+stepper, each with a title and a subtitle: **1.** פרטי החוג · זהות ומיתוג · **2.** קבוצות ולו״ז ·
+שעות משתנות · **3.** תמחור ומסלולים · הוראות קבע · **4.** דרגות וחגורות · סולם התקדמות ·
+**5.** ציוד ומדים · חנות המועדון · **6.** מאמנים וסמכויות · הרשאות ושכר · **7.** הרשמה והשקה ·
+אישורים וחניכים. Completed steps are clickable; `validateCurrentStep(n)` blocks Next and prints one
+named error; the footer reads "שלב N מתוך 7"; the last step publishes.
+
+**What it produces, and what that maps to.** The prototype's `handlePublishClass` fabricates a
+`Program` plus one `ClassScheduleItem` per group per weekday. There is no `Program` in this product
+(§4 rule 4) — the wizard creates a **class**, its **groups**, and their **schedule rules**, which is
+what those two objects already express.
+
+Step by step, with the endpoint each one calls. Every one of them exists; nothing here needs a
+migration.
+
+| # | Step | Calls | Constraint |
+|---|---|---|---|
+| 1 | Class identity — name, description, discipline, colour, age range | `POST /api/v1/classes` | `ClassCreate.color` is **a token name, never a hex literal** — the schema says so in a comment and G13 enforces it. The prototype's `brandColor: '#4edea3'` picker becomes the palette chooser the wizard already owes. Its `bannerUrl` has no column and is dropped. |
+| 2 | Groups and their weekly schedule | `POST /api/v1/groups`, then `PUT /api/v1/groups/{id}/schedule` per group | The PUT returns a **`ScheduleImpactPreview`**, not a bare 204. The wizard must show that preview before it commits — an existing affordance the prototype has no equivalent of, and losing it would be §0's forbidden move. `GroupCreate` rejects `age_min > age_max` with a 422 naming the field. |
+| 3 | Prices | `POST /api/v1/price-plans`, then `PUT /api/v1/price-plans/{id}/class` | The prototype's five price points map onto plans by frequency. **Standing orders are recorded, not created** — §4 rule 7, a `CLAUDE.md` gotcha that predates this port. `cancellationNoticeDays` and `freezeDaysAllowed` have no columns; leave them out rather than draw dead fields. |
+| 4 | Belt ladder | `GET /api/v1/belt-presets`, `POST /api/v1/belt-ranks/seed`, `POST /api/v1/belt-ranks` | The ladder is `name` · `kyu` · `order_index` · `color_hex` · `secondary_color_hex`. It has **no** `minMonths`, `minAttendances`, `fee`, `examFee`, `passingScorePercentage` or `requiresCoachRecommendation`. Seed from a preset and let the manager rename and reorder; that is the whole step. `evaluationType: 'levels' \| 'caps'` is §4 rule 5. |
+| 5 | Gear and club shop | `POST /api/v1/products`, `POST /api/v1/products/{id}/image` | Prices are agorot. The prototype's `regularPrice` / `discountPrice` pair is one price — D9 took the discount box out. `mandatoryInCart` has no column; drop it. |
+| 6 | Coaches | `POST /api/v1/groups/{id}/staff` | Assignment is real and creates the group-scoped role grant in the same call. **Wages are not**: `grep` for `hourly_rate\|wage\|salary` across `app/models` and `app/schemas` returns nothing. §4 rule 3. Permissions are **roles**, which `POST /api/v1/staff/invitations` and `PATCH /api/v1/staff/{id}` already own — the wizard shows which permissions the chosen roles grant, read-only, exactly as `#/staff` does, and never invents a per-capability switch. |
+| 7 | Registration and launch | `POST /api/v1/onboarding-link`, `GET /api/v1/students` for the import picker | `requireHealthDeclaration` is **not a toggle** — §5.5 makes it a hard gate, and §3.19 already records that a contract test fails if such a setting reappears. Render it as a stated fact, not a switch. The link is the real onboarding link, with its existing revoke path. |
+
+**Port.** Take the stepper, the two-line step labels, the per-step validation with one named error,
+and the "שלב N מתוך 7" footer. The stepper is the **same component checkpoint 17 builds for the
+setup wizard** — built once in `packages/ui`, consumed three times (setup, rollover, class).
+
+**Improve.**
+- **The wizard must be resumable, or it must not start.** The setup wizard persists through
+  `GET /api/v1/setup` and survives a closed app; the prototype's class wizard holds seven steps of
+  state in React and loses all of it on a refresh. Creating the class on step 1 and patching
+  forward — rather than batching seven steps into one publish — is what makes a half-finished class
+  a draft rather than a lost afternoon.
+- **Each step commits its own call.** The prototype's single `handlePublishClass` would need a
+  seven-call transaction the API does not offer; a failure on call five would leave a class, groups
+  and plans behind with no wizard to return to.
+- Reuse the setup wizard's step components where the shape matches — `GroupsStep`, `BeltsWizardStep`,
+  `PricesWizardStep`, `ItemsWizardStep` and `StaffStep` already exist in
+  `packages/ui/src/setup-wizard/` and already talk to these endpoints. Steps 2–6 are those five
+  files scoped to one class rather than to the studio.
+
+---
+
 ## 4. Deliberately not built
 
 Each of these appears in the prototype and is excluded, with the reason. Naming them here is what
@@ -1236,7 +1315,7 @@ its own wave.
 
 ### 5.3 The order
 
-Seventeen checkpoints. Each is one screen or one seam. After each: the manager reviews the diff,
+Nineteen checkpoints. Each is one screen or one seam. After each: the manager reviews the diff,
 screenshots the result beside the prototype into
 `docs/screenshots/dashboard-checkpoints/<screen>/`, and **stops and waits for a yes.**
 
@@ -1256,12 +1335,16 @@ screenshots the result beside the prototype into
 | 12 | Announcements — the four-step wizard and the notification preview | §3.12. The strongest single idea in the prototype |
 | 13 | Reports — chart styling, tooltips, KPI strip | §3.13 |
 | 14 | Belts, exams, events | §3.9, §3.10. Includes the rank-rename gap and event attendance |
-| 15 | Documents, staff, settings, setup, rollover | §3.11, §3.17–3.19. Includes the settings load-error defect |
+| 15 | Documents, staff, settings, rollover | §3.11, §3.17–3.19. Includes the settings load-error defect. **The setup wizard is not here** — it moved to checkpoint 17, because it is shared with the staff app. Rollover is restyled here and gets its stepper in 17 |
 | 16 | Platform | §3.14. One person sees it |
-| 17 | **The uPay receipt link** | **D6 — genuinely last, and alone.** Until this checkpoint the paid row shows the typed receipt number as plain text and no button. Here: prove against a real uPay transaction that a per-receipt link exists and opens; if it does, add the button; if it does not, the row keeps the plain number and this checkpoint ships nothing. Either outcome is a result — record which |
+| 17 | **The setup wizard** — the shared stepper, built once | §3.19. Added 2026-09-10 at the owner's request. Its composition changes land in the **staff app** too, so it is proven with two screenshots, not one. The stepper it builds is then mounted by rollover (§3.17), which checkpoint 15 restyles but does not re-compose |
+| 18 | **The class wizard** — seven steps, `#/classes/new` | §3.21. Added 2026-09-10 at the owner's request. The only checkpoint that builds a screen rather than porting one. Consumes 17's stepper and five of the setup wizard's step components |
+| 19 | **The uPay receipt link** | **D6 — alone, and after every screen.** Until this checkpoint the paid row shows the typed receipt number as plain text and no button. Here: prove against a real uPay transaction that a per-receipt link exists and opens; if it does, add the button; if it does not, the row keeps the plain number and this checkpoint ships nothing. Either outcome is a result — record which |
 
 Checkpoint 1 serialises against everything. Checkpoints 2 and 15 both touch `App.tsx` and must not
-run beside each other.
+run beside each other. Checkpoint 18 depends on 17 for the stepper; nothing else depends on either.
+Checkpoint 19's only dependency is checkpoint 9 — it is listed last because its outcome may be to
+ship nothing, not because the two wizards block it.
 
 ---
 
