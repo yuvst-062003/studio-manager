@@ -448,3 +448,85 @@
   font-size: var(--text-caption);
   color: var(--text-muted);
 }
+
+/* ═══ The session card ════════════════════════════════════════════════════════════
+ * Ported from the prototype's week grid: a title with its start time badged beside it, a
+ * coach·room meta line, then a rule and a foot stating where the session sits against the
+ * clock. `data-when` is the third axis — `data-coverage` says whether anyone is teaching
+ * it and `data-status` whether it was cancelled; neither says whether it is happening now. */
+.week-block__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.week-block__title {
+  font-size: var(--text-label);
+  font-weight: var(--weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.week-block__time {
+  flex-shrink: 0;
+  font-size: var(--text-micro);
+  font-variant-numeric: tabular-nums;
+  padding-block: 1px;
+  padding-inline: var(--space-1);
+  border-radius: var(--radius-xs);
+  background: var(--disabled-surface);
+  color: var(--text-secondary);
+}
+
+.week-block__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  font-size: var(--text-micro);
+  color: var(--text-muted);
+  overflow: hidden;
+}
+
+.week-block__meta > bdi + bdi::before {
+  content: '·';
+  margin-inline-end: var(--space-1);
+}
+
+.week-block__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  padding-block-start: var(--space-1);
+  border-block-start: var(--border-width-hairline) solid var(--border);
+  font-size: var(--text-micro);
+}
+
+.week-block__state {
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+}
+
+.week-block__sub {
+  color: var(--pending);
+}
+
+/* Live is the one state worth spending the accent on: it is what a manager scans for. */
+.week-block[data-when='live'] {
+  border-color: var(--emphasis);
+}
+
+.week-block[data-when='live'] .week-block__state,
+.week-block[data-when='live'] .week-block__time {
+  color: var(--emphasis);
+}
+
+.week-block[data-when='live'] .week-block__time {
+  background: var(--emphasis-tint);
+}
+
+.week-block[data-when='past'] {
+  opacity: 0.75;
+}

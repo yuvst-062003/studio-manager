@@ -1433,7 +1433,8 @@ waves:
         on: 2026-09-10
       - id: W10.5
         title: Weekly schedule — the grid and the two-tab session popover
-        status: planned
+        status: shipped
+        on: 2026-09-10
       - id: W10.6
         title: Groups and cycles — the card grid
         status: planned

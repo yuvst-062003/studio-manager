@@ -133,18 +133,32 @@ const boardStyle: CSSProperties = {
   inlineSize: '100%',
 }
 
+/**
+ * Where a session sits against the clock: finished, on the mat now, or still to come.
+ *
+ * Taken as an argument rather than read here, so the value is stable across one render and
+ * the function stays testable at a fixed instant.
+ */
+export function whenIs(session: SessionRow, nowMs: number): 'past' | 'live' | 'soon' {
+  if (Date.parse(session.ends_at) <= nowMs) return 'past'
+  if (Date.parse(session.starts_at) <= nowMs) return 'live'
+  return 'soon'
+}
+
 function SessionBlock({
   locale,
   session,
   onOpen,
   onPickUp,
   moving,
+  nowMs,
 }: {
   locale: Locale
   session: SessionRow
   onOpen: () => void
   onPickUp: () => void
   moving: boolean
+  nowMs: number
 }) {
   const lead = session.staff[0]
   // A short press opens the popover, a long one picks the class up off the board. Both
@@ -161,11 +175,13 @@ function SessionBlock({
       : session.attendance_taken
         ? 'complete'
         : 'unmarked'
+  const when = whenIs(session, nowMs)
   return (
     <button
       data-testid="session-block"
       data-status={session.status}
       data-coverage={coverage}
+      data-when={when}
       data-moving={moving || undefined}
       className="week-block"
       // F3 — D5: "clicking a session opens a popover with the roster and inline
@@ -174,20 +190,42 @@ function SessionBlock({
       {...press}
       type="button"
     >
-      <strong>{session.group_name}</strong>
-      {/* Was three text children in one span, which an RTL row lays out end-then-start:
-          the staging board printed `15:00–14:00`. Fifth occurrence of that shape. */}
-      <RangeText
-        from={formatTimeInStudioZone(session.starts_at, locale)}
-        to={formatTimeInStudioZone(session.ends_at, locale)}
-      />
-      {session.location_name ? <span>{session.location_name}</span> : null}
-      {/* D5 — coverage. A block with no coach is §5.14's 'sessions without a coach'. */}
-      {lead ? <span>{lead.display_name}</span> : <span>{t(locale, 'schedule.session.noCoach')}</span>}
-      {lead?.is_substitute ? <span>{t(locale, 'schedule.session.substitute')}</span> : null}
-      {session.cancel_reason ? (
-        <span>{cancelReasonLabel(locale, session.cancel_reason)}</span>
-      ) : null}
+      {/* The prototype's card: title with its start time badged beside it, a coach·room
+          meta line, then a rule and a foot stating where the session sits. */}
+      <span className="week-block__head">
+        <strong className="week-block__title">
+          <bdi>{session.group_name}</bdi>
+        </strong>
+        {/* The prototype badges the START time only; ours badges the RANGE. Dropping the
+            end time would lose something the board already showed, and §0's rule is that a
+            ported screen loses nothing its predecessor handled. `RangeText` is what makes
+            that safe: three text children in one span are laid out end-then-start by the
+            RTL row around them, and the staging board printed `15:00–14:00` until this
+            component existed. */}
+        <RangeText
+          className="week-block__time"
+          from={formatTimeInStudioZone(session.starts_at, locale)}
+          to={formatTimeInStudioZone(session.ends_at, locale)}
+        />
+      </span>
+
+      <span className="week-block__meta">
+        {/* D5 — coverage. A block with no coach is §5.14's 'sessions without a coach', and
+            it must not draw like a covered one. */}
+        <bdi>{lead ? lead.display_name : t(locale, 'schedule.session.noCoach')}</bdi>
+        {session.location_name ? <bdi>{session.location_name}</bdi> : null}
+      </span>
+
+      <span className="week-block__foot">
+        <span className="week-block__state">
+          {session.status === 'cancelled'
+            ? cancelReasonLabel(locale, session.cancel_reason ?? '')
+            : t(locale, `schedule.session.when.${when}`)}
+        </span>
+        {lead?.is_substitute ? (
+          <span className="week-block__sub">{t(locale, 'schedule.session.substitute')}</span>
+        ) : null}
+      </span>
     </button>
   )
 }
@@ -454,6 +492,10 @@ export function WeekBoard({
    *  rather than snapping them back to today. */
   const [anchor, setAnchor] = useState(() => studioDayKey(today))
   const [sessions, setSessions] = useState<SessionRow[]>([])
+  // Stamped with the sessions rather than read in render: `Date.now()` during render is
+  // impure and the lint rule refuses it, for the same reason this file's header gives for
+  // taking `today` as a prop instead of calling `new Date()`.
+  const [nowMs, setNowMs] = useState(0)
   const [openSessionId, setOpenSessionId] = useState<string | null>(null)
   const [version, setVersion] = useState(0)
   const attendanceClient = useMemo(() => makeDashboardAttendanceClient(apiFetch), [])
@@ -496,7 +538,10 @@ export function WeekBoard({
           from: days[0] as string,
           to: days[days.length - 1] as string,
         })
-        if (live) setSessions(loaded)
+        if (live) {
+          setSessions(loaded)
+          setNowMs(Date.now())
+        }
       } catch (error) {
         // `void` silences the floating-promise lint; it does not handle anything. Without
         // this catch a failed load became an *unhandled* rejection — thrown past every
@@ -1135,6 +1180,7 @@ export function WeekBoard({
                   ) : null}
                   {cell.map((session) => (
                     <SessionBlock
+              nowMs={nowMs}
                       key={session.id}
                       locale={locale}
                       moving={session.id === movingId}

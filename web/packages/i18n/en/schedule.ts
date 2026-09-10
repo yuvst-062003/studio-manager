@@ -66,6 +66,9 @@ export const schedule: Bundle = {
   'session.coach': 'Coach',
   'session.substitute': 'Substitute',
   'session.noCoach': 'No coach assigned',
+  'session.when.past': 'Finished',
+  'session.when.live': 'On the mat now',
+  'session.when.soon': 'Planned',
   // Moving a session by picking it up from the board. The popover's date fields remain
   // the keyboard path; this is the pointer one.
   'session.move.hint': 'Choose a new slot for the class',
