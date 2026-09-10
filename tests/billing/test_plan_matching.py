@@ -248,9 +248,9 @@ def test_a_priced_student_and_a_departed_one_are_not_on_the_unpriced_list(
         )
     app_session.commit()
 
-    rows = client.get(
-        "/api/v1/billing/unpriced-students", headers=as_manager.headers
-    ).json()["items"]
+    rows = client.get("/api/v1/billing/unpriced-students", headers=as_manager.headers).json()[
+        "items"
+    ]
     assert rows == []
 
 

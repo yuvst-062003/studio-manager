@@ -132,9 +132,5 @@ def test_a_covered_charge_still_names_the_order_that_covers_it(
     assert rows[str(charge.id)]["is_covered_elsewhere"] is True
     # And still resumable, which is what makes the first fact survivable: every charge the
     # covered flag names is named back by an order the parent owns and may reopen.
-    held = {
-        charge_id
-        for row in resumable.json()["items"]
-        for charge_id in row["charge_ids"]
-    }
+    held = {charge_id for row in resumable.json()["items"] for charge_id in row["charge_ids"]}
     assert str(charge.id) in held

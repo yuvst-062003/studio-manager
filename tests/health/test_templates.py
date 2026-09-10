@@ -182,9 +182,7 @@ def test_the_bundled_marker_is_gone_from_the_shipped_schema(
         ).json()["id"]
     )
     app_session.expire_all()
-    assert "is_bundled_default" not in (
-        app_session.get(HealthFormTemplate, draft_id).schema or {}
-    )
+    assert "is_bundled_default" not in (app_session.get(HealthFormTemplate, draft_id).schema or {})
 
 
 def test_a_manager_can_remove_a_question(client, as_manager, a_full_template, app_session):

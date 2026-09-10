@@ -104,9 +104,11 @@ def _trial_student(session, *, group_id, attended: bool | None = True) -> Studen
 
 
 def _guardian_of(session, student: Student) -> Person:
-    person_id = session.execute(
-        select(Guardian.person_id).where(Guardian.student_id == student.id)
-    ).scalars().first()
+    person_id = (
+        session.execute(select(Guardian.person_id).where(Guardian.student_id == student.id))
+        .scalars()
+        .first()
+    )
     return session.get(Person, person_id)
 
 
@@ -197,9 +199,7 @@ def test_an_invite_only_group_is_refused_as_not_found(
 ):
     """`is_invite_only` is enforced on every enrolment path, and 404 rather than 403: a 403
     confirms the group exists, which is the one fact the flag is keeping."""
-    secret = Group(
-        studio_id=studio.id, class_id=a_class, name="נבחרת בנות", is_invite_only=True
-    )
+    secret = Group(studio_id=studio.id, class_id=a_class, name="נבחרת בנות", is_invite_only=True)
     tenant_session.add(secret)
     tenant_session.flush()
     fake_schedule.sessions[secret.id] = [

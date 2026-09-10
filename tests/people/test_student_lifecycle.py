@@ -382,9 +382,9 @@ def test_converting_an_unpriced_student_raises_no_charge_and_does_not_fail(
     tenant_session.flush()
     assert student.status == "active"
     assert (
-        tenant_session.execute(
-            select(Charge).where(Charge.student_id == student.id)
-        ).scalars().all()
+        tenant_session.execute(select(Charge).where(Charge.student_id == student.id))
+        .scalars()
+        .all()
         == []
     )
 

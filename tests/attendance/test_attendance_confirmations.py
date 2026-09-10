@@ -149,9 +149,7 @@ def test_withdrawing_returns_to_having_said_nothing(
     assert (row.has_confirmation, row.has_absence_report) == (False, False)
 
 
-def test_the_deadline_is_the_servers(
-    tenant_session, a_session, an_enrolled_student, as_guardian
-):
+def test_the_deadline_is_the_servers(tenant_session, a_session, an_enrolled_student, as_guardian):
     """§10.2's rule, applied to this answer too: after the lesson starts it is not a
     pre-report, and a device an hour behind does not get to say otherwise."""
     with pytest.raises(PreconditionError) as exc:

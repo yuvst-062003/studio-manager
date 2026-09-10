@@ -67,11 +67,19 @@ def test_the_parent_read_is_windowed_by_date(
     overlaps rather than contains — a סוכות range that starts in September and ends in
     October belongs to both months' screens."""
     _a_closure(
-        client, as_manager, an_active_year, date_from="2026-09-21", date_to="2026-09-21",
+        client,
+        as_manager,
+        an_active_year,
+        date_from="2026-09-21",
+        date_to="2026-09-21",
         reason="יום כיפור",
     )
     _a_closure(
-        client, as_manager, an_active_year, date_from="2026-09-26", date_to="2026-10-03",
+        client,
+        as_manager,
+        an_active_year,
+        date_from="2026-09-26",
+        date_to="2026-10-03",
         reason="סוכות",
     )
     student_id = make_student(
@@ -79,9 +87,7 @@ def test_the_parent_read_is_windowed_by_date(
     )
     parent = as_guardian_of(student_id, is_primary=True)
 
-    october = client.get(
-        f"{API}/me/closures?from=2026-10-01&to=2026-10-31", headers=parent.headers
-    )
+    october = client.get(f"{API}/me/closures?from=2026-10-01&to=2026-10-31", headers=parent.headers)
     assert october.status_code == 200, october.text
     assert [c["reason"] for c in october.json()["items"]] == ["סוכות"]
 

@@ -100,7 +100,7 @@ class ReportService:
                     else:
                         target["pending_agorot"] += charge.amount_agorot
 
-        names = self._class_names(set(buckets) - {None})
+        names = self._class_names({cid for cid in buckets if cid is not None})
 
         def _out(class_id: uuid.UUID | None, bucket: dict[str, Any]) -> dict[str, Any]:
             return {

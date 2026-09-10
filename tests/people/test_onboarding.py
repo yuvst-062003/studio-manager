@@ -3431,7 +3431,7 @@ def test_the_router_refuses_another_studios_belt(
     other = StudioModel(name="מועדון אחר", slug=f"other-{uuid.uuid4().hex[:8]}")
     app_session.add(other)
     app_session.flush()
-    other_class = Class(studio_id=other.id, name="ג\'ודו", discipline="judo")
+    other_class = Class(studio_id=other.id, name="ג'ודו", discipline="judo")
     app_session.add(other_class)
     app_session.flush()
     stray = BeltRank(
