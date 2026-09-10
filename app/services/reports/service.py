@@ -100,7 +100,13 @@ class ReportService:
                     else:
                         target["pending_agorot"] += charge.amount_agorot
 
-        names = self._class_names(set(buckets) - {None})
+        # `set(buckets) - {None}` is `set[UUID | None]` as far as mypy is concerned:
+        # subtracting a set does not narrow the element type, so the None it removes at
+        # runtime is still in the type it hands to `_class_names(set[UUID])`. A comprehension
+        # with an explicit guard narrows, which is the same shape as the fix already sitting
+        # uncommitted in main's working tree from a parallel session — written identically so
+        # the two cannot disagree when they meet.
+        names = self._class_names({cid for cid in buckets if cid is not None})
 
         def _out(class_id: uuid.UUID | None, bucket: dict[str, Any]) -> dict[str, Any]:
             return {
