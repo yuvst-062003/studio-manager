@@ -393,3 +393,67 @@ def test_editing_a_class_that_does_not_exist_is_a_404(client, as_manager):
         headers=as_manager.headers,
     )
     assert response.status_code == 404
+
+
+# -- taking a coach OFF a group (owner report, 2026-09-10) ---------------------------
+#
+# `POST /groups/{id}/staff` shipped in M1.4 and nothing ever removed the row. Classes have
+# had `DELETE /classes/{id}/staff/{person_id}` since the class-manager work; groups had no
+# counterpart at all, so a coach assigned to the wrong group stayed on it, and the staff
+# screen's "ללא קבוצה" could be fixed in exactly one direction.
+
+
+def test_removing_a_coach_closes_the_row_and_revokes_the_group_grant(
+    client, as_manager, a_group, a_coach_person, app_session
+):
+    from app.core.tenancy import with_all_tenants
+    from app.models.person import RoleAssignment
+    from app.models.structure import GroupStaff
+    from sqlalchemy import select
+
+    client.post(
+        f"/api/v1/groups/{a_group}/staff",
+        json={"person_id": str(a_coach_person), "role": "lead_coach"},
+        headers=as_manager.headers,
+    )
+    removed = client.delete(
+        f"/api/v1/groups/{a_group}/staff/{a_coach_person}", headers=as_manager.headers
+    )
+    assert removed.status_code == 204, removed.text
+
+    with with_all_tenants(reason="test asserts the row is closed, not deleted"):
+        # Closed, never deleted: who coached a group last season is history the sessions
+        # already point at. Same rule the class-level removal follows.
+        row = app_session.execute(
+            select(GroupStaff).where(
+                GroupStaff.group_id == a_group, GroupStaff.person_id == a_coach_person
+            )
+        ).scalar_one()
+        assert row.to_date is not None
+        # The grant goes with it, or the coach keeps read access to a roster they are no
+        # longer on — which is the whole reason assigning is one call and not two.
+        live = app_session.execute(
+            select(RoleAssignment.id).where(
+                RoleAssignment.person_id == a_coach_person,
+                RoleAssignment.scope_type == "group",
+                RoleAssignment.scope_id == a_group,
+                RoleAssignment.revoked_at.is_(None),
+            )
+        ).first()
+        assert live is None
+
+
+def test_removing_a_coach_who_is_not_on_the_group_is_404(
+    client, as_manager, a_group, a_coach_person
+):
+    missing = client.delete(
+        f"/api/v1/groups/{a_group}/staff/{a_coach_person}", headers=as_manager.headers
+    )
+    assert missing.status_code == 404
+
+
+def test_removing_a_coach_is_manager_only(client, as_lead_coach, a_group, a_coach_person):
+    refused = client.delete(
+        f"/api/v1/groups/{a_group}/staff/{a_coach_person}", headers=as_lead_coach.headers
+    )
+    assert refused.status_code == 403

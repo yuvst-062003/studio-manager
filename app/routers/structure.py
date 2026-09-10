@@ -364,6 +364,39 @@ def add_class_staff(
     raise _not_found()
 
 
+@router.delete("/groups/{group_id}/staff/{person_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_group_staff(
+    _: ManagerOrOwner,
+    group_id: uuid.UUID,
+    person_id: uuid.UUID,
+    request: Request,
+    session: TenantSessionDep,
+) -> Response:
+    """The counterpart `POST /groups/{id}/staff` shipped without in M1.4.
+
+    Classes have had a removal since the class-manager work; groups had none, so a coach
+    put on the wrong group stayed on it, and the staff screen's ללא קבוצה could only ever
+    be fixed in one direction (owner report, 2026-09-10).
+
+    Closes the row and revokes the group-scoped grant together -- see
+    `StructureService.unassign_staff` for why that is one call.
+    """
+    at = now()
+    try:
+        StructureService.unassign_staff(
+            session,
+            group_id=group_id,
+            person_id=person_id,
+            on=at.date(),
+            at=at,
+            actor_person_id=getattr(request.state, "person_id", None),
+        )
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.delete("/classes/{class_id}/staff/{person_id}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_class_staff(
     _: ManagerOfClass,

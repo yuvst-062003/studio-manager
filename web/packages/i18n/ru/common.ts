@@ -628,4 +628,6 @@ export const common: Bundle = {
   'imagePicker.preview': 'Предпросмотр',
   'staff.invite.groups': 'Группы (необязательно)',
   'staff.invite.groupsHint': 'Группы, в которые тренер попадёт сразу. Можно назначить и позже со страницы группы.',
+  'staff.actions.editMember': 'Редактировать сотрудника',
+  'staff.actions.saveMember': 'Сохранить',
 }

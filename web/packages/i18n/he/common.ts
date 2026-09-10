@@ -703,4 +703,6 @@ export const common: Bundle = {
   'imagePicker.preview': 'תצוגה מקדימה',
   'staff.invite.groups': 'קבוצות (לא חובה)',
   'staff.invite.groupsHint': 'הקבוצות שהמאמן ישובץ אליהן מיד. אפשר גם לשבץ מאוחר יותר מעמוד הקבוצה.',
+  'staff.actions.editMember': 'עריכת איש צוות',
+  'staff.actions.saveMember': 'שמירה',
 }

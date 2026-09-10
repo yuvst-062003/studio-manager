@@ -445,3 +445,67 @@ def test_the_lifecycle_is_manager_only(client, as_lead_coach) -> None:
         headers=as_lead_coach.headers,
     )
     assert refused.status_code == 403
+
+
+# -- editing a staff member's own details (owner report, 2026-09-10) -----------------
+#
+# "אי אפשר לערוך איש צוות" — and it was true. `PATCH /staff/{id}` took `roles` and nothing
+# else, so a coach invited with a typo in their name carried it for ever: the invite form is
+# the only place a name is ever written, and nothing could rewrite it afterwards.
+#
+# The columns already exist on `person`; this is a schema and service gap, not a data one,
+# which is why it needs no migration.
+
+
+def test_a_staff_members_name_can_be_corrected(client, as_manager, app_session, studio) -> None:
+    person_id = _add_coach(app_session, studio.id, name="שגוי", role="lead_coach")
+    changed = client.patch(
+        f"{STAFF}/{person_id}",
+        json={"roles": ["lead_coach"], "first_name": "מתוקן", "last_name": "כהן"},
+        headers=as_manager.headers,
+    )
+    assert changed.status_code == 204, changed.text
+    listed = client.get(STAFF, headers=as_manager.headers).json()
+    row = next(r for r in listed["items"] if r["person_id"] == str(person_id))
+    assert row["first_name"] == "מתוקן"
+    assert row["last_name"] == "כהן"
+
+
+def test_an_email_can_be_corrected(client, as_manager, app_session, studio) -> None:
+    person_id = _add_coach(app_session, studio.id, name="דואל", role="lead_coach")
+    changed = client.patch(
+        f"{STAFF}/{person_id}",
+        json={"roles": ["lead_coach"], "email": "fixed@example.invalid"},
+        headers=as_manager.headers,
+    )
+    assert changed.status_code == 204, changed.text
+    listed = client.get(STAFF, headers=as_manager.headers).json()
+    row = next(r for r in listed["items"] if r["person_id"] == str(person_id))
+    assert row["email"] == "fixed@example.invalid"
+
+
+def test_omitting_the_details_leaves_them_alone(client, as_manager, app_session, studio) -> None:
+    # The role editor sends `{roles}` and nothing else, and must keep doing so without
+    # blanking the name. `None` means "not mentioned", never "set to empty" — the
+    # difference every partial update has to get right.
+    person_id = _add_coach(app_session, studio.id, name="שמור", role="lead_coach")
+    changed = client.patch(
+        f"{STAFF}/{person_id}",
+        json={"roles": ["assistant_coach"]},
+        headers=as_manager.headers,
+    )
+    assert changed.status_code == 204, changed.text
+    listed = client.get(STAFF, headers=as_manager.headers).json()
+    row = next(r for r in listed["items"] if r["person_id"] == str(person_id))
+    assert row["first_name"] == "שמור"
+    assert row["roles"] == ["assistant_coach"]
+
+
+def test_editing_details_is_manager_only(client, as_lead_coach, app_session, studio) -> None:
+    person_id = _add_coach(app_session, studio.id, name="לא-שלך", role="lead_coach")
+    refused = client.patch(
+        f"{STAFF}/{person_id}",
+        json={"roles": ["lead_coach"], "first_name": "גנוב"},
+        headers=as_lead_coach.headers,
+    )
+    assert refused.status_code == 403

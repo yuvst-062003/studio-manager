@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.core.tenancy import require_current_studio_id
 from app.models.person import Person, RoleAssignment
 from app.models.structure import Class, Group, GroupStaff, Location
+from app.services.audit import AuditService
 from app.services.structure.class_staff import ClassStaffService
 
 
@@ -336,3 +337,65 @@ class StructureService:
             )
         session.flush()
         return row, True
+
+    @staticmethod
+    def unassign_staff(
+        session: Session,
+        *,
+        group_id: uuid.UUID,
+        person_id: uuid.UUID,
+        on: date,
+        at: datetime,
+        actor_person_id: uuid.UUID | None = None,
+    ) -> None:
+        """Take a coach off a group. The mirror of `assign_staff`, and one call for the
+        same reason that one is.
+
+        `assign_staff` explains why writing the `group_staff` row and the group-scoped
+        `role_assignment` is a single call: a coach with one and not the other is either on
+        a roster they cannot log in to see, or able to read a roster they are not on.
+        Removing them carries the identical hazard in reverse, so this closes both.
+
+        The row is CLOSED, never deleted -- who coached a group last season is history the
+        sessions already point at. Same rule `ClassStaffService.remove_coach` follows.
+
+        Taking the LAST lead coach off a group is allowed, unlike the class-level removal
+        which 409s. An uncovered group is a real and recoverable state the product already
+        names out loud: `groups_without_coach` is on the staff screen and drives 3d's red
+        banner. The class-level guard exists to prevent an inconsistency -- a class coach
+        still holding that class's groups -- which has no counterpart here.
+
+        Audited, unlike `assign_staff`. A revocation is the half worth being able to answer
+        "who did this, and when" about; the grant beside it should probably record one too,
+        which is noted here rather than changed in a commit about removal.
+        """
+        StructureService.get_group(session, group_id)
+        row = session.execute(
+            select(GroupStaff).where(
+                GroupStaff.group_id == group_id,
+                GroupStaff.person_id == person_id,
+                GroupStaff.to_date.is_(None),
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            raise NotFoundError(str(person_id))
+        role = row.role
+        row.to_date = on
+        for assignment in session.execute(
+            select(RoleAssignment).where(
+                RoleAssignment.person_id == person_id,
+                RoleAssignment.scope_type == "group",
+                RoleAssignment.scope_id == group_id,
+                RoleAssignment.revoked_at.is_(None),
+            )
+        ).scalars():
+            assignment.revoked_at = at
+        session.flush()
+        AuditService.record(
+            session,
+            action="group.staff_removed",
+            entity_type="group",
+            entity_id=group_id,
+            actor_person_id=actor_person_id,
+            diff={"person_id": str(person_id), "role": role},
+        )

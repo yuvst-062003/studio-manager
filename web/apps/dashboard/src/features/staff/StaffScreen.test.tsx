@@ -235,7 +235,7 @@ describe('B4.2 — permissions move out of the table and into the role editor', 
     render(<StaffScreen locale="he" />)
     await openRowActions(MANAGER_NAME)
     await userEvent.click(
-      await screen.findByRole('menuitem', { name: t('he', 'common.staff.actions.editRoles') }),
+      await screen.findByRole('menuitem', { name: t('he', 'common.staff.actions.editMember') }),
     )
     for (const permission of ALL_PERMISSIONS) {
       expect(screen.getByText(t('he', `common.staff.perm.${permission}`))).toBeInTheDocument()
@@ -286,7 +286,7 @@ describe('B4.4 — one overflow control per row instead of stacked buttons', () 
     const menu = screen.getByRole('menu')
     const items = within(menu).getAllByRole('menuitem')
     expect(items.map((item) => item.textContent)).toEqual([
-      t('he', 'common.staff.actions.editRoles'),
+      t('he', 'common.staff.actions.editMember'),
       t('he', 'common.staff.actions.deactivate'),
     ])
     expect(within(menu).getByRole('separator')).toBeInTheDocument()

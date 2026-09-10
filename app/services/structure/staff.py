@@ -455,16 +455,39 @@ def change_roles(
     person_id: uuid.UUID,
     *,
     roles: list[str],
+    first_name: str | None = None,
+    last_name: str | None = None,
+    email: str | None = None,
     actor_person_id: uuid.UUID | None,
     at: datetime,
 ) -> None:
     """Grants and revocations reconciled against the wanted set. `owner` is untouchable
-    from here in both directions (§3.1: exactly one, cannot be removed)."""
+    from here in both directions (§3.1: exactly one, cannot be removed).
+
+    Also the person's own details, since 2026-09-10 — see `StaffRolesIn` for why. Each is
+    `None` when the caller did not mention it, which is not the same as clearing it: the
+    role editor sends roles alone and must not blank a name on the way past.
+    """
     if not roles or any(role not in GRANTABLE_ROLES for role in roles):
         raise StaffError("bad_roles")
     person = session.get(Person, person_id)
     if person is None:
         raise StaffError("not_found")
+    # Details first, so a bad_roles refusal above leaves the row untouched rather than
+    # renaming somebody and then declining the edit they actually asked for.
+    changed_details: dict[str, str] = {}
+    if first_name is not None:
+        person.first_name = first_name
+        changed_details["first_name"] = first_name
+    if last_name is not None:
+        person.last_name = last_name
+        changed_details["last_name"] = last_name
+    if email is not None:
+        person.email = email
+        # NOT in the audit diff. `audit_log` is append-only and an email is contact detail
+        # about a real person; the fact that it changed is what the log needs to carry, and
+        # the value itself lives on the row.
+        changed_details["email"] = "changed"
     wanted = set(roles)
     current = list(
         session.execute(
@@ -503,7 +526,7 @@ def change_roles(
         entity_type="person",
         entity_id=person_id,
         actor_person_id=actor_person_id,
-        diff={"roles": sorted(wanted)},
+        diff={"roles": sorted(wanted), **changed_details},
     )
 
 
