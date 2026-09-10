@@ -293,6 +293,7 @@ export const people: Bundle = {
   'freeze.from': 'From',
   'freeze.to': 'Until',
   'freeze.openEnded': 'No end date',
+  'freeze.until': 'Frozen until {{date}}',
   'freeze.reason': 'Reason',
   'freeze.submit': 'Freeze',
   'freeze.active': 'Membership is frozen',

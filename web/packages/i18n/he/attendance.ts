@@ -29,6 +29,18 @@ export const attendance: Bundle = {
   'roster.absent': 'נעדר',
   'roster.absentExcused': 'נעדר בהצדקה',
   'roster.absentUnexcused': 'נעדר ללא הצדקה',
+  // B1.4's Quick View redesign — the 3-up stat header's first tile. `registered` is the
+  // roster's own length, not a fetched figure: the popover already holds every student it
+  // needs to count.
+  'roster.registered': 'רשומים',
+  // The Quick View's three explicit per-student buttons, replacing the three-tap cycle.
+  // Distinct wording from `roster.absentExcused`/`absentUnexcused` above on purpose: those
+  // are glyph labels answering "what is this mark", worded around justification
+  // (בהצדקה/ללא הצדקה). These are the BUTTONS a coach presses, worded around notice
+  // (בהודעה/ללא הודעה) to match `source.preReported` — a coach is recording whether a
+  // parent gave advance word, not judging whether the absence was justified.
+  'roster.markAbsentExcused': 'נעדר בהודעה',
+  'roster.markAbsentUnexcused': 'נעדר ללא הודעה',
   // §5.14 — `unmarked` is a real state. A report must never treat it as absent.
   'roster.unmarked': 'לא סומן',
   'roster.unmarkedCount': 'לא סומנו {{count}} חניכים',

@@ -297,6 +297,7 @@ export const people: Bundle = {
   'freeze.from': 'С',
   'freeze.to': 'По',
   'freeze.openEnded': 'Без даты окончания',
+  'freeze.until': 'Заморожен до {{date}}',
   'freeze.reason': 'Причина',
   'freeze.submit': 'Заморозить',
   'freeze.active': 'Членство заморожено',

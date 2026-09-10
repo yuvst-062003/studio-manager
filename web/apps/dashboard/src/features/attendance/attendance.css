@@ -18,32 +18,94 @@
   list-style: none;
 }
 
-.quickview__list button {
+/* B1.4's redesign — the row itself is no longer a single clickable control (three explicit
+ * buttons replaced the three-tap cycle), so it is a plain flex container rather than a
+ * `<button>`: no cursor, no border reset to undo. */
+.quickview__row {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-3);
   align-items: center;
-  inline-size: 100%;
   padding-block: var(--space-2);
   padding-inline: var(--space-2);
-  border: 0;
-  background: transparent;
   color: var(--fg);
+}
+
+/* The name and mark stay flush at the row's start; the action buttons are pushed to its
+ * end regardless of how much a plan badge or the pre-reported note in between takes up. */
+.quickview__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin-inline-start: auto;
+}
+
+/* The artboard's three explicit per-student buttons (`present` / `absent_excused` /
+ * `absent_unexcused`), replacing the old three-tap cycle. Unpressed is a neutral outline —
+ * `aria-pressed` is what recolours a button, never colour alone, so the same attribute a
+ * screen reader announces is the one this stylesheet reads. */
+.quickview__action {
+  padding-block: var(--space-1);
+  padding-inline: var(--space-3);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
   font: inherit;
-  text-align: start;
+  font-weight: var(--weight-medium);
   cursor: pointer;
 }
 
-/* §5.7 — a parent's advance notice is not cycled by a click. The cursor says the row is not
- * the control the ones above it are. */
-.quickview__list button[data-pre-reported='true'] {
+.quickview__action:disabled {
   cursor: default;
+  opacity: 0.5;
+}
+
+/* Present and absent-unexcused reuse the exact fills `AttendanceMark` already wears for
+ * those two states (`primitives.css`'s `.studio-attendance[data-state="present"/"absent"]`),
+ * so a pressed button and the glyph beside the name agree on what green and red mean here.
+ * Absent-excused stays an outline, like `AttendanceMark`'s `notified` state — `--pending`
+ * has never been used as a fill in this app and a first fill here would be a new claim
+ * about the token, not a ported one. */
+.quickview__action[data-action='present'][aria-pressed='true'] {
+  border-color: var(--paid);
+  background: var(--paid);
+  color: var(--on-accent);
+}
+
+.quickview__action[data-action='absent_unexcused'][aria-pressed='true'] {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--surface);
+}
+
+.quickview__action[data-action='absent_excused'][aria-pressed='true'] {
+  border-color: var(--pending);
+  color: var(--pending);
+}
+
+/* B1.4's redesign — the artboard's 3-up stat header (`WeeklyScheduleView`'s attendance
+ * tab): registered, present, absent-or-late, the same `.staff-stats`/`StatTile` shape B4.1
+ * already established for exactly this "three tiles instead of a text summary" composition,
+ * so this popover does not invent a second one. */
+.quickview__stats {
+  display: grid;
+
+  /* FOUR, not three: §5.14's `unmarked` is a real state and earns its own tile. A fixed
+   * three-column grid wrapped the fourth onto a row of its own, which reads as an
+   * afterthought rather than as one of the four numbers. */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+  flex: 1 1 auto;
 }
 
 /* Must not mirror: every count and time on both artboards (4c and 1e RTL sections). B1.1's
- * datetime moved from a `<span>` to the `<bdi dir="ltr">` this selector now also names. */
-[data-testid='quickview-summary'],
+ * datetime moved from a `<span>` to the `<bdi dir="ltr">` this selector now also names, and
+ * the 3-up stat header's three counts are the same rule applied to `StatTile`'s value. */
 [data-testid='unmarked-list'] span,
-[data-testid='unmarked-list'] bdi[dir='ltr'] {
+[data-testid='unmarked-list'] bdi[dir='ltr'],
+.quickview__stats .studio-stat-tile__value {
   font-variant-numeric: tabular-nums;
 }
 

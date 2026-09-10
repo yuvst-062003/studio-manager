@@ -1443,7 +1443,8 @@ waves:
         status: planned
       - id: W10.8
         title: Attendance — three buttons per student
-        status: planned
+        status: shipped
+        on: 2026-09-10
       - id: W10.9
         title: Billing collections, promises, plan changes
         status: planned

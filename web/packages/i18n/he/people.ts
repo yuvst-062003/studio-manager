@@ -348,6 +348,7 @@ export const people: Bundle = {
   'freeze.from': 'מתאריך',
   'freeze.to': 'עד תאריך',
   'freeze.openEnded': 'ללא תאריך סיום',
+  'freeze.until': 'מוקפא עד {{date}}',
   'freeze.reason': 'סיבה',
   'freeze.submit': 'הקפאה',
   'freeze.active': 'החברות מוקפאת',
