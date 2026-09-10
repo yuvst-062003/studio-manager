@@ -59,10 +59,12 @@ export function RecordPaymentDialog({
   const [result, setResult] = useState<{ allocated: number; unallocatedAgorot: number } | null>(
     null,
   )
+  const [failed, setFailed] = useState(false)
 
   async function submit() {
     if (inFlight) return
     setInFlight(true)
+    setFailed(false)
     try {
       setResult(
         await client.recordPayment({
@@ -77,6 +79,12 @@ export function RecordPaymentDialog({
           note: note || undefined,
         }),
       )
+    } catch {
+      // §3.20's named gap, on the screen where it matters most: a manager who has just
+      // taken 320 shekels in cash and sees nothing happen has no way to tell whether the
+      // payment was recorded. Nothing is cleared — the amount, date and note stay, so
+      // pressing again retries the same payment rather than asking for it to be retyped.
+      setFailed(true)
     } finally {
       setInFlight(false)
     }
@@ -131,6 +139,12 @@ export function RecordPaymentDialog({
         >
           {t(locale, 'billing.payment.record')}
         </Button>
+
+        {failed ? (
+          <p data-testid="record-payment-failed" role="alert" style={{ color: 'var(--danger)' }}>
+            {t(locale, 'billing.payment.failed')}
+          </p>
+        ) : null}
 
         {result ? (
           <div data-testid="record-payment-result">

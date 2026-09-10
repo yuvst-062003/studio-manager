@@ -186,6 +186,7 @@ export const billing: Bundle = {
   'payment.method.cheque': 'Cheque',
   'payment.method.bank_transfer': 'Bank transfer',
   'payment.saved': 'Payment recorded',
+  'payment.failed': 'We could not record the payment. Your entries are still here — try again.',
   'payment.allocatedOldestFirst': 'Allocated to the oldest charges first',
   'payment.unallocated': 'Unallocated balance',
 
@@ -315,6 +316,9 @@ export const billing: Bundle = {
   'plan.activeTo': 'Effective to',
   'plan.appliesTo': 'Applies to',
   'plan.empty': 'No plans defined',
+  // §3.20's named gap: both write paths on this screen had no catch at all.
+  'plan.createFailed': 'We could not create the plan. Your entries are still here — try again.',
+  'plan.closeFailed': 'We could not close the plan. The old price is still in force — try again.',
   'plan.versionedHint': 'Changing a price closes the current plan and opens a new one. Past charges are preserved',
   'plan.closeCurrent': 'Close the current plan',
 

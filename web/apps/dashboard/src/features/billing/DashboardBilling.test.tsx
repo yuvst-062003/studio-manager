@@ -1205,3 +1205,98 @@ describe('the money band', () => {
     expect(screen.getByTestId('kpi-failed')).not.toHaveAttribute('data-tone')
   })
 })
+
+// Checkpoint 10 — §3.20's named gap, three times: "no error handling at all — no `.catch`,
+// so a failed create rejects unhandled and the form simply appears to do nothing."
+describe('a failed write on the prices screen says so', () => {
+  const PLAN = {
+    id: 'p1',
+    name: 'פעמיים בשבוע',
+    sessions_per_week: 2,
+    monthly_amount_agorot: 32_000,
+    registration_fee_agorot: 0,
+    active_from: '2026-09-01',
+    active_to: null,
+    class_id: 'c1',
+    standing_order_link_url: null,
+  }
+
+  function renderPlans(client: DashboardBillingClient) {
+    render(
+      <PricePlansScreen
+        classes={[{ id: 'c1', name: "ג'ודו" }]}
+        client={client}
+        locale={LOCALE}
+        onChanged={() => undefined}
+        plans={[PLAN]}
+      />,
+    )
+  }
+
+  it('reports a failed create and KEEPS what the manager typed', async () => {
+    const client = stub({
+      createPricePlan: vi.fn(async () => {
+        throw new Error('500')
+      }),
+    })
+    renderPlans(client)
+    // By id, not by label: `מחיר חודשי` is also the plan row's own wording above, and an
+    // unscoped label query would not know which one it meant.
+    await userEvent.type(screen.getByTestId('plan-monthly'), '320')
+    await userEvent.selectOptions(screen.getByTestId('plan-class'), 'c1')
+    await userEvent.click(screen.getByTestId('wizard-plan-freq-2'))
+    await userEvent.click(screen.getByTestId('plan-save'))
+
+    expect(await screen.findByTestId('plan-write-failed')).toHaveTextContent(
+      t(LOCALE, 'billing.plan.createFailed'),
+    )
+    // A retry must not mean retyping an amount the manager already typed once.
+    expect(screen.getByTestId('plan-monthly')).toHaveValue('320')
+  })
+
+  it('reports a failed close and says the OLD price is still in force', async () => {
+    // The more dangerous of the two: §5.10 versions a plan so a price change never rewrites
+    // history, and closing one IS how a price change is done. Silence here reads as "the new
+    // price is live" while every charge keeps being raised at the old one.
+    const client = stub({
+      closePricePlan: vi.fn(async () => {
+        throw new Error('500')
+      }),
+    })
+    renderPlans(client)
+    await userEvent.click(screen.getAllByTestId('plan-row')[0]!)
+    await userEvent.click(screen.getByTestId('plan-close'))
+
+    expect(await screen.findByTestId('plan-write-failed')).toHaveTextContent(
+      t(LOCALE, 'billing.plan.closeFailed'),
+    )
+    // And the card stays open, so the manager is not left wondering what happened.
+    expect(screen.getByTestId('plan-close')).toBeInTheDocument()
+  })
+})
+
+describe('a failed payment says so', () => {
+  it('reports it, and keeps the amount and date', async () => {
+    // A manager who has just taken 320 shekels in cash and sees nothing happen has no way
+    // to tell whether the payment was recorded.
+    renderCollections({
+      client: stub({
+        recordPayment: vi.fn(async () => {
+          throw new Error('500')
+        }),
+      }),
+    })
+    await userEvent.click(screen.getAllByTestId('record-cash')[0]!)
+    await userEvent.type(screen.getByLabelText(t(LOCALE, 'billing.payment.amount')), '320')
+    await userEvent.type(screen.getByLabelText(t(LOCALE, 'billing.payment.date')), '2026-11-12')
+    await userEvent.click(screen.getByTestId('record-payment-submit'))
+
+    expect(await screen.findByTestId('record-payment-failed')).toHaveTextContent(
+      t(LOCALE, 'billing.payment.failed'),
+    )
+    expect(screen.getByLabelText(t(LOCALE, 'billing.payment.amount'))).toHaveValue('320')
+    // No success panel beside the failure — the two must never both be on screen saying
+    // opposite things.
+    expect(screen.queryByTestId('record-payment-result')).not.toBeInTheDocument()
+  })
+})

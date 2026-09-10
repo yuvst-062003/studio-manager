@@ -189,6 +189,7 @@ export const billing: Bundle = {
   'payment.method.cheque': 'Чек',
   'payment.method.bank_transfer': 'Банковский перевод',
   'payment.saved': 'Платёж записан',
+  'payment.failed': 'Не удалось записать платёж. Введённое сохранено — попробуйте ещё раз.',
   'payment.allocatedOldestFirst': 'Зачтено в самые старые начисления',
   'payment.unallocated': 'Нераспределённый остаток',
 
@@ -318,6 +319,9 @@ export const billing: Bundle = {
   'plan.activeTo': 'Действует до',
   'plan.appliesTo': 'Применяется к',
   'plan.empty': 'Тарифы не заданы',
+  // §3.20's named gap: both write paths on this screen had no catch at all.
+  'plan.createFailed': 'Не удалось создать тариф. Введённое сохранено — попробуйте ещё раз.',
+  'plan.closeFailed': 'Не удалось закрыть тариф. Старая цена всё ещё действует — попробуйте ещё раз.',
   'plan.versionedHint': 'Изменение цены закрывает текущий тариф и открывает новый. Прошлые начисления сохраняются',
   'plan.closeCurrent': 'Закрыть текущий тариф',
 

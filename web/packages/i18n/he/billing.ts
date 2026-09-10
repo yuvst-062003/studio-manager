@@ -252,6 +252,7 @@ export const billing: Bundle = {
   'payment.method.cheque': 'צ׳ק',
   'payment.method.bank_transfer': 'העברה בנקאית',
   'payment.saved': 'התשלום נרשם',
+  'payment.failed': 'לא הצלחנו לרשום את התשלום. הפרטים נשמרו בטופס — נסו שוב.',
   'payment.allocatedOldestFirst': 'התשלום שויך לחיובים הוותיקים ביותר',
   'payment.unallocated': 'יתרה לא משויכת',
 
@@ -398,6 +399,9 @@ export const billing: Bundle = {
   'plan.activeTo': 'בתוקף עד',
   'plan.appliesTo': 'חל על',
   'plan.empty': 'לא הוגדרו מסלולים',
+  // §3.20's named gap: both write paths on this screen had no catch at all.
+  'plan.createFailed': 'לא הצלחנו ליצור את המסלול. הפרטים נשמרו בטופס — נסו שוב.',
+  'plan.closeFailed': 'לא הצלחנו לסגור את המסלול. המחיר הישן עדיין בתוקף — נסו שוב.',
   // §5.10 — plans are versioned, never edited in place, so history stays explicable.
   'plan.versionedHint': 'שינוי מחיר סוגר את המסלול הקיים ופותח חדש. חיובים קודמים נשמרים',
   'plan.closeCurrent': 'סגירת המסלול הנוכחי',

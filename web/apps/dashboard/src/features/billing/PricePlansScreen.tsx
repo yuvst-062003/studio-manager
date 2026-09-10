@@ -117,6 +117,10 @@ export function PricePlansScreen({
   // Grouped for display, in the club's own class order.
   const { unfiled, groups: grouped } = groupByClass(plans, classes)
 
+  // Which write failed, or null. One piece of state rather than two booleans: the two
+  // never happen at once, and two flags is how a screen ends up showing both messages.
+  const [writeFailed, setWriteFailed] = useState<'create' | 'close' | null>(null)
+
   async function filePlan(planId: string, classId: string) {
     if (!classId || filing !== null) return
     setFiling(planId)
@@ -179,6 +183,7 @@ export function PricePlansScreen({
   async function create() {
     if (inFlight || perWeek === undefined) return
     setInFlight(true)
+    setWriteFailed(null)
     try {
       await client.createPricePlan({
         // The frequency already names the plan, so a club with no house name for
@@ -196,6 +201,12 @@ export function PricePlansScreen({
       setPerWeek(undefined)
       setMonthly('')
       setPlanClassId('')
+    } catch {
+      // §3.20's named gap. There was no `catch` at all, so a failed create rejected
+      // unhandled and the form simply appeared to do nothing — on a screen where the thing
+      // that failed is a PRICE. The fields are NOT cleared: a retry must not mean retyping
+      // an amount the manager already typed once.
+      setWriteFailed('create')
     } finally {
       setInFlight(false)
     }
@@ -204,6 +215,15 @@ export function PricePlansScreen({
   return (
     <div style={columnStyle} data-testid="price-plans">
       <h1>{t(locale, 'billing.plan.title')}</h1>
+
+      {writeFailed ? (
+        <p className="plans-error" data-testid="plan-write-failed" role="alert">
+          {t(
+            locale,
+            writeFailed === 'create' ? 'billing.plan.createFailed' : 'billing.plan.closeFailed',
+          )}
+        </p>
+      ) : null}
 
       {plans.length === 0 ? (
         <EmptyState title={t(locale, 'billing.plan.empty')} />
@@ -282,11 +302,21 @@ export function PricePlansScreen({
             variant="primary"
             data-testid="plan-close"
             onClick={async () => {
-              await client.closePricePlan(
-                openPlanId,
-                new Date().toISOString().slice(0, 10),
-                agorotFromShekels(monthly),
-              )
+              setWriteFailed(null)
+              try {
+                await client.closePricePlan(
+                  openPlanId,
+                  new Date().toISOString().slice(0, 10),
+                  agorotFromShekels(monthly),
+                )
+              } catch {
+                // The same gap as `create`, on the more dangerous of the two: §5.10 versions
+                // a plan so a price change never rewrites history, and closing one IS how a
+                // price change is done. A silent failure here reads as "the new price is
+                // live" while every charge keeps being raised at the old one.
+                setWriteFailed('close')
+                return
+              }
               onChanged()
               setOpenPlanId(null)
             }}
@@ -327,6 +357,7 @@ export function PricePlansScreen({
           </SelectField>
         ) : null}
         <TextField
+          data-testid="plan-monthly"
           hint={t(locale, 'billing.plan.monthlyHint')}
           inputMode="decimal"
           label={t(locale, 'billing.plan.monthlyAmount')}
