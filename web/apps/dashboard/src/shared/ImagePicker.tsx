@@ -125,10 +125,10 @@ export function ImagePicker({
         ) : (
           <>
             <Icon name="image" size={28} />
-            <span style={{ font: 'var(--type-label)' }}>
+            <span style={{ fontSize: 'var(--text-label)' }}>
               {label ?? t(locale, 'common.imagePicker.empty')}
             </span>
-            <span style={{ font: 'var(--type-caption)', color: 'var(--text-muted)' }}>
+            <span style={{ fontSize: 'var(--text-caption)', color: 'var(--text-muted)' }}>
               {hint ?? t(locale, 'common.imagePicker.hint')}
             </span>
           </>
@@ -153,7 +153,7 @@ export function ImagePicker({
           {/* A second, explicit affordance for replacing. The square itself is already a
               label and would do it, but once it holds a photo it stops LOOKING pressable,
               and "click the picture" is not discoverable. */}
-          <span style={{ font: 'var(--type-caption)', color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: 'var(--text-caption)', color: 'var(--text-muted)' }}>
             {t(locale, 'common.imagePicker.replace')}
           </span>
           {onRemove ? (
