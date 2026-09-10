@@ -712,7 +712,7 @@ describe('AddStudentScreen — 3c', () => {
  *  way a manager does. */
 async function openDetailTab(locale: 'he', key: 'general' | 'training' | 'finance' | 'health') {
   await userEvent.click(
-    await screen.findByRole('radio', { name: t(locale, `people.student.tab.${key}`) }),
+    await screen.findByRole('tab', { name: t(locale, `people.student.tab.${key}`) }),
   )
 }
 
@@ -805,10 +805,20 @@ describe('StudentDetailScreen — 4a', () => {
     expect(screen.getByTestId('detail-mark-lost')).toBeInTheDocument()
   })
 
-  it('renders narrow as well as wide', async () => {
+  it('lays out from a stylesheet, with no physical properties, so it can render narrow', async () => {
     // §6.4 — 'a manager checking cover from a phone is a normal case rather than an error.'
-    render(<StudentDetailScreen studentId="st1" locale="he" client={makeClient()} />)
-    expect(await screen.findByTestId('student-detail')).toHaveStyle({ display: 'grid' })
+    //
+    // This used to assert `display: grid` on an inline style object. That style was the
+    // auto-fit card grid the redesign replaced, and asserting it pinned an implementation
+    // detail rather than the rule. jsdom resolves no stylesheet, so the breakpoint itself
+    // cannot be checked here — what CAN be, and is what actually breaks a narrow render in
+    // an RTL document, is a physical `left`/`margin-left` sneaking into an inline style.
+    const { container } = render(
+      <StudentDetailScreen studentId="st1" locale="he" client={makeClient()} />,
+    )
+    const card = await screen.findByTestId('student-detail')
+    expect(card).toHaveClass('student-card')
+    noPhysicalCss(container)
   })
 
   // -- Decision 20's nameless guardian --------------------------------------------

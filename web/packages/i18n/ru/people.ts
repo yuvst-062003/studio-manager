@@ -63,6 +63,10 @@ export const people: Bundle = {
   'status.membershipHistory': 'История занятий в клубе',
   'student.attendance': 'История посещаемости',
   'student.attendanceEmpty': 'Посещаемость ещё не отмечалась',
+  'student.weeklyVolume': 'Тренировок в неделю',
+  'student.statusHistory': 'История статуса',
+  'student.historyEmpty': 'Изменений статуса нет',
+  'guardian.phone': 'Телефон родителя',
   'student.attendanceMarkedOn': 'Отмечено',
 
   // -- 4a's tab strip (dashboard redesign) — groups the card's existing sections under

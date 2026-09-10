@@ -88,6 +88,10 @@ export const people: Bundle = {
   // -- 4a's attendance section (dashboard) ---------------------------------------
   'student.attendance': 'היסטוריית נוכחות',
   'student.attendanceEmpty': 'עדיין לא נרשמה נוכחות',
+  'student.weeklyVolume': 'אימונים בשבוע',
+  'student.statusHistory': 'היסטוריית סטטוס',
+  'student.historyEmpty': 'אין שינויי סטטוס',
+  'guardian.phone': 'טלפון הורה',
   'student.attendanceMarkedOn': 'סומן בתאריך',
 
   // -- 4a's tab strip (dashboard redesign) — groups the card's existing sections under
