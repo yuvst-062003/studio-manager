@@ -16,9 +16,19 @@
 // single most consequential button on the dashboard, and the artboard shows it with no
 // confirmation, no in-progress state and no result. All three are here.
 import { useEffect, useMemo, useState } from 'react'
-import type { CSSProperties } from 'react'
-import { apiFetch, downloadFile, formatDateInStudioZone } from '@studio/core'
-import { Button, Card, Checkbox, EmptyState, MoneyDisplay, PercentDisplay, StatusChip } from '@studio/ui'
+import type { CSSProperties, ReactNode } from 'react'
+import { apiFetch, downloadFile, fill, formatDateInStudioZone, whatsappShareUrl } from '@studio/core'
+import {
+  Button,
+  Card,
+  Checkbox,
+  EmptyState,
+  Icon,
+  MoneyDisplay,
+  PercentDisplay,
+  StatusChip,
+} from '@studio/ui'
+import type { IconName } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type {
@@ -43,24 +53,6 @@ const rowStyle: CSSProperties = {
   gap: 'var(--space-4)',
 }
 
-const detailListStyle: CSSProperties = {
-  listStyle: 'none',
-  margin: 0,
-  padding: 'var(--space-2) var(--space-4)',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--space-2)',
-  borderBlockEnd: 'var(--border-width-hairline) solid var(--border)',
-}
-
-const detailRowStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 'var(--space-3)',
-  fontSize: 'var(--text-label)',
-  color: 'var(--text-secondary)',
-}
-
 export type HouseholdRow = {
   payerPersonId: string
   payerName: string
@@ -74,6 +66,13 @@ export type HouseholdRow = {
   monthsInDebt: number
   daysOverdue: number
 }
+
+/** `3e`'s three aging buckets, plus "everything". The prototype's filter pills carry a
+ *  live count each, which is the half that makes them worth having: a manager who cannot
+ *  see that 60+ holds four households has no reason to press it. */
+const BUCKETS = ['all', '0_30', '31_60', '60_plus'] as const
+
+type Bucket = (typeof BUCKETS)[number]
 
 export type CollectionsScreenProps = {
   locale: Locale
@@ -99,6 +98,22 @@ export function CollectionsScreen({
   period,
 }: CollectionsScreenProps) {
   const [selected, setSelected] = useState<string[]>([])
+  const [bucket, setBucket] = useState<Bucket>('all')
+  // Counted off the households already on screen, so a pill never offers a filter that
+  // yields nothing and the numbers cannot disagree with the list under them.
+  const counts = useMemo(() => {
+    const tally: Record<Bucket, number> = { all: households.length, '0_30': 0, '31_60': 0, '60_plus': 0 }
+    for (const row of households) tally[ageBucket(row.daysOverdue)] += 1
+    return tally
+  }, [households])
+  const shown = useMemo(
+    () => (bucket === 'all' ? households : households.filter((row) => ageBucket(row.daysOverdue) === bucket)),
+    [bucket, households],
+  )
+  const shownTotal = useMemo(
+    () => shown.reduce((sum, row) => sum + row.balanceAgorot, 0),
+    [shown],
+  )
   // F7a — the reminder outcome per household, so 'sent' and 'we did not send that'
   // never look alike. `quiet` renders the 21:00 rule; `recent` the 24h rate limit.
   const [reminded, setReminded] = useState<Record<string, 'sent' | 'recent' | 'quiet' | 'failed'>>({})
@@ -172,10 +187,6 @@ export function CollectionsScreen({
     }
   }
 
-  const total = useMemo(
-    () => households.reduce((sum, row) => sum + row.balanceAgorot, 0),
-    [households],
-  )
 
   async function runNow() {
     setRunning(true)
@@ -232,28 +243,44 @@ export function CollectionsScreen({
         </p>
       ) : null}
 
-      {/* -- the four KPIs ---------------------------------------------------- */}
-      <div style={rowStyle} data-testid="kpi-row">
-        <Stat label={t(locale, 'billing.debt.total')} agorot={openDebtAgorot} tone="debt" />
-        <Stat
-          label={t(locale, 'billing.debt.collectedThisMonth')}
-          agorot={collectedThisMonthAgorot}
-          tone="paid"
-          percentNote={{
-            value: collectedSharePercent,
-            suffix: t(locale, 'billing.debt.collectedShare'),
-          }}
+      {/* -- the four KPIs, in the manager home's own tile shape ---------------- */}
+      <div className="dash-kpis" data-testid="kpi-row">
+        <Kpi
+          icon="payments"
+          label={t(locale, 'billing.debt.total')}
+          testId="kpi-debt"
+          tone="debt"
+          value={<MoneyDisplay agorot={openDebtAgorot} tone="debt" />}
         />
-        <Card caption={t(locale, 'billing.subscription.title')}>
-          {/* Informational, and deliberately uncoloured — `3e`'s token table gives this one
-              `--border` rather than a semantic tone. */}
-          <span data-testid="kpi-subscriptions">{activeSubscriptions}</span>
-        </Card>
-        <Card caption={t(locale, 'billing.order.status.failed')}>
-          <span data-testid="kpi-failed" data-tone="pending">
-            {failedCharges}
-          </span>
-        </Card>
+        <Kpi
+          foot={
+            <>
+              <PercentDisplay value={collectedSharePercent} />{' '}
+              {t(locale, 'billing.debt.collectedShare')}
+            </>
+          }
+          footTestId="kpi-collected-share"
+          icon="check"
+          label={t(locale, 'billing.debt.collectedThisMonth')}
+          testId="kpi-collected"
+          tone="paid"
+          value={<MoneyDisplay agorot={collectedThisMonthAgorot} tone="paid" />}
+        />
+        {/* Informational, and deliberately uncoloured — `3e`'s token table gives this one
+            `--border` rather than a semantic tone. */}
+        <Kpi
+          icon="students"
+          label={t(locale, 'billing.subscription.title')}
+          testId="kpi-subscriptions"
+          value={activeSubscriptions}
+        />
+        <Kpi
+          icon="warning"
+          label={t(locale, 'billing.order.status.failed')}
+          testId="kpi-failed"
+          tone={failedCharges > 0 ? 'pending' : undefined}
+          value={failedCharges}
+        />
       </div>
 
       {/* -- the children nobody can bill ------------------------------------- */}
@@ -298,7 +325,7 @@ export function CollectionsScreen({
         </section>
       ) : null}
 
-      {/* -- the debt table --------------------------------------------------- */}
+      {/* -- the debt list ----------------------------------------------------- */}
       <section aria-labelledby="open-debts">
         <div style={rowStyle}>
           <h2 id="open-debts">{t(locale, 'billing.openDebts.title')}</h2>
@@ -315,57 +342,102 @@ export function CollectionsScreen({
           </Button>
         </div>
 
+        {/* The prototype's filter pills, with the live count that makes them worth having.
+            Only when there is more than one bucket to choose between — a single pill is
+            not a choice, the same rule the students screen's class chips follow. */}
+        {households.length > 0 ? (
+          <div
+            aria-label={t(locale, 'billing.debt.filterAging')}
+            className="collections-pills"
+            data-testid="aging-pills"
+            role="group"
+          >
+            {BUCKETS.map((value) => (
+              <button
+                aria-pressed={bucket === value}
+                data-testid={`aging-pill-${value}`}
+                key={value}
+                onClick={() => setBucket(value)}
+                type="button"
+              >
+                {value === 'all'
+                  ? t(locale, 'billing.debt.filterAll')
+                  : t(locale, `billing.debt.aging.${value}`)}
+                <span className="collections-pills__count">{counts[value]}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+
         {households.length === 0 ? (
           // `3e` finding 7 — not drawn, and it is the goal state for a well-run club.
           <EmptyState title={t(locale, 'billing.debt.empty')} />
         ) : (
-          <Card>
-            {households.map((row) => (
-              <div key={row.payerPersonId} data-testid="household-block">
-              <div style={rowStyle} data-testid="household-row">
-                <Checkbox
-                  // Never empty (ship-audit D1): an empty label is an unnamed checkbox to
-                  // a screen reader. The students name the family when the payer read
-                  // came back short; the generic word is the floor, not the norm.
-                  label={
-                    row.payerName ||
-                    row.studentNames.join(', ') ||
-                    t(locale, 'billing.debt.household')
-                  }
-                  checked={selected.includes(row.payerPersonId)}
-                  onChange={(event) =>
-                    setSelected((previous) =>
-                      event.target.checked
-                        ? [...previous, row.payerPersonId]
-                        : previous.filter((id) => id !== row.payerPersonId),
-                    )
-                  }
-                />
-                {/* A flat summary of which children the debt covers. Never a row key, and
-                    the row does not expand — `3e` records that as a real gap, not a
-                    feature to invent here. */}
-                <span data-testid="household-students">{row.studentNames.join(', ')}</span>
-                <span data-testid="household-months">{row.monthsInDebt}</span>
-                <StatusChip
-                  status="debt"
-                  label={t(locale, `billing.debt.aging.${ageBucket(row.daysOverdue)}`)}
-                />
-                {/* `3e` finding 4 — four rungs, and the artboard shows one button. A
-                    manager who cannot see the rung cannot tell a first nudge from a final
-                    notice. */}
-                <span data-testid="household-rung">
-                  {t(locale, `billing.debt.escalation.${escalationRung(row.daysOverdue)}`)}
-                </span>
-                <MoneyDisplay agorot={row.balanceAgorot} tone="debt" label={row.payerName} />
-                {/* §7 — beside the debt, never merged into it. A family who has paid ahead
-                    is not a debtor for the part they paid, and a manager who sends them a
-                    reminder without seeing this makes a phone call nobody enjoys. */}
-                {row.creditAgorot > 0 ? (
-                  <span data-testid="household-credit">
-                    {t(locale, 'billing.prepay.credit')}{' '}
-                    <MoneyDisplay agorot={row.creditAgorot} tone="paid" label={row.payerName} />
+          <ul className="collections-list" data-testid="collections-list">
+            {shown.map((row) => (
+              <li className="debt-card" key={row.payerPersonId} data-testid="household-block">
+              <div className="debt-card__row" data-testid="household-row">
+                {/* Band one — who. */}
+                <div className="debt-card__who">
+                  <Checkbox
+                    // Never empty (ship-audit D1): an empty label is an unnamed checkbox to
+                    // a screen reader. The students name the family when the payer read
+                    // came back short; the generic word is the floor, not the norm.
+                    label={
+                      row.payerName ||
+                      row.studentNames.join(', ') ||
+                      t(locale, 'billing.debt.household')
+                    }
+                    checked={selected.includes(row.payerPersonId)}
+                    onChange={(event) =>
+                      setSelected((previous) =>
+                        event.target.checked
+                          ? [...previous, row.payerPersonId]
+                          : previous.filter((id) => id !== row.payerPersonId),
+                      )
+                    }
+                  />
+                  {/* A flat summary of which children the debt covers. Never a row key, and
+                      the row does not expand — `3e` records that as a real gap, not a
+                      feature to invent here. */}
+                  <span className="debt-card__students" data-testid="household-students">
+                    {row.studentNames.join(', ')}
                   </span>
-                ) : null}
+                </div>
+
+                {/* Band two — what state. The amount is the figure a manager scans for, so
+                    it is the largest thing on the card rather than the eighth item in a
+                    row of eleven. */}
+                <div className="debt-card__state">
+                  <span className="debt-card__amount">
+                    <MoneyDisplay agorot={row.balanceAgorot} tone="debt" label={row.payerName} />
+                  </span>
+                  <StatusChip
+                    status="debt"
+                    label={t(locale, `billing.debt.aging.${ageBucket(row.daysOverdue)}`)}
+                  />
+                  <span className="debt-card__months" data-testid="household-months">
+                    {fill(t(locale, 'billing.debt.monthsInDebtCount'), { count: row.monthsInDebt })}
+                  </span>
+                  {/* `3e` finding 4 — four rungs, and the artboard shows one button. A
+                      manager who cannot see the rung cannot tell a first nudge from a final
+                      notice. */}
+                  <span className="debt-card__rung" data-testid="household-rung">
+                    {t(locale, `billing.debt.escalation.${escalationRung(row.daysOverdue)}`)}
+                  </span>
+                  {/* §7 — beside the debt, never merged into it. A family who has paid ahead
+                      is not a debtor for the part they paid, and a manager who sends them a
+                      reminder without seeing this makes a phone call nobody enjoys. */}
+                  {row.creditAgorot > 0 ? (
+                    <span className="debt-card__credit" data-testid="household-credit">
+                      {t(locale, 'billing.prepay.credit')}{' '}
+                      <MoneyDisplay agorot={row.creditAgorot} tone="paid" label={row.payerName} />
+                    </span>
+                  ) : null}
+                </div>
+
+                {/* Band three — what you can do about it. */}
+                <div className="debt-card__actions">
                 <Button
                   variant="secondary"
                   data-testid="send-reminder"
@@ -374,7 +446,10 @@ export function CollectionsScreen({
                   {t(locale, 'billing.debt.sendReminder')}
                 </Button>
                 {reminded[row.payerPersonId] ? (
-                  <span data-testid={`reminder-outcome-${row.payerPersonId}`}>
+                  <span
+                    className="debt-card__outcome"
+                    data-testid={`reminder-outcome-${row.payerPersonId}`}
+                  >
                     {t(
                       locale,
                       reminded[row.payerPersonId] === 'sent'
@@ -387,6 +462,28 @@ export function CollectionsScreen({
                     )}
                   </span>
                 ) : null}
+                {/* The prototype's per-row WhatsApp nudge, and it earns its place: the
+                    button beside it goes through `POST /reminders/debt`, which is push, and
+                    push is exactly what a family that has not opened the app in a month does
+                    not receive. A `wa.me` link opens the conversation with the message
+                    composed and lets the manager press send — nothing is sent on their
+                    behalf, and no phone number leaves this screen. */}
+                <a
+                  className="studio-btn"
+                  data-testid={`whatsapp-${row.payerPersonId}`}
+                  data-variant="ghost"
+                  href={whatsappShareUrl(
+                    t(locale, 'billing.debt.whatsappTitle'),
+                    fill(t(locale, 'billing.debt.whatsappBody'), {
+                      name: row.payerName || row.studentNames.join(', '),
+                      amount: (row.balanceAgorot / 100).toFixed(2),
+                    }),
+                  )}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  {t(locale, 'billing.debt.whatsapp')}
+                </a>
                 <Button
                   variant="secondary"
                   data-testid="record-cash"
@@ -402,18 +499,21 @@ export function CollectionsScreen({
                 >
                   {t(locale, 'billing.debt.details')}
                 </Button>
+                </div>
               </div>
               {detailsFor === row.payerPersonId ? (
-                <ul style={detailListStyle} data-testid="household-charges">
+                <ul className="debt-card__charges" data-testid="household-charges">
                   {(detailCharges[row.payerPersonId] ?? []).map((charge) => (
-                    <li key={charge.id} style={detailRowStyle}>
+                    <li className="debt-card__charge" key={charge.id}>
                       {/* The label first: it is what the money is FOR, and it is where a
                           parent's own note arrives. The kind is the fallback for charges
                           the run wrote with no label of their own. */}
-                      <span style={{ flex: 1 }}>
+                      <span className="debt-card__charge-label">
                         {charge.proration_note || t(locale, `billing.charge.kind.${charge.kind}`)}
                       </span>
-                      <span>{charge.due_date}</span>
+                      <span className="debt-card__charge-date" dir="ltr">
+                        {charge.due_date}
+                      </span>
                       <MoneyDisplay agorot={charge.amount_agorot} tone="debt" />
                     </li>
                   ))}
@@ -422,14 +522,25 @@ export function CollectionsScreen({
                   ) : null}
                 </ul>
               ) : null}
-              </div>
+              </li>
             ))}
-            <div style={rowStyle}>
-              <span>{t(locale, 'billing.debt.total')}</span>
-              <MoneyDisplay agorot={total} tone="debt" />
-            </div>
-          </Card>
+          </ul>
         )}
+
+        {/* The total sits under the list rather than inside it: it is a fact about the
+            whole screen, and it is the FILTERED total when a pill is pressed, because a
+            sum that ignores the filter above it is a sum answering a question nobody
+            asked. */}
+        {households.length > 0 ? (
+          <p className="collections-total" data-testid="collections-total">
+            <span>
+              {bucket === 'all'
+                ? t(locale, 'billing.debt.total')
+                : t(locale, 'billing.debt.totalFiltered')}
+            </span>
+            <MoneyDisplay agorot={shownTotal} tone="debt" />
+          </p>
+        ) : null}
       </section>
 
       {payingFor ? (
@@ -446,29 +557,59 @@ export function CollectionsScreen({
 
 /** `3e`'s KPI tile. The same shape as `6a`, `4a`, `4c`, `1c` and `9g` — the spec asks for it
  *  to be extracted once across the dashboard, and this is a local one until it is. */
-function Stat({
+/**
+ * One tile of the money band, in the shape checkpoint 2 gave the manager home: a label, a
+ * figure, a tinted icon badge, and a foot rule with whatever qualifies the number.
+ *
+ * The same `.dash-kpi` classes, deliberately — the home's band and this one show the same
+ * club's money on two screens, and two tile designs for one fact is how a manager starts
+ * wondering whether they mean different things.
+ *
+ * `tone` is SEMANTIC and not an emphasis choice: `debt` and `paid` are the tokens that mean
+ * those things everywhere else, and there is no tone for "make this one stand out".
+ */
+function Kpi({
   label,
-  agorot,
+  value,
+  foot,
+  icon,
   tone,
-  percentNote,
+  testId,
+  footTestId,
 }: {
   label: string
-  agorot: number
-  tone: 'debt' | 'paid'
-  /** §3.3 -- a number and its own trailing words, never a pre-built string: the value
-   *  goes through `PercentDisplay`'s own isolation, and a plain string here is exactly
-   *  what let this fuse with the amount above it in the first place. */
-  percentNote?: { value: number; suffix: string }
+  value: ReactNode
+  /** §3.3 -- a number and its own trailing words, never a pre-built string: the value goes
+   *  through `PercentDisplay`'s own isolation, and a plain string here is exactly what let
+   *  this fuse with the amount above it in the first place. */
+  foot?: ReactNode
+  icon: IconName
+  tone?: 'debt' | 'paid' | 'pending'
+  testId: string
+  /** The foot's own id, kept separate because the collected-share note is asserted by
+   *  name — §3.3's isolation test names it, and renaming it would lose that link. */
+  footTestId?: string
 }) {
   return (
-    <Card caption={label}>
-      <MoneyDisplay agorot={agorot} tone={tone} label={label} />
-      {percentNote ? (
-        <span data-testid="kpi-collected-share">
-          {' '}
-          <PercentDisplay value={percentNote.value} /> {percentNote.suffix}
+    <div className="dash-kpi" data-testid={testId} data-tone={tone}>
+      <div className="dash-kpi__head">
+        <span className="dash-kpi__text">
+          <span className="dash-kpi__label">{label}</span>
+          <span className="dash-kpi__figures">
+            <span className="dash-kpi__value">{value}</span>
+          </span>
         </span>
+        <span aria-hidden="true" className="dash-kpi__badge">
+          <Icon name={icon} size={18} />
+        </span>
+      </div>
+      {foot ? (
+        <div className="dash-kpi__foot">
+          <span className="dash-kpi__note" data-testid={footTestId ?? `${testId}-foot`}>
+            {foot}
+          </span>
+        </div>
       ) : null}
-    </Card>
+    </div>
   )
 }

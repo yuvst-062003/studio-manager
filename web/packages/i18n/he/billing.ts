@@ -277,6 +277,12 @@ export const billing: Bundle = {
   'debt.empty': 'אין חובות פתוחים במועדון',
   'debt.total': 'סה״כ חוב פתוח',
   'debt.aging.title': 'גיל החוב',
+  // Checkpoint 9 — the prototype's filter pills, and the WhatsApp nudge beside the push one.
+  'debt.filterAging': 'סינון לפי ותק החוב',
+  'debt.filterAll': 'הכול',
+  'debt.whatsapp': 'וואטסאפ',
+  'debt.whatsappTitle': 'תזכורת תשלום — מועדון הג׳ודו',
+  'debt.whatsappBody': 'שלום {{name}}, נשמח להסדיר יתרה של {{amount}} ₪. תודה!',
   'debt.aging.0_30': '0–30 ימים',
   'debt.aging.31_60': '31–60 ימים',
   'debt.aging.60_plus': 'מעל 60 ימים',
@@ -441,6 +447,10 @@ export const billing: Bundle = {
   'filter.all': 'הכל',
   'debt.balance': 'יתרה',
   'debt.monthsInDebt': 'חודשים בחוב',
+  // The same fact as a sentence rather than a column header — the debt card labels its own
+  // figures, where the table it replaced labelled a column once at the top.
+  'debt.monthsInDebtCount': '{{count}} חודשים בחוב',
+  'debt.totalFiltered': 'סה״כ בסינון',
   'debt.sortBy': 'מיון',
   'debt.collectedThisMonth': 'נגבה החודש',
   // §3.3 -- no `{{percent}}` here any more. The KPI card composes the number through

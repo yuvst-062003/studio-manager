@@ -210,6 +210,12 @@ export const billing: Bundle = {
   'debt.empty': 'Nothing outstanding across the club',
   'debt.total': 'Total outstanding',
   'debt.aging.title': 'Debt age',
+  // Checkpoint 9 — the prototype's filter pills, and the WhatsApp nudge beside the push one.
+  'debt.filterAging': 'Filter by how overdue',
+  'debt.filterAll': 'All',
+  'debt.whatsapp': 'WhatsApp',
+  'debt.whatsappTitle': 'Payment reminder — the judo club',
+  'debt.whatsappBody': 'Hello {{name}}, we would be glad to settle a balance of ₪{{amount}}. Thank you!',
   'debt.aging.0_30': '0–30 days',
   'debt.aging.31_60': '31–60 days',
   'debt.aging.60_plus': 'Over 60 days',
@@ -347,6 +353,10 @@ export const billing: Bundle = {
   'filter.all': 'All',
   'debt.balance': 'Balance',
   'debt.monthsInDebt': 'Months in debt',
+  // The same fact as a sentence rather than a column header — the debt card labels its own
+  // figures, where the table it replaced labelled a column once at the top.
+  'debt.monthsInDebtCount': '{{count}} months in debt',
+  'debt.totalFiltered': 'Total in this filter',
   'debt.sortBy': 'Sort by',
   'debt.collectedThisMonth': 'Collected this month',
   'debt.collectedShare': 'of expected',

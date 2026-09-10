@@ -1449,7 +1449,8 @@ waves:
         on: 2026-09-10
       - id: W10.9
         title: Billing collections, promises, plan changes
-        status: planned
+        status: shipped
+        on: 2026-09-10
       - id: W10.10
         title: Prices and reconciliation
         status: planned
