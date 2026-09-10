@@ -84,6 +84,10 @@ export type CollectionsScreenProps = {
   activeSubscriptions: number
   failedCharges: number
   period: { year: number; month: number }
+  /** The queues a person has to close — pending cash promises and plan changes. Passed in
+   *  rather than mounted here because `BillingSection` owns their client and their refresh;
+   *  this screen only owns WHERE on the page they belong, which is under its own title. */
+  queues?: ReactNode
 }
 
 export function CollectionsScreen({
@@ -96,6 +100,7 @@ export function CollectionsScreen({
   activeSubscriptions,
   failedCharges,
   period,
+  queues = null,
 }: CollectionsScreenProps) {
   const [selected, setSelected] = useState<string[]>([])
   const [bucket, setBucket] = useState<Bucket>('all')
@@ -293,6 +298,18 @@ export function CollectionsScreen({
           value={failedCharges}
         />
       </div>
+
+      {/* The two queues that need a person to close them. They used to render ABOVE this
+          whole screen, in `BillingSection` — which put them above the page's own H1, so
+          תשלומים וגבייה appeared halfway down the page with two panels stacked on top of
+          it and nothing saying what the page was. The owner reported exactly that on
+          2026-09-10.
+
+          Their original reasoning is kept, not reversed: a pending cash request IS
+          tonight's collections news, and the debt board below still shows those families
+          in debt until the notes change hands. So they stay ABOVE the board and BELOW the
+          title and the four KPIs, which is the position that satisfies both. */}
+      {queues}
 
       {/* -- the children nobody can bill ------------------------------------- */}
       {/* §5.10's run has appended these to `tally.unpriced` since M6, the tally lands in
