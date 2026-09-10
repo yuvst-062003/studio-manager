@@ -117,9 +117,8 @@
 }
 
 .setup-body > main {
-  grid-column: 2;
-  grid-row: 1;
   min-inline-size: 0;
+  order: 2;
 }
 
 .setup-header {
@@ -171,56 +170,42 @@
   transition: inline-size var(--motion-base) var(--ease-standard);
 }
 
+/* Checkpoint 17 — one column, not two.
+ *
+ * The rail used to be a 15rem side track, which is the right shape for a vertical list of
+ * six links and the wrong one for a horizontal stepper: seven numbered nodes in 15rem
+ * overlap into an unreadable smear. The stepper runs ACROSS, so the layout does too.
+ *
+ * The step body stays FIRST in the DOM and is now first on screen as well, which removes
+ * the reason the old grid placed its tracks explicitly: a keyboard or screen-reader user
+ * reaches the thing they came to fill in before the rail either way. */
 .setup-body {
-  display: grid;
-
-  /* Two tracks, PLACED rather than filled in DOM order. Track 1 is the inline-start edge
-   * — the right in Hebrew, the left in English — which is where `DashNav` sits and where
-   * both the artboards and the Stitch pass put the rail.
-   *
-   * The placement is explicit because the step body stays FIRST in the DOM: a keyboard or
-   * screen-reader user should reach the thing they came to fill in before a list of six
-   * links, and letting the grid fill by source order would force the opposite. */
-  grid-template-columns: 15rem 1fr;
-  gap: var(--space-6);
-  padding: var(--space-6);
-  align-items: start;
-}
-
-/* §6.4 — a manager on a phone is a normal case, and a 15rem rail is not. Below that the
- * rail goes above the step: still present, still naming where they are, no longer a
- * column. */
-@media (width <= 860px) {
-  .setup-body {
-    grid-template-columns: 1fr;
-  }
-
-  .setup-rail,
-  .setup-body > main {
-    grid-column: 1;
-  }
-
-  .setup-rail {
-    grid-row: 1;
-  }
-
-  .setup-body > main {
-    grid-row: 2;
-  }
-}
-
-.setup-rail {
-  grid-column: 1;
-  grid-row: 1;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-5);
+  padding: var(--space-6);
+}
+
+/* §6.4 — a manager on a phone is a normal case. The rail is above the step on every width
+ * now, so all this leaves is the padding. */
+@media (width <= 860px) {
+  .setup-body {
+    padding: var(--space-4);
+  }
+}
+
+/* A strip above the body, not a column beside it — see `.setup-body`. Sticky is gone with
+ * the side track: a horizontal rail that follows the scroll would sit on top of the step a
+ * manager is filling in. */
+.setup-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  order: 1;
   padding: var(--space-4);
   background: var(--surface);
   border: var(--border-width-hairline) solid var(--border);
-  border-radius: var(--radius-lg);
-  position: sticky;
-  inset-block-start: var(--space-4);
+  border-radius: var(--radius-xl);
 }
 
 .setup-rail__title {

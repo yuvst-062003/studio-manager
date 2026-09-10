@@ -3,6 +3,18 @@
  * The rail scrolls inline rather than wrapping: seven nodes on a 390px phone would stack
  * into a column that pushes the step body off the screen, and a manager reading "step 3 of
  * 7" wants the rail to be a strip, not a table of contents. */
+
+/* The container the narrow rules below query. A MEDIA query would read the viewport, and
+ * the viewport is the wrong number: the staff app mounts the setup wizard inside a ~440px
+ * phone shell on a 1440px screen, so the rail is narrow while the window is not. Only the
+ * rail's own width answers "do seven labels fit here". */
+.studio-stepper-shell {
+  container-name: studio-stepper;
+  container-type: inline-size;
+  inline-size: 100%;
+  min-inline-size: 0;
+}
+
 .studio-stepper {
   list-style: none;
   margin: 0;
@@ -133,10 +145,41 @@
   color: var(--emphasis);
 }
 
-/* Below the rail's own breakpoint the subtitles are noise — the titles alone still say
- * where the manager is, and seven two-line labels on a phone are a wall. */
-@media (width <= 48rem) {
+/* ── narrow ──────────────────────────────────────────────────────────────────────────
+ * A manager on a phone is a normal case (§6.4), and the staff app mounts the setup wizard
+ * in a shell about 440px wide. Seven labelled nodes do not fit there at any font size, and
+ * squeezing them is what makes a rail unreadable rather than merely small.
+ *
+ * So below the breakpoint the rail becomes what a narrow rail can be: the numbered marks,
+ * scrolling, with the CURRENT step named and the rest reachable by their number. Nothing
+ * is hidden from a screen reader — the title and the state stay in the DOM for every node,
+ * and only their VISIBILITY changes. */
+@container studio-stepper (width < 52rem) {
   .studio-stepper__subtitle {
     display: none;
+  }
+}
+
+@container studio-stepper (width < 34rem) {
+  /* No growing, no shrinking: the strip scrolls instead of compressing. */
+  .studio-stepper__node {
+    flex: none;
+  }
+
+  .studio-stepper__rule {
+    min-inline-size: var(--space-3);
+  }
+
+  /* Named where the manager IS; numbered everywhere else. Nothing is hidden from a screen
+   * reader — the title and the state stay in the DOM for every node, and only their
+   * VISIBILITY changes. */
+  .studio-stepper__button:not([data-state='current']) .studio-stepper__text,
+  .studio-stepper__button:not([data-state='current']) .studio-stepper__state {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }

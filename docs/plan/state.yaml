@@ -1477,10 +1477,12 @@ waves:
         on: 2026-09-10
       - id: W10.16
         title: Platform
-        status: planned
+        status: shipped
+        on: 2026-09-10
       - id: W10.17
         title: The setup wizard, and the stepper built once for all three wizards
-        status: planned
+        status: shipped
+        on: 2026-09-10
       - id: W10.18
         title: The class wizard — seven steps, the one screen this port builds
         status: shipped

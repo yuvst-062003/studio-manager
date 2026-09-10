@@ -136,10 +136,14 @@ describe('SetupWizard container', () => {
     // that says where the step is edited and still offers skip.
     registerM1Stubs()
     render(<SetupWizard client={fakeClient()} locale="he" />)
+    // Checkpoint 17 — the rail is the shared `Stepper` now, which never disables a node
+    // at all: this decision was learned HERE and the shared component inherits it. What
+    // `data-registered` used to mark, the step BODY says — it names where the step is
+    // edited and links there — so the marker is gone and the property is unchanged.
     const belts = await screen.findByTestId('setup-rail-belts')
     expect(belts).toBeEnabled()
-    expect(belts).toHaveAttribute('data-registered', 'false')
-    expect(screen.getByTestId('setup-rail-studio')).not.toHaveAttribute('data-registered')
+    await userEvent.click(belts)
+    expect(await screen.findByTestId('setup-step-unbuilt')).toBeInTheDocument()
   })
 
   it('states every step status in words, never by colour alone', async () => {
@@ -885,7 +889,11 @@ describe('SetupWizard chrome — artboards 5c–5f (2026-08-29)', () => {
     const first = await screen.findByTestId('setup-rail-studio')
     expect(first).toHaveAttribute('data-state', 'current')
     expect(screen.getByTestId('setup-rail-groups')).toHaveAttribute('data-state', 'upcoming')
-    expect(screen.getByTestId('setup-rail-studio-status')).toHaveClass('studio-visually-hidden')
+    // Checkpoint 17 — the status word is VISIBLE now, not off-screen. Setup is answered
+    // over days, and hiding it is the exact failure an owner reported as "finished them
+    // all, still says 6/7, and it doesn't show what's missing". Still never a circle
+    // alone: the word is there either way, which is what SC 1.4.1 asks.
+    expect(screen.getByTestId('setup-rail-studio-status')).toHaveClass('studio-stepper__state')
   })
 
   it('keeps the reassurance visible on every step, not only the first', async () => {

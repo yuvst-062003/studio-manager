@@ -70,48 +70,54 @@ export function Stepper({
   idPrefix?: string
 }) {
   return (
-    // An ordered list, so a screen reader announces "3 of 7" without the rail saying it.
-    <ol aria-label={label} className="studio-stepper" data-testid="stepper">
-      {nodes.map((node, index) => (
-        <li className="studio-stepper__node" key={node.id}>
-          <button
-            aria-current={node.state === 'current' ? 'step' : undefined}
-            className="studio-stepper__button"
-            data-state={node.state}
-            data-testid={`${idPrefix}-${node.id}`}
-            // NOT disabled when unreachable (the lesson `SetupWizard`'s rail learned): a
-            // dead button reads as "this step doesn't work". It is pressable and simply
-            // does not move — the title says why.
-            onClick={() => node.reachable && onPick(node.id)}
-            title={node.reachable ? undefined : t(locale, 'common.stepper.locked')}
-            type="button"
-          >
-            <span aria-hidden="true" className="studio-stepper__mark">
-              {mark(node, index)}
-            </span>
-            <span className="studio-stepper__text">
-              <span className="studio-stepper__title">{node.title}</span>
-              {node.subtitle ? (
-                <span className="studio-stepper__subtitle">{node.subtitle}</span>
-              ) : null}
-            </span>
-            {/* The state in words. Visually hidden by default, because the mark and the
+    // The shell is the CONTAINER the narrow rules query. A media query would read the
+    // viewport, and the viewport is the wrong number: the staff app mounts this wizard
+    // inside a ~440px phone shell on a 1440px screen, so the rail is narrow while the
+    // window is not. Only the rail's own width answers "do seven labels fit here".
+    <div className="studio-stepper-shell">
+      {/* An ordered list, so a screen reader announces "3 of 7" without the rail saying it. */}
+      <ol aria-label={label} className="studio-stepper" data-testid="stepper">
+        {nodes.map((node, index) => (
+          <li className="studio-stepper__node" key={node.id}>
+            <button
+              aria-current={node.state === 'current' ? 'step' : undefined}
+              className="studio-stepper__button"
+              data-state={node.state}
+              data-testid={`${idPrefix}-${node.id}`}
+              // NOT disabled when unreachable (the lesson `SetupWizard`'s rail learned): a
+              // dead button reads as "this step doesn't work". It is pressable and simply
+              // does not move — the title says why.
+              onClick={() => node.reachable && onPick(node.id)}
+              title={node.reachable ? undefined : t(locale, 'common.stepper.locked')}
+              type="button"
+            >
+              <span aria-hidden="true" className="studio-stepper__mark">
+                {mark(node, index)}
+              </span>
+              <span className="studio-stepper__text">
+                <span className="studio-stepper__title">{node.title}</span>
+                {node.subtitle ? (
+                  <span className="studio-stepper__subtitle">{node.subtitle}</span>
+                ) : null}
+              </span>
+              {/* The state in words. Visually hidden by default, because the mark and the
                 tint already carry it on screen — but never ONLY the tint. `stateVisible`
                 puts it on the face for a flow answered over days rather than in one
                 sitting. */}
-            <span
-              className={stateVisible ? 'studio-stepper__state' : 'studio-visually-hidden'}
-              data-testid={`${idPrefix}-${node.id}-status`}
-            >
-              {node.stateLabel ?? t(locale, `common.stepper.state.${node.state}`)}
-            </span>
-          </button>
-          {/* The rule between nodes. Decorative, and the last node has none. */}
-          {index < nodes.length - 1 ? (
-            <span aria-hidden="true" className="studio-stepper__rule" data-state={node.state} />
-          ) : null}
-        </li>
-      ))}
-    </ol>
+              <span
+                className={stateVisible ? 'studio-stepper__state' : 'studio-visually-hidden'}
+                data-testid={`${idPrefix}-${node.id}-status`}
+              >
+                {node.stateLabel ?? t(locale, `common.stepper.state.${node.state}`)}
+              </span>
+            </button>
+            {/* The rule between nodes. Decorative, and the last node has none. */}
+            {index < nodes.length - 1 ? (
+              <span aria-hidden="true" className="studio-stepper__rule" data-state={node.state} />
+            ) : null}
+          </li>
+        ))}
+      </ol>
+    </div>
   )
 }
