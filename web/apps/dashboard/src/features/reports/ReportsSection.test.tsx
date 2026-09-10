@@ -723,3 +723,45 @@ describe('the reports screen', () => {
     expect(screen.getByLabelText('Year')).toBeInTheDocument()
   })
 })
+
+// Checkpoint 13 — §3.13's chart tooltip, which `4g` had forbidden.
+describe('the revenue chart’s tooltip', () => {
+  const MONTHS = [
+    { year: 2026, month: 9, billed_agorot: 100_000, collected_agorot: 80_000, outstanding_agorot: 20_000 },
+    { year: 2026, month: 10, billed_agorot: 120_000, collected_agorot: 120_000, outstanding_agorot: 0 },
+  ]
+
+  it('names the month and both amounts, per column', () => {
+    render(<RevenueChart locale="he" months={MONTHS} />)
+    const tip = screen.getByTestId('revenue-tip-2026-9')
+    expect(tip).toHaveTextContent(t('he', 'reports.financial.collected'))
+    expect(tip).toHaveTextContent(t('he', 'reports.financial.outstanding'))
+  })
+
+  it('is aria-hidden, because the accessible copy is already beside it', () => {
+    // The three numbers were ALREADY in the DOM for a screen reader; announcing both would
+    // read every column twice. What the tooltip fixes is that a sighted manager was the
+    // only person who could not read them.
+    render(<RevenueChart locale="he" months={MONTHS} />)
+    expect(screen.getByTestId('revenue-tip-2026-9')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('reaches the keyboard, not only the pointer', () => {
+    // `:focus-within` opens it too, which is why the column is focusable. A tooltip only a
+    // mouse can open is a tooltip half the people using this screen never see.
+    render(<RevenueChart locale="he" months={MONTHS} />)
+    const column = screen.getByTestId('revenue-column-2026-9').closest('li')
+    expect(column).toHaveAttribute('tabindex', '0')
+  })
+
+  it('keeps the visually-hidden line — the tooltip did not replace it', () => {
+    render(<RevenueChart locale="he" months={MONTHS} />)
+    const chart = screen.getByTestId('revenue-chart')
+    expect(chart.querySelectorAll('.studio-visually-hidden')).toHaveLength(MONTHS.length)
+  })
+
+  it('is not a button — there is nothing to press', () => {
+    render(<RevenueChart locale="he" months={MONTHS} />)
+    expect(screen.getByTestId('revenue-chart').querySelector('button')).toBeNull()
+  })
+})

@@ -198,6 +198,9 @@
   gap: var(--space-2);
   min-inline-size: 0;
 
+  /* The tooltip below is positioned against the column. */
+  position: relative;
+
   /* B5.4 — the column is its own container, so `.dash-chart__month`'s query below reads
    * that ONE column's width rather than the whole chart's — the only number that
    * actually answers "does the full month name fit here". */
@@ -360,4 +363,74 @@
   max-block-size: 7rem;
   margin-block-start: var(--space-1);
   align-self: center;
+}
+
+/* ── §3.13's tooltip ────────────────────────────────────────────────────────────────
+ * `4g` said no tooltip; checkpoint 13 overturns that on the merits. The three numbers were
+ * ALREADY in the DOM for a screen reader — the visually-hidden line at the foot of every
+ * column — so a sighted manager was the only person who could not read them. This does not
+ * add information to the chart; it stops withholding it from one group.
+ *
+ * CSS only: no library, no JavaScript, no positioning engine. It opens on hover AND on
+ * keyboard focus, so the pointer and the keyboard get the same thing. */
+.dash-chart__column:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.dash-chart__tip {
+  position: absolute;
+  inset-block-end: calc(100% + var(--space-2));
+  inset-inline-start: 50%;
+  translate: 50% 0;
+  z-index: 3;
+  display: none;
+  flex-direction: column;
+  gap: var(--space-1);
+  inline-size: max-content;
+  max-inline-size: 12rem;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--fg);
+  color: var(--on-fg);
+  font-size: var(--text-caption);
+
+  /* A tooltip that intercepts the pointer flickers as the pointer crosses it. */
+  pointer-events: none;
+}
+
+.dash-chart__column:hover .dash-chart__tip,
+.dash-chart__column:focus-within .dash-chart__tip {
+  display: flex;
+}
+
+.dash-chart__tip-month {
+  font-weight: var(--weight-semibold);
+}
+
+.dash-chart__tip-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/* The same two colours as the segments they name, so a row of the tooltip and the band it
+ * describes are recognisably the same thing. `--on-fg` is the ground here, so these are the
+ * light-on-dark pair rather than the chart's own. */
+.dash-chart__tip-row[data-part='collected'] {
+  color: var(--paid);
+}
+
+.dash-chart__tip-row[data-part='outstanding'] {
+  color: var(--debt);
+}
+
+/* A pointer with no hover — a touchscreen — gets no tooltip and would otherwise get a
+ * sticky one that only a tap elsewhere clears. The accessible line is still there. */
+@media (hover: none) {
+  .dash-chart__column:hover .dash-chart__tip {
+    display: none;
+  }
 }

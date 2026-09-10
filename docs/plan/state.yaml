@@ -1465,7 +1465,8 @@ waves:
         on: 2026-09-10
       - id: W10.13
         title: Reports — chart styling and the KPI strip
-        status: planned
+        status: shipped
+        on: 2026-09-10
       - id: W10.14
         title: Belts, exams, events
         status: planned
