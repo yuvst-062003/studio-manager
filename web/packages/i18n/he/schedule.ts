@@ -190,6 +190,8 @@ export const schedule: Bundle = {
 
   // -- the impact preview (§5.6, E2E-5) -----------------------------------------
   'impact.title': 'מה ישתנה',
+  'impact.changesTitle': 'השינויים',
+  'impact.protectedTitle': 'מה לא ישתנה',
   'impact.subtitle': 'השינוי יחול על שיעורים עתידיים בלבד',
   'impact.toCreate': 'שיעורים חדשים',
   'impact.toUpdate': 'שיעורים שיעודכנו',
@@ -221,6 +223,8 @@ export const schedule: Bundle = {
 
   // -- closures (§5.6) ----------------------------------------------------------
   'closure.title': 'ימי סגירה',
+  'closure.subtitle': 'ימים שבהם המועדון סגור — חגים שסימנתם וטווחים שהוספתם ידנית',
+  'closure.saveFailed': 'לא הצלחנו לשמור את יום הסגירה. נסו שוב.',
   'closure.add': 'הוספת סגירה',
   'closure.dateFrom': 'מתאריך',
   'closure.dateTo': 'עד תאריך',
@@ -356,6 +360,9 @@ export const schedule: Bundle = {
 
   // -- the group page (6a) ---------------------------------------------------------
   'group.scheduleTitle': 'לו״ז הקבוצה',
+  'group.subtitle': 'סוג הקבוצה, המאמנים, הלו״ז השבועי והשיעורים שנוצרו ממנו',
+  'group.previewFailed': 'לא הצלחנו לחשב את השפעת השינוי. נסו שוב.',
+  'group.applyFailed': 'לא הצלחנו להחיל את השינוי. בדקו את הלו״ז ונסו שוב.',
   'group.sessions': 'שיעורים',
   'group.changeFrom': 'השינוי בתוקף מתאריך',
   'group.reviewChange': 'בדיקת השינוי',

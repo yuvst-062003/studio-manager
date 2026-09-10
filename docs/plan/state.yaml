@@ -1441,7 +1441,8 @@ waves:
         on: 2026-09-10
       - id: W10.7
         title: One group, and closures
-        status: planned
+        status: shipped
+        on: 2026-09-10
       - id: W10.8
         title: Attendance — three buttons per student
         status: shipped

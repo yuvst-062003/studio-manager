@@ -670,3 +670,258 @@ a.group-card__name:focus-visible {
 .week-block[data-when='past'] {
   opacity: 0.75;
 }
+
+/* ═══ One group, and closures ═════════════════════════════════════════════════════
+ * Checkpoint 7. Both screens were laid out entirely in inline `CSSProperties` objects,
+ * which is why neither could pick up the studio-os surface treatment — an inline style
+ * has no token to re-value. The rules below are the same shapes, moved where the palette
+ * can reach them.
+ *
+ * §3.3 asks for "card styling and section headers only" here: the group page keeps its
+ * structure, because `ImpactDialog` is the safety mechanism and the prototype has no
+ * per-group page at all to teach it anything. */
+.group-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  inline-size: 100%;
+}
+
+.group-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+}
+
+.group-panel__title {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+}
+
+.group-panel__note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.group-panel__error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-caption);
+}
+
+.group-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+}
+
+.group-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-label);
+  color: var(--text-secondary);
+}
+
+.rule-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+  padding-block: var(--space-3);
+  border-block-end: var(--border-width-hairline) solid var(--border);
+}
+
+/* A season is ~100 rows per group; unscrolled they made this page a kilometre long and
+ * buried the schedule editor above them (2026-08-30). */
+.group-sessions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-block-size: 24rem;
+  overflow-y: auto;
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.session-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding-block: var(--space-2);
+  padding-inline: var(--space-3);
+  border-block-end: var(--border-width-hairline) solid var(--border);
+  font-size: var(--text-caption);
+}
+
+.session-row:last-child {
+  border-block-end: none;
+}
+
+.session-row__time {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.session-row__note {
+  color: var(--text-muted);
+}
+
+/* ── the impact dialog ──────────────────────────────────────────────────────────── */
+.impact-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-inline-size: 34rem;
+  inline-size: 100%;
+}
+
+.impact-dialog__group {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+}
+
+/* §3.3's one named gain: three counts read faster as three tiles than as three text
+ * rows. `auto-fit` here rather than `auto-fill` — there are always exactly three, and
+ * they should fill the dialog's width. */
+.impact-dialog__counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: var(--space-2);
+}
+
+/* The protected three, held back from the changing three. Not a colour that claims a
+ * meaning — see the component's note on `StatTone`. */
+.impact-tile--muted {
+  background: var(--ground);
+}
+
+.impact-tile--muted .studio-stat-tile__value {
+  color: var(--text-secondary);
+}
+
+.impact-dialog__list {
+  margin: 0;
+  padding-inline-start: var(--space-5);
+  color: var(--text-secondary);
+}
+
+.impact-dialog__hint {
+  display: block;
+  margin-block-start: var(--space-1);
+}
+
+.impact-dialog__actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+}
+
+/* ── closures ───────────────────────────────────────────────────────────────────── */
+.closures {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  inline-size: 100%;
+  align-items: start;
+}
+
+.closures__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  inline-size: 100%;
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+}
+
+.closure-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-block-end: var(--border-width-hairline) solid var(--border);
+}
+
+.closure-row:last-child {
+  border-block-end: none;
+}
+
+.closure-row__when {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  min-inline-size: 11rem;
+}
+
+.closure-row__reason {
+  flex: 1;
+  font-weight: var(--weight-medium);
+}
+
+.closures__error {
+  margin: 0;
+  color: var(--danger);
+}
+
+.closures__outcome {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.closures__presets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  inline-size: 100%;
+  align-items: start;
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+}
+
+/* Sixteen Israeli holidays in one column is a scroll; in a grid it is a glance. */
+.closures__preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: var(--space-2);
+  inline-size: 100%;
+}
+
+.closures__form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+  inline-size: 100%;
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+}
+
+.closures__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-label);
+  color: var(--text-secondary);
+}
+
+.closures__field--wide {
+  flex: 1;
+  min-inline-size: 12rem;
+}

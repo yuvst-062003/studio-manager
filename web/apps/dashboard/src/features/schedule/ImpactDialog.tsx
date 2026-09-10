@@ -9,50 +9,25 @@
 // about sessions and still empty the pattern of every student who only came on the day it
 // moved — they drop off the roster and stop being counted absent, which looks exactly like
 // the feature working.
-import type { CSSProperties } from 'react'
-import { Alert, Button, Card, useModalDialog } from '@studio/ui'
+import { Alert, Button, StatTile, useModalDialog } from '@studio/ui'
 import { formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { fill } from './client'
 import type { ImpactPreview } from './client'
 
-const dialogStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--space-4)',
-  maxInlineSize: '34rem',
-  inlineSize: '100%',
-}
-
-const rowStyle: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  gap: 'var(--space-3)',
-  paddingBlock: 'var(--space-2)',
-  borderBlockEnd: 'var(--border-width-hairline) solid var(--border)',
-}
-
-const protectedRowStyle: CSSProperties = { ...rowStyle, color: 'var(--text-secondary)' }
-
-const actionsStyle: CSSProperties = {
-  display: 'flex',
-  gap: 'var(--space-3)',
-  justifyContent: 'flex-end',
-}
-
-const hintStyle: CSSProperties = {
-  display: 'block',
-  marginBlockStart: 'var(--space-1)',
-}
-
-const listStyle: CSSProperties = {
-  margin: 0,
-  paddingInlineStart: 'var(--space-5)',
-  color: 'var(--text-secondary)',
-}
-
-function Row({
+/**
+ * One of the dialog's six numbers, as a tile rather than a label-and-value row —
+ * §3.3's one named gain from the prototype ("the stat-block treatment would make the
+ * three change counts and three protected counts read faster than the current text rows").
+ *
+ * Every tile is `neutral`. `StatTone` is a SEMANTIC choice — `debt`, `paid`, `pending`
+ * mean those things everywhere else in the app — and "sessions to create" is not a
+ * payment. Tinting it green for emphasis is exactly what D3 forbids. What separates the
+ * three changes from the three protections is the heading over each group and the muted
+ * class on the second, not a colour that would claim a meaning it does not have.
+ */
+function Count({
   testId,
   label,
   value,
@@ -64,9 +39,8 @@ function Row({
   muted?: boolean
 }) {
   return (
-    <div data-testid={testId} style={muted ? protectedRowStyle : rowStyle}>
-      <span>{label}</span>
-      <span>{value}</span>
+    <div data-testid={testId}>
+      <StatTile className={muted ? 'impact-tile impact-tile--muted' : 'impact-tile'} label={label} value={value} />
     </div>
   )
 }
@@ -99,9 +73,9 @@ export function ImpactDialog({
       role="dialog"
       aria-modal="true"
       aria-labelledby="impact-title"
+      className="impact-dialog"
       data-testid="impact-preview"
       ref={dialogRef}
-      style={dialogStyle}
       tabIndex={-1}
     >
       <h2 id="impact-title">{t(locale, 'schedule.impact.title')}</h2>
@@ -110,53 +84,68 @@ export function ImpactDialog({
       {changes === 0 ? (
         <p>{t(locale, 'schedule.impact.nothingChanges')}</p>
       ) : (
-        <Card>
-          <Row
-            testId="impact-create"
-            label={t(locale, 'schedule.impact.toCreate')}
-            value={preview.sessions_to_create}
-          />
-          <Row
-            testId="impact-update"
-            label={t(locale, 'schedule.impact.toUpdate')}
-            value={preview.sessions_to_update}
-          />
-          <Row
-            testId="impact-cancel-count"
-            label={t(locale, 'schedule.impact.toCancel')}
-            value={preview.sessions_to_cancel}
-          />
-        </Card>
+        <section aria-labelledby="impact-changes-title">
+          {/* Named, where the three numbers used to sit under nothing. A manager reading
+              six figures needs to know which three are the change and which three are the
+              promise. */}
+          <h3 className="impact-dialog__group" id="impact-changes-title">
+            {t(locale, 'schedule.impact.changesTitle')}
+          </h3>
+          <div className="impact-dialog__counts">
+            <Count
+              testId="impact-create"
+              label={t(locale, 'schedule.impact.toCreate')}
+              value={preview.sessions_to_create}
+            />
+            <Count
+              testId="impact-update"
+              label={t(locale, 'schedule.impact.toUpdate')}
+              value={preview.sessions_to_update}
+            />
+            <Count
+              testId="impact-cancel-count"
+              label={t(locale, 'schedule.impact.toCancel')}
+              value={preview.sessions_to_cancel}
+            />
+          </div>
+        </section>
       )}
 
       {/* §5.6's three protections, named. This is the half of the dialog a manager
           actually reads before pressing the button — and it is rendered even when nothing
           changes, because "what is at risk" is the question that was asked. */}
-      <Card>
-        <Row
-          testId="protected-past"
-          label={t(locale, 'schedule.impact.protectedPast')}
-          value={preview.sessions_protected_past}
-          muted
-        />
-        <Row
-          testId="protected-manual"
-          label={t(locale, 'schedule.impact.protectedManual')}
-          value={preview.sessions_protected_manually_edited}
-          muted
-        />
-        <Row
-          testId="protected-adhoc"
-          label={t(locale, 'schedule.impact.protectedAdHoc')}
-          value={preview.sessions_protected_ad_hoc}
-          muted
-        />
-      </Card>
+      <section aria-labelledby="impact-protected-title">
+        <h3 className="impact-dialog__group" id="impact-protected-title">
+          {t(locale, 'schedule.impact.protectedTitle')}
+        </h3>
+        <div className="impact-dialog__counts">
+          <Count
+            testId="protected-past"
+            label={t(locale, 'schedule.impact.protectedPast')}
+            value={preview.sessions_protected_past}
+            muted
+          />
+          <Count
+            testId="protected-manual"
+            label={t(locale, 'schedule.impact.protectedManual')}
+            value={preview.sessions_protected_manually_edited}
+            muted
+          />
+          <Count
+            testId="protected-adhoc"
+            label={t(locale, 'schedule.impact.protectedAdHoc')}
+            value={preview.sessions_protected_ad_hoc}
+            muted
+          />
+        </div>
+      </section>
 
       {preview.protected_manually_edited_sessions.length > 0 ? (
         <section aria-labelledby="protected-manual-title">
-          <h3 id="protected-manual-title">{t(locale, 'schedule.impact.protectedManualList')}</h3>
-          <ul style={listStyle}>
+          <h3 className="impact-dialog__group" id="protected-manual-title">
+            {t(locale, 'schedule.impact.protectedManualList')}
+          </h3>
+          <ul className="impact-dialog__list">
             {preview.protected_manually_edited_sessions.map((session) => (
               <li key={session.id} data-testid="protected-manual-session">
                 {formatDateInStudioZone(session.starts_at, locale)}
@@ -197,12 +186,14 @@ export function ImpactDialog({
                 a nested paragraph is invalid HTML — the browser closes the outer one early
                 and the banner loses its tint below the fold. `packages/ui` is not this
                 lane's file, so the composition bends here rather than the primitive. */}
-            <span style={hintStyle}>{t(locale, 'schedule.impact.studentsUnscheduledHint')}</span>
+            <span className="impact-dialog__hint">
+              {t(locale, 'schedule.impact.studentsUnscheduledHint')}
+            </span>
           </Alert>
         </div>
       ) : null}
 
-      <div style={actionsStyle}>
+      <div className="impact-dialog__actions">
         <Button variant="secondary" onClick={onCancel} data-testid="impact-cancel">
           {t(locale, 'schedule.impact.cancel')}
         </Button>

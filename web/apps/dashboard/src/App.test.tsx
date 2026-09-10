@@ -490,3 +490,21 @@ describe('the dashboard can be switched between light, dark and system', () => {
     expect(nav.getByRole('radio', { name: t('he', 'common.theme.light') })).toBeInTheDocument()
   })
 })
+
+// Checkpoint 7. `routeFromHash` folds `#/closures` into the `schedule` route — one
+// vertical, one route — and the nav followed the fold: on the closures screen BOTH the
+// weekly-calendar door and the closures door carried `aria-current="page"`, so the sidebar
+// said the manager was in two places at once. Caught on the checkpoint's own screenshot.
+describe('one door is current at a time', () => {
+  it('lights only the closures door on #/closures, not the weekly calendar too', async () => {
+    stubApi(SIGNED_IN)
+    globalThis.location.hash = '#/closures'
+    render(<App />)
+    await waitFor(() =>
+      expect(document.querySelectorAll('.studio-sidenav [aria-current="page"]').length).toBe(1),
+    )
+    expect(document.querySelector('.studio-sidenav [aria-current="page"]')).toHaveTextContent(
+      t('he', 'schedule.closure.title'),
+    )
+  })
+})

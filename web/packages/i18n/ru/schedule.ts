@@ -141,6 +141,8 @@ export const schedule: Bundle = {
   'weekday.6': 'Суббота',
 
   'impact.title': 'Что изменится',
+  'impact.changesTitle': 'Изменения',
+  'impact.protectedTitle': 'Что не изменится',
   'impact.subtitle': 'Изменение затронет только будущие занятия',
   'impact.toCreate': 'Новые занятия',
   'impact.toUpdate': 'Занятия к обновлению',
@@ -169,6 +171,8 @@ export const schedule: Bundle = {
   'year.generated': 'Создано занятий: {{count}}',
 
   'closure.title': 'Дни закрытия',
+  'closure.subtitle': 'Дни, когда клуб закрыт, — отмеченные праздники и добавленные вручную периоды',
+  'closure.saveFailed': 'Не удалось сохранить день закрытия. Попробуйте ещё раз.',
   'closure.add': 'Добавить закрытие',
   'closure.dateFrom': 'С',
   'closure.dateTo': 'По',
@@ -285,6 +289,9 @@ export const schedule: Bundle = {
   'groups.rowActions': 'Действия для {{name}}',
 
   'group.scheduleTitle': 'Расписание группы',
+  'group.subtitle': 'Тип группы, тренеры, недельное расписание и созданные по нему занятия',
+  'group.previewFailed': 'Не удалось рассчитать последствия изменения. Попробуйте ещё раз.',
+  'group.applyFailed': 'Не удалось применить изменение. Проверьте расписание и попробуйте ещё раз.',
   'group.sessions': 'Занятия',
   'group.changeFrom': 'Изменение вступает в силу с',
   'group.reviewChange': 'Проверить изменение',

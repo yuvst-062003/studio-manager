@@ -139,6 +139,8 @@ export const schedule: Bundle = {
   'weekday.6': 'Saturday',
 
   'impact.title': 'What will change',
+  'impact.changesTitle': 'The changes',
+  'impact.protectedTitle': 'What will not change',
   'impact.subtitle': 'The change applies to future classes only',
   'impact.toCreate': 'New classes',
   'impact.toUpdate': 'Classes to be updated',
@@ -167,6 +169,8 @@ export const schedule: Bundle = {
   'year.generated': '{{count}} classes created',
 
   'closure.title': 'Closure days',
+  'closure.subtitle': 'Days the club is closed — holidays you ticked and ranges you added by hand',
+  'closure.saveFailed': 'We could not save the closure. Please try again.',
   'closure.add': 'Add a closure',
   'closure.dateFrom': 'From',
   'closure.dateTo': 'To',
@@ -283,6 +287,9 @@ export const schedule: Bundle = {
   'groups.rowActions': 'Actions for {{name}}',
 
   'group.scheduleTitle': "The group's schedule",
+  'group.subtitle': 'What kind of group this is, its coaches, its weekly schedule, and the sessions that came from it',
+  'group.previewFailed': 'We could not work out what the change would do. Please try again.',
+  'group.applyFailed': 'We could not apply the change. Check the schedule and try again.',
   'group.sessions': 'Sessions',
   'group.changeFrom': 'The change takes effect from',
   'group.reviewChange': 'Review the change',

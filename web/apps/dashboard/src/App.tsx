@@ -330,6 +330,12 @@ function doors(
   badges: { debtHouseholds: number; missingDocuments: number },
 ): Door[] {
   const onGroups = hash.startsWith('#/groups')
+  // `routeFromHash` folds `#/closures` into the `schedule` route — one vertical, one route,
+  // and the feature folder decides between its own hashes. The NAV cannot use that fold:
+  // closures has a door of its own, so on `#/closures` both it and the weekly calendar lit
+  // up and the sidebar claimed the manager was in two places at once (seen on the
+  // checkpoint-7 capture). `onGroups` already carves out the same case for the groups door.
+  const onClosures = hash.startsWith('#/closures')
   const items: Door[] = [
     {
       key: 'home',
@@ -349,7 +355,7 @@ function doors(
       href: '#/schedule',
       icon: <Icon name="calendar" />,
       // D14 — events live in the calendar rather than in a door of their own.
-      active: (route === 'schedule' && !onGroups) || route === 'events',
+      active: (route === 'schedule' && !onGroups && !onClosures) || route === 'events',
     },
     {
       key: 'students',
