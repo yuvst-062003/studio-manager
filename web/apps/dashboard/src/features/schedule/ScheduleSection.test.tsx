@@ -28,6 +28,22 @@ const SESSION_ROW = {
 
 function stub(overrides: Partial<ScheduleClient> = {}): ScheduleClient {
   return {
+    listClasses: vi.fn(async () => [
+      {
+        id: 'c1',
+        name: "ג'ודו",
+        description: null,
+        discipline: null,
+        color: null,
+        isActive: true,
+      },
+    ]),
+    createClass: vi.fn(async () => {
+      throw new Error('not in this test')
+    }),
+    updateClass: vi.fn(async () => {
+      throw new Error('not in this test')
+    }),
     listGroups: vi.fn(async () => [{ id: 'g1', name: 'מתחילים', className: "ג'ודו", classId: 'c1', isActive: true }]),
     listSessions: vi.fn(async () => []),
     getSchedule: vi.fn(async () => []),
@@ -76,8 +92,19 @@ function renderAt(hash: string, client = stub()) {
 describe('scheduleRoute', () => {
   it('reads the three top-level screens', () => {
     expect(scheduleRoute('#/schedule')).toEqual({ view: 'week' })
-    expect(scheduleRoute('#/groups')).toEqual({ view: 'groups' })
+    expect(scheduleRoute('#/classes')).toEqual({ view: 'classes' })
     expect(scheduleRoute('#/closures')).toEqual({ view: 'closures' })
+  })
+
+  it('still answers #/groups, which is the hash the nav pointed at until checkpoint 6', () => {
+    // The screen that hash named has been REPLACED, not deleted, and it is in real
+    // bookmarks. Resolving it to the classes index is the nearest true answer; 404-ing a
+    // hash the product itself published would be a dead end of our own making.
+    expect(scheduleRoute('#/groups')).toEqual({ view: 'classes' })
+  })
+
+  it('reads a class id out of the class route', () => {
+    expect(scheduleRoute('#/classes/abc-123')).toEqual({ view: 'classGroups', classId: 'abc-123' })
   })
 
   it('reads a group id out of the group route', () => {
@@ -96,9 +123,58 @@ describe('ScheduleSection', () => {
     expect(await screen.findByText(t('he', 'schedule.week.title'))).toBeInTheDocument()
   })
 
-  it('renders 4b at #/groups', async () => {
-    renderAt('#/groups')
+  it('renders the classes index at #/classes', async () => {
+    renderAt('#/classes')
+    await waitFor(() => expect(screen.getAllByTestId(/^class-card-/)).toHaveLength(1))
+    // And NOT the group cards: groups live one level down now.
+    expect(screen.queryAllByTestId(/^group-card-/)).toHaveLength(0)
+  })
+
+  it("renders one class's groups at #/classes/<id>", async () => {
+    renderAt('#/classes/c1')
     await waitFor(() => expect(screen.getAllByTestId(/^group-card-/)).toHaveLength(1))
+    // Named by the CLASS, with a way back up.
+    expect(screen.getByRole('heading', { name: "ג'ודו" })).toBeInTheDocument()
+    expect(screen.getByTestId('groups-back')).toHaveAttribute('href', '#/classes')
+  })
+
+  it('names the class even when it has no groups to take a name from', async () => {
+    // The manager who most needs the screen to say which class they opened is the one
+    // whose class is still empty. Reading the class beats deriving its name from a group
+    // that does not exist.
+    renderAt(
+      '#/classes/c2',
+      stub({
+        listClasses: vi.fn(async () => [
+          {
+            id: 'c2',
+            name: 'קרב מגע',
+            description: null,
+            discipline: null,
+            color: null,
+            isActive: true,
+          },
+        ]),
+        listGroups: vi.fn(async () => []),
+      }),
+    )
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'קרב מגע' }),
+    ).toBeInTheDocument()
+  })
+
+  it('shows only the groups of the class in the hash', async () => {
+    renderAt(
+      '#/classes/c2',
+      stub({
+        listGroups: vi.fn(async () => [
+          { id: 'g1', name: 'מתחילים', className: "ג'ודו", classId: 'c1', isActive: true },
+          { id: 'g2', name: 'מבוגרים', className: 'קרב מגע', classId: 'c2', isActive: true },
+        ]),
+      }),
+    )
+    await waitFor(() => expect(screen.getAllByTestId(/^group-card-/)).toHaveLength(1))
+    expect(screen.getByTestId('group-card-g2')).toBeInTheDocument()
   })
 
   it('renders the closure calendar at #/closures', async () => {
@@ -112,10 +188,16 @@ describe('ScheduleSection', () => {
     expect(screen.getByRole('heading', { name: 'מתחילים' })).toBeInTheDocument()
   })
 
-  it('links each 4b row to its own group page', async () => {
-    renderAt('#/groups')
+  it('links each group card to its own group page', async () => {
+    renderAt('#/classes/c1')
     const link = await screen.findByRole('link', { name: /מתחילים/ })
     expect(link).toHaveAttribute('href', '#/groups/g1')
+  })
+
+  it('links each class card to that class’s groups', async () => {
+    renderAt('#/classes')
+    const link = await screen.findByRole('link', { name: "ג'ודו" })
+    expect(link).toHaveAttribute('href', '#/classes/c1')
   })
 
   it('says so when the group id in the hash matches no group', async () => {
@@ -153,7 +235,7 @@ describe('ScheduleSection', () => {
     // on every render. The guarantee that it does not lives in `useToday.test.ts`.
     const client = stub()
     const { rerender } = render(
-      <ScheduleSection locale="he" client={client} hash="#/groups" today="2026-11-03T12:00:00Z" />,
+      <ScheduleSection locale="he" client={client} hash="#/classes/c1" today="2026-11-03T12:00:00Z" />,
     )
     await waitFor(() => expect(screen.getAllByTestId(/^group-card-/)).toHaveLength(1))
     const before = vi.mocked(client.putSchedule).mock.calls.length
@@ -162,7 +244,7 @@ describe('ScheduleSection', () => {
       <ScheduleSection
         locale="he"
         client={client}
-        hash="#/groups"
+        hash="#/classes/c1"
         today="2026-11-03T12:00:00.001Z"
       />,
     )
@@ -177,7 +259,7 @@ describe('ScheduleSection', () => {
     // the caller has to meet: stable inputs in, no requests out.
     const client = stub()
     const view = (
-      <ScheduleSection locale="he" client={client} hash="#/groups" today="2026-11-03T12:00:00Z" />
+      <ScheduleSection locale="he" client={client} hash="#/classes/c1" today="2026-11-03T12:00:00Z" />
     )
     const { rerender } = render(view)
     await waitFor(() => expect(screen.getAllByTestId(/^group-card-/)).toHaveLength(1))
@@ -205,7 +287,7 @@ describe('ScheduleSection', () => {
       <ScheduleSection
         locale="he"
         client={stub()}
-        hash="#/groups"
+        hash="#/classes/c1"
         today="2026-11-03T12:00:00Z"
       />,
     )

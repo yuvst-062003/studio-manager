@@ -14,24 +14,35 @@ import { useEffect, useMemo, useState } from 'react'
 import { EmptyState } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { ClassesScreen } from './ClassesScreen'
 import { ClosuresPanel } from './ClosuresPanel'
 import { GroupSchedulePage } from './GroupSchedulePage'
 import { GroupsAndCycles } from './GroupsAndCycles'
 import { WeekBoard } from './WeekBoard'
-import type { GroupSummary, ScheduleClient, TrainingYear } from './client'
+import type { ClassSummary, GroupSummary, ScheduleClient, TrainingYear } from './client'
 
-export type ScheduleView = 'week' | 'groups' | 'group' | 'closures'
+export type ScheduleView = 'week' | 'classes' | 'classGroups' | 'group' | 'closures'
 
 export interface ScheduleRoute {
   view: ScheduleView
   groupId?: string
+  classId?: string
 }
 
-/** `#/schedule` · `#/groups` · `#/groups/<id>` · `#/closures`. Anything else is the board. */
+/**
+ * `#/schedule` · `#/classes` · `#/classes/<id>` · `#/groups/<id>` · `#/closures`. Anything
+ * else is the board.
+ *
+ * `#/groups` — the flat list of every group in the club — resolves to the classes index
+ * rather than 404-ing: it is the hash the nav pointed at until this checkpoint, so it is
+ * in real bookmarks, and the screen it named has been replaced rather than deleted.
+ */
 export function scheduleRoute(hash: string): ScheduleRoute {
   const path = hash.replace(/^#\/?/, '')
   if (path === 'closures') return { view: 'closures' }
-  if (path === 'groups') return { view: 'groups' }
+  if (path === 'classes' || path === 'groups') return { view: 'classes' }
+  const klass = /^classes\/(.+)$/.exec(path)
+  if (klass?.[1]) return { view: 'classGroups', classId: klass[1] }
   const group = /^groups\/(.+)$/.exec(path)
   if (group?.[1]) return { view: 'group', groupId: group[1] }
   // An unknown hash resolves to the week board rather than to a blank page — the same rule
@@ -55,7 +66,10 @@ export function ScheduleSection({
   canSeeMoney?: boolean
 }) {
   const route = scheduleRoute(hash)
-  const needsGroups = route.view === 'groups' || route.view === 'group'
+  // The classes index counts each class's groups, so it needs the same list the drill-in
+  // renders — one read for both rather than a count endpoint the API does not have.
+  const needsGroups =
+    route.view === 'classes' || route.view === 'classGroups' || route.view === 'group'
   const needsYear = route.view === 'closures'
 
   const [groups, setGroups] = useState<GroupSummary[] | null>(null)
@@ -66,6 +80,25 @@ export function ScheduleSection({
   const groupList = useMemo(() => groups ?? [], [groups])
   const [year, setYear] = useState<TrainingYear | null>(null)
   const [yearLoaded, setYearLoaded] = useState(false)
+  // The class a drill-in is inside. Read rather than derived from its groups: a class with
+  // no groups yet has none to take a name from, and that is exactly the manager who most
+  // needs the screen to say which class they opened.
+  const [klass, setKlass] = useState<ClassSummary | null>(null)
+
+  useEffect(() => {
+    if (route.view !== 'classGroups' || !route.classId) return
+    const wanted = route.classId
+    let live = true
+    void client
+      .listClasses()
+      .then((rows) => {
+        if (live) setKlass(rows.find((row) => row.id === wanted) ?? null)
+      })
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [client, route.classId, route.view])
 
   useEffect(() => {
     // 3a needs sessions, not groups. Fetching a roster to draw a calendar is a request the
@@ -136,14 +169,32 @@ export function ScheduleSection({
     )
   }
 
-  if (route.view === 'groups') {
+  if (route.view === 'classGroups') {
+    if (groups === null) return null
+    const mine = groupList.filter((group) => group.classId === route.classId)
     return (
       <GroupsAndCycles
+        backHref="#/classes"
+        classId={route.classId}
+        className={klass?.name}
+        client={client}
+        groups={mine}
+        hrefForGroup={(groupId) => `#/groups/${groupId}`}
         locale={locale}
+        onChanged={() => setGroupsVersion((n) => n + 1)}
+        today={today}
+      />
+    )
+  }
+
+  if (route.view === 'classes') {
+    if (groups === null) return null
+    return (
+      <ClassesScreen
         client={client}
         groups={groupList}
-        today={today}
-        hrefForGroup={(groupId) => `#/groups/${groupId}`}
+        hrefForClass={(classId) => `#/classes/${classId}`}
+        locale={locale}
         onChanged={() => setGroupsVersion((n) => n + 1)}
       />
     )

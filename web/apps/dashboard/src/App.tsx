@@ -220,7 +220,17 @@ export function routeFromHash(hash: string): DashboardRoute {
   // this screen has been looked at on real data. Flipping the fallback is a one-line
   // change here and an open question in the proposal, not something to do silently.
   if (name === 'home') return 'home'
-  if (name === 'schedule' || name === 'closures' || name.startsWith('groups')) return 'schedule'
+  if (
+    name === 'schedule' ||
+    name === 'closures' ||
+    name.startsWith('groups') ||
+    // Checkpoint 6, second pass: `#/classes` and `#/classes/<id>` are the classes
+    // index and one class's groups. Same vertical, same route — `ScheduleSection`
+    // decides between its own five hashes, which is what keeps this file to one
+    // branch per vertical rather than one per screen.
+    name.startsWith('classes')
+  )
+    return 'schedule'
   // §5.15's rollover. One hash and one screen: the wizard's own seven steps are its
   // internal state, not routes — a manager who bookmarked step 5 would land on a step the
   // server may since have answered, and `resume_at` is the only correct answer to "where
@@ -329,7 +339,7 @@ function doors(
   canSeeMoney: boolean,
   badges: { debtHouseholds: number; missingDocuments: number },
 ): Door[] {
-  const onGroups = hash.startsWith('#/groups')
+  const onGroups = hash.startsWith('#/groups') || hash.startsWith('#/classes')
   // `routeFromHash` folds `#/closures` into the `schedule` route — one vertical, one route,
   // and the feature folder decides between its own hashes. The NAV cannot use that fold:
   // closures has a door of its own, so on `#/closures` both it and the weekly calendar lit
@@ -371,7 +381,7 @@ function doors(
       label: t(locale, 'common.dash.nav.groups'),
       labelKey: 'common.dash.nav.groups',
       hint: t(locale, 'common.dash.hint.groups'),
-      href: '#/groups',
+      href: '#/classes',
       icon: <Icon name="groups" />,
       active: onGroups || route === 'belts' || route === 'exams',
     },

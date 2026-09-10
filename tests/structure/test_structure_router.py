@@ -297,3 +297,99 @@ def test_mine_lists_only_the_groups_the_caller_coaches(
 
     mine = client.get("/api/v1/groups?mine=true", headers=as_lead_coach.headers).json()["items"]
     assert [row["id"] for row in mine] == [str(a_group)]
+
+
+# -- editing a class ----------------------------------------------------------
+# `ClassUpdate` was written when the model landed and no route ever used it, so a club that
+# mistyped a class name during setup had no way to correct it. The dashboard's class card
+# now offers an edit popup, and this is the endpoint behind it.
+def test_a_manager_renames_a_class(client, as_manager):
+    created = client.post(
+        "/api/v1/classes", json={"name": "ג'ודו"}, headers=as_manager.headers
+    ).json()
+    response = client.patch(
+        f"/api/v1/classes/{created['id']}",
+        json={"name": "ג'ודו אולימפי"},
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["name"] == "ג'ודו אולימפי"
+
+
+def test_an_absent_field_leaves_its_column_alone(client, as_manager):
+    """`model_fields_set` decides, like SessionPatch and GroupPatch. A PATCH that names
+    only the name must not null the description the club already wrote."""
+    created = client.post(
+        "/api/v1/classes",
+        json={"name": "ג'ודו", "description": "לילדים ונוער", "discipline": "judo"},
+        headers=as_manager.headers,
+    ).json()
+    body = client.patch(
+        f"/api/v1/classes/{created['id']}",
+        json={"name": "ג'ודו אולימפי"},
+        headers=as_manager.headers,
+    ).json()
+    assert body["description"] == "לילדים ונוער"
+    assert body["discipline"] == "judo"
+
+
+def test_renaming_a_class_onto_a_siblings_name_is_refused(client, as_manager):
+    """The same 409 `POST /classes` gives, for the same reason: the partial unique index
+    would otherwise raise an IntegrityError that reads as a 500, on a name the manager
+    typed."""
+    first = client.post(
+        "/api/v1/classes", json={"name": "ג'ודו"}, headers=as_manager.headers
+    ).json()
+    client.post("/api/v1/classes", json={"name": "קראטה"}, headers=as_manager.headers)
+    response = client.patch(
+        f"/api/v1/classes/{first['id']}", json={"name": "קראטה"}, headers=as_manager.headers
+    )
+    assert response.status_code == 409
+
+
+def test_renaming_a_class_to_its_own_name_is_allowed(client, as_manager):
+    """A form that submits every field must not refuse because the name did not change."""
+    created = client.post(
+        "/api/v1/classes", json={"name": "ג'ודו"}, headers=as_manager.headers
+    ).json()
+    response = client.patch(
+        f"/api/v1/classes/{created['id']}",
+        json={"name": "ג'ודו", "description": "עודכן"},
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["description"] == "עודכן"
+
+
+def test_a_class_can_be_retired_and_revived(client, as_manager):
+    created = client.post(
+        "/api/v1/classes", json={"name": "ג'ודו"}, headers=as_manager.headers
+    ).json()
+    retired = client.patch(
+        f"/api/v1/classes/{created['id']}", json={"is_active": False}, headers=as_manager.headers
+    )
+    assert retired.json()["is_active"] is False
+    revived = client.patch(
+        f"/api/v1/classes/{created['id']}", json={"is_active": True}, headers=as_manager.headers
+    )
+    assert revived.json()["is_active"] is True
+
+
+def test_a_coach_cannot_edit_a_class(client, as_manager, as_lead_coach):
+    """3.2 -- 'Create/edit classes, groups, schedules: owner, manager' and nothing else."""
+    created = client.post(
+        "/api/v1/classes", json={"name": "ג'ודו"}, headers=as_manager.headers
+    ).json()
+    response = client.patch(
+        f"/api/v1/classes/{created['id']}", json={"name": "אחר"}, headers=as_lead_coach.headers
+    )
+    assert response.status_code == 403
+
+
+def test_editing_a_class_that_does_not_exist_is_a_404(client, as_manager):
+    response = client.patch(
+        "/api/v1/classes/00000000-0000-0000-0000-000000000000",
+        json={"name": "אחר"},
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 404

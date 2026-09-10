@@ -428,51 +428,6 @@
   gap: var(--space-4);
 }
 
-/* D1's class chips. This is the SECOND copy of this shape — `people-class-tabs` in
- * people.css is the first — and a third use should promote it to a `@studio/ui`
- * primitive rather than a third copy. Two features owning fifteen lines each is
- * cheaper than a shared class that neither feature owns. */
-.groups-class-tabs {
-  display: flex;
-  gap: var(--space-2);
-  overflow-x: auto;
-  margin-block-end: var(--space-4);
-  padding-block-end: var(--space-1);
-}
-
-.groups-class-tabs > button {
-  flex-shrink: 0;
-  background: var(--surface);
-  border: var(--border-width-hairline) solid var(--border-strong);
-  border-radius: var(--radius-pill);
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-family: inherit;
-  font-size: var(--text-label);
-  padding-block: var(--space-2);
-  padding-inline: var(--space-4);
-  white-space: nowrap;
-}
-
-.groups-class-tabs > button:hover {
-  border-color: var(--emphasis);
-  color: var(--fg);
-}
-
-.groups-class-tabs > button:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
-
-/* `aria-pressed` carries the state to assistive tech and drives the styling from the
- * same attribute, so the two cannot disagree — the selected chip is never only a colour. */
-.groups-class-tabs > button[aria-pressed='true'] {
-  background: var(--emphasis);
-  border-color: var(--emphasis);
-  color: var(--on-emphasis);
-  font-weight: var(--weight-medium);
-}
-
 .group-card {
   display: flex;
   flex-direction: column;
@@ -924,4 +879,277 @@ a.group-card__name:focus-visible {
 .closures__field--wide {
   flex: 1;
   min-inline-size: 12rem;
+}
+
+/* ═══ Classes — `#/classes` ═══════════════════════════════════════════════════════
+ * Checkpoint 6, second pass. The prototype's `ProgramsView` curriculum tab: one card per
+ * class, with its discipline as an eyebrow, its description under the name, and how many
+ * groups it holds in the foot. Opening one is how you reach its groups.
+ *
+ * D2 still holds — no capacity, no occupancy bar. The group count is a number this screen
+ * can count from data it already has, which is what makes it honest. */
+.classes-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr));
+  gap: var(--space-4);
+}
+
+.class-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+}
+
+.class-card:hover {
+  border-color: var(--border-strong);
+}
+
+.class-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+/* The class's own colour, by TOKEN NAME — G13. A class with no colour set falls back to
+ * the neutral tint rather than rendering a hole, and the swatches in the edit popup are
+ * the same six tokens under the same names. */
+.class-card__badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  inline-size: 2.25rem;
+  block-size: 2.25rem;
+  border-radius: var(--radius-md);
+  background: var(--disabled-surface);
+  color: var(--text-muted);
+}
+
+.class-card__badge[data-colour='emphasis'] {
+  background: var(--emphasis-tint);
+  color: var(--emphasis);
+}
+
+.class-card__badge[data-colour='accent'] {
+  background: var(--emphasis-tint);
+  color: var(--accent);
+}
+
+.class-card__badge[data-colour='debt'] {
+  background: var(--debt-tint);
+  color: var(--debt);
+}
+
+.class-card__badge[data-colour='paid'] {
+  background: var(--paid-tint);
+  color: var(--paid);
+}
+
+.class-card__badge[data-colour='pending'] {
+  background: var(--pending-tint);
+  color: var(--pending);
+}
+
+.class-card__badge[data-colour='cancelled'] {
+  background: var(--cancelled-tint);
+  color: var(--cancelled);
+}
+
+.class-card__titles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+  flex: 1;
+}
+
+.class-card__eyebrow {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--emphasis);
+  letter-spacing: 0.04em;
+}
+
+.class-card__name {
+  font-size: var(--text-title);
+  font-weight: var(--weight-semibold);
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.class-card__name:hover,
+.class-card__name:focus-visible {
+  text-decoration: underline;
+}
+
+.class-card__description {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+}
+
+.class-card__foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-block-start: var(--space-3);
+  border-block-start: var(--border-width-hairline) solid var(--border);
+  margin-block-start: auto;
+  font-size: var(--text-caption);
+}
+
+.class-card__count {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.class-card__open {
+  font-weight: var(--weight-medium);
+  color: var(--accent);
+}
+
+/* The way back up out of one class's groups. */
+.groups-back {
+  display: inline-block;
+  margin-block-end: var(--space-2);
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+}
+
+.groups-create {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-2);
+}
+
+/* ── the small edit popup ───────────────────────────────────────────────────────── */
+.class-dialog__scrim {
+  position: fixed;
+  inset-block: 0;
+  inset-inline: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: var(--scrim);
+}
+
+.class-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  inline-size: 100%;
+  max-inline-size: 28rem;
+  max-block-size: 90vh;
+  overflow-y: auto;
+  background: var(--surface-raised);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+}
+
+.class-dialog__title {
+  margin: 0;
+  font-size: var(--text-title);
+  font-weight: var(--weight-semibold);
+}
+
+.class-dialog__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-label);
+  color: var(--text-secondary);
+}
+
+.class-dialog__field > textarea {
+  font-family: inherit;
+  font-size: var(--text-body);
+  color: var(--fg);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  resize: vertical;
+}
+
+/* NOT a flex container. A `<legend>` is not a flex item in every engine, so the label
+ * floated onto the swatch row instead of sitting above it. Block layout, and the legend
+ * carries its own spacing. */
+.class-dialog__colours {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  font-size: var(--text-label);
+  color: var(--text-secondary);
+}
+
+.class-dialog__colours > legend {
+  padding: 0;
+  margin-block-end: var(--space-2);
+}
+
+.class-dialog__swatches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Every swatch carries `aria-pressed`, so which colour is chosen lives in the
+ * accessibility tree and drives the ring from the same attribute — a colour choice must
+ * not be conveyed by colour alone. */
+.class-dialog__swatch {
+  inline-size: 2rem;
+  block-size: 2rem;
+  border-radius: var(--radius-md);
+  border: var(--border-width-hairline) solid var(--border-strong);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+  background: var(--surface);
+}
+
+.class-dialog__swatch[data-swatch='none'] {
+  inline-size: auto;
+  padding-inline: var(--space-3);
+}
+
+.class-dialog__swatch[data-swatch='emphasis'] { background: var(--emphasis); }
+.class-dialog__swatch[data-swatch='debt'] { background: var(--debt); }
+.class-dialog__swatch[data-swatch='paid'] { background: var(--paid); }
+.class-dialog__swatch[data-swatch='pending'] { background: var(--pending); }
+.class-dialog__swatch[data-swatch='cancelled'] { background: var(--cancelled); }
+
+.class-dialog__swatch[aria-pressed='true'] {
+  outline: var(--border-width-strong) solid var(--fg);
+  outline-offset: 2px;
+}
+
+.class-dialog__swatch:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.class-dialog__error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-caption);
+}
+
+.class-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
 }

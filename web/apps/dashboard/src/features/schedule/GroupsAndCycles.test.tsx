@@ -253,42 +253,6 @@ describe('GroupsAndCycles (4b)', () => {
   })
 })
 
-describe('D1 — the prototype’s discipline pills become class chips that filter', () => {
-  const THREE: GroupSummary[] = [
-    ...GROUPS,
-    { id: 'g3', name: 'מבוגרים', className: 'קרב מגע', classId: 'c2', isActive: true },
-  ]
-
-  it('offers one chip per class ON SCREEN, so no chip filters to nothing', async () => {
-    render(
-      <GroupsAndCycles client={stub()} groups={THREE} locale="he" today="2026-11-03T12:00:00Z" />,
-    )
-    await cardsSettle(3)
-    const chips = within(screen.getByTestId('groups-class-tabs'))
-    expect(chips.getByTestId('groups-class-tab-all')).toBeInTheDocument()
-    expect(chips.getByTestId('groups-class-tab-c1')).toBeInTheDocument()
-    expect(chips.getByTestId('groups-class-tab-c2')).toBeInTheDocument()
-  })
-
-  it('filters the grid for real, and says which chip is chosen through aria-pressed', async () => {
-    render(
-      <GroupsAndCycles client={stub()} groups={THREE} locale="he" today="2026-11-03T12:00:00Z" />,
-    )
-    await cardsSettle(3)
-    await userEvent.click(screen.getByTestId('groups-class-tab-c2'))
-    expect(screen.getByTestId('groups-class-tab-c2')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByTestId('groups-class-tab-all')).toHaveAttribute('aria-pressed', 'false')
-    expect(screen.getAllByTestId(/^group-card-/)).toHaveLength(1)
-    expect(screen.getByTestId('group-card-g3')).toBeInTheDocument()
-  })
-
-  it('hides the chips when one class is the only class — that is not a choice', async () => {
-    renderGrid()
-    await cardsSettle()
-    expect(screen.queryByTestId('groups-class-tabs')).not.toBeInTheDocument()
-  })
-})
-
 describe('the door to the schedule editor (2026-08-28)', () => {
   afterEach(() => {
     globalThis.location.hash = ''
@@ -315,20 +279,20 @@ describe('the door to the schedule editor (2026-08-28)', () => {
     )
     render(
       <GroupsAndCycles
-        locale="he"
+        classId="c1"
         client={stub()}
         groups={GROUPS}
-        today="2026-11-03T12:00:00Z"
         hrefForGroup={(id) => `#/groups/${id}`}
+        locale="he"
         onChanged={() => undefined}
+        today="2026-11-03T12:00:00Z"
       />,
     )
     await userEvent.click(screen.getByTestId('new-group-open'))
     await userEvent.type(screen.getAllByRole('textbox')[0] as HTMLElement, 'קבוצה 1')
-    await waitFor(() =>
-      expect(screen.getByRole('combobox').querySelectorAll('option').length).toBeGreaterThan(1),
-    )
-    await userEvent.selectOptions(screen.getByRole('combobox'), 'c1')
+    // No class `<select>` any more: asking which class after the manager opened one is a
+    // question with exactly one right answer.
+    expect(screen.queryByTestId('new-group-class')).not.toBeInTheDocument()
     await userEvent.click(screen.getByTestId('new-group-submit'))
     await waitFor(() => expect(globalThis.location.hash).toBe('#/groups/g-new'))
   })
@@ -411,6 +375,7 @@ describe('B3.4 — one overflow control per card', () => {
   function renderWithActions() {
     render(
       <GroupsAndCycles
+        classId="c1"
         client={stub()}
         groups={GROUPS}
         locale="he"
@@ -519,6 +484,7 @@ describe('B3.6 — one PageHeader row: title, a two-line subtitle, and the creat
     )
     render(
       <GroupsAndCycles
+        classId="c1"
         client={stub()}
         groups={GROUPS}
         locale="he"
@@ -544,6 +510,7 @@ describe('B3.6 — one PageHeader row: title, a two-line subtitle, and the creat
     )
     render(
       <GroupsAndCycles
+        classId="c1"
         client={stub()}
         groups={GROUPS}
         locale="he"

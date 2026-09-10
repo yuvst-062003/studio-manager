@@ -373,7 +373,53 @@ hardcodes every created class to Wednesday with 16 registrants.
 
 ---
 
-### 3.2 Groups and cycles — `#/groups`
+### 3.2 Classes and their groups — `#/classes`, `#/classes/<id>`
+
+`features/schedule/ClassesScreen.tsx`, `ClassEditDialog.tsx`, `GroupsAndCycles.tsx`.
+
+**Corrected 2026-09-10, after the first build.** This section originally described one flat
+list of every group in the club, and checkpoint 6 built it that way. The owner rejected it
+against the prototype: *"first it need to show classes and when entering a class shows the
+all… when looking at a created class press opens a small popup to just update, but when
+creating a new class the full steps wizard."* They are right, and the prototype says so —
+`ProgramsView`'s **curriculum** tab is a grid of programs, and its **groups** tab is what
+sits one level down. The screen is now two:
+
+* **`#/classes`** — one card per class: its discipline as an eyebrow, its name as the door,
+  its description, whether it is active, and **how many active groups it holds**. Not
+  capacity (D2) — a number this screen counts from the group list it already holds.
+* **`#/classes/<id>`** — that class's groups, in the card grid described below, titled by
+  the class and carrying a way back up.
+
+`#/groups` — the hash the nav pointed at until this checkpoint, and therefore in real
+bookmarks — resolves to the classes index rather than 404-ing.
+
+**The two ways in differ, and that is the point of the correction.**
+
+| | Opens | Writes | Why |
+|---|---|---|---|
+| An existing class | **A small popup** (`ClassEditDialog`) | `PATCH /api/v1/classes/{id}` | Correcting a name is not a seven-step flow. The popup edits the four columns `class` actually has and nothing else. |
+| A new class | **The seven-step wizard** (§3.21) | Each step its own call | A class needs groups, a schedule, prices, a ladder and coaches before it can take a student. That is the wizard's job. |
+
+**`PATCH /api/v1/classes/{id}` did not exist.** `ClassUpdate` had been sitting in
+`app/schemas/structure.py` since the model landed with no route using it, so a club that
+mistyped a class name during setup could not fix it. Added in checkpoint 6 with the same
+shape as `GroupPatch` — `model_fields_set` decides, so an absent field leaves its column
+alone — the same 409 on a duplicate name that `POST /classes` gives, and manager-or-owner
+only, per §3.2's matrix. No migration: every column already exists.
+
+The popup stores a colour as a **token name, never a hex literal** (G13, and the model's own
+docstring). It offers five swatches rather than six: `[data-surface="studio-os"]` gives
+`--accent` and `--emphasis` the same mint, so offering both would be two swatches a manager
+cannot tell apart that produce the same badge.
+
+**D1's class chips are not on this screen.** They were, in the first build, filtering the
+flat list. The classes index *is* that choice, made better — so the chips came out and the
+class stopped being repeated as an eyebrow on every card of its own page.
+
+---
+
+#### The group card grid — `#/classes/<id>`
 
 `features/schedule/GroupsAndCycles.tsx`.
 
@@ -1339,7 +1385,7 @@ screenshots the result beside the prototype into
 | 3 | Students list and the class tabs | §3.5 |
 | 4 | Student detail — the four-tab drawer, **plus the missing error state** | §3.6. Failing test first for the defect |
 | 5 | Weekly schedule — the grid, and `SessionPopover`'s two-tab split | §3.1 |
-| 6 | Groups and cycles — the card grid and occupancy | §3.2 |
+| 6 | **Classes, and one class's groups** — the class card grid, the drill-in, and the small edit popup | §3.2. **Rebuilt 2026-09-10** after the owner corrected the first pass: classes come first and a class is what you open to find its groups. Adds `PATCH /api/v1/classes/{id}`, which did not exist |
 | 7 | One group, and closures | §3.3, §3.4. Includes the closures error state |
 | 8 | Attendance — three buttons per student, the stat header | §3.16 |
 | 9 | Billing collections, promises, plan changes | §3.20 |

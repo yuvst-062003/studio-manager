@@ -94,6 +94,39 @@ class StructureService:
             raise NotFoundError(str(class_id))
         return row
 
+    @staticmethod
+    def update_class(
+        session: Session,
+        class_id: uuid.UUID,
+        *,
+        fields: dict[str, object],
+        at: datetime,
+    ) -> Class:
+        """Rename / re-describe / retire one class.
+
+        `ClassUpdate` has existed in the schemas since the model landed and no route ever
+        used it, so a club that mistyped a class name at setup could not fix it. Shaped
+        like `update_group`: `fields` carries only what the caller SET, so renaming to the
+        same name is legal and absence leaves a column alone rather than nulling it.
+
+        The duplicate check is the same one `create_class` makes and for the same reason —
+        the partial unique index would raise an IntegrityError that reads as a 500, and
+        this is a name the manager typed.
+        """
+        row = StructureService.get_class(session, class_id)
+        if "name" in fields and fields["name"] != row.name:
+            duplicate = session.execute(
+                select(Class.id).where(Class.name == fields["name"], Class.id != class_id)
+            ).first()
+            if duplicate is not None:
+                raise DuplicateNameError(str(fields["name"]))
+        for column in ("name", "description", "discipline", "color", "is_active"):
+            if column in fields:
+                setattr(row, column, fields[column])
+        row.updated_at = at
+        session.flush()
+        return row
+
     # -- groups ---------------------------------------------------------------
     @staticmethod
     def list_groups(

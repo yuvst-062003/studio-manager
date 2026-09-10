@@ -27,6 +27,7 @@ from app.schemas.structure import (
     ClassCreate,
     ClassListResponse,
     ClassOut,
+    ClassUpdate,
     GroupCreate,
     GroupListResponse,
     GroupOut,
@@ -87,6 +88,35 @@ def create_class(_: ManagerOrOwner, body: ClassCreate, session: TenantSessionDep
         )
     except DuplicateNameError as exc:
         raise _conflict(body.name) from exc
+    session.commit()
+    return ClassOut.model_validate(row, from_attributes=True)
+
+
+@router.patch("/classes/{class_id}", response_model=ClassOut)
+def update_class(
+    _: ManagerOrOwner,
+    class_id: uuid.UUID,
+    body: ClassUpdate,
+    session: TenantSessionDep,
+) -> ClassOut:
+    """Rename / re-describe / retire one class.
+
+    `ClassUpdate` was written when the model landed and no route ever used it, so a club
+    that mistyped a class name during setup had no way to correct it. `model_fields_set`
+    decides what to write, like `SessionPatch` and `GroupPatch`: an absent field leaves
+    its column alone rather than nulling it.
+    """
+    try:
+        row = StructureService.update_class(
+            session,
+            class_id,
+            fields=body.model_dump(exclude_unset=True),
+            at=now(),
+        )
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    except DuplicateNameError as exc:
+        raise _conflict(body.name or "") from exc
     session.commit()
     return ClassOut.model_validate(row, from_attributes=True)
 
