@@ -1437,7 +1437,8 @@ waves:
         on: 2026-09-10
       - id: W10.6
         title: Groups and cycles — the card grid
-        status: planned
+        status: shipped
+        on: 2026-09-10
       - id: W10.7
         title: One group, and closures
         status: planned

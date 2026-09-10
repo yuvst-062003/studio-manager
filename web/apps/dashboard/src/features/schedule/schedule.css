@@ -405,48 +405,188 @@
  * however many there are; `3a`'s week/month board above is a different component in
  * the same file. */
 
-/* B3.1 — the identity column's name link. A bare `<a>` already carries the app's accent
- * colour (`primitives.css:935`) and the UA default underline, which is what made a
- * SECOND link-button beside it redundant. This still gives it the app's own
- * underline-on-hover affordance (the same shape as `msignin__legal a`) rather than
- * leaving the browser default always-on: an always-underlined name reads noisier next
- * to a table full of plain text than a name that underlines when the pointer or focus
- * says "this one, specifically". */
-.groups-table__name {
-  text-decoration: none;
-}
-
-.groups-table__name:hover,
-.groups-table__name:focus-visible {
-  text-decoration: underline;
-}
-
-/* B3.5 — the `ללא יום` column: its header AND its count both end-align, so a
- * right-aligned number sits under a right-aligned label instead of floating away from
- * it. `.groups-table__align-end` is the shared shape (`text-align: end` — never
- * `right`, so it flips with `dir` — and `inline-size: 100%` so a `text-align` on an
- * inline `<span>`/`<th>` child has a box to align inside); `.groups-table__unscheduled`
- * adds the tabular-numeral formatting the count alone needs. The cell's own default
- * `text-align: start` and the header's are both `primitives.css`'s and stay out of
- * this file's set — these classes align a wrapper INSIDE the cell/header, not the
- * `<td>`/`<th>` itself. */
-.groups-table__align-end {
-  display: block;
-  inline-size: 100%;
-  text-align: end;
-}
-
-.groups-table__unscheduled {
-  font-variant-numeric: tabular-nums;
-}
-
 /* B3.3/B3.6 — the stated gap's line inside the header's two-line subtitle. Caption
- * weight and the muted token, so it reads as a footnote about a column that is not
+ * weight and the muted token, so it reads as a footnote about a fact that is not
  * there yet rather than as a second sentence describing the screen. */
 .groups-table__subtitle-note {
   display: inline-block;
   font-size: var(--text-caption);
   color: var(--text-muted);
+}
+
+/* ═══ The groups card grid ════════════════════════════════════════════════════════
+ * Checkpoint 6. The prototype's `ProgramsView` grid, minus the occupancy bar D2 cut.
+ *
+ * `auto-fill` rather than `auto-fit`: a club with two groups should get two cards at
+ * their natural width, not two cards stretched across a 1440px board. */
+.groups-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  gap: var(--space-4);
+}
+
+/* D1's class chips. This is the SECOND copy of this shape — `people-class-tabs` in
+ * people.css is the first — and a third use should promote it to a `@studio/ui`
+ * primitive rather than a third copy. Two features owning fifteen lines each is
+ * cheaper than a shared class that neither feature owns. */
+.groups-class-tabs {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  margin-block-end: var(--space-4);
+  padding-block-end: var(--space-1);
+}
+
+.groups-class-tabs > button {
+  flex-shrink: 0;
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-label);
+  padding-block: var(--space-2);
+  padding-inline: var(--space-4);
+  white-space: nowrap;
+}
+
+.groups-class-tabs > button:hover {
+  border-color: var(--emphasis);
+  color: var(--fg);
+}
+
+.groups-class-tabs > button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* `aria-pressed` carries the state to assistive tech and drives the styling from the
+ * same attribute, so the two cannot disagree — the selected chip is never only a colour. */
+.groups-class-tabs > button[aria-pressed='true'] {
+  background: var(--emphasis);
+  border-color: var(--emphasis);
+  color: var(--on-emphasis);
+  font-weight: var(--weight-medium);
+}
+
+.group-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+}
+
+.group-card:hover {
+  border-color: var(--border-strong);
+}
+
+.group-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+/* The tinted mark the prototype puts on every card head. Structural, not semantic —
+ * every group card carries the same one, so it takes the emphasis tint rather than a
+ * state colour. */
+.group-card__badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border-radius: var(--radius-md);
+  background: var(--emphasis-tint);
+  color: var(--emphasis);
+}
+
+.group-card__titles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+  flex: 1;
+}
+
+.group-card__eyebrow {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--emphasis);
+  letter-spacing: 0.04em;
+}
+
+/* B3.1 — the name link IS the door to the schedule editor. A bare `<a>` already carries
+ * the app's accent colour and the UA underline; this gives it the app's own
+ * underline-on-hover affordance instead, because an always-underlined name reads noisier
+ * on a card than one that underlines when the pointer or focus says "this one". */
+.group-card__name {
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  color: var(--fg);
+  text-decoration: none;
+}
+
+a.group-card__name:hover,
+a.group-card__name:focus-visible {
+  text-decoration: underline;
+}
+
+/* The tinted well the prototype groups its facts into — one recessed block, so the four
+ * label/value pairs read as one object rather than four loose lines. */
+.group-card__well {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  font-size: var(--text-caption);
+}
+
+.group-card__fact {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.group-card__fact > dt {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.group-card__fact > dd {
+  margin: 0;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+/* The unscheduled count above zero. The label sits beside it in every state, so the
+ * colour is the second signal and never the only one. */
+.group-card__fact[data-tone='danger'] > dd {
+  color: var(--danger);
+  font-weight: var(--weight-semibold);
+}
+
+/* Present only while a rename is open — see the component. */
+.group-card__foot {
+  display: flex;
+  align-items: end;
+  gap: var(--space-2);
+  padding-block-start: var(--space-3);
+  border-block-start: var(--border-width-hairline) solid var(--border);
+  margin-block-start: auto;
 }
 
 /* ═══ The session card ════════════════════════════════════════════════════════════

@@ -394,14 +394,27 @@ States: empty (`schedule.groups.empty`); no loading state; write errors only.
 discipline pills, an age-category filter, a search box, group cards with an occupancy bar, and a
 trainees drawer.
 
-**Port.** The card grid with the occupancy bar is a real improvement over a bare table — it shows
-capacity pressure at a glance, which the unscheduled count only hints at. Take the three-tab split
-too: `groups` maps to this screen, `curriculum` to the belt ladder (§3.9), and `staff` to the coach
-assignments already on the group page (§3.3).
+**Port.** The card grid is a real improvement over a bare table: the four things a manager reads
+here are four facts about one group, not a comparison across rows, and a card is where four facts
+about one thing belong. **The occupancy bar is not part of it** — see the correction below.
 
 **Improve.**
-- The occupancy bar needs a real denominator. Group capacity is not currently surfaced on the
-  group list; `GET /api/v1/groups` plus roster counts can supply it.
+- **Correction, 2026-09-10.** An earlier draft of this section asked for the occupancy bar and for
+  a denominator to feed it. **D2 forbids both** and D2 is the spec: no capacity column, no
+  occupancy bar, no `14/15`. Group capacity was cut from the product on 2026-08-27 and the owner
+  confirmed the cut again on 2026-09-10. What takes the bar's slot on the card is the count this
+  screen already computes and the prototype has no equivalent of — **C12's students left with no
+  training day** — which is capacity pressure a manager can act on rather than a ratio against a
+  number nobody stores.
+- The prototype's three-tab split (groups / curriculum / staff) is **not** taken. Its `curriculum`
+  is the belt ladder (§3.9) and its `staff` is the group page's coach assignments (§3.3); both are
+  destinations the sidebar already reaches, and a tab strip that navigates elsewhere is not a tab
+  strip. What this screen takes instead is D1's **class chips**, which filter the grid in place and
+  scale as the club adds classes — the affordance the prototype's five hardcoded discipline pills
+  were standing in for.
+- Coach and room are read off the group's **next session**, which the screen already fetches, and
+  labelled as that session's. Asking `GET /api/v1/groups/{id}/staff` per card would add a fourth
+  request per group to a loop that already makes three — the N+1 shape §3.17 flags as a defect.
 - The prototype's trainees drawer holds the one genuine empty state in the whole prototype
   ("טרם שובצו חניכים לקבוצה זו"). Keep it.
 - **Do not port** its "שבץ חניך חדש" button, which raises a toast and opens no picker; nor its

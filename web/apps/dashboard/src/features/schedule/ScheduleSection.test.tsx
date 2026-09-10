@@ -98,7 +98,7 @@ describe('ScheduleSection', () => {
 
   it('renders 4b at #/groups', async () => {
     renderAt('#/groups')
-    await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(1))
+    await waitFor(() => expect(screen.getAllByTestId(/^group-card-/)).toHaveLength(1))
   })
 
   it('renders the closure calendar at #/closures', async () => {
@@ -155,7 +155,7 @@ describe('ScheduleSection', () => {
     const { rerender } = render(
       <ScheduleSection locale="he" client={client} hash="#/groups" today="2026-11-03T12:00:00Z" />,
     )
-    await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(1))
+    await waitFor(() => expect(screen.getAllByTestId(/^group-card-/)).toHaveLength(1))
     const before = vi.mocked(client.putSchedule).mock.calls.length
 
     rerender(
@@ -180,9 +180,9 @@ describe('ScheduleSection', () => {
       <ScheduleSection locale="he" client={client} hash="#/groups" today="2026-11-03T12:00:00Z" />
     )
     const { rerender } = render(view)
-    await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(1))
+    await waitFor(() => expect(screen.getAllByTestId(/^group-card-/)).toHaveLength(1))
 
-    // The rowheader appearing means the GROUPS arrived; the schedule preview is a second,
+    // The cards appearing means the GROUPS arrived; the schedule preview is a second,
     // later request, and this used to read its count the moment the first one landed. Under
     // load that read `0` and the setup assertion below failed before the test had begun —
     // `expected 0 to be greater than 0`. Wait for the call this test is actually about.
@@ -193,7 +193,7 @@ describe('ScheduleSection', () => {
 
     rerender(view)
     rerender(view)
-    await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(1))
+    await waitFor(() => expect(screen.getAllByTestId(/^group-card-/)).toHaveLength(1))
 
     expect(vi.mocked(client.listGroups).mock.calls).toHaveLength(groupCalls)
     expect(vi.mocked(client.putSchedule).mock.calls).toHaveLength(previewCalls)
@@ -209,7 +209,7 @@ describe('ScheduleSection', () => {
         today="2026-11-03T12:00:00Z"
       />,
     )
-    await waitFor(() => expect(screen.getAllByRole('rowheader')).toHaveLength(1))
+    await waitFor(() => expect(screen.getAllByTestId(/^group-card-/)).toHaveLength(1))
     for (const node of container.querySelectorAll<HTMLElement>('[style]')) {
       expect(node.getAttribute('style') ?? '').not.toMatch(
         /margin-(left|right)|padding-(left|right)|(^|;)\s*(left|right):/,
