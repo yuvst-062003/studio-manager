@@ -491,3 +491,82 @@
   align-items: baseline;
   gap: var(--space-2);
 }
+
+/* The alert-centre queues (owner report, 2026-09-10).
+ *
+ * `שיעורי ניסיון קרובים` rendered as a bare `<ul>` whose every row was three adjacent
+ * inline elements with nothing between them, so the name, the group and the date ran
+ * together into one word: "עמית דודגבחרת31 באוגוסט 2026". Two facts made it unreadable and
+ * both are fixed here — there was no separator, and there was no styling at all.
+ *
+ * `TrialsAwaitingDecisionAlert` had the same shape and takes the same classes, so the two
+ * queues on one screen read as one thing rather than as two accidents.
+ */
+.alert-queue {
+  display: grid;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.alert-queue__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+/* The name is what the eye looks for, so it takes the reading edge and the weight, and
+ * pushes everything after it to the far end. */
+.alert-queue__name {
+  font-weight: var(--weight-medium);
+  color: var(--fg);
+  margin-inline-end: auto;
+}
+
+.alert-queue__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+}
+
+/* A real separator between the group and the date, drawn rather than typed: a literal "·"
+ * in the markup would be read aloud by a screen reader as punctuation between two facts
+ * that are already separate elements. */
+.alert-queue__meta > * + *::before {
+  content: '';
+  display: inline-block;
+  inline-size: var(--border-width-hairline);
+  block-size: 0.9em;
+  margin-inline-end: var(--space-2);
+  vertical-align: -0.1em;
+  background: var(--border-strong);
+}
+
+/* `#/alerts` — the six registered queues, one card each, evenly spaced. Before this they
+ * sat straight on the page background and read as six unrelated headings. */
+.alert-centre {
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* Three of the six registered sections hide themselves unconditionally — "a row that never
+ * requires a decision is how that list stops being scanned", as their own comments put it.
+ * They return null, so the `Card` wrapped around them rendered as an empty box: two blank
+ * cards sat between the debt alert and the first real queue, which one look at the screen
+ * showed and no test would have.
+ *
+ * `:empty` and not `:has()`: `Card` renders a bare `<section>` whose only child is the
+ * section, so when that renders nothing the element has no child nodes at all. This is the
+ * precise condition, and it needs no newer selector to say it. */
+.alert-centre > .studio-card:empty {
+  display: none;
+}

@@ -1195,4 +1195,5 @@ export const people: Bundle = {
   'bookTrial.error.email': 'כתובת אימייל לא תקינה',
   'bookTrial.error.consent': 'יש לאשר את התקנון כדי להמשיך',
   'bookTrial.error.health': 'נא לענות על הצהרת הבריאות',
+  'alerts.subtitle': 'כל מה שדורש החלטה — במקום אחד, כולל מה שריק.',
 }

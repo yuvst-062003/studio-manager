@@ -1037,4 +1037,5 @@ export const people: Bundle = {
   'bookTrial.error.email': 'That email address is not valid',
   'bookTrial.error.consent': 'You need to accept the terms to continue',
   'bookTrial.error.health': 'Please answer the health declaration',
+  'alerts.subtitle': 'Everything waiting on a decision — in one place, empty queues included.',
 }

@@ -1037,4 +1037,5 @@ export const people: Bundle = {
   'bookTrial.error.email': 'Некорректный адрес электронной почты',
   'bookTrial.error.consent': 'Чтобы продолжить, примите устав клуба',
   'bookTrial.error.health': 'Ответьте на медицинскую декларацию',
+  'alerts.subtitle': 'Всё, что ждёт решения — в одном месте, включая пустые очереди.',
 }

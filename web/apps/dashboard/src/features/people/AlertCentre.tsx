@@ -7,10 +7,11 @@
 //
 // Hardcoding an alert this lane does not own would put another milestone's work in M3's file
 // and serialize the waves the registry exists to keep parallel.
-import { useSlot } from '@studio/ui'
+import { Card, PageHeader, useSlot } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { DashboardPeopleClient } from './peopleClient'
+import './people.css'
 
 /**
  * What every `alert-centre` section receives.
@@ -60,15 +61,44 @@ export function AlertSections({ locale, client, emptyState = 'show' }: AlertSect
   )
 }
 
+/**
+ * `#/alerts` — the full list, reached from the manager home's `כל ההתראות`.
+ *
+ * Given a page's structure on 2026-09-10, at the owner's request. It had a bare `<h1>` and
+ * then the sections' own `<h2>`s straight onto the page background, so six queues read as
+ * six unrelated headings with dashed boxes between them and nothing tying them together —
+ * beside a home screen that renders the same registry as cards.
+ *
+ * It is NOT merged into the home, though D8 puts the centre there too. The two surfaces
+ * answer different questions and `emptyState` is the difference: the home hides an empty
+ * queue, because on the home an empty alert list is the good day. Here a manager came to
+ * look, and "nothing is waiting" is the answer they came for — so every section renders,
+ * empty or not. That is also why the home's tile links here rather than scrolling itself.
+ */
 export function AlertCentre({ locale, client }: AlertSectionProps) {
   const sections = useSlot<AlertSectionProps>('alert-centre')
   return (
     <section aria-labelledby="alerts-title" data-testid="alert-centre">
-      <h1 id="alerts-title">{t(locale, 'people.alerts.title')}</h1>
+      <PageHeader
+        subtitle={t(locale, 'people.alerts.subtitle')}
+        title={t(locale, 'people.alerts.title')}
+        titleId="alerts-title"
+      />
       {sections.length === 0 ? (
-        <p data-testid="alerts-empty">{t(locale, 'people.alerts.empty')}</p>
+        <Card>
+          <p data-testid="alerts-empty">{t(locale, 'people.alerts.empty')}</p>
+        </Card>
       ) : (
-        <AlertSections locale={locale} client={client} />
+        <div className="alert-centre">
+          {/* Each registered section in its own card. The sections keep their own `<h2>`,
+              so the card supplies the frame and never a second heading — six lanes register
+              here and none of them can be asked to change for this. */}
+          {sections.map(({ key, render: Section }) => (
+            <Card key={key}>
+              <Section client={client} emptyState="show" locale={locale} />
+            </Card>
+          ))}
+        </div>
       )}
     </section>
   )

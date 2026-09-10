@@ -12,6 +12,7 @@ import { Button, EmptyState } from '@studio/ui'
 import { formatDateInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { AlertSectionProps } from '../AlertCentre'
+import '../people.css'
 import type { GroupOption, TrialBookingRow } from '../peopleClient'
 
 export function TrialsAwaitingDecisionAlert({ locale, client, emptyState = 'show' }: AlertSectionProps) {
@@ -61,11 +62,16 @@ export function TrialsAwaitingDecisionAlert({ locale, client, emptyState = 'show
       {rows.length === 0 ? (
         <EmptyState title={t(locale, 'people.trial.outcome.pending')} />
       ) : (
-        <ul>
+        <ul className="alert-queue">
           {rows.map((row) => (
-            <li key={row.id} data-testid="alert-decision-row">
-              <bdi>{row.student_display_name}</bdi>
-              <span>{formatDateInStudioZone(row.booked_at, locale)}</span>
+            <li className="alert-queue__row" key={row.id} data-testid="alert-decision-row">
+              {/* Same shape and the same classes as `UpcomingTrialsAlert` above it. The two
+                  queues sit on one screen, and giving them different row treatments would
+                  make them read as two accidents rather than one list of things to do. */}
+              <bdi className="alert-queue__name">{row.student_display_name}</bdi>
+              <span className="alert-queue__meta">
+                <span>{formatDateInStudioZone(row.booked_at, locale)}</span>
+              </span>
               {/* §5.4a ⑤ — two outcomes, and `lost` is a real one rather than an absence.
                   Both are offered, because a queue with only the happy path is a queue that
                   never empties. */}
