@@ -1476,7 +1476,8 @@ waves:
         status: planned
       - id: W10.18
         title: The class wizard — seven steps, the one screen this port builds
-        status: planned
+        status: shipped
+        on: 2026-09-10
       - id: W10.19
         title: The uPay receipt link — proven against a real transaction, or dropped
         status: planned

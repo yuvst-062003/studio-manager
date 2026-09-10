@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
 import { ScheduleSection, scheduleRoute } from './ScheduleSection'
 import type { ScheduleClient } from './client'
+import type { ClassWizardClient } from './class-wizard/client'
 
 const SESSION_ROW = {
   id: 's1',
@@ -24,6 +25,21 @@ const SESSION_ROW = {
   cancel_reason: null,
   staff: [],
   attendance_taken: false,
+}
+
+function wizardStub(): ClassWizardClient {
+  return new Proxy(
+    {},
+    {
+      get() {
+        // The section routes TO the wizard; it never calls through it. A call arriving
+        // here means the section grew a fetch that belongs a level down.
+        return async () => {
+          throw new Error('the section must not call the wizard client')
+        }
+      },
+    },
+  ) as ClassWizardClient
 }
 
 function stub(overrides: Partial<ScheduleClient> = {}): ScheduleClient {
@@ -84,7 +100,13 @@ function stub(overrides: Partial<ScheduleClient> = {}): ScheduleClient {
 
 function renderAt(hash: string, client = stub()) {
   render(
-    <ScheduleSection locale="he" client={client} hash={hash} today="2026-11-03T12:00:00Z" />,
+    <ScheduleSection
+      client={client}
+      hash={hash}
+      locale="he"
+      today="2026-11-03T12:00:00Z"
+      wizardClient={wizardStub()}
+    />,
   )
   return client
 }
@@ -101,6 +123,16 @@ describe('scheduleRoute', () => {
     // bookmarks. Resolving it to the classes index is the nearest true answer; 404-ing a
     // hash the product itself published would be a dead end of our own making.
     expect(scheduleRoute('#/groups')).toEqual({ view: 'classes' })
+  })
+
+  it('reads the wizard\u2019s two hashes — create and edit', () => {
+    // `new` is matched BEFORE the id pattern: a literal that looks like an id is how a
+    // create route becomes a 404 for one unlucky uuid.
+    expect(scheduleRoute('#/classes/new')).toEqual({ view: 'classWizard' })
+    expect(scheduleRoute('#/classes/abc-123/edit')).toEqual({
+      view: 'classWizard',
+      classId: 'abc-123',
+    })
   })
 
   it('reads a class id out of the class route', () => {
@@ -235,17 +267,24 @@ describe('ScheduleSection', () => {
     // on every render. The guarantee that it does not lives in `useToday.test.ts`.
     const client = stub()
     const { rerender } = render(
-      <ScheduleSection locale="he" client={client} hash="#/classes/c1" today="2026-11-03T12:00:00Z" />,
+      <ScheduleSection
+        client={client}
+        hash="#/classes/c1"
+        locale="he"
+        today="2026-11-03T12:00:00Z"
+        wizardClient={wizardStub()}
+      />,
     )
     await waitFor(() => expect(screen.getAllByTestId(/^group-card-/)).toHaveLength(1))
     const before = vi.mocked(client.putSchedule).mock.calls.length
 
     rerender(
       <ScheduleSection
-        locale="he"
         client={client}
         hash="#/classes/c1"
+        locale="he"
         today="2026-11-03T12:00:00.001Z"
+        wizardClient={wizardStub()}
       />,
     )
     await waitFor(() =>
@@ -259,7 +298,13 @@ describe('ScheduleSection', () => {
     // the caller has to meet: stable inputs in, no requests out.
     const client = stub()
     const view = (
-      <ScheduleSection locale="he" client={client} hash="#/classes/c1" today="2026-11-03T12:00:00Z" />
+      <ScheduleSection
+        client={client}
+        hash="#/classes/c1"
+        locale="he"
+        today="2026-11-03T12:00:00Z"
+        wizardClient={wizardStub()}
+      />
     )
     const { rerender } = render(view)
     await waitFor(() => expect(screen.getAllByTestId(/^group-card-/)).toHaveLength(1))
@@ -285,10 +330,11 @@ describe('ScheduleSection', () => {
   it('uses no physical CSS', async () => {
     const { container } = render(
       <ScheduleSection
-        locale="he"
         client={stub()}
         hash="#/classes/c1"
+        locale="he"
         today="2026-11-03T12:00:00Z"
+        wizardClient={wizardStub()}
       />,
     )
     await waitFor(() => expect(screen.getAllByTestId(/^group-card-/)).toHaveLength(1))

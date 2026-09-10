@@ -597,4 +597,10 @@ export const common: Bundle = {
   'account.group.notifications': 'Notifications and communication',
   'account.group.system': 'System and preferences',
   'account.group.legal': 'Policies and terms',
+  // The shared stepper (§3.21, §3.19, §3.17).
+  'stepper.locked': 'Finish the earlier steps first',
+  'stepper.state.done': 'Done',
+  'stepper.state.skipped': 'Skipped',
+  'stepper.state.current': 'Current step',
+  'stepper.state.upcoming': 'Not reached yet',
 }

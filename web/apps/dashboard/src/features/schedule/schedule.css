@@ -917,9 +917,8 @@ a.group-card__name:focus-visible {
   gap: var(--space-3);
 }
 
-/* The class's own colour, by TOKEN NAME — G13. A class with no colour set falls back to
- * the neutral tint rather than rendering a hole, and the swatches in the edit popup are
- * the same six tokens under the same names. */
+/* One neutral mark on every class card. The per-class colour was cut by the owner, so
+ * there is no token to tint this by and nothing here pretends there is. */
 .class-card__badge {
   display: flex;
   align-items: center;
@@ -930,36 +929,6 @@ a.group-card__name:focus-visible {
   border-radius: var(--radius-md);
   background: var(--disabled-surface);
   color: var(--text-muted);
-}
-
-.class-card__badge[data-colour='emphasis'] {
-  background: var(--emphasis-tint);
-  color: var(--emphasis);
-}
-
-.class-card__badge[data-colour='accent'] {
-  background: var(--emphasis-tint);
-  color: var(--accent);
-}
-
-.class-card__badge[data-colour='debt'] {
-  background: var(--debt-tint);
-  color: var(--debt);
-}
-
-.class-card__badge[data-colour='paid'] {
-  background: var(--paid-tint);
-  color: var(--paid);
-}
-
-.class-card__badge[data-colour='pending'] {
-  background: var(--pending-tint);
-  color: var(--pending);
-}
-
-.class-card__badge[data-colour='cancelled'] {
-  background: var(--cancelled-tint);
-  color: var(--cancelled);
 }
 
 .class-card__titles {
@@ -1031,40 +1000,87 @@ a.group-card__name:focus-visible {
   gap: var(--space-2);
 }
 
-/* ── the small edit popup ───────────────────────────────────────────────────────── */
-.class-dialog__scrim {
-  position: fixed;
-  inset-block: 0;
-  inset-inline: 0;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-4);
-  background: var(--scrim);
-}
-
-.class-dialog {
+/* ═══ The class wizard — §3.21 ═════════════════════════════════════════════════════
+ * Seven steps on one page, the shared stepper across the top, and a step body that owns
+ * its own reads and writes. The container is a screen and not a modal: it is seven steps
+ * long, it survives a reload, and every one of its steps is a real hash a manager can
+ * bookmark or open in a tab. */
+.class-wizard {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   inline-size: 100%;
-  max-inline-size: 28rem;
-  max-block-size: 90vh;
-  overflow-y: auto;
-  background: var(--surface-raised);
+}
+
+.class-wizard__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.class-wizard__title {
+  margin: 0;
+  font-size: var(--text-display);
+  font-weight: var(--weight-semibold);
+}
+
+.class-wizard__subtitle {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.class-wizard__body {
+  background: var(--surface);
   border: var(--border-width-hairline) solid var(--border);
   border-radius: var(--radius-xl);
   padding: var(--space-5);
 }
 
-.class-dialog__title {
-  margin: 0;
-  font-size: var(--text-title);
-  font-weight: var(--weight-semibold);
+.class-wizard__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
 }
 
-.class-dialog__field {
+.class-wizard__count {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+
+  /* Pushed to the reading end when Back is absent on step 1. */
+  margin-inline-start: auto;
+}
+
+/* ── one step's body ────────────────────────────────────────────────────────────── */
+.wizard-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  align-items: stretch;
+}
+
+.wizard-step__lead {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.wizard-step__note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.wizard-step__error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-caption);
+}
+
+.wizard-step__field {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -1072,7 +1088,7 @@ a.group-card__name:focus-visible {
   color: var(--text-secondary);
 }
 
-.class-dialog__field > textarea {
+.wizard-step__field > textarea {
   font-family: inherit;
   font-size: var(--text-body);
   color: var(--fg);
@@ -1083,73 +1099,179 @@ a.group-card__name:focus-visible {
   resize: vertical;
 }
 
-/* NOT a flex container. A `<legend>` is not a flex item in every engine, so the label
- * floated onto the swatch row instead of sitting above it. Block layout, and the legend
- * carries its own spacing. */
-.class-dialog__colours {
-  border: 0;
+.wizard-step__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+}
+
+.wizard-step__box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
   margin: 0;
+  padding: var(--space-4);
+  background: var(--ground);
+}
+
+.wizard-step__box > legend,
+.wizard-step__box > h3 {
   padding: 0;
+  margin: 0;
   font-size: var(--text-label);
+  font-weight: var(--weight-medium);
   color: var(--text-secondary);
 }
 
-.class-dialog__colours > legend {
-  padding: 0;
-  margin-block-end: var(--space-2);
+.wizard-step__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding-block-start: var(--space-3);
+  border-block-start: var(--border-width-hairline) solid var(--border);
 }
 
-.class-dialog__swatches {
+/* ── the lists a step renders ───────────────────────────────────────────────────── */
+.wizard-list,
+.wizard-groups,
+.wizard-coach-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.wizard-list__item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.wizard-list__name {
+  font-weight: var(--weight-medium);
+  flex: 1;
+}
+
+.wizard-list__meta {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.wizard-groups__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.wizard-groups__head {
+  display: flex;
   align-items: center;
   gap: var(--space-2);
 }
 
-/* Every swatch carries `aria-pressed`, so which colour is chosen lives in the
- * accessibility tree and drives the ring from the same attribute — a colour choice must
- * not be conveyed by colour alone. */
-.class-dialog__swatch {
-  inline-size: 2rem;
-  block-size: 2rem;
-  border-radius: var(--radius-md);
-  border: var(--border-width-hairline) solid var(--border-strong);
-  cursor: pointer;
-  font-family: inherit;
+.wizard-groups__ages {
+  color: var(--text-muted);
   font-size: var(--text-caption);
-  color: var(--text-secondary);
-  background: var(--surface);
+  font-variant-numeric: tabular-nums;
 }
 
-.class-dialog__swatch[data-swatch='none'] {
-  inline-size: auto;
-  padding-inline: var(--space-3);
-}
-
-.class-dialog__swatch[data-swatch='emphasis'] { background: var(--emphasis); }
-.class-dialog__swatch[data-swatch='debt'] { background: var(--debt); }
-.class-dialog__swatch[data-swatch='paid'] { background: var(--paid); }
-.class-dialog__swatch[data-swatch='pending'] { background: var(--pending); }
-.class-dialog__swatch[data-swatch='cancelled'] { background: var(--cancelled); }
-
-.class-dialog__swatch[aria-pressed='true'] {
-  outline: var(--border-width-strong) solid var(--fg);
-  outline-offset: 2px;
-}
-
-.class-dialog__swatch:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.class-dialog__error {
+.wizard-groups__locked {
   margin: 0;
-  color: var(--danger);
+  color: var(--text-muted);
   font-size: var(--text-caption);
 }
 
-.class-dialog__actions {
+.wizard-rules {
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.wizard-rules__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-2);
+}
+
+/* ── the belt ladder, step 4 ────────────────────────────────────────────────────── */
+.wizard-ladder {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.wizard-ladder__rung {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+}
+
+/* The belt's own colour, which is a FACT about the belt and comes from the row rather than
+ * from a token — a white belt is white in every theme. It sits beside the name, never
+ * instead of it. */
+.wizard-ladder__swatch {
+  inline-size: 0.75rem;
+  block-size: 0.75rem;
+  border-radius: var(--radius-pill);
+  border: var(--border-width-hairline) solid var(--border-strong);
+}
+
+.wizard-ladder__kyu {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── the summary, step 7 ────────────────────────────────────────────────────────── */
+.wizard-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3);
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.wizard-summary__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
   gap: var(--space-3);
+  font-size: var(--text-caption);
+}
+
+.wizard-summary__row > dt {
+  color: var(--text-muted);
+}
+
+/* `> dd` again, and stylelint is right that it reads after a more specific sibling — the
+ * two never meet, one being inside a summary row and the other inside a group card's
+ * fact, but the rule is about the file's readability rather than the cascade. Named
+ * rather than reordered: moving it would split the summary block in half. */
+/* stylelint-disable-next-line no-descending-specificity */
+.wizard-summary__row > dd {
+  margin: 0;
 }

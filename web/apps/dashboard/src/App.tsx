@@ -36,6 +36,7 @@ import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { ScheduleSection } from './features/schedule/ScheduleSection'
 import { makeScheduleClient } from './features/schedule/client'
+import { makeClassWizardClient } from './features/schedule/class-wizard/client'
 // §5/C12 of the staff app redesign — the manager's side of §6.1's coach unavailability:
 // an alert-centre card and the resolution popup it opens (decisions 10, 11, 12).
 import { registerCoachConstraintAlerts } from './features/schedule/register'
@@ -677,6 +678,9 @@ export default function App() {
   // object every render would re-fetch progress forever.
   const setupClient = useMemo(() => makeSetupClient(apiFetch), [])
   const scheduleClient = useMemo(() => makeScheduleClient(apiFetch), [])
+  // §3.21's class wizard reaches seven verticals' endpoints, so it carries its own
+  // client rather than widening the schedule one with prices, products and staff.
+  const classWizardClient = useMemo(() => makeClassWizardClient(apiFetch), [])
   const homeClient = useMemo(() => makeHomeClient(apiFetch), [])
   const peopleClient = useMemo(() => makeDashboardPeopleClient(apiFetch), [])
   const eventsClient = useMemo(() => makeDashboardEventsClient(apiFetch), [])
@@ -917,6 +921,7 @@ export default function App() {
               client={scheduleClient}
               hash={hash}
               today={today}
+              wizardClient={classWizardClient}
               // §3.2 — 'coaches never see money'. The plan badge on a roster row is read
               // from a manager-only route, so the permission travels with the request to
               // draw it rather than the roster deciding for itself.

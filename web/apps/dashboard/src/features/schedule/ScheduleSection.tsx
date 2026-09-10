@@ -15,13 +15,21 @@ import { EmptyState } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { ClassesScreen } from './ClassesScreen'
+import { ClassWizard } from './class-wizard/ClassWizard'
 import { ClosuresPanel } from './ClosuresPanel'
 import { GroupSchedulePage } from './GroupSchedulePage'
 import { GroupsAndCycles } from './GroupsAndCycles'
 import { WeekBoard } from './WeekBoard'
 import type { ClassSummary, GroupSummary, ScheduleClient, TrainingYear } from './client'
+import type { ClassWizardClient } from './class-wizard/client'
 
-export type ScheduleView = 'week' | 'classes' | 'classGroups' | 'group' | 'closures'
+export type ScheduleView =
+  | 'week'
+  | 'classes'
+  | 'classGroups'
+  | 'classWizard'
+  | 'group'
+  | 'closures'
 
 export interface ScheduleRoute {
   view: ScheduleView
@@ -30,18 +38,26 @@ export interface ScheduleRoute {
 }
 
 /**
- * `#/schedule` · `#/classes` · `#/classes/<id>` · `#/groups/<id>` · `#/closures`. Anything
- * else is the board.
+ * `#/schedule` · `#/classes` · `#/classes/new` · `#/classes/<id>` · `#/classes/<id>/edit` ·
+ * `#/groups/<id>` · `#/closures`. Anything else is the board.
  *
  * `#/groups` — the flat list of every group in the club — resolves to the classes index
  * rather than 404-ing: it is the hash the nav pointed at until this checkpoint, so it is
  * in real bookmarks, and the screen it named has been replaced rather than deleted.
+ *
+ * `new` is matched BEFORE the id pattern, the same way `#/students/new` is: a literal that
+ * looks like an id is how a create route becomes a 404 for one unlucky uuid.
  */
 export function scheduleRoute(hash: string): ScheduleRoute {
   const path = hash.replace(/^#\/?/, '')
   if (path === 'closures') return { view: 'closures' }
   if (path === 'classes' || path === 'groups') return { view: 'classes' }
-  const klass = /^classes\/(.+)$/.exec(path)
+  // Creating: the wizard with no class behind it yet.
+  if (path === 'classes/new') return { view: 'classWizard' }
+  // Editing: the same wizard, opened on what the class already has.
+  const editing = /^classes\/([^/]+)\/edit$/.exec(path)
+  if (editing?.[1]) return { view: 'classWizard', classId: editing[1] }
+  const klass = /^classes\/([^/]+)$/.exec(path)
   if (klass?.[1]) return { view: 'classGroups', classId: klass[1] }
   const group = /^groups\/(.+)$/.exec(path)
   if (group?.[1]) return { view: 'group', groupId: group[1] }
@@ -54,12 +70,15 @@ export function ScheduleSection({
   locale,
   client,
   hash,
+  wizardClient,
   today,
   canSeeMoney = false,
 }: {
   locale: Locale
   client: ScheduleClient
   hash: string
+  /** The wizard's own client — seven verticals' endpoints, injected like every other. */
+  wizardClient: ClassWizardClient
   /** An ISO instant. A prop, not `new Date()`, all the way down. */
   today: string
   /** §3.2 — coaches never see money, so only a manager gets the plan badge on a roster. */
@@ -70,6 +89,8 @@ export function ScheduleSection({
   // renders — one read for both rather than a count endpoint the API does not have.
   const needsGroups =
     route.view === 'classes' || route.view === 'classGroups' || route.view === 'group'
+  // The wizard fetches for itself, step by step — it is seven screens' worth of data and
+  // loading all of it up here would make opening step 1 wait on step 6.
   const needsYear = route.view === 'closures'
 
   const [groups, setGroups] = useState<GroupSummary[] | null>(null)
@@ -169,6 +190,19 @@ export function ScheduleSection({
     )
   }
 
+  if (route.view === 'classWizard') {
+    return (
+      <ClassWizard
+        classId={route.classId ?? null}
+        client={wizardClient}
+        locale={locale}
+        onExit={(classId) => {
+          globalThis.location.hash = classId ? `#/classes/${classId}` : '#/classes'
+        }}
+      />
+    )
+  }
+
   if (route.view === 'classGroups') {
     if (groups === null) return null
     const mine = groupList.filter((group) => group.classId === route.classId)
@@ -194,6 +228,7 @@ export function ScheduleSection({
         client={client}
         groups={groupList}
         hrefForClass={(classId) => `#/classes/${classId}`}
+        hrefForWizard={(classId) => (classId ? `#/classes/${classId}/edit` : '#/classes/new')}
         locale={locale}
         onChanged={() => setGroupsVersion((n) => n + 1)}
       />

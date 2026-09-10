@@ -6,31 +6,28 @@
 // one card per program with its eyebrow, name, description, status badge and its belt
 // ladder — and its groups tab is what sits one level down.
 //
-// The two ways in differ, and the owner named both:
-//
-//   * **an existing class opens a small popup** to correct its name, description or
-//     colour — `ClassEditDialog`, and `PATCH /api/v1/classes/{id}`, which did not exist
-//     until this checkpoint;
-//   * **a new class opens the seven-step wizard** — §3.21, its own checkpoint. Until that
-//     lands the create button opens the same small popup against `POST /classes`, which
-//     is less than the wizard and is not a dead end; the wizard replaces it in place.
+// **Both ways in are the wizard.** A first pass put a small edit popup beside it; the
+// owner cut it — *"remove the popup, it's irrelevant. If want to edit, then the full
+// wizard, but with the details already in it."* So `⋯ → עריכה` and `חוג חדש` open the same
+// seven steps (§3.21), the first on what the class already has and the second empty.
 //
 // D2 still holds: no capacity, no occupancy bar. What a class card carries instead is how
 // many groups it has, which is a number this screen can count rather than one nobody
-// stores.
+// stores. And no colour: the owner cut that too, so the badge is the same neutral mark on
+// every card and `class.color` is a column nothing writes.
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, EmptyState, Icon, LoadFailed, PageHeader, RowActions, StatusChip } from '@studio/ui'
+import { EmptyState, Icon, LoadFailed, PageHeader, RowActions, StatusChip } from '@studio/ui'
 import { fill } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { ClassEditDialog } from './ClassEditDialog'
-import type { ClassDraft, ClassSummary, GroupSummary, ScheduleClient } from './client'
+import type { ClassSummary, GroupSummary, ScheduleClient } from './client'
 
 export function ClassesScreen({
   locale,
   client,
   groups,
   hrefForClass,
+  hrefForWizard,
   onChanged,
 }: {
   locale: Locale
@@ -38,14 +35,14 @@ export function ClassesScreen({
   /** Already fetched by the section for the drill-in; counted here rather than re-read. */
   groups: GroupSummary[]
   hrefForClass: (classId: string) => string
+  /** Where the wizard lives, for a class or for a new one. */
+  hrefForWizard: (classId: string | null) => string
   /** Absent in a read-only mount — then no create button and no row actions. */
   onChanged?: () => void
 }) {
   const [classes, setClasses] = useState<ClassSummary[] | null>(null)
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
-  /** `null` = closed · `{ klass: null }` = create · `{ klass }` = edit. */
-  const [editing, setEditing] = useState<{ klass: ClassSummary | null } | null>(null)
 
   useEffect(() => {
     let live = true
@@ -70,21 +67,6 @@ export function ClassesScreen({
     return counts
   }, [groups])
 
-  const save = useCallback(
-    async (draft: ClassDraft) => {
-      const target = editing?.klass
-      if (target) await client.updateClass(target.id, draft)
-      else await client.createClass(draft)
-      // Closed only on success — `ClassEditDialog` renders the failure itself and keeps
-      // what was typed, so a failed save is never a popup that vanished with the words in
-      // it.
-      setEditing(null)
-      setClasses(await client.listClasses())
-      onChanged?.()
-    },
-    [client, editing, onChanged],
-  )
-
   const retire = useCallback(
     async (klass: ClassSummary) => {
       await client.updateClass(klass.id, { is_active: !klass.isActive })
@@ -98,13 +80,16 @@ export function ClassesScreen({
     <PageHeader
       actions={
         onChanged ? (
-          <Button
+          // A link, not a button: the wizard is a route, so it opens in a new tab and the
+          // back button works — the same reasoning `App.tsx` gives for hash routing.
+          <a
+            className="studio-btn"
             data-testid="new-class-open"
-            onClick={() => setEditing({ klass: null })}
-            variant="secondary"
+            data-variant="secondary"
+            href={hrefForWizard(null)}
           >
             {t(locale, 'schedule.classes.create')}
-          </Button>
+          </a>
         ) : null
       }
       subtitle={t(locale, 'schedule.classes.subtitle')}
@@ -130,21 +115,11 @@ export function ClassesScreen({
 
   if (classes === null) return null
 
-  const dialog = editing ? (
-    <ClassEditDialog
-      klass={editing.klass}
-      locale={locale}
-      onCancel={() => setEditing(null)}
-      onSave={save}
-    />
-  ) : null
-
   if (classes.length === 0) {
     return (
       <section aria-labelledby="classes-title">
         {header}
         <EmptyState title={t(locale, 'schedule.classes.empty')} />
-        {dialog}
       </section>
     )
   }
@@ -163,14 +138,9 @@ export function ClassesScreen({
           return (
             <li className="class-card" data-testid={`class-card-${klass.id}`} key={klass.id}>
               <div className="class-card__head">
-                {/* The class's own colour, as a token name — G13. `data-colour` drives the
-                    tint from CSS, so a class with no colour set simply falls back to the
-                    neutral badge rather than rendering a hole. */}
-                <span
-                  aria-hidden="true"
-                  className="class-card__badge"
-                  data-colour={klass.color ?? undefined}
-                >
+                {/* One neutral mark on every card. The owner cut the per-class colour, so
+                    there is nothing here to tint it by and nothing pretending there is. */}
+                <span aria-hidden="true" className="class-card__badge">
                   <Icon name="groups" />
                 </span>
                 <span className="class-card__titles">
@@ -195,7 +165,9 @@ export function ClassesScreen({
                       {
                         id: 'edit',
                         label: t(locale, 'schedule.classes.edit'),
-                        onSelect: () => setEditing({ klass }),
+                        onSelect: () => {
+                          globalThis.location.hash = hrefForWizard(klass.id)
+                        },
                       },
                       {
                         id: 'retire',
@@ -231,8 +203,6 @@ export function ClassesScreen({
           )
         })}
       </ul>
-
-      {dialog}
     </section>
   )
 }

@@ -1,0 +1,129 @@
+/* The shared stepper. One definition for the class wizard, the setup wizard and rollover.
+ *
+ * The rail scrolls inline rather than wrapping: seven nodes on a 390px phone would stack
+ * into a column that pushes the step body off the screen, and a manager reading "step 3 of
+ * 7" wants the rail to be a strip, not a table of contents. */
+.studio-stepper {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  overflow-x: auto;
+  padding-block-end: var(--space-2);
+}
+
+.studio-stepper__node {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.studio-stepper__node:last-child {
+  flex: none;
+}
+
+.studio-stepper__button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  background: transparent;
+  border: 0;
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.studio-stepper__button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The numbered circle. Its state drives BOTH the tint and the mark inside it, so the two
+ * cannot disagree — and the state is also in the accessibility tree as a word. */
+.studio-stepper__mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  border-radius: var(--radius-pill);
+  border: var(--border-width-hairline) solid var(--border-strong);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.studio-stepper__button[data-state='current'] {
+  color: var(--fg);
+}
+
+.studio-stepper__button[data-state='current'] .studio-stepper__mark {
+  background: var(--emphasis);
+  border-color: var(--emphasis);
+  color: var(--on-emphasis);
+}
+
+.studio-stepper__button[data-state='done'] {
+  color: var(--text-secondary);
+}
+
+.studio-stepper__button[data-state='done'] .studio-stepper__mark {
+  background: var(--emphasis-tint);
+  border-color: var(--emphasis);
+  color: var(--emphasis);
+}
+
+/* A skip is an answer but not a finish, and it looks like neither of the other two. */
+.studio-stepper__button[data-state='skipped'] .studio-stepper__mark {
+  background: var(--disabled-surface);
+  border-style: dashed;
+}
+
+.studio-stepper__text {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+
+.studio-stepper__title {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.studio-stepper__subtitle {
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* The rule between two nodes. It flips with `dir` on its own — it is a flex sibling, not a
+ * positioned element — which is why there is no physical property here. */
+.studio-stepper__rule {
+  flex: 1;
+  min-inline-size: var(--space-4);
+  block-size: var(--border-width-hairline);
+  background: var(--border);
+}
+
+.studio-stepper__rule[data-state='done'],
+.studio-stepper__rule[data-state='skipped'] {
+  background: var(--emphasis);
+}
+
+/* Below the rail's own breakpoint the subtitles are noise — the titles alone still say
+ * where the manager is, and seven two-line labels on a phone are a wall. */
+@media (width <= 48rem) {
+  .studio-stepper__subtitle {
+    display: none;
+  }
+}

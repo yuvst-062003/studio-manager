@@ -394,12 +394,18 @@ sits one level down. The screen is now two:
 `#/groups` — the hash the nav pointed at until this checkpoint, and therefore in real
 bookmarks — resolves to the classes index rather than 404-ing.
 
-**The two ways in differ, and that is the point of the correction.**
+**Both ways in are the wizard — corrected again, 2026-09-10.** The first build put a small
+edit popup beside it, on the reading that correcting a name is not a seven-step flow. The
+owner cut it: *"remove the popup, it's irrelevant. If want to edit, then the full wizard,
+but with the details already in it."* One flow, two entrances:
 
-| | Opens | Writes | Why |
-|---|---|---|---|
-| An existing class | **A small popup** (`ClassEditDialog`) | `PATCH /api/v1/classes/{id}` | Correcting a name is not a seven-step flow. The popup edits the four columns `class` actually has and nothing else. |
-| A new class | **The seven-step wizard** (§3.21) | Each step its own call | A class needs groups, a schedule, prices, a ladder and coaches before it can take a student. That is the wizard's job. |
+| | Opens | Writes |
+|---|---|---|
+| An existing class (`⋯ → עריכה`) | **§3.21's seven steps, pre-filled** at `#/classes/<id>/edit` | `PATCH /classes/{id}`, then each later step's own call |
+| A new class (`חוג חדש`) | **The same seven steps, empty** at `#/classes/new` | `POST /classes` on step 1, then the same |
+
+Retiring a class stays on the row menu and is not an edit: it is one field and no flow, and
+sending it through seven steps would be the opposite mistake to the one the popup made.
 
 **`PATCH /api/v1/classes/{id}` did not exist.** `ClassUpdate` had been sitting in
 `app/schemas/structure.py` since the model landed with no route using it, so a club that
@@ -408,10 +414,11 @@ shape as `GroupPatch` — `model_fields_set` decides, so an absent field leaves 
 alone — the same 409 on a duplicate name that `POST /classes` gives, and manager-or-owner
 only, per §3.2's matrix. No migration: every column already exists.
 
-The popup stores a colour as a **token name, never a hex literal** (G13, and the model's own
-docstring). It offers five swatches rather than six: `[data-surface="studio-os"]` gives
-`--accent` and `--emphasis` the same mint, so offering both would be two swatches a manager
-cannot tell apart that produce the same badge.
+**No per-class colour.** The first build offered a palette of token names (G13 forbids a hex
+literal); the owner cut the feature outright — *"and no need class color"*. `class.color`
+stays in the schema and nothing writes it, the wizard has no swatch, and every class card
+carries the same neutral mark. A tinted badge with nothing behind it would be worse than
+none.
 
 **D1's class chips are not on this screen.** They were, in the first build, filtering the
 flat list. The classes index *is* that choice, made better — so the chips came out and the
@@ -1295,8 +1302,16 @@ migration.
 | 7 | Registration and launch | `POST /api/v1/onboarding-link`, `GET /api/v1/students` for the import picker | `requireHealthDeclaration` is **not a toggle** — §5.5 makes it a hard gate, and §3.19 already records that a contract test fails if such a setting reappears. Render it as a stated fact, not a switch. The link is the real onboarding link, with its existing revoke path. |
 
 **Port.** Take the stepper, the two-line step labels, the per-step validation with one named error,
-and the "שלב N מתוך 7" footer. The stepper is the **same component checkpoint 17 builds for the
-setup wizard** — built once in `packages/ui`, consumed three times (setup, rollover, class).
+and the "שלב N מתוך 7" footer. The stepper is built once, in
+`packages/ui/src/wizard/Stepper.tsx`, and consumed three times — the class wizard now, the setup
+wizard at checkpoint 17, rollover at 15. **It keeps a status word on every node, which the
+prototype does not have**: the setup wizard already learned that lesson when an owner reported
+"finished them all, still says 6/7" because `done` and `skipped` shared one ✓.
+
+**Built at checkpoint 6, not 18.** The owner's correction — *"if want to edit, then the full
+wizard, but with the details already in it"* — makes the wizard the only editor a class has, so it
+could not wait for a later checkpoint without leaving the classes screen with no way to change
+anything.
 
 **Improve.**
 - **The wizard must be resumable, or it must not start.** The setup wizard persists through
@@ -1396,8 +1411,8 @@ screenshots the result beside the prototype into
 | 14 | Belts, exams, events | §3.9, §3.10. Includes the rank-rename gap and event attendance |
 | 15 | Documents, staff, settings, rollover | §3.11, §3.17–3.19. Includes the settings load-error defect. **The setup wizard is not here** — it moved to checkpoint 17, because it is shared with the staff app. Rollover is restyled here and gets its stepper in 17 |
 | 16 | Platform | §3.14. One person sees it |
-| 17 | **The setup wizard** — the shared stepper, built once | §3.19. Added 2026-09-10 at the owner's request. Its composition changes land in the **staff app** too, so it is proven with two screenshots, not one. The stepper it builds is then mounted by rollover (§3.17), which checkpoint 15 restyles but does not re-compose |
-| 18 | **The class wizard** — seven steps, `#/classes/new` | §3.21. Added 2026-09-10 at the owner's request. The only checkpoint that builds a screen rather than porting one. Consumes 17's stepper and five of the setup wizard's step components |
+| 17 | **The setup wizard** — mounts the shared stepper | §3.19. Added 2026-09-10 at the owner's request. The stepper itself was built at checkpoint 6 with the class wizard; this checkpoint adopts it and re-composes the setup flow around it. Its changes land in the **staff app** too, so it is proven with two screenshots, not one |
+| 18 | ~~**The class wizard**~~ — **done inside checkpoint 6** | §3.21. Pulled forward the same day: the owner cut the small edit popup, which made the wizard the ONLY editor a class has, so it could not wait. It also built the shared stepper that 17 and 15 consume. Nothing is left of this checkpoint |
 | 19 | **The uPay receipt link** | **D6 — alone, and after every screen.** Until this checkpoint the paid row shows the typed receipt number as plain text and no button. Here: prove against a real uPay transaction that a per-receipt link exists and opens; if it does, add the button; if it does not, the row keeps the plain number and this checkpoint ships nothing. Either outcome is a result — record which |
 
 Checkpoint 1 serialises against everything. Checkpoints 2 and 15 both touch `App.tsx` and must not
