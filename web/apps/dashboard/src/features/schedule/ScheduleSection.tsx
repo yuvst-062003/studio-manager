@@ -212,6 +212,7 @@ export function ScheduleSection({
         classId={route.classId}
         className={klass?.name}
         client={client}
+        discipline={klass?.discipline}
         groups={mine}
         hrefForGroup={(groupId) => `#/groups/${groupId}`}
         locale={locale}

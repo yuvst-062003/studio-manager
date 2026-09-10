@@ -148,6 +148,68 @@ const PATHS = {
       <path d="m6 6 12 12" />
     </>
   ),
+  // -- the class/group set (2026-09-10) -------------------------------------------------
+  // The prototype gives every group card a pictogram for its discipline and puts a small
+  // icon beside each fact in the card's well. The set had neither, so a card's three facts
+  // read as three unlabelled lines. Same 24x24 stroke grid, same grammar as the rest.
+  //
+  // `martialArts` is the DEFAULT a class gets when its discipline names nothing we draw —
+  // this is a judo club, and a club that types 'קרב מגע' should still get a mark rather
+  // than a hole.
+  martialArts: (
+    <>
+      <path d="M7 4a2 2 0 1 1 4 0 2 2 0 0 1-4 0Z" />
+      <path d="M9 8v4l-3 3 2 5" />
+      <path d="M9 12h4l4-3" />
+      <path d="m13 12 2 4-2 4" />
+    </>
+  ),
+  fitness: (
+    <>
+      <path d="M4 9v6" />
+      <path d="M20 9v6" />
+      <path d="M7 6v12" />
+      <path d="M17 6v12" />
+      <path d="M7 12h10" />
+    </>
+  ),
+  pool: (
+    <>
+      <path d="M2 17c1.5 0 1.5 1.2 3 1.2s1.5-1.2 3-1.2 1.5 1.2 3 1.2 1.5-1.2 3-1.2 1.5 1.2 3 1.2 1.5-1.2 3-1.2" />
+      <path d="M7 15V6a2 2 0 0 1 4 0" />
+      <path d="M13 15V6a2 2 0 0 1 4 0" />
+      <path d="M7 10h6" />
+    </>
+  ),
+  ball: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 3c3 3 3 15 0 18" />
+      <path d="M12 3c-3 3-3 15 0 18" />
+      <path d="M3.5 9h17" />
+      <path d="M3.5 15h17" />
+    </>
+  ),
+  // The three facts on a group card, in the prototype's own order.
+  location: (
+    <>
+      <path d="M20 10c0 5-8 12-8 12s-8-7-8-12a8 8 0 0 1 16 0Z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </>
+  ),
+  whistle: (
+    <>
+      <path d="M13 8h7a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-7" />
+      <circle cx="8" cy="12" r="5" />
+      <path d="M8 5V3" />
+    </>
+  ),
 } as const
 
 export function Icon({

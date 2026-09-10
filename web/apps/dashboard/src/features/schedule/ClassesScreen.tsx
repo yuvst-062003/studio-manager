@@ -20,6 +20,7 @@ import { EmptyState, Icon, LoadFailed, PageHeader, RowActions, StatusChip } from
 import { fill } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { disciplineIcon } from './disciplineIcon'
 import type { ClassSummary, GroupSummary, ScheduleClient } from './client'
 
 export function ClassesScreen({
@@ -138,10 +139,12 @@ export function ClassesScreen({
           return (
             <li className="class-card" data-testid={`class-card-${klass.id}`} key={klass.id}>
               <div className="class-card__head">
-                {/* One neutral mark on every card. The owner cut the per-class colour, so
-                    there is nothing here to tint it by and nothing pretending there is. */}
+                {/* The class's own pictogram, chosen from its discipline the way the
+                    prototype chooses one per program. The COLOUR is still neutral on every
+                    card — the owner cut the per-class colour — so the mark distinguishes a
+                    class without inventing a palette. */}
                 <span aria-hidden="true" className="class-card__badge">
-                  <Icon name="groups" />
+                  <Icon name={disciplineIcon(klass.discipline)} size={22} />
                 </span>
                 <span className="class-card__titles">
                   {klass.discipline ? (

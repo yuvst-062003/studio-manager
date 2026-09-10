@@ -456,10 +456,13 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  inline-size: 2rem;
-  block-size: 2rem;
+  inline-size: 2.25rem;
+  block-size: 2.25rem;
   border-radius: var(--radius-md);
   background: var(--emphasis-tint);
+
+  /* The hairline the prototype puts round every card mark. Without it the tint floats. */
+  border: var(--border-width-hairline) solid var(--emphasis);
   color: var(--emphasis);
 }
 
@@ -510,14 +513,25 @@ a.group-card__name:focus-visible {
 
 .group-card__fact {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
 }
 
+/* The label carries the icon, so the two never separate — and the icon rides on the
+ * label's own colour, which is what makes a `data-tone` change both at once. */
 .group-card__fact > dt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   color: var(--text-muted);
   flex-shrink: 0;
+}
+
+.group-card__fact-icon {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--emphasis);
 }
 
 .group-card__fact > dd {
@@ -529,9 +543,16 @@ a.group-card__name:focus-visible {
 
 /* The unscheduled count above zero. The label sits beside it in every state, so the
  * colour is the second signal and never the only one. */
+
+/* Above zero the whole row turns — icon, label and count — so the state is carried by the
+ * mark and the wording as well as the colour. */
 .group-card__fact[data-tone='danger'] > dd {
   color: var(--danger);
   font-weight: var(--weight-semibold);
+}
+
+.group-card__fact[data-tone='danger'] .group-card__fact-icon {
+  color: var(--danger);
 }
 
 /* Present only while a rename is open — see the component. */
@@ -924,11 +945,12 @@ a.group-card__name:focus-visible {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  inline-size: 2.25rem;
-  block-size: 2.25rem;
-  border-radius: var(--radius-md);
-  background: var(--disabled-surface);
-  color: var(--text-muted);
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  border-radius: var(--radius-lg);
+  background: var(--emphasis-tint);
+  border: var(--border-width-hairline) solid var(--emphasis);
+  color: var(--emphasis);
 }
 
 .class-card__titles {

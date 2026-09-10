@@ -36,9 +36,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Button, EmptyState, Icon, PageHeader, RowActions, StatusChip, TextField } from '@studio/ui'
+import type { IconName } from '@studio/ui'
 import { apiFetch, fill, formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { disciplineIcon } from './disciplineIcon'
 import type { GroupSummary, ScheduleClient, ScheduleRule, SessionRow } from './client'
 
 interface GroupFacts {
@@ -63,21 +65,32 @@ function coachOf(session: SessionRow): string | null {
 }
 
 /** One labelled fact inside a card's well. `<dt>`/`<dd>` rather than two spans: the label
- *  and its value are a pair, and a screen reader that can say so should. */
+ *  and its value are a pair, and a screen reader that can say so should.
+ *
+ *  The icon is the prototype's — it puts a small pictogram before every fact in a group
+ *  card's well, which is what makes three lines scannable rather than three lines. It is
+ *  decorative: the label is always beside it, so nothing is carried by the picture alone. */
 function Fact({
   label,
   children,
+  icon,
   testId,
   tone,
 }: {
   label: string
   children: ReactNode
+  icon: IconName
   testId?: string
   tone?: 'danger'
 }) {
   return (
     <div className="group-card__fact" data-tone={tone}>
-      <dt>{label}</dt>
+      <dt>
+        <span className="group-card__fact-icon">
+          <Icon name={icon} size={15} />
+        </span>
+        {label}
+      </dt>
       <dd data-testid={testId}>{children}</dd>
     </div>
   )
@@ -92,6 +105,7 @@ export function GroupsAndCycles({
   onChanged,
   className,
   classId,
+  discipline,
   backHref,
 }: {
   locale: Locale
@@ -99,6 +113,8 @@ export function GroupsAndCycles({
   groups: GroupSummary[]
   /** The class these groups belong to. Names the screen and pre-fills the create form. */
   className?: string
+  /** The class's discipline, which picks every card's pictogram. */
+  discipline?: string | null
   /** Set on the create form, so a group made here lands in the class the manager is in. */
   classId?: string
   /** Where "back to classes" goes. Absent in a standalone mount. */
@@ -298,8 +314,10 @@ export function GroupsAndCycles({
           return (
             <li className="group-card" data-testid={`group-card-${group.id}`} key={group.id}>
               <div className="group-card__head">
+                {/* The class's pictogram, the way the prototype marks every group card.
+                    Decorative — the group's name is right beside it. */}
                 <span aria-hidden="true" className="group-card__badge">
-                  <Icon name="groups" />
+                  <Icon name={disciplineIcon(discipline ?? group.className)} size={20} />
                 </span>
                 <span className="group-card__titles">
                   {/* The class reads as the card's eyebrow — where the prototype puts the
@@ -368,6 +386,7 @@ export function GroupsAndCycles({
 
               <dl className="group-card__well">
                 <Fact
+                  icon="clock"
                   label={t(locale, 'schedule.groups.weeklySchedule')}
                   testId={`schedule-${group.id}`}
                 >
@@ -378,7 +397,11 @@ export function GroupsAndCycles({
                     : t(locale, 'schedule.rules.empty')}
                 </Fact>
 
-                <Fact label={t(locale, 'schedule.groups.nextSession')} testId={`next-${group.id}`}>
+                <Fact
+                  icon="calendar"
+                  label={t(locale, 'schedule.groups.nextSession')}
+                  testId={`next-${group.id}`}
+                >
                   {next
                     ? `${formatDateInStudioZone(next.starts_at, locale)} · ${formatTimeInStudioZone(
                         next.starts_at,
@@ -392,6 +415,7 @@ export function GroupsAndCycles({
                     fixed pair when a substitute is taking Tuesday. */}
                 {next && (coach || room) ? (
                   <Fact
+                    icon="whistle"
                     label={t(locale, 'schedule.groups.nextCoachRoom')}
                     testId={`next-where-${group.id}`}
                   >
@@ -404,6 +428,9 @@ export function GroupsAndCycles({
                     `--danger` when above zero, with the label beside it — never colour
                     alone. */}
                 <Fact
+                  // The icon changes with the state, so the warning is not the colour's
+                  // job alone — a zero is a person-shaped mark and a non-zero is a warning.
+                  icon={unscheduled > 0 ? 'warning' : 'students'}
                   label={t(locale, 'schedule.groups.unscheduledStudents')}
                   testId={`unscheduled-${group.id}`}
                   tone={unscheduled > 0 ? 'danger' : undefined}
