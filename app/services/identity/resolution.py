@@ -290,8 +290,14 @@ def studios_for_identity(session: Session, identity_id: uuid.UUID) -> list[Studi
             )
             # The other half of that split. `manager` only: a class-scoped COACH grant would
             # be a coaching assignment, and coaching lives on `class_staff`, not here.
+            # `scope_id` is nullable on the column, so the SQL `IS NOT NULL` above narrows
+            # the ROWS but not the static type -- mypy still sees `UUID | None`. The
+            # comprehension is what makes the two agree, and it is a filter rather than a
+            # cast: a null here would be a class-scoped grant naming no class, which is a
+            # row nobody should be handed as if it meant something.
             managed_class_ids = tuple(
-                session.execute(
+                class_id
+                for class_id in session.execute(
                     select(RoleAssignment.scope_id)
                     .where(
                         RoleAssignment.person_id == person.id,
@@ -305,6 +311,7 @@ def studios_for_identity(session: Session, identity_id: uuid.UUID) -> list[Studi
                 )
                 .scalars()
                 .all()
+                if class_id is not None
             )
             is_guardian = (
                 session.execute(
