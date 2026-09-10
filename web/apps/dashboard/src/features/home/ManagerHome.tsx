@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { formatTimeInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -38,11 +39,18 @@ export function ManagerHome({
   studioId,
   studioName,
   today,
+  alerts,
 }: {
   locale: Locale
   client: HomeClient
   studioId: string
   studioName?: string
+  /** D8's alert centre, passed in rather than mounted here.
+   *
+   *  The sections need the PEOPLE client, and this screen has no business holding one:
+   *  it owns no data and performs no mutation, and taking a second client would be the
+   *  first crack in that. App.tsx already has both, so it composes them. */
+  alerts?: ReactNode
   /** The ISO instant from `useToday`, which is stable for as long as the studio's day is.
    *  Taken as a string and widened here rather than as a `Date`: `new Date()` at the call
    *  site would be a fresh value every render and would re-fire the load below. */
@@ -164,6 +172,18 @@ export function ManagerHome({
           />
         </div>
       ) : null}
+
+      {/* D8 — the alert centre, rendered here rather than only behind `#/alerts`.
+          Six sections from five feature lanes register into that slot: the debt alert,
+          attendance-at-risk, coach unavailability, the health-review hold, trials
+          awaiting a decision and upcoming trials. Every one of them was live and correct
+          and sat on a route with no reason to visit it, which is the definition of an
+          alert nobody sees.
+          Directly under the money band, where the prototype puts its urgent tray, and
+          above today's classes: several sections deliberately render `null` when they
+          hold nothing, so on a quiet morning this collapses to no space at all rather
+          than to a row of reassuring zeroes. */}
+      {alerts ? <div className="dash-home__tray">{alerts}</div> : null}
 
       {/* B6.2 — a two-column body below the money band: the wide column answers "what
           needs me today?" (today's classes, then the attendance trend), the narrow

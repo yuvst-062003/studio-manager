@@ -6,7 +6,7 @@ import { t } from '@studio/i18n'
 import type { AlertSectionProps } from '../AlertCentre'
 import type { TrialBookingRow } from '../peopleClient'
 
-export function UpcomingTrialsAlert({ locale, client }: AlertSectionProps) {
+export function UpcomingTrialsAlert({ locale, client, emptyState = 'show' }: AlertSectionProps) {
   const [rows, setRows] = useState<TrialBookingRow[]>([])
 
   useEffect(() => {
@@ -24,6 +24,11 @@ export function UpcomingTrialsAlert({ locale, client }: AlertSectionProps) {
       live = false
     }
   }, [client])
+
+  // D8 — on the manager home an empty section disappears entirely, heading included.
+  // Hiding only the empty state left a heading standing over nothing, which reads worse
+  // than the panel did: a heading is a promise that something follows it.
+  if (emptyState === 'hide' && rows.length === 0) return null
 
   return (
     <section aria-labelledby="alert-trials" data-testid="alert-upcoming-trials">

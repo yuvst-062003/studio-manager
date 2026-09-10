@@ -57,6 +57,7 @@ import { SettingsScreen } from './features/settings/SettingsScreen'
 import {
   AddStudentScreen,
   AlertCentre,
+  AlertSections,
   SharingCards,
   StudentDetailScreen,
   StudentsScreen,
@@ -883,6 +884,15 @@ export default function App() {
               studioId={session.activeStudioId ?? ''}
               studioName={session.activeStudioName ?? undefined}
               today={today}
+              // D8. Composed here because the sections need the people client and the home
+              // screen deliberately holds none — it owns no data and performs no mutation.
+              // Manager-only: every registered section reads an endpoint a coach's role
+              // cannot open, and a column of empty alert cards is worse than no column.
+              alerts={
+                canSeeMoney ? (
+                  <AlertSections client={peopleClient} emptyState="hide" locale={locale} />
+                ) : undefined
+              }
             />
           ) : null}
           {route === 'schedule' ? (

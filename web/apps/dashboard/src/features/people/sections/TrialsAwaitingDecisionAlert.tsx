@@ -14,7 +14,7 @@ import { t } from '@studio/i18n'
 import type { AlertSectionProps } from '../AlertCentre'
 import type { GroupOption, TrialBookingRow } from '../peopleClient'
 
-export function TrialsAwaitingDecisionAlert({ locale, client }: AlertSectionProps) {
+export function TrialsAwaitingDecisionAlert({ locale, client, emptyState = 'show' }: AlertSectionProps) {
   const [rows, setRows] = useState<TrialBookingRow[]>([])
   const [groups, setGroups] = useState<GroupOption[]>([])
   const [deciding, setDeciding] = useState<{ studentId: string; kind: 'convert' | 'lost' } | null>(null)
@@ -49,6 +49,11 @@ export function TrialsAwaitingDecisionAlert({ locale, client }: AlertSectionProp
       })
       .finally(() => setBusy(false))
   }
+
+  // D8 — on the manager home an empty section disappears entirely, heading included.
+  // Hiding only the empty state left a heading standing over nothing, which reads worse
+  // than the panel did: a heading is a promise that something follows it.
+  if (emptyState === 'hide' && rows.length === 0) return null
 
   return (
     <section aria-labelledby="alert-decisions" data-testid="alert-trials-awaiting">

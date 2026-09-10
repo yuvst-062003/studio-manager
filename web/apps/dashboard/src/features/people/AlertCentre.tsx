@@ -22,6 +22,42 @@ import type { DashboardPeopleClient } from './peopleClient'
 export type AlertSectionProps = {
   locale: Locale
   client: DashboardPeopleClient
+  /**
+   * Whether a section with nothing in it should say so, or disappear.
+   *
+   * `'show'` on `#/alerts`, where a manager came to look and "nothing is waiting" is the
+   * answer they came for. `'hide'` on the manager home (D8), where three empty panels
+   * announcing that nothing is wrong pushed today's classes below the fold — the exact
+   * "row of reassuring zeroes" the home's own attention list already refuses to draw.
+   *
+   * Three of the six registered sections already choose `'hide'` unconditionally, and say
+   * why in their own comments: "a row that never requires a decision is how that list
+   * stops being scanned." This gives the other three the same choice, per surface.
+   */
+  emptyState?: 'show' | 'hide'
+}
+
+/**
+ * The registered sections and nothing else — no heading, no empty state.
+ *
+ * Split out for D8 of the 2026-09-10 redesign, which renders these on the manager home.
+ * The home already owns the page's `<h1>`, and a second one inside it would give the
+ * screen two titles; the empty state goes too, because on the home an empty alert list is
+ * the good day rather than a thing to report. `#/alerts` keeps both — see `AlertCentre`.
+ *
+ * Six sections register into this slot from five different feature lanes, at fixed
+ * orders. Rendering them in a second place costs one call and no lane any change at all,
+ * which is the property the registry existed for.
+ */
+export function AlertSections({ locale, client, emptyState = 'show' }: AlertSectionProps) {
+  const sections = useSlot<AlertSectionProps>('alert-centre')
+  return (
+    <>
+      {sections.map(({ key, render: Section }) => (
+        <Section key={key} client={client} emptyState={emptyState} locale={locale} />
+      ))}
+    </>
+  )
 }
 
 export function AlertCentre({ locale, client }: AlertSectionProps) {
@@ -32,9 +68,7 @@ export function AlertCentre({ locale, client }: AlertSectionProps) {
       {sections.length === 0 ? (
         <p data-testid="alerts-empty">{t(locale, 'people.alerts.empty')}</p>
       ) : (
-        sections.map(({ key, render: Section }) => (
-          <Section key={key} locale={locale} client={client} />
-        ))
+        <AlertSections locale={locale} client={client} />
       )}
     </section>
   )

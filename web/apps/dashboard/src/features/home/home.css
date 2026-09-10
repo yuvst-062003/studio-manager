@@ -144,3 +144,42 @@
   overflow-wrap: anywhere;
   max-inline-size: 7rem;
 }
+
+/* D8 — the alert centre on the manager home.
+ *
+ * Directly under the money band, where the prototype puts its urgent tray. Each registered
+ * section brings its own heading and cards, so this only has to space them; several render
+ * nothing at all when they hold nothing, and `:empty` keeps the gap from appearing on a
+ * morning when none of them has anything to say. */
+.dash-home__tray {
+  display: grid;
+  gap: var(--space-4);
+  margin-block-start: var(--space-5);
+}
+
+.dash-home__tray:empty {
+  display: none;
+}
+
+/* The tray treatment. Each registered section arrives as a bare <section> with a heading
+ * and its own rows; on `#/alerts` that reads fine because the whole screen is alerts, but
+ * on the home it sat as loose text between two carded regions. Styled here rather than in
+ * each section, so the five lanes that own them are not reopened and `#/alerts` keeps the
+ * plainer list it was designed as. */
+
+/* `> *`, not `> section`: the six registered sections do not agree on a root element —
+ * the debt alert renders a <div>, the people sections render <section>. Selecting the
+ * child rather than its tag name is what makes the tray look like one thing. */
+.dash-home__tray > * {
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-inline-start: 3px solid var(--pending);
+  border-radius: var(--radius-lg);
+  padding-block: var(--space-4);
+  padding-inline: var(--space-5);
+}
+
+.dash-home__tray > * > h2 {
+  font-size: var(--text-title);
+  margin-block: 0 var(--space-3);
+}

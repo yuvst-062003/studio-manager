@@ -20,7 +20,7 @@ import { t } from '@studio/i18n'
 import type { AlertSectionProps } from '../AlertCentre'
 import type { PendingReviewRow } from '../peopleClient'
 
-export function PendingHealthReviewAlert({ locale, client }: AlertSectionProps) {
+export function PendingHealthReviewAlert({ locale, client, emptyState = 'show' }: AlertSectionProps) {
   const [rows, setRows] = useState<PendingReviewRow[]>([])
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -48,6 +48,11 @@ export function PendingHealthReviewAlert({ locale, client }: AlertSectionProps) 
       })
       .finally(() => setBusy(false))
   }
+
+  // D8 — on the manager home an empty section disappears entirely, heading included.
+  // Hiding only the empty state left a heading standing over nothing, which reads worse
+  // than the panel did: a heading is a promise that something follows it.
+  if (emptyState === 'hide' && rows.length === 0) return null
 
   return (
     <section

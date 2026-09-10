@@ -1421,7 +1421,8 @@ waves:
         on: 2026-09-10
       - id: W10.2
         title: Home — layout, KPI cards, and the alert centre moved onto it
-        status: planned
+        status: shipped
+        on: 2026-09-10
       - id: W10.3
         title: Students list and the class tabs
         status: planned
