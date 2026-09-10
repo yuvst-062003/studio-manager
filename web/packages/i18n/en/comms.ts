@@ -244,4 +244,5 @@ export const comms: Bundle = {
   'kpi.scheduled': 'Scheduled',
   'filter.scheduled': 'Scheduled',
   'state.scheduled': 'Scheduled',
+  'install.openList': 'Who has not installed — names and phone numbers',
 }

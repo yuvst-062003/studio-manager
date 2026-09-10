@@ -15,9 +15,10 @@
 // walkthrough is actually judged on.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Card } from '@studio/ui'
+import { Button, Card } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { Modal } from '../../shared/Modal'
 import type { DashboardCommsClient, InstallStateOut } from './dashboardCommsClient'
 
 const sectionStyle: CSSProperties = {
@@ -52,6 +53,7 @@ const PLATFORMS = ['ios', 'android', 'web'] as const
 
 export function InstallState({ client, locale }: { client: DashboardCommsClient; locale: Locale }) {
   const [state, setState] = useState<InstallStateOut | null>(null)
+  const [listOpen, setListOpen] = useState(false)
 
   useEffect(() => {
     let live = true
@@ -95,19 +97,56 @@ export function InstallState({ client, locale }: { client: DashboardCommsClient;
               String(state.not_installed_count),
             )}
           </p>
-          {/* §5.11 permits no email and no SMS fallback. Said out loud, because a list of
-              names with no explanation reads as a nice-to-have rather than as the only
-              remaining route to these families. */}
-          <p style={hintStyle}>{t(locale, 'comms.install.callThem')}</p>
+          {/* §5.11's reason — no email, no SMS fallback — moved INTO the dialog, beside
+              the list of names it explains. It is said exactly once: kept here as well it
+              appeared twice on the same screen once the dialog opened, which the tests
+              caught. The button below carries enough on its own. */}
 
-          {state.not_installed.map((row) => (
-            <Card key={row.person_id}>
-              <div style={rowStyle} data-testid={`not-installed-${row.person_id}`}>
-                <span style={lineStyle}>{row.name}</span>
-                <span style={lineStyle}>{row.phone ?? ''}</span>
-              </div>
-            </Card>
-          ))}
+          {/* The list is BEHIND a button, not stacked into the page. It used to render every
+              family inline, one card each with a phone number — so a club with thirty
+              un-installed families turned the bottom of the announcements screen into thirty
+              rows of contact details that nobody was reading at that moment, under a screen
+              whose job is composing a message. The owner asked for a popup on 2026-09-10.
+
+              The two NUMBERS stay on the page: "how many families will not receive this" is
+              exactly the fact worth seeing before pressing send, and §6.5 put this beside
+              the delivery report for that reason. It is the roll-call that is on demand. */}
+          <Button
+            data-testid="install-list-open"
+            onClick={() => setListOpen(true)}
+            variant="secondary"
+          >
+            {t(locale, 'comms.install.openList')}
+          </Button>
+
+          {listOpen ? (
+            <Modal
+              locale={locale}
+              onClose={() => setListOpen(false)}
+              testId="install-list"
+              title={t(locale, 'comms.install.title')}
+              width="30rem"
+            >
+              <p style={hintStyle}>{t(locale, 'comms.install.callThem')}</p>
+              {state.not_installed.map((row) => (
+                <Card key={row.person_id}>
+                  <div style={rowStyle} data-testid={`not-installed-${row.person_id}`}>
+                    <span style={lineStyle}>{row.name}</span>
+                    {/* `tel:` and not plain text: §5.11 permits no email and no SMS
+                        fallback, so calling IS the remaining channel — and a manager on a
+                        laptop with a phone paired should not retype a number to use it. */}
+                    {row.phone ? (
+                      <a href={`tel:${row.phone}`} style={lineStyle}>
+                        {row.phone}
+                      </a>
+                    ) : (
+                      <span style={lineStyle} />
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </Modal>
+          ) : null}
         </>
       )}
     </section>

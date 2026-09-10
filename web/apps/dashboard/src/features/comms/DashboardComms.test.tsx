@@ -484,11 +484,41 @@ describe('the install list', () => {
     })
     render(<InstallState client={client} locale="he" />)
 
+    // The roll-call is behind a button as of 2026-09-10: it used to render every family
+    // inline at the foot of the announcements screen, one card each with a phone number,
+    // under a screen whose job is composing a message. The COUNT stays on the page — that
+    // is the fact worth seeing before pressing send — and the names are on demand.
+    await userEvent.click(await screen.findByTestId('install-list-open'))
+
     const row = await screen.findByTestId('not-installed-g9')
     expect(within(row).getByText('יעל כהן')).toBeInTheDocument()
-    expect(within(row).getByText('054-1234567')).toBeInTheDocument()
-    // §5.11 permits no email and no SMS fallback, and the screen says so.
+    // A `tel:` link rather than plain text: §5.11 permits no email and no SMS fallback, so
+    // calling is the remaining channel and the number should be usable as one.
+    expect(within(row).getByRole('link', { name: '054-1234567' })).toHaveAttribute(
+      'href',
+      'tel:054-1234567',
+    )
+    // §5.11's reason, still said out loud — now inside the dialog with the list it explains.
     expect(screen.getByText(t('he', 'comms.install.callThem'))).toBeInTheDocument()
+  })
+
+  it('keeps the two numbers on the page, and only the names behind the button', async () => {
+    // The half of the change that is easy to get wrong: hiding the COUNT with the list
+    // would take away the one thing a manager needs before sending, which is how many
+    // families will not receive it whatever the delivery report says afterwards.
+    const client = makeClient({
+      installState: vi.fn().mockResolvedValue({
+        installed_count: 19,
+        not_installed_count: 1,
+        by_platform: { ios: 12, android: 7, web: 0 },
+        not_installed: [{ person_id: 'g9', name: 'יעל כהן', phone: '054-1234567' }],
+      }),
+    })
+    render(<InstallState client={client} locale="he" />)
+
+    await screen.findByTestId('install-list-open')
+    expect(screen.getByText(/19/)).toBeInTheDocument()
+    expect(screen.queryByTestId('not-installed-g9')).toBeNull()
   })
 
   it('counts iOS and Android apart', async () => {

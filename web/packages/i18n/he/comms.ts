@@ -305,4 +305,5 @@ export const comms: Bundle = {
   'kpi.scheduled': 'מתוזמנות',
   'filter.scheduled': 'מתוזמנות',
   'state.scheduled': 'מתוזמן',
+  'install.openList': 'מי לא התקין — רשימה ומספרי טלפון',
 }

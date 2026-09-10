@@ -249,4 +249,5 @@ export const comms: Bundle = {
   'kpi.scheduled': 'Запланировано',
   'filter.scheduled': 'Запланированные',
   'state.scheduled': 'Запланировано',
+  'install.openList': 'Кто не установил — список и телефоны',
 }
