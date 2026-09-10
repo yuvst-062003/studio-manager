@@ -27,7 +27,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { apiFetch, useAuthedImage } from '@studio/core'
-import { Card, PageHeader, SectionHeader, Switch, TextField } from '@studio/ui'
+import { Card, LoadFailed, PageHeader, SectionHeader, Switch, TextField } from '@studio/ui'
 import { StructurePanel } from './StructurePanel'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -187,20 +187,31 @@ export function SettingsScreen({ locale }: { locale: Locale }) {
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'failed'>('idle')
   const [photoError, setPhotoError] = useState<string | null>(null)
   const [logoError, setLogoError] = useState<string | null>(null)
+  /** §3.19's named defect, closed. `attempt` re-runs the read on retry. */
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const logoUrl = useAuthedImage(details?.logo_url ?? null)
 
   useEffect(() => {
     let alive = true
     void apiFetch('/api/v1/studio')
-      .then(async (response) => (await response.json()) as StudioDetails)
+      .then(async (response) => {
+        // §3.19's named defect: the failure was swallowed to `undefined`, so a manager
+        // whose network dropped sat on `טוען…` for ever with no error and no retry —
+        // indistinguishable from a slow request that was still coming.
+        if (!response.ok) throw new Error(String(response.status))
+        return (await response.json()) as StudioDetails
+      })
       .then((next) => {
         if (alive) setDetails(next)
       })
-      .catch(() => undefined)
+      .catch(() => {
+        if (alive) setLoadFailed(true)
+      })
     return () => {
       alive = false
     }
-  }, [])
+  }, [attempt])
 
   const save = (fields: Partial<StudioDetails>) => {
     setSaveState('idle')
@@ -359,7 +370,15 @@ export function SettingsScreen({ locale }: { locale: Locale }) {
           </div>
         ) : (
         <Card>
-          {details === null ? (
+          {loadFailed ? (
+            <LoadFailed
+              locale={locale}
+              onRetry={() => {
+                setLoadFailed(false)
+                setAttempt((n) => n + 1)
+              }}
+            />
+          ) : details === null ? (
             <p data-testid="settings-loading">{t(locale, 'common.setup.loading')}</p>
           ) : (
             <div data-testid="settings-panel-studio">

@@ -31,7 +31,7 @@
 // rather than hidden, so the shape of the flow is stable between visits.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { ActionBar, Button, Card, LoadFailed } from '@studio/ui'
+import { ActionBar, Button, Card, LoadFailed, Stepper } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { fill } from './client'
@@ -55,28 +55,6 @@ const shellStyle: CSSProperties = {
   inlineSize: '100%',
 }
 
-const railStyle: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 'var(--space-2)',
-  listStyle: 'none',
-  margin: 0,
-  padding: 0,
-}
-
-const chipStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 'var(--space-2)',
-  // Logical properties throughout (D10): the rail runs right-to-left in `he` and
-  // left-to-right in `en`, and `padding-left` would be wrong in one of them.
-  paddingBlock: 'var(--space-2)',
-  paddingInline: 'var(--space-3)',
-  border: 'var(--border-width-hairline) solid var(--border)',
-  borderRadius: 'var(--radius-pill)',
-  background: 'var(--surface)',
-}
-
 const introStyle: CSSProperties = { color: 'var(--text-secondary)' }
 
 const noteStyle: CSSProperties = {
@@ -98,10 +76,6 @@ const summaryPairStyle: CSSProperties = {
 }
 
 const summaryValueStyle: CSSProperties = { margin: 0, fontWeight: 'var(--weight-semibold)' }
-
-function statusWord(locale: Locale, status: RolloverStepStatus): string {
-  return t(locale, `schedule.rollover.status.${status}`)
-}
 
 /** One `<dt>`/`<dd>` of the counts the server sends beside the rail. */
 function SummaryPair({ label, value, testId }: { label: string; value: number; testId: string }) {
@@ -300,35 +274,48 @@ export function RolloverWizard({
         ) : null}
       </header>
 
-      {/* An ordered list, so a screen reader announces "3 of 7" without the visual rail
-          having to say it. `aria-current` names the one being worked on. */}
-      <ol aria-label={t(locale, 'schedule.rollover.progressLabel')} style={railStyle}>
-        {ROLLOVER_STEP_ORDER.map((stepId) => {
+      {/* §3.17's port — the shared stepper, the same component the class wizard (§3.21)
+          and the setup wizard (§3.19) mount. What it gains over the chip row it replaces is
+          the prototype's numbered nodes and the rule between them, which is what makes a
+          seven-step flow read as a sequence rather than as seven buttons.
+
+          `stateVisible` is on, and that is the whole reason the prop exists. Rollover's
+          steps are answered over DAYS — "which of these did I finish" is the question this
+          rail exists to answer, and hiding the word behind a tint is the exact failure an
+          owner reported as "finished them all, still says 6/7, and it doesn't show what's
+          missing". `idPrefix` keeps the names this rail's own tests already use.
+
+          Still an ordered list, still `aria-current` on the one being worked on, still a
+          word for every state (SC 1.4.1). A step the server has not sent is unreachable
+          rather than hidden: the flow has seven steps whether or not they all arrived, and
+          a rail that changes length between visits is one nobody can navigate from memory. */}
+      <Stepper
+        idPrefix="rollover-rail"
+        label={t(locale, 'schedule.rollover.progressLabel')}
+        locale={locale}
+        nodes={ROLLOVER_STEP_ORDER.map((stepId) => {
           const step = steps.find((candidate) => candidate.id === stepId)
-          return (
-            <li key={stepId}>
-              <button
-                type="button"
-                aria-current={stepId === current ? 'step' : undefined}
-                data-testid={`rollover-rail-${stepId}`}
-                data-status={step?.status ?? 'pending'}
-                // Unreachable rather than hidden: the flow has seven steps whether or not
-                // the server sent them all, and a rail that changes length between visits is
-                // a rail nobody can navigate from memory.
-                disabled={step === undefined}
-                onClick={() => setActiveId(stepId)}
-                style={chipStyle}
-              >
-                <span>{t(locale, `schedule.rollover.step.${stepId}`)}</span>
-                {/* Never colour alone (SC 1.4.1) — the state is written out. */}
-                <span data-testid={`rollover-rail-${stepId}-status`}>
-                  {statusWord(locale, step?.status ?? 'pending')}
-                </span>
-              </button>
-            </li>
-          )
+          return {
+            id: stepId,
+            title: t(locale, `schedule.rollover.step.${stepId}`),
+            state:
+              stepId === current
+                ? ('current' as const)
+                : step?.status === 'done'
+                  ? ('done' as const)
+                  : step?.status === 'skipped'
+                    ? ('skipped' as const)
+                    : ('upcoming' as const),
+            // Rollover's OWN status words, not the stepper's generic ones: these are tuned
+            // to a flow answered over days, and taking the shared vocabulary would have
+            // been a quiet loss on the one rail whose words are load-bearing.
+            stateLabel: t(locale, `schedule.rollover.status.${step?.status ?? 'pending'}`),
+            reachable: step !== undefined,
+          }
         })}
-      </ol>
+        onPick={(stepId) => setActiveId(stepId as RolloverStepId)}
+        stateVisible
+      />
 
       <Card caption={t(locale, 'schedule.rollover.summaryLabel')}>
         <dl style={summaryStyle}>

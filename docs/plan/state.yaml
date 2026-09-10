@@ -1473,7 +1473,8 @@ waves:
         on: 2026-09-10
       - id: W10.15
         title: Documents, staff, settings, rollover
-        status: planned
+        status: shipped
+        on: 2026-09-10
       - id: W10.16
         title: Platform
         status: planned

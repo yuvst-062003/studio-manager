@@ -351,3 +351,42 @@ describe('the studio logo', () => {
     expect(await screen.findByTestId('settings-logo-empty')).toBeInTheDocument()
   })
 })
+
+// Checkpoint 15 — §3.19's named defect: "`GET /api/v1/studio` failure is swallowed — the
+// panel never leaves its loading state."
+describe('a failed studio read says so', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('shows the failure and a retry, not טוען… for ever', async () => {
+    let calls = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        calls += 1
+        if (calls === 1) return new Response('{}', { status: 500 })
+        return new Response(JSON.stringify(STUDIO), { status: 200 })
+      }),
+    )
+    render(<SettingsScreen locale="he" />)
+
+    expect(await screen.findByText(t('he', 'common.loadFailed.body'))).toBeInTheDocument()
+    // NOT the loading line: "we could not load this" and "this is still coming" are
+    // different sentences, and the old code showed only the second, for ever.
+    expect(screen.queryByTestId('settings-loading')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: t('he', 'common.loadFailed.retry') }))
+    expect(await screen.findByTestId('settings-panel-studio')).toBeInTheDocument()
+  })
+
+  it('treats a non-2xx as a failure, not as a studio with no name', async () => {
+    // The old code read `response.json()` whatever the status, so a 500 whose body happened
+    // to parse became a studio object with every field undefined — and the form rendered
+    // it as blanks a manager could then SAVE over their real details.
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 503 })))
+    render(<SettingsScreen locale="he" />)
+    expect(await screen.findByText(t('he', 'common.loadFailed.body'))).toBeInTheDocument()
+    expect(screen.queryByTestId('settings-panel-studio')).not.toBeInTheDocument()
+  })
+})

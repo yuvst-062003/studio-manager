@@ -24,6 +24,13 @@ export interface StepperNode {
   /** The line under it — "זהות ומיתוג". Optional: rollover's steps have no subtitle. */
   subtitle?: string
   state: StepperState
+  /**
+   * The word for this node's state, when the screen has better ones than the shared
+   * vocabulary. The year rollover does — its steps have their own status words, tuned to a
+   * flow answered over days — and taking the generic ones would have been a quiet loss on
+   * the exact rail whose words are load-bearing.
+   */
+  stateLabel?: string
   /** False for a step the manager has not reached yet. */
   reachable: boolean
 }
@@ -40,6 +47,8 @@ export function Stepper({
   nodes,
   onPick,
   label,
+  stateVisible = false,
+  idPrefix = 'stepper',
 }: {
   locale: Locale
   nodes: StepperNode[]
@@ -47,6 +56,18 @@ export function Stepper({
   onPick: (id: string) => void
   /** Names the whole rail — "התקדמות באשף". */
   label: string
+  /**
+   * Show the state word on the face of the node rather than only to a screen reader.
+   *
+   * Off by default: in a wizard a manager walks in one sitting, the mark and the tint say
+   * enough and seven state words is noise. ON for the year rollover, where the steps are
+   * answered over days and "which of these did I finish" is the question the rail exists
+   * to answer — the same lesson `SetupWizard`'s rail learned when an owner reported
+   * "finished them all, still says 6/7, and it doesn't show what's missing".
+   */
+  stateVisible?: boolean
+  /** The `data-testid` stem, so a screen that already had a named rail keeps its names. */
+  idPrefix?: string
 }) {
   return (
     // An ordered list, so a screen reader announces "3 of 7" without the rail saying it.
@@ -57,7 +78,7 @@ export function Stepper({
             aria-current={node.state === 'current' ? 'step' : undefined}
             className="studio-stepper__button"
             data-state={node.state}
-            data-testid={`stepper-${node.id}`}
+            data-testid={`${idPrefix}-${node.id}`}
             // NOT disabled when unreachable (the lesson `SetupWizard`'s rail learned): a
             // dead button reads as "this step doesn't work". It is pressable and simply
             // does not move — the title says why.
@@ -74,10 +95,15 @@ export function Stepper({
                 <span className="studio-stepper__subtitle">{node.subtitle}</span>
               ) : null}
             </span>
-            {/* The state in words, for the accessibility tree. Visually hidden because the
-                mark and the tint already carry it on screen — but never ONLY the tint. */}
-            <span className="studio-visually-hidden">
-              {t(locale, `common.stepper.state.${node.state}`)}
+            {/* The state in words. Visually hidden by default, because the mark and the
+                tint already carry it on screen — but never ONLY the tint. `stateVisible`
+                puts it on the face for a flow answered over days rather than in one
+                sitting. */}
+            <span
+              className={stateVisible ? 'studio-stepper__state' : 'studio-visually-hidden'}
+              data-testid={`${idPrefix}-${node.id}-status`}
+            >
+              {node.stateLabel ?? t(locale, `common.stepper.state.${node.state}`)}
             </span>
           </button>
           {/* The rule between nodes. Decorative, and the last node has none. */}

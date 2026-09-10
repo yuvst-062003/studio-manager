@@ -120,6 +120,19 @@
   background: var(--emphasis);
 }
 
+/* The state on the face of the node, for a flow answered over days rather than in one
+ * sitting — the year rollover. Off everywhere else, where the mark and the tint say enough
+ * and seven state words would be noise. */
+.studio-stepper__state {
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.studio-stepper__button[data-state='done'] .studio-stepper__state {
+  color: var(--emphasis);
+}
+
 /* Below the rail's own breakpoint the subtitles are noise — the titles alone still say
  * where the manager is, and seven two-line labels on a phone are a wall. */
 @media (width <= 48rem) {
