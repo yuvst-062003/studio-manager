@@ -34,6 +34,7 @@ import {
 } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { Modal } from '../../shared/Modal'
 import { makeDashboardAttendanceClient } from '../attendance'
 import { usePlanBadges } from '../billing/usePlanBadges'
 import { useLongPress } from './useLongPress'
@@ -525,6 +526,13 @@ export function WeekBoard({
    *  positioned from the cell's own rect because `.week-grid` scrolls, and anything
    *  rendered INSIDE a scrolling box is clipped by it. */
   const [slot, setSlot] = useState<{ day: string; time: string; x: number; y: number } | null>(null)
+  // What the manager said they are creating in that slot. `null` is the question still on
+  // screen. D14 (§2.6 of the redesign spec) asks for exactly this: "the slot's day and time
+  // pre-fill the form, and the manager CHOOSES whether they are creating a session or an
+  // event." Pressing an empty slot used to go straight to the session form, so the calendar
+  // could only ever create one of the two things it draws — and an event had to be made
+  // from a different screen that knows nothing about the slot you pressed.
+  const [slotKind, setSlotKind] = useState<'session' | 'event' | null>(null)
   /** Bug #20 — the club's closures, so an empty board can say why it is empty. */
   const [closures, setClosures] = useState<Closure[]>([])
 
@@ -992,14 +1000,31 @@ export function WeekBoard({
         ) : null}
       </ul>
 
-      <CreateSessionForm
-        locale={locale}
-        client={client}
-        defaultDay={todayKey}
-        onCreated={() => setVersion((n) => n + 1)}
-        open={open}
-        setOpen={setOpen}
-      />
+      {/* In a dialog, not stacked into the page. It used to render inline directly under
+          the board's header — so pressing שיעור חדש pushed the whole week down and left a
+          two-column form floating between the toolbar and the grid, with nothing framing it
+          as a thing you were in the middle of. The owner asked for a popup on 2026-09-10.
+
+          `Modal` brings the focus trap and Escape with it, which the inline form never had:
+          Tab ran straight out of it and into the calendar behind. */}
+      {open ? (
+        <Modal
+          locale={locale}
+          onClose={() => setOpen(false)}
+          testId="session-create-modal"
+          title={t(locale, 'schedule.session.create')}
+          width="40rem"
+        >
+          <CreateSessionForm
+            locale={locale}
+            client={client}
+            defaultDay={todayKey}
+            onCreated={() => setVersion((n) => n + 1)}
+            open={open}
+            setOpen={setOpen}
+          />
+        </Modal>
+      ) : null}
 
       {/* An empty board has two possible reasons and they are not interchangeable: a week
           with nothing scheduled is a gap to fill, a week the club declared shut is not.
@@ -1225,7 +1250,10 @@ export function WeekBoard({
               the week behind it is the point of anchoring it here. */}
           <div
             data-testid="week-slot-backdrop"
-            onClick={() => setSlot(null)}
+            onClick={() => {
+              setSlot(null)
+              setSlotKind(null)
+            }}
             style={{ position: 'fixed', insetBlock: 0, insetInline: 0, zIndex: 39 }}
           />
           <div
@@ -1243,24 +1271,63 @@ export function WeekBoard({
               <span>
                 {slot.day} · {slot.time}
               </span>
-              <Button variant="ghost" data-testid="week-slot-close" onClick={() => setSlot(null)}>
+              <Button
+                variant="ghost"
+                data-testid="week-slot-close"
+                onClick={() => {
+                  setSlot(null)
+                  setSlotKind(null)
+                }}
+              >
                 {t(locale, 'common.cancel')}
               </Button>
             </div>
-            <CreateSessionForm
-              client={client}
-              defaultDay={slot.day}
-              defaultStart={slot.time}
-              locale={locale}
-              onCreated={() => {
-                setSlot(null)
-                setVersion((n) => n + 1)
-              }}
-              open
-              setOpen={(next) => {
-                if (!next) setSlot(null)
-              }}
-            />
+            {slotKind === null ? (
+              // The question, before either form. Two choices and not a dropdown: there are
+              // two of them, they are equally likely, and a select would hide both behind a
+              // press and a read.
+              <div className="week-slot-popover__choices" data-testid="week-slot-choices">
+                <p>{t(locale, 'schedule.slot.chooseKind')}</p>
+                <Button
+                  data-testid="week-slot-kind-session"
+                  onClick={() => setSlotKind('session')}
+                  variant="secondary"
+                >
+                  {t(locale, 'schedule.slot.kindSession')}
+                </Button>
+                {/* An event is a route, so this is a link: `#/events/new` opens the real
+                    event form rather than a second, thinner one built into the calendar.
+                    The slot's day travels in the hash so the date is not retyped — the
+                    prefill D14 asks for, without the calendar owning an event editor. */}
+                <a
+                  className="studio-btn"
+                  data-testid="week-slot-kind-event"
+                  data-variant="secondary"
+                  href={`#/events/new?date=${slot.day}`}
+                >
+                  {t(locale, 'schedule.slot.kindEvent')}
+                </a>
+              </div>
+            ) : (
+              <CreateSessionForm
+                client={client}
+                defaultDay={slot.day}
+                defaultStart={slot.time}
+                locale={locale}
+                onCreated={() => {
+                  setSlot(null)
+                  setSlotKind(null)
+                  setVersion((n) => n + 1)
+                }}
+                open
+                setOpen={(next) => {
+                  if (!next) {
+                    setSlot(null)
+                    setSlotKind(null)
+                  }
+                }}
+              />
+            )}
           </div>
         </>
       ) : null}

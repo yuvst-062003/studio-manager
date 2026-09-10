@@ -607,6 +607,41 @@ describe('WeekBoard · moving a class, and starting one in a slot', () => {
     expect(screen.getByTestId('week-slot-popover')).toHaveTextContent('17:00')
   })
 
+  // D14 (§2.6): "the manager chooses whether they are creating a session or an event."
+  // Pressing an empty slot used to open the session form directly, so the calendar could
+  // create only one of the two things it draws — and an event had to be started from a
+  // different screen that knows nothing about the square that was pressed. The owner asked
+  // for the choice on 2026-09-10.
+  it('asks what goes in the slot before opening either form', async () => {
+    // An ACTIVE training year, because without one `CreateSessionForm` draws its
+    // `session-create-no-year` refusal instead of the form — §5.15's rule, and the default
+    // stub returns no years at all. Asserting the refusal instead would have made this test
+    // pass while proving nothing about the chooser.
+    const client = stub()
+    vi.mocked(client.listTrainingYears).mockResolvedValue([
+      { id: 'y1', name: 'שנה', starts_on: '2026-09-01', ends_on: '2027-08-31', status: 'active' },
+    ] as never)
+    render(<WeekBoard locale="he" client={client} today="2026-11-03T12:00:00Z" />)
+    await userEvent.click(await screen.findByTestId('week-slot-action-2026-11-05-17:00'))
+
+    // The question first, and NEITHER form yet.
+    expect(await screen.findByTestId('week-slot-choices')).toHaveTextContent(
+      t('he', 'schedule.slot.chooseKind'),
+    )
+    expect(screen.queryByTestId('session-create-form')).toBeNull()
+
+    // An event is a route, and carries the slot's day so the date is not retyped.
+    expect(screen.getByTestId('week-slot-kind-event')).toHaveAttribute(
+      'href',
+      '#/events/new?date=2026-11-05',
+    )
+
+    // Choosing a lesson opens the session form, still pre-filled from the slot.
+    await userEvent.click(screen.getByTestId('week-slot-kind-session'))
+    expect(await screen.findByTestId('session-create-form')).toBeInTheDocument()
+    expect(screen.queryByTestId('week-slot-choices')).toBeNull()
+  })
+
   it('does not offer to start one in a cell that already has a class', async () => {
     render(<WeekBoard locale="he" client={stub()} today="2026-11-03T12:00:00Z" />)
     await screen.findByTestId('session-block')

@@ -276,9 +276,23 @@ export function routeFromHash(hash: string): DashboardRoute {
   return 'home'
 }
 
-/** `#/events/<id>` → 7c; `#/events/new` → 7b; bare `#/events` → 7a's roundup. */
+/** `#/events/<id>` → 7c; `#/events/new` → 7b; bare `#/events` → 7a's roundup.
+ *
+ * The query string is stripped. D14 lets the calendar hand a slot's date to the event form
+ * as `#/events/new?date=2026-09-10`, and without this the sub-route read
+ * `new?date=2026-09-10` — which matches neither `'new'` nor an event id, so the app tried to
+ * load an event whose id was a query string and showed a not-found for a link it had just
+ * written itself. */
 export function eventRouteFrom(hash: string): string {
-  return hash.replace(/^#\/?events\/?/, '')
+  return hash.replace(/^#\/?events\/?/, '').split('?')[0] ?? ''
+}
+
+/** The `?date=YYYY-MM-DD` D14 puts on `#/events/new`, or null. Validated rather than
+ *  trusted: it reaches `new Date()` in the form, and a hand-typed hash is user input. */
+export function eventDateFrom(hash: string): string | null {
+  const query = hash.split('?')[1] ?? ''
+  const value = new URLSearchParams(query).get('date')
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null
 }
 
 /** `#/students/<id>` → the card; `#/students/new` → 3c; bare `#/students` → the table. */
@@ -543,6 +557,7 @@ export default function App() {
   const { route, hash } = useHashRoute()
   const studentRoute = studentRouteFrom(hash)
   const eventRoute = eventRouteFrom(hash)
+  const eventDate = eventDateFrom(hash)
   const beltsClassId = hash.replace(/^#\/?belts\/?/, '')
   const examRoute = hash.replace(/^#\/?exams\/?/, '')
   const [locale, setLocale] = useState<Locale>('he')
@@ -936,6 +951,9 @@ export default function App() {
           {route === 'events' && eventRoute === 'new' ? (
             <EventForm
               client={eventsClient}
+              // D14 — the day of the calendar slot the manager pressed, so the date is not
+              // retyped on a form reached from a specific square of a specific week.
+              defaultDate={eventDate}
               locale={locale}
               onSaved={(id) => {
                 globalThis.location.hash = `#/events/${id}`

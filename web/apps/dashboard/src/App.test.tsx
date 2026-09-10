@@ -3,7 +3,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
-import App, { routeFromHash } from './App'
+import App, { eventDateFrom, eventRouteFrom, routeFromHash } from './App'
 
 const SESSION = {
   access: { staff: true, parent: false },
@@ -43,6 +43,30 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+})
+
+// D14 puts a slot's date on the event form's own hash, which the sub-route parser had to
+// learn to ignore. Without the split, `#/events/new?date=2026-11-05` read as an event id of
+// `new?date=2026-11-05` — matching neither `'new'` nor a real id, so the app tried to load
+// an event by that id and showed a not-found for a link it had just written itself.
+describe('eventRouteFrom and eventDateFrom', () => {
+  it.each([
+    ['#/events', ''],
+    ['#/events/new', 'new'],
+    ['#/events/new?date=2026-11-05', 'new'],
+    ['#/events/abc-123', 'abc-123'],
+  ])('%s → sub-route %s', (hash, expected) => {
+    expect(eventRouteFrom(hash)).toBe(expected)
+  })
+
+  it('reads a well-formed date and refuses anything else', () => {
+    expect(eventDateFrom('#/events/new?date=2026-11-05')).toBe('2026-11-05')
+    expect(eventDateFrom('#/events/new')).toBeNull()
+    // The hash is user input and the value reaches `new Date()` in the form, so it is
+    // validated rather than trusted.
+    expect(eventDateFrom('#/events/new?date=lol')).toBeNull()
+    expect(eventDateFrom('#/events/new?date=2026-13-45x')).toBeNull()
+  })
 })
 
 describe('routeFromHash', () => {

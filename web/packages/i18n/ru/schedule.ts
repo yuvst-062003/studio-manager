@@ -859,4 +859,7 @@ export const schedule: Bundle = {
   'staffCalendar.dayConstraint': 'Недоступность тренера: {{reason}}',
   'staffCalendar.account.title': 'Месячный календарь',
   'staffCalendar.account.subtitle': 'Все занятия и мероприятия месяца',
+  'slot.chooseKind': 'Что добавить в это время?',
+  'slot.kindSession': 'Занятие',
+  'slot.kindEvent': 'Событие или соревнование',
 }

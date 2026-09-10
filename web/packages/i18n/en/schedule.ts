@@ -880,4 +880,7 @@ export const schedule: Bundle = {
   // `constraint.account.*` above already established for the same tab.
   'staffCalendar.account.title': 'Month calendar',
   'staffCalendar.account.subtitle': 'Every session and event this month',
+  'slot.chooseKind': 'What goes in this slot?',
+  'slot.kindSession': 'A lesson',
+  'slot.kindEvent': 'An event or competition',
 }

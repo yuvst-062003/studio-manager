@@ -1028,4 +1028,8 @@ export const schedule: Bundle = {
   'constraint.manager.refuseReasonLabel': 'סיבת הדחייה למאמן/ת',
   'constraint.manager.decidedApproved': 'האילוץ אושר. המאמן/ת קיבל/ה הודעה.',
   'constraint.manager.decidedRefused': 'האילוץ נדחה. המאמן/ת קיבל/ה הודעה.',
+  // D14 — pressing an empty slot asks what is being created before it opens a form.
+  'slot.chooseKind': 'מה להוסיף במועד הזה?',
+  'slot.kindSession': 'שיעור',
+  'slot.kindEvent': 'אירוע או תחרות',
 }

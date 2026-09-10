@@ -269,6 +269,18 @@
   color: var(--text-muted);
 }
 
+/* D14's question, before either form. Stacked rather than side by side: the two labels are
+ * different lengths in all three locales, and a row would size one button to the other. */
+.week-slot-popover__choices {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.week-slot-popover__choices > p {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-label);
+}
+
 /* `3a`'s filter bar. A fieldset, so it has no border of its own to reset away. */
 .week-filter {
   display: flex;
