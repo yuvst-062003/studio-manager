@@ -270,6 +270,7 @@ def invite_staff(
     first_name: str | None,
     last_name: str | None,
     group_ids: Sequence[uuid.UUID] = (),
+    class_ids: Sequence[uuid.UUID] = (),
     actor_person_id: uuid.UUID | None,
     at: datetime,
 ) -> tuple[Invitation, str]:
@@ -286,6 +287,12 @@ def invite_staff(
     """
     if not roles or any(role not in GRANTABLE_ROLES for role in roles):
         raise StaffError("bad_roles")
+    # A manager scoped to CLASSES rather than to the studio (2026-09-09). Only `manager`
+    # can be: a coach's scope is the roster they are on, which `group_ids` already writes,
+    # and giving `lead_coach` a class scope would create a second, competing way to say the
+    # same thing.
+    if class_ids and roles != ["manager"]:
+        raise StaffError("class_scope_is_manager_only")
 
     person = Person(
         studio_id=_require_studio(),
@@ -297,17 +304,35 @@ def invite_staff(
     )
     session.add(person)
     session.flush()
-    for role in sorted(set(roles)):
-        session.add(
-            RoleAssignment(
-                studio_id=person.studio_id,
-                person_id=person.id,
-                role=role,
-                scope_type="studio",
-                granted_at=at,
-                created_at=at,
+    if class_ids:
+        # **Class-scoped, and therefore NOT studio-scoped.** Writing both would hand them
+        # the studio-wide grant this whole feature exists to withhold -- `resolution.py`
+        # keeps class rows out of `roles` precisely so one class cannot read as all of
+        # them, and a studio row beside it would walk straight past that.
+        for class_id in sorted(set(class_ids)):
+            session.add(
+                RoleAssignment(
+                    studio_id=person.studio_id,
+                    person_id=person.id,
+                    role="manager",
+                    scope_type="class",
+                    scope_id=class_id,
+                    granted_at=at,
+                    created_at=at,
+                )
             )
-        )
+    else:
+        for role in sorted(set(roles)):
+            session.add(
+                RoleAssignment(
+                    studio_id=person.studio_id,
+                    person_id=person.id,
+                    role=role,
+                    scope_type="studio",
+                    granted_at=at,
+                    created_at=at,
+                )
+            )
     # The roster rows, before the invitation exists — a bad group id must fail the whole
     # request rather than leave a coach invited to groups they were never put on.
     # `assign_staff` is idempotent and adds the group-scoped grant alongside each row; the

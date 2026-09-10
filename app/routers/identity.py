@@ -99,6 +99,7 @@ def _membership_out(membership: StudioMembership) -> StudioMembershipOut:
         person_id=membership.person_id,
         roles=list(membership.roles),
         is_guardian=membership.is_guardian,
+        managed_class_ids=list(membership.managed_class_ids),
     )
 
 
@@ -191,6 +192,7 @@ def _build_session(
         active_studio_id=active.studio_id if active else None,
         acting_as_person_id=acting_as_person_id,
         roles=active.roles if active else (),
+        managed_class_ids=active.managed_class_ids if active else (),
         is_developer=is_developer,
         studio_is_demo=active.studio_is_demo if active else False,
         is_platform_admin=is_platform_admin,

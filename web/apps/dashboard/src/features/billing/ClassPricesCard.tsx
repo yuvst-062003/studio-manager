@@ -34,7 +34,7 @@
 // landed.
 import { useEffect, useMemo, useState } from 'react'
 import { apiFetch, formatAgorot } from '@studio/core'
-import { Button, Card, SelectField } from '@studio/ui'
+import { Button, Card, LoadFailed, SelectField } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { makeDashboardBillingClient } from './billingClient'
@@ -65,6 +65,9 @@ export function ClassPricesCard({
    *  that class's price — so this cannot be a map of truthy ids. */
   const [draft, setDraft] = useState<Record<string, string | null>>({})
   const [failed, setFailed] = useState(false)
+  //: Bumped by the retry so the effect re-runs. A retry that changed no dependency would
+  //: redraw the same failure and look like a dead button.
+  const [attempt, setAttempt] = useState(0)
   const [save, setSave] = useState<SaveState>('idle')
 
   useEffect(() => {
@@ -84,7 +87,7 @@ export function ClassPricesCard({
     return () => {
       live = false
     }
-  }, [client, studentId])
+  }, [client, studentId, attempt])
 
   /** What the child pays for a class nobody has priced. Resolved from the plan list rather
    *  than asked for separately — the picker already needs every plan, and a second read for
@@ -119,10 +122,22 @@ export function ClassPricesCard({
   }
 
   if (failed) {
+    // `LoadFailed`, not a bare sentence. The repo rule (tools/__tests__/load-failed-
+    // recovery) is that a failed read must offer the way OUT of it -- a manager who
+    // cannot see this child's prices needs a retry, not a paragraph telling them so.
     return (
       <Card>
         <h2>{t(locale, 'billing.classPrices.title')}</h2>
-        <p data-testid="class-prices-failed">{t(locale, 'billing.classPrices.loadFailed')}</p>
+        <div data-testid="class-prices-failed">
+          <LoadFailed
+            detail={t(locale, 'billing.classPrices.loadFailed')}
+            locale={locale}
+            onRetry={() => {
+              setFailed(false)
+              setAttempt((n) => n + 1)
+            }}
+          />
+        </div>
       </Card>
     )
   }

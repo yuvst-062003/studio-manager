@@ -65,6 +65,10 @@ class StudioMembershipOut(BaseModel):
     person_id: uuid.UUID
     roles: list[str]
     is_guardian: bool
+    #: Classes this person MANAGES in this studio, when their grant is scoped to a class
+    #: rather than to the studio. Deliberately not folded into `roles`: a class-scoped
+    #: `manager` read as a plain one would hand them the whole studio.
+    managed_class_ids: list[uuid.UUID] = []
 
 
 class AppAccessOut(BaseModel):

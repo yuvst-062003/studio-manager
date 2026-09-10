@@ -392,6 +392,7 @@
   flex-direction: column;
   overflow-y: auto;
   background: var(--surface);
+
   /* A literal shadow, like every other one in this tree. What stood here was a `var()` on
    * a raised-shadow token that the design system does not define: the fallback made it
    * look right, so nothing showed on screen, while the name stayed free for somebody to

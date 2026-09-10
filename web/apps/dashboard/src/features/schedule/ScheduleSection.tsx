@@ -11,7 +11,7 @@
 // without adding a dependency, which .claude/rules/ui-rtl-a11y.md says not to do without
 // asking").
 import { useEffect, useMemo, useState } from 'react'
-import { EmptyState } from '@studio/ui'
+import { EmptyState, LoadFailed } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { ClassesScreen } from './ClassesScreen'
@@ -101,6 +101,11 @@ export function ScheduleSection({
   const groupList = useMemo(() => groups ?? [], [groups])
   const [year, setYear] = useState<TrainingYear | null>(null)
   const [yearLoaded, setYearLoaded] = useState(false)
+  // F1a — a failed year lookup must not read as "there is no active year". The two send a
+  // manager to different places: one to the rollover screen to open a year, the other back
+  // in a minute.
+  const [yearFailed, setYearFailed] = useState(false)
+  const [yearAttempt, setYearAttempt] = useState(0)
   // The class a drill-in is inside. Read rather than derived from its groups: a class with
   // no groups yet has none to take a name from, and that is exactly the manager who most
   // needs the screen to say which class they opened.
@@ -127,8 +132,9 @@ export function ScheduleSection({
     if (!needsGroups) return
     let live = true
     void (async () => {
-      const loaded = await client.listGroups()
-      if (live) setGroups(loaded)
+      // Same reason as the year below: a rejection nobody catches outlives the component.
+      const loaded = await client.listGroups().catch(() => null)
+      if (live && loaded) setGroups(loaded)
     })()
     return () => {
       live = false
@@ -139,18 +145,38 @@ export function ScheduleSection({
     if (!needsYear) return
     let live = true
     void (async () => {
-      const years = await client.listTrainingYears()
+      // Caught, and not only for the screen's sake: an uncaught rejection here escapes the
+      // effect after the component has gone, which surfaces as an unhandled rejection in
+      // the test run and as a console error in a browser — a failure with no owner.
+      const years = await client.listTrainingYears().catch(() => null)
       if (!live) return
+      if (years === null) {
+        setYearFailed(true)
+        setYearLoaded(true)
+        return
+      }
       setYear(years.find((candidate) => candidate.status === 'active') ?? null)
       setYearLoaded(true)
     })()
     return () => {
       live = false
     }
-  }, [client, needsYear])
+  }, [client, needsYear, yearAttempt])
 
   if (route.view === 'closures') {
     if (!yearLoaded) return null
+    if (yearFailed) {
+      return (
+        <LoadFailed
+          locale={locale}
+          onRetry={() => {
+            setYearFailed(false)
+            setYearLoaded(false)
+            setYearAttempt((n) => n + 1)
+          }}
+        />
+      )
+    }
     if (!year) {
       return (
         <EmptyState

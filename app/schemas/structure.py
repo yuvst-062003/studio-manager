@@ -141,6 +141,38 @@ class GroupStaffListResponse(BaseModel):
     items: list[GroupStaffOut]
 
 
+class ClassStaffCreate(BaseModel):
+    """Put a person on a class's coaching roster.
+
+    The role pattern is the GROUP one deliberately: "main coach" and "assistant" mean the
+    same thing at both levels, and a second vocabulary for one idea is how two screens end
+    up disagreeing about who runs a class. `manager` is not here -- a manager scoped to a
+    class is a role assignment, not somebody on the mat.
+    """
+
+    person_id: uuid.UUID
+    role: str = Field(pattern=GROUP_STAFF_ROLE_PATTERN)
+    from_date: date | None = None
+
+
+class ClassCoachOut(BaseModel):
+    """One coach of one class, as a roster screen reads them.
+
+    Carries `display_name` because every caller wants it and the alternative is each screen
+    joining `person` for itself -- which is where two screens start showing the same coach
+    under two different names.
+    """
+
+    person_id: uuid.UUID
+    display_name: str
+    role: str
+    from_date: date
+
+
+class ClassStaffListResponse(BaseModel):
+    items: list[ClassCoachOut]
+
+
 class HealthTemplateOut(BaseModel):
     """Conflict C3. The questions, never an answer -- M4 owns anything that could hold
     one."""

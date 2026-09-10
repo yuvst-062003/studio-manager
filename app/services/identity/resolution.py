@@ -59,6 +59,9 @@ class StudioMembership:
     person_id: uuid.UUID
     roles: tuple[str, ...]
     is_guardian: bool
+    #: Classes this person MANAGES, for a manager scoped to one rather than to the studio.
+    #: Deliberately NOT folded into `roles` -- see the query that builds it.
+    managed_class_ids: tuple[uuid.UUID, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -259,18 +262,56 @@ def studios_for_identity(session: Session, identity_id: uuid.UUID) -> list[Studi
             # card printed 'מאמן עוזר' once per group, eleven times for a real coach.
             # `act_as._describe` fixed the identical bug as ship-audit D4; this query,
             # which feeds every real session rather than the persona switcher, was missed.
+            #
+            # **CLASS-scoped rows are excluded, and that exclusion is a security boundary.**
+            # A manager of ONE class holds `role='manager', scope_type='class'`. Folded in
+            # here it would read as plain `manager`, and `require_roles` -- which sees only
+            # this tuple -- would open every `ManagerOrOwner` route in the product to them,
+            # for the whole studio. Granting one class would grant all of them, with nothing
+            # on any screen showing it.
+            #
+            # GROUP-scoped rows stay: `StructureService.assign_staff` grants a coach their
+            # `lead_coach` against a group, so excluding those would log every real coach
+            # out of the staff app. Only `class` is held back, and it travels in
+            # `managed_class_ids` below instead.
             roles = tuple(
                 session.execute(
                     select(RoleAssignment.role)
                     .where(
                         RoleAssignment.person_id == person.id,
                         RoleAssignment.revoked_at.is_(None),
+                        RoleAssignment.scope_type != "class",
                     )
                     .distinct()
                     .order_by(RoleAssignment.role)
                 )
                 .scalars()
                 .all()
+            )
+            # The other half of that split. `manager` only: a class-scoped COACH grant would
+            # be a coaching assignment, and coaching lives on `class_staff`, not here.
+            # `scope_id` is nullable on the column, so the SQL `IS NOT NULL` above narrows
+            # the ROWS but not the static type -- mypy still sees `UUID | None`. The
+            # comprehension is what makes the two agree, and it is a filter rather than a
+            # cast: a null here would be a class-scoped grant naming no class, which is a
+            # row nobody should be handed as if it meant something.
+            managed_class_ids = tuple(
+                class_id
+                for class_id in session.execute(
+                    select(RoleAssignment.scope_id)
+                    .where(
+                        RoleAssignment.person_id == person.id,
+                        RoleAssignment.revoked_at.is_(None),
+                        RoleAssignment.scope_type == "class",
+                        RoleAssignment.role == "manager",
+                        RoleAssignment.scope_id.is_not(None),
+                    )
+                    .distinct()
+                    .order_by(RoleAssignment.scope_id)
+                )
+                .scalars()
+                .all()
+                if class_id is not None
             )
             is_guardian = (
                 session.execute(
@@ -286,6 +327,7 @@ def studios_for_identity(session: Session, identity_id: uuid.UUID) -> list[Studi
                     person_id=person.id,
                     roles=roles,
                     is_guardian=is_guardian,
+                    managed_class_ids=managed_class_ids,
                 )
             )
         return memberships

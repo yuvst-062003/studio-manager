@@ -2127,6 +2127,37 @@
         "title": "ChildMatchOut",
         "type": "object"
       },
+      "ClassCoachOut": {
+        "description": "One coach of one class, as a roster screen reads them.\n\nCarries `display_name` because every caller wants it and the alternative is each screen\njoining `person` for itself -- which is where two screens start showing the same coach\nunder two different names.",
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "from_date": {
+            "format": "date",
+            "title": "From Date",
+            "type": "string"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "person_id",
+          "display_name",
+          "role",
+          "from_date"
+        ],
+        "title": "ClassCoachOut",
+        "type": "object"
+      },
       "ClassCreate": {
         "properties": {
           "color": {
@@ -2321,6 +2352,55 @@
           "is_active"
         ],
         "title": "ClassOut",
+        "type": "object"
+      },
+      "ClassStaffCreate": {
+        "description": "Put a person on a class's coaching roster.\n\nThe role pattern is the GROUP one deliberately: \"main coach\" and \"assistant\" mean the\nsame thing at both levels, and a second vocabulary for one idea is how two screens end\nup disagreeing about who runs a class. `manager` is not here -- a manager scoped to a\nclass is a role assignment, not somebody on the mat.",
+        "properties": {
+          "from_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Date"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "role": {
+            "pattern": "^(lead_coach|assistant_coach)$",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "person_id",
+          "role"
+        ],
+        "title": "ClassStaffCreate",
+        "type": "object"
+      },
+      "ClassStaffListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ClassCoachOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ClassStaffListResponse",
         "type": "object"
       },
       "ClosureCreate": {
@@ -13337,6 +13417,15 @@
       },
       "StaffInvitationIn": {
         "properties": {
+          "class_ids": {
+            "description": "Classes this MANAGER runs, for a manager scoped to classes rather than to the whole studio (2026-09-09). Non-empty means the grants written are class-scoped and no studio-wide one is written at all — a studio row beside them would hand back exactly the club-wide authority the scoping withholds. Only valid with `roles: [\"manager\"]`; a coach's scope is the roster `group_ids` puts them on.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Class Ids",
+            "type": "array"
+          },
           "email": {
             "maxLength": 320,
             "minLength": 3,
@@ -15100,6 +15189,15 @@
           "is_guardian": {
             "title": "Is Guardian",
             "type": "boolean"
+          },
+          "managed_class_ids": {
+            "default": [],
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Managed Class Ids",
+            "type": "array"
           },
           "person_id": {
             "format": "uuid",
@@ -19413,6 +19511,149 @@
           }
         },
         "summary": "Create Class",
+        "tags": [
+          "structure"
+        ]
+      }
+    },
+    "/api/v1/classes/{class_id}/staff": {
+      "get": {
+        "description": "Who coaches this class, main coach first.\n\nReadable by any staff member: §3.2 makes MANAGING staff a manager's act, but knowing who\nelse teaches your class is neither a financial nor a personal-data read, and a coach app\nthat could not show it would be worse than useless on the mat.",
+        "operationId": "list_class_staff_api_v1_classes__class_id__staff_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassStaffListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Class Staff",
+        "tags": [
+          "structure"
+        ]
+      },
+      "post": {
+        "description": "Owner, 2026-09-09: \"if a coach is in both, the studio manager needs to add his\ndetails in both classes.\" So this is per class, and a person genuinely holds two rows.\n\n200 rather than 201 when the coach was already there: re-adding creates nothing, and a\nrole change on an existing row is an edit rather than a creation. Saying 201 to both\nmakes a correct retry indistinguishable from a first assignment in any log that reads\nstatus codes -- the same reasoning as the group route above.",
+        "operationId": "add_class_staff_api_v1_classes__class_id__staff_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClassStaffCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassCoachOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Class Staff",
+        "tags": [
+          "structure"
+        ]
+      }
+    },
+    "/api/v1/classes/{class_id}/staff/{person_id}": {
+      "delete": {
+        "description": "Closes the row rather than deleting it -- who taught a class last year is history the\nsessions already point at.\n\n409 while they still hold one of this class's groups. Letting it through would create\nthe exact state the assignment rule forbids, made by the act meant to tidy up, and the\nnext reader could not tell a bug from an exception somebody meant.",
+        "operationId": "remove_class_staff_api_v1_classes__class_id__staff__person_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Class Staff",
         "tags": [
           "structure"
         ]
