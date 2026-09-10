@@ -3,7 +3,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
-import App, { routeFromHash } from './App'
+import App, { eventDateFrom, eventRouteFrom, routeFromHash } from './App'
 
 const SESSION = {
   access: { staff: true, parent: false },
@@ -45,6 +45,30 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+// D14 puts a slot's date on the event form's own hash, which the sub-route parser had to
+// learn to ignore. Without the split, `#/events/new?date=2026-11-05` read as an event id of
+// `new?date=2026-11-05` — matching neither `'new'` nor a real id, so the app tried to load
+// an event by that id and showed a not-found for a link it had just written itself.
+describe('eventRouteFrom and eventDateFrom', () => {
+  it.each([
+    ['#/events', ''],
+    ['#/events/new', 'new'],
+    ['#/events/new?date=2026-11-05', 'new'],
+    ['#/events/abc-123', 'abc-123'],
+  ])('%s → sub-route %s', (hash, expected) => {
+    expect(eventRouteFrom(hash)).toBe(expected)
+  })
+
+  it('reads a well-formed date and refuses anything else', () => {
+    expect(eventDateFrom('#/events/new?date=2026-11-05')).toBe('2026-11-05')
+    expect(eventDateFrom('#/events/new')).toBeNull()
+    // The hash is user input and the value reaches `new Date()` in the form, so it is
+    // validated rather than trusted.
+    expect(eventDateFrom('#/events/new?date=lol')).toBeNull()
+    expect(eventDateFrom('#/events/new?date=2026-13-45x')).toBeNull()
+  })
+})
+
 describe('routeFromHash', () => {
   it.each([
     ['#/staff', 'staff'],
@@ -53,11 +77,13 @@ describe('routeFromHash', () => {
     // §5.15's rollover is one hash and one screen: the wizard's seven steps are its own
     // state, and `resume_at` is the only correct answer to "where was I".
     ['#/rollover', 'rollover'],
-    // The design pass retired `home`: 3a/1e draw the weekly board as the manager's
-    // landing, so the bare hash — and any unknown one — resolves to the board rather
-    // than to the "בחרו מסך מהתפריט" page that used to land nowhere.
-    ['', 'schedule'],
-    ['#/nothing-here', 'schedule'],
+    // D16 of the 2026-09-10 redesign restored `home` as the landing screen. The 2026-08-27
+    // pass had made the weekly board the landing because the home of THAT day "landed
+    // nowhere" — an empty "בחרו מסך מהתפריט" page. It no longer does: it carries the money
+    // band, today's classes, the attendance trend and the alert centre, so the bare hash —
+    // and any unknown one — resolves to the screen that says what needs attention.
+    ['', 'home'],
+    ['#/nothing-here', 'home'],
     ['#/comms', 'comms'],
     ['#/documents', 'documents'],
     ['#/prices', 'prices'],
@@ -243,10 +269,13 @@ describe('every route the manager can reach has a door (2026-08-29)', () => {
     expect(link).toHaveAttribute('href', '#/home')
   })
 
-  it('resolves that hash to its own route rather than falling through to the board', async () => {
+  it('resolves that hash to its own route, and is now the fallback too', async () => {
     expect(routeFromHash('#/home')).toBe('home')
-    // And the fallback is still the board: `#/` is deliberately NOT the home yet.
-    expect(routeFromHash('#/')).toBe('schedule')
+    // D16 (2026-09-10) flipped this. The line above used to read `toBe('schedule')` with
+    // the comment "`#/` is deliberately NOT the home yet" — "yet" being the operative
+    // word: the home was waiting to be looked at on real data before it became the
+    // landing. It has been, and it now carries the alert centre.
+    expect(routeFromHash('#/')).toBe('home')
   })
 })
 
@@ -483,5 +512,52 @@ describe('the dashboard can be switched between light, dark and system', () => {
     render(<App />)
     const nav = within(await screen.findByTestId('side-nav'))
     expect(nav.getByRole('radio', { name: t('he', 'common.theme.light') })).toBeInTheDocument()
+  })
+})
+
+// Checkpoint 7. `routeFromHash` folds `#/closures` into the `schedule` route — one
+// vertical, one route — and the nav followed the fold: on the closures screen BOTH the
+// weekly-calendar door and the closures door carried `aria-current="page"`, so the sidebar
+// said the manager was in two places at once. Caught on the checkpoint's own screenshot.
+describe('one door is current at a time', () => {
+  // Rewritten 2026-09-10 when `overflowDoors()` was retired. It used to assert that the
+  // CLOSURES door was the current one — but closures no longer has a door: §2.3 makes the
+  // calendar absorb `#/closures`, and the link now lives in the calendar's own header.
+  // So the invariant the test protects is unchanged (exactly one door is current, never
+  // two) while the door it names is the calendar's.
+  it('lights only the weekly-calendar door on #/closures, and nothing else', async () => {
+    stubApi(SIGNED_IN)
+    globalThis.location.hash = '#/closures'
+    render(<App />)
+    await waitFor(() =>
+      expect(document.querySelectorAll('.studio-sidenav [aria-current="page"]').length).toBe(1),
+    )
+    expect(document.querySelector('.studio-sidenav [aria-current="page"]')).toHaveTextContent(
+      t('he', 'common.dash.nav.weekly'),
+    )
+  })
+
+  // The duplication the owner reported: `הגדרות` was both the ninth door and a pinned
+  // `settingsItem` at the foot of the sidebar, so one menu offered the same screen twice.
+  it('names הגדרות exactly once in the sidebar', async () => {
+    stubApi(SIGNED_IN)
+    globalThis.location.hash = '#/home'
+    render(<App />)
+    const nav = await screen.findByRole('navigation', { name: t('he', 'common.nav.menu') })
+    expect(
+      within(nav).getAllByRole('link', { name: new RegExp(t('he', 'common.dash.nav.settings')) }),
+    ).toHaveLength(1)
+  })
+
+  // The overflow group itself. It was labelled with `common.dash.nav.club` (מועדון) and
+  // held the ten absorbed destinations; every checkpoint that was meant to retire an entry
+  // had shipped while the entries stayed, so the sidebar carried nine doors and then a
+  // second menu of eight more.
+  it('has no second nav group below the doors', async () => {
+    stubApi(SIGNED_IN)
+    globalThis.location.hash = '#/home'
+    render(<App />)
+    const nav = await screen.findByRole('navigation', { name: t('he', 'common.nav.menu') })
+    expect(within(nav).queryByText(t('he', 'common.dash.nav.club'))).not.toBeInTheDocument()
   })
 })

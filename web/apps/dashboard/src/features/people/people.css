@@ -50,3 +50,523 @@
 .people-sharing-card__actions {
   margin-block-start: auto;
 }
+
+/* D1 — the class chips above the students filter bar.
+ *
+ * A horizontal, scrollable row rather than a wrapping one: a club with a dozen classes
+ * should push the row sideways, not push the table down the page. `flex-shrink: 0` on the
+ * chip is what makes the scroll happen instead of the chips squashing into each other. */
+.people-class-tabs {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-block-end: var(--space-1);
+}
+
+.people-class-tabs > button {
+  flex-shrink: 0;
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-label);
+  padding-block: var(--space-2);
+  padding-inline: var(--space-4);
+  white-space: nowrap;
+}
+
+.people-class-tabs > button:hover {
+  border-color: var(--emphasis);
+  color: var(--fg);
+}
+
+.people-class-tabs > button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* `aria-pressed` carries the state to assistive tech and drives the styling from the same
+ * attribute, so the two cannot disagree — the selected chip is never only a colour. */
+.people-class-tabs > button[aria-pressed='true'] {
+  background: var(--emphasis);
+  border-color: var(--emphasis);
+  color: var(--on-emphasis);
+  font-weight: var(--weight-medium);
+}
+
+/* Dashboard redesign — 4a's health tab. There is no health card on this screen yet, so
+ * the tab holds a single muted line pointing at where the data actually lives instead of
+ * an empty card. */
+.people-detail-health-hint {
+  color: var(--text-muted);
+  margin-block: var(--space-2);
+}
+
+/* The student card's group list. The group name and its weekday list are two adjacent
+ * inline elements with nothing between them, which rendered as one run-on word. A gap
+ * rather than a literal separator in the markup: a separator between the tags is an
+ * inlined user-facing string, and G4 fails the build on those. */
+.people-detail-groups {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.people-detail-groups > li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: baseline;
+}
+
+.people-detail-groups > li > [data-testid='detail-weekdays'],
+.people-detail-groups > li > [data-testid='detail-primary'],
+.people-detail-groups > li > [data-testid='detail-guardian-pending'] {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+/* ═══ The student card ════════════════════════════════════════════════════════════
+ * Ported from the prototype's member drawer: an avatar header carrying the name and its
+ * chips, a row of UNDERLINED tabs, then a two-column grid of labelled field wells, and a
+ * footer bar holding the actions.
+ *
+ * It stays a routed page rather than becoming an overlay. The prototype opens it over the
+ * list because it has no routing at all; ours is deep-linkable and survives a refresh,
+ * which is worth more than the overlay. */
+.student-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  inline-size: 100%;
+}
+
+.student-card__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--surface-raised);
+  border-block-end: var(--border-width-hairline) solid var(--border);
+}
+
+/* Initials, not a photograph — D3. The ring is what makes it read as a portrait slot
+ * rather than as a coloured circle that happens to hold letters. */
+.student-card__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  inline-size: 3rem;
+  block-size: 3rem;
+  border-radius: var(--radius-circle);
+  background: var(--emphasis-tint);
+  color: var(--accent);
+  font-size: var(--text-title);
+  font-weight: var(--weight-semibold);
+  box-shadow: 0 0 0 2px var(--emphasis);
+}
+
+.student-card__identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.student-card__name-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.student-card__name-row h1 {
+  font-size: var(--text-title);
+  font-weight: var(--weight-semibold);
+  margin: 0;
+}
+
+.student-card__belt {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+}
+
+/* The who-and-where line. A separator between the two facts, drawn in CSS because a
+ * literal between the tags would be an inlined user-facing string (G4). */
+.student-card__sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+}
+
+.student-card__sub > bdi + bdi::before {
+  content: '·';
+  margin-inline-end: var(--space-2);
+  color: var(--border-strong);
+}
+
+.student-card__back {
+  margin-inline-start: auto;
+  font-size: var(--text-label);
+  flex-shrink: 0;
+}
+
+.student-card__frozen {
+  margin: 0;
+  padding-block: var(--space-2);
+  padding-inline: var(--space-5);
+  background: var(--pending-tint);
+  color: var(--pending);
+  font-size: var(--text-caption);
+}
+
+/* Underlined tabs, as the prototype draws them — not a segmented pill. The active one is
+ * the only place the accent appears in this row, which is what makes it findable. */
+.student-card__tabs {
+  display: flex;
+  gap: var(--space-5);
+  padding-inline: var(--space-5);
+  border-block-end: var(--border-width-hairline) solid var(--border);
+  overflow-x: auto;
+}
+
+.student-card__tab {
+  flex-shrink: 0;
+  background: transparent;
+  border: 0;
+  border-block-end: 2px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  padding-block: var(--space-3);
+  white-space: nowrap;
+}
+
+.student-card__tab:hover {
+  color: var(--fg);
+}
+
+.student-card__tab:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.student-card__tab[aria-selected='true'] {
+  color: var(--accent);
+  border-block-end-color: var(--accent);
+}
+
+.student-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+}
+
+/* Two columns above 44rem, one below — a labelled well is unreadable at half a phone. */
+.student-card__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+@media (width <= 44rem) {
+  .student-card__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.student-card__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.student-card__field-label {
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+}
+
+.student-card__field-value {
+  margin: 0;
+  padding-block: var(--space-2);
+  padding-inline: var(--space-3);
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-body);
+  min-block-size: 2.5rem;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.student-card__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.student-card__stack {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.student-card__muted {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+/* The actions sit in a bar at the foot rather than loose in the page — they act on the
+ * student, so they belong to the card and not to whichever tab happens to be open. */
+.student-card__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface-raised);
+  border-block-start: var(--border-width-hairline) solid var(--border);
+}
+
+/* Rows inside a field well hold a value and a qualifier side by side — a guardian's name
+ * and "primary", a group and its weekdays. With nothing between them they render as one
+ * run-on word. The gap goes here rather than as a separator between the tags, which would
+ * be an inlined user-facing string (G4). */
+.student-card__stack > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+/* ═══ The drawer ══════════════════════════════════════════════════════════════════
+ * The card opens as a side popup over the list, which is how the prototype draws it.
+ * Pinned to the INLINE-START edge, so in this RTL app it slides in from the left the way
+ * the design does — and would come from the right in an LTR locale without a second rule. */
+.student-drawer__scrim {
+  position: fixed;
+  inset-block: 0;
+  inset-inline: 0;
+  background: var(--scrim);
+  z-index: 40;
+}
+
+.student-drawer {
+  position: fixed;
+  inset-block: 0;
+
+  /* inline-END, so in this RTL app the panel sits on the physical LEFT — which is where
+   * the prototype puts it, and which leaves the navigation on the right still visible and
+   * usable. inline-start would slide it over the sidebar and hide the way out. */
+  inset-inline-end: 0;
+  inline-size: min(42rem, 100%);
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--surface);
+
+  /* A literal shadow, like every other one in this tree. What stood here was a `var()` on
+   * a raised-shadow token that the design system does not define: the fallback made it
+   * look right, so nothing showed on screen, while the name stayed free for somebody to
+   * later define as something else and silently change this drawer. `tokens-are-defined`
+   * is the test that catches it — and it reads raw text, so the token cannot be named
+   * even in a comment. */
+  box-shadow: 0 0 40px rgb(0 0 0 / 28%);
+}
+
+/* Inside the drawer the card fills it rather than floating as a rounded panel. */
+.student-drawer > .student-card {
+  border: 0;
+  border-radius: 0;
+  min-block-size: 100%;
+}
+
+.student-card__close {
+  margin-inline-start: auto;
+  flex-shrink: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--text-title);
+  line-height: 1;
+  padding: var(--space-2);
+}
+
+.student-card__close:hover {
+  background: var(--ground);
+  color: var(--fg);
+}
+
+.student-card__close:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The dated attendance log. A grid of cells, each carrying a day, a date and a WORD —
+ * a row of identical ticks says one thing many times and nothing about which lesson. */
+.student-card__panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.student-card__present-count {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--paid);
+}
+
+.student-card__marks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+  gap: var(--space-2);
+}
+
+.student-card__mark {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: center;
+  padding-block: var(--space-2);
+  padding-inline: var(--space-2);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.student-card__mark-day,
+.student-card__mark-date {
+  font-size: var(--text-micro);
+  color: var(--text-muted);
+}
+
+.student-card__mark-state {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+}
+
+.student-card__mark[data-state='present'] .student-card__mark-state { color: var(--paid); }
+.student-card__mark[data-state='absent'] .student-card__mark-state { color: var(--debt); }
+.student-card__mark[data-state='notified'] .student-card__mark-state { color: var(--pending); }
+.student-card__mark[data-state='unmarked'] .student-card__mark-state { color: var(--text-muted); }
+
+.student-card__stack-inline {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+/* The alert-centre queues (owner report, 2026-09-10).
+ *
+ * `שיעורי ניסיון קרובים` rendered as a bare `<ul>` whose every row was three adjacent
+ * inline elements with nothing between them, so the name, the group and the date ran
+ * together into one word: "עמית דודגבחרת31 באוגוסט 2026". Two facts made it unreadable and
+ * both are fixed here — there was no separator, and there was no styling at all.
+ *
+ * `TrialsAwaitingDecisionAlert` had the same shape and takes the same classes, so the two
+ * queues on one screen read as one thing rather than as two accidents.
+ */
+.alert-queue {
+  display: grid;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.alert-queue__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+/* The name is what the eye looks for, so it takes the reading edge and the weight, and
+ * pushes everything after it to the far end. */
+.alert-queue__name {
+  font-weight: var(--weight-medium);
+  color: var(--fg);
+  margin-inline-end: auto;
+}
+
+.alert-queue__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+}
+
+/* A real separator between the group and the date, drawn rather than typed: a literal "·"
+ * in the markup would be read aloud by a screen reader as punctuation between two facts
+ * that are already separate elements. */
+.alert-queue__meta > * + *::before {
+  content: '';
+  display: inline-block;
+  inline-size: var(--border-width-hairline);
+  block-size: 0.9em;
+  margin-inline-end: var(--space-2);
+  vertical-align: -0.1em;
+  background: var(--border-strong);
+}
+
+/* `#/alerts` — the six registered queues, one card each, evenly spaced. Before this they
+ * sat straight on the page background and read as six unrelated headings. */
+.alert-centre {
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* Three of the six registered sections hide themselves unconditionally — "a row that never
+ * requires a decision is how that list stops being scanned", as their own comments put it.
+ * They return null, so the `Card` wrapped around them rendered as an empty box: two blank
+ * cards sat between the debt alert and the first real queue, which one look at the screen
+ * showed and no test would have.
+ *
+ * `:empty` and not `:has()`: `Card` renders a bare `<section>` whose only child is the
+ * section, so when that renders nothing the element has no child nodes at all. This is the
+ * precise condition, and it needs no newer selector to say it. */
+.alert-centre > .studio-card:empty {
+  display: none;
+}

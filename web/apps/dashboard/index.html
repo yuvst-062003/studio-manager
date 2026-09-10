@@ -1,9 +1,13 @@
 <!doctype html>
-<html lang="he" dir="rtl" data-theme="light">
+<!-- `data-surface="studio-os"` puts the manager dashboard in its own dark-mint register
+     rather than the neutral inward palette it shared with the staff app until the
+     2026-09-10 redesign. The values are the [data-surface="studio-os"] block in
+     packages/ui/src/tokens.css; ThemeProvider still owns light/dark/system on top. -->
+<html lang="he" dir="rtl" data-theme="light" data-surface="studio-os">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#f7f5f1" />
+    <meta name="theme-color" content="#f2f5f3" />
 
     <!-- iOS ignores the manifest for the home-screen icon and reads these
          instead. Without them the icon is a screenshot of the page (§6.5). -->

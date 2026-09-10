@@ -2,9 +2,16 @@
 //
 // **No charting dependency.** A grid of twelve columns, each a flex column whose two
 // segments carry a percentage `block-size`, is the whole implementation. `4g` asks for no
-// y-axis, no per-bar labels and no tooltip, so everything a chart library exists to
-// provide is something this chart must not have. See `reports.css` for the rest of that
-// argument.
+// y-axis and no per-bar labels, so most of what a chart library exists to provide is
+// something this chart must not have. See `reports.css` for the rest of that argument.
+//
+// **The tooltip is the one part of `4g`'s rule that checkpoint 13 overturns, deliberately.**
+// `4g` said "no tooltip" and §3.13 asks for one by name. The newer instruction wins on its
+// own merits rather than only by being newer: the numbers were ALREADY in the DOM for a
+// screen reader, in the visually-hidden line at the foot of every column, so a sighted
+// manager was the only person who could not read them. A tooltip does not add information
+// to this chart — it stops withholding it from one group. It is CSS on hover and on
+// keyboard focus, with no library and no JavaScript.
 //
 // **The scale is the tallest column, and it is shared.** Each column is scaled against
 // the largest billed month in the window rather than against itself — twelve bars each
@@ -69,7 +76,15 @@ export function RevenueChart({ locale, months }: { locale: Locale; months: Reven
       aria-label={t(locale, 'reports.financial.chartLabel')}
     >
       {months.map((month) => (
-        <li className="dash-chart__column" key={`${month.year}-${month.month}`}>
+        // `tabIndex` and not a `<button>`: there is nothing to press. The column is a
+        // figure a keyboard user needs to be able to REACH, which is what a focusable
+        // group is for — and the tooltip below opens on `:focus-within` as well as on
+        // hover, so the pointer and the keyboard get the same thing.
+        <li
+          className="dash-chart__column"
+          key={`${month.year}-${month.month}`}
+          tabIndex={0}
+        >
           <span
             className="dash-chart__stack"
             data-testid={`revenue-column-${month.year}-${month.month}`}
@@ -112,6 +127,26 @@ export function RevenueChart({ locale, months }: { locale: Locale; months: Reven
             <MoneyDisplay agorot={month.collected_agorot} /> ·{' '}
             {t(locale, 'reports.financial.outstanding')}{' '}
             <MoneyDisplay agorot={month.outstanding_agorot} />
+          </span>
+          {/* §3.13's tooltip — the same three facts the line above gives a screen reader,
+              shown to the eye on hover and on focus. `aria-hidden`, because the accessible
+              copy is right there and announcing both would read every column twice. */}
+          <span
+            aria-hidden="true"
+            className="dash-chart__tip"
+            data-testid={`revenue-tip-${month.year}-${month.month}`}
+          >
+            <span className="dash-chart__tip-month">
+              {formatMonthLabel(month.year, month.month, locale)}
+            </span>
+            <span className="dash-chart__tip-row" data-part="collected">
+              {t(locale, 'reports.financial.collected')}
+              <MoneyDisplay agorot={month.collected_agorot} />
+            </span>
+            <span className="dash-chart__tip-row" data-part="outstanding">
+              {t(locale, 'reports.financial.outstanding')}
+              <MoneyDisplay agorot={month.outstanding_agorot} />
+            </span>
           </span>
         </li>
       ))}

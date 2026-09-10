@@ -164,17 +164,26 @@ export function BillingSection({ locale, view }: { locale: Locale; view: 'collec
 
   const households = householdsFrom(charges, new Date(), students, credit)
   return (
-    <>
-    {/* Above the debt board, because a pending cash request IS tonight's collections
-        news: the family already answered, and the board below still shows them in debt
-        until the notes change hands. */}
-    <PaymentPromisesPanel locale={locale} client={client} onChanged={refresh} />
-    {/* §11 — beside the promises queue, because both are the same sentence: money the
-        app cannot confirm on its own and a person has to close. */}
-    <PlanChangesPanel locale={locale} client={client} onChanged={refresh} />
     <CollectionsScreen
       locale={locale}
       client={client}
+      // Handed to the screen instead of rendered before it. These two panels used to sit
+      // here, as siblings ABOVE `CollectionsScreen` — and `CollectionsScreen` owns the H1,
+      // so תשלומים וגבייה rendered halfway down the page under two stacked queues, with
+      // nothing at the top saying what the page was (owner report, 2026-09-10).
+      //
+      // The reason they were first is still good and is preserved by the slot's position:
+      // a pending cash request IS tonight's collections news, and the debt board still
+      // shows those families in debt until the notes change hands. §11 puts the plan
+      // changes beside them because both are the same sentence — money the app cannot
+      // confirm on its own and a person has to close. They now render under the title and
+      // the four KPIs, and above the board.
+      queues={
+        <>
+          <PaymentPromisesPanel locale={locale} client={client} onChanged={refresh} />
+          <PlanChangesPanel locale={locale} client={client} onChanged={refresh} />
+        </>
+      }
       households={households}
       openDebtAgorot={households.reduce((sum, row) => sum + row.balanceAgorot, 0)}
       // `3e`'s two collected figures need a payments total for the month, which has no
@@ -186,6 +195,5 @@ export function BillingSection({ locale, view }: { locale: Locale; view: 'collec
       failedCharges={0}
       period={period}
     />
-    </>
   )
 }

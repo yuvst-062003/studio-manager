@@ -187,6 +187,7 @@ export const common: Bundle = {
   'dash.hint.items': 'פריטים למכירה — ג׳ודוגי, חגורות וציוד',
   'dash.hint.documents': 'הצהרות בריאות — מי חתם ומי חסר',
   'dash.hint.reports': 'דוחות — הכנסות, נוכחות, שימור וחגורות',
+  'dash.hint.settings': 'הגדרות המועדון — פרטים, מסמכים, צוות ומעבר שנה',
   'dash.nav.daily': 'יומיום',
   'dash.nav.club': 'מועדון',
   'dash.nav.money': 'כספים ומסמכים',
@@ -585,6 +586,12 @@ export const common: Bundle = {
   'dash.home.today.hall': 'אולם',
   'dash.home.today.coach': 'מאמן',
   'dash.home.today.noCoach': 'לא שובץ מאמן',
+  'dash.home.money.debtAction': 'טיפול בגבייה',
+  'dash.home.money.collectedAction': 'פירוט תשלומים',
+  'dash.home.money.households': '{{count}} משפחות',
+  'dash.home.today.when.past': 'הסתיים',
+  'dash.home.today.when.live': 'מתקיים עכשיו',
+  'dash.home.today.when.soon': 'עוד מעט',
 
   // -- §18.1's platform console (#/platform) --------------------------------------
   // Operator-facing, not club-facing: this whole block is read by one person, the
@@ -669,4 +676,33 @@ export const common: Bundle = {
   'account.group.notifications': 'התראות ותקשורת',
   'account.group.system': 'מערכת והעדפות',
   'account.group.legal': 'מדיניות ותנאים',
+  // The shared stepper (§3.21, §3.19, §3.17). Its state words are never the only signal —
+  // the mark and the tint carry it on screen, and these carry it to a screen reader.
+  'stepper.completion': 'התקדמות באשף',
+  'stepper.percent': '{{percent}}% הושלמו',
+  'stepper.locked': 'יש להשלים את השלבים הקודמים תחילה',
+  'stepper.state.done': 'הושלם',
+  'stepper.state.skipped': 'דולג',
+  'stepper.state.current': 'השלב הנוכחי',
+  'stepper.state.upcoming': 'טרם הגיע',
+  // Checkpoint 15b (2026-09-10) — the five-tab settings §3.19 asked for. The rail used to
+  // carry nine entries of which six only navigated away to screens that own themselves;
+  // the owner asked why settings held all of that. These are the tabs that remain.
+  'settings.section.appearance': 'מראה ושפה',
+  'settings.annual.title': 'פעולות שנתיות',
+  'settings.annual.hint': 'שתי פעולות שרצות פעם בשנה, לא בכל יום.',
+  'settings.annual.setup': 'אשף הקמה',
+  'settings.annual.rollover': 'גלגול שנה',
+  'settings.users.hint': 'הצוות, התפקידים וההרשאות מנוהלים במסך הצוות.',
+  'settings.users.open': 'פתיחת מסך הצוות',
+  // ImagePicker (2026-09-10) — the empty square that replaces the browser's Choose File.
+  'imagePicker.empty': 'הוספת תמונה',
+  'imagePicker.hint': 'לחצו כדי לבחור קובץ',
+  'imagePicker.replace': 'החלפת תמונה',
+  'imagePicker.remove': 'הסרת תמונה',
+  'imagePicker.preview': 'תצוגה מקדימה',
+  'staff.invite.groups': 'קבוצות (לא חובה)',
+  'staff.invite.groupsHint': 'הקבוצות שהמאמן ישובץ אליהן מיד. אפשר גם לשבץ מאוחר יותר מעמוד הקבוצה.',
+  'staff.actions.editMember': 'עריכת איש צוות',
+  'staff.actions.saveMember': 'שמירה',
 }

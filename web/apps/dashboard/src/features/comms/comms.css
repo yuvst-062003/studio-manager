@@ -1,0 +1,759 @@
+/* `#/comms` — rebuilt against the prototype's own `AnnouncementsView`, second pass.
+ *
+ * The first pass made the wizard the page. The prototype's page is the FEED: a header, a
+ * band of figures, a filter-and-search bar, then one rich card per broadcast — with the
+ * wizard as a modal over it. */
+
+/* ── the header ─────────────────────────────────────────────────────────────────────
+ * The prototype's is a left-to-right gradient plate. Ours takes the shape and the marked
+ * eyebrow and leaves the gradient: `--surface` is a token every other screen's header
+ * already sits on, and a gradient here would make one screen's header disagree with the
+ * rest for no reason a manager can name. */
+.comms-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+}
+
+.comms-hero__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.comms-hero__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--emphasis);
+  letter-spacing: 0.04em;
+}
+
+.comms-hero__mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  border-radius: var(--radius-md);
+  background: var(--emphasis-tint);
+  border: var(--border-width-hairline) solid var(--emphasis);
+}
+
+.comms-hero__title {
+  margin: 0;
+  font-size: var(--text-display);
+  font-weight: var(--weight-semibold);
+}
+
+.comms-hero__lead {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+/* The prototype's filled send button, which is the one control on this screen that should
+ * pull the eye — everything else here is reading. */
+.comms-hero__send {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  background: var(--emphasis);
+  border: var(--border-width-hairline) solid var(--emphasis);
+  border-radius: var(--radius-lg);
+  color: var(--on-emphasis);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-label);
+  font-weight: var(--weight-semibold);
+  padding-block: var(--space-3);
+  padding-inline: var(--space-5);
+}
+
+.comms-hero__send:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── the filter bar ─────────────────────────────────────────────────────────────────
+ * Pills and search in ONE bar, the way the prototype groups them: they are two halves of
+ * "narrow this list", and splitting them into two rows makes them read as two features. */
+.comms-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-3);
+}
+
+.comms-bar__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.comms-bar__pills > button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--ground);
+  border: var(--border-width-hairline) solid transparent;
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  padding-block: var(--space-2);
+  padding-inline: var(--space-3);
+  white-space: nowrap;
+}
+
+.comms-bar__pills > button:hover {
+  color: var(--fg);
+}
+
+.comms-bar__pills > button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* `aria-pressed` carries the state and drives the fill from the same attribute, so the two
+ * cannot disagree — the chosen pill is never only a colour. */
+.comms-bar__pills > button[aria-pressed='true'] {
+  background: var(--emphasis);
+  border-color: var(--emphasis);
+  color: var(--on-emphasis);
+}
+
+.comms-bar__count {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.comms-bar__search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  min-inline-size: 14rem;
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+  padding-inline: var(--space-3);
+  color: var(--text-muted);
+}
+
+.comms-bar__search:focus-within {
+  border-color: var(--emphasis);
+}
+
+.comms-bar__search > input {
+  flex: 1;
+  min-inline-size: 0;
+  background: none;
+  border: 0;
+  color: var(--fg);
+  font-family: inherit;
+  font-size: var(--text-label);
+  padding-block: var(--space-2);
+}
+
+.comms-bar__search > input:focus {
+  outline: none;
+}
+
+/* ── the feed ───────────────────────────────────────────────────────────────────────
+ * One card per broadcast, in the prototype's own bands: a head with the mark, the title,
+ * its state and the channels it went out on; the body; then the actions. */
+.comms-feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.comms-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+}
+
+.comms-card:hover {
+  border-color: var(--border-strong);
+}
+
+.comms-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding-block-end: var(--space-3);
+  border-block-end: var(--border-width-hairline) solid var(--border);
+}
+
+/* The prototype tints this mark by urgency. We have no urgency column, so it is tinted by
+ * the one state we do store: a draft has not gone anywhere, and reads muted; a published
+ * one reads live. */
+.comms-card__badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  inline-size: 2.25rem;
+  block-size: 2.25rem;
+  border-radius: var(--radius-md);
+  background: var(--disabled-surface);
+  border: var(--border-width-hairline) solid var(--border);
+  color: var(--text-muted);
+}
+
+.comms-card[data-published] .comms-card__badge {
+  background: var(--emphasis-tint);
+  border-color: var(--emphasis);
+  color: var(--emphasis);
+}
+
+.comms-card__titles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.comms-card__title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.comms-card__title {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+}
+
+/* The state as a WORD in a pill, never the tint alone. */
+.comms-card__state {
+  border-radius: var(--radius-pill);
+  background: var(--disabled-surface);
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  padding-block: 0.1rem;
+  padding-inline: var(--space-2);
+}
+
+.comms-card[data-published] .comms-card__state {
+  background: var(--emphasis-tint);
+  color: var(--emphasis);
+}
+
+.comms-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.comms-card__meta strong {
+  color: var(--fg);
+  font-weight: var(--weight-medium);
+}
+
+.comms-card__channels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+/* D7 — one live channel, so one badge. The prototype shows three because it has three. */
+.comms-channel-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+  padding-block: 0.15rem;
+  padding-inline: var(--space-2);
+}
+
+.comms-card__body {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-label);
+  line-height: var(--leading-relaxed, 1.6);
+}
+
+.comms-card__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding-block-start: var(--space-3);
+  border-block-start: var(--border-width-hairline) solid var(--border);
+}
+
+.comms-card__action {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  padding-block: var(--space-1);
+  padding-inline: var(--space-3);
+}
+
+.comms-card__action:hover {
+  border-color: var(--emphasis);
+  color: var(--fg);
+}
+
+.comms-card__action:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── the composer, as a side drawer ─────────────────────────────────────────────────
+ * *"When pressing write new msgs, a left popup opens up with ready template and free
+ * text."* A drawer rather than the centred modal that stood here: it opens beside the feed
+ * instead of on top of it, so the thing a manager is answering stays on screen while they
+ * write the answer.
+ *
+ * It sits on `inset-inline-end`, which is the LEFT edge of the Hebrew screen the owner was
+ * describing and the right edge of the English one. A physical `left` would be correct in
+ * one locale and wrong in the other — D10, and the same reason the student drawer is
+ * anchored this way. */
+.composer__scrim {
+  position: fixed;
+  inset-block: 0;
+  inset-inline: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: flex-end;
+  background: var(--scrim);
+}
+
+.composer {
+  display: flex;
+  flex-direction: column;
+  inline-size: 100%;
+  max-inline-size: 30rem;
+  block-size: 100%;
+  overflow: hidden;
+  background: var(--surface);
+  border-inline-start: var(--border-width-hairline) solid var(--border);
+
+  /* Square against the screen edge it is attached to, rounded on the edge that faces the
+   * feed — which is what makes it read as a panel that slid in rather than a card someone
+   * dropped in the corner. */
+  border-start-start-radius: var(--radius-xl);
+  border-end-start-radius: var(--radius-xl);
+  animation: composer-in var(--motion-base) var(--ease-standard);
+}
+
+/* From the edge it is anchored to, so the motion says where the panel came from. In RTL
+ * `inset-inline-end` is the left edge and the panel has to travel the other way, which a
+ * logical translation cannot express — hence the pair below rather than one rule. */
+@keyframes composer-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+[dir='rtl'] .composer {
+  animation-name: composer-in-rtl;
+}
+
+@keyframes composer-in-rtl {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer {
+    animation: none;
+  }
+}
+
+/* The panel's own header, on the recessed ground the prototype uses to separate its chrome
+ * from its content. */
+.composer__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+  padding: var(--space-4);
+  background: var(--ground);
+  border-block-end: var(--border-width-hairline) solid var(--border);
+}
+
+.composer__mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  inline-size: 2.25rem;
+  block-size: 2.25rem;
+  border-radius: var(--radius-md);
+  background: var(--emphasis-tint);
+  border: var(--border-width-hairline) solid var(--emphasis);
+  color: var(--emphasis);
+}
+
+.composer__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.composer__title {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+}
+
+.composer__lead {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.composer__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: var(--space-2);
+}
+
+.composer__close:hover {
+  background: var(--disabled-surface);
+  color: var(--fg);
+}
+
+.composer__close:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The one part that scrolls. Everything the owner asked for is on this single surface —
+ * templates, then the two boxes, then what a parent will see — so the panel is long by
+ * design and the chrome above and below has to stay put. */
+.composer__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4);
+}
+
+/* Each part of the panel is labelled, because with the steps gone the headings are the
+ * only thing left saying where one thing ends and the next begins. */
+.composer__section {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.composer__note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.composer__sent {
+  color: var(--paid);
+  font-weight: var(--weight-medium);
+  font-size: var(--text-caption);
+}
+
+.composer__scopes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Cancel on the reading-start edge, send on the other — the same arrangement the wizard
+ * had, and the one that puts the button a manager reaches for where their hand already is. */
+.composer__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-shrink: 0;
+  padding: var(--space-4);
+  background: var(--ground);
+  border-block-start: var(--border-width-hairline) solid var(--border);
+}
+
+/* ── the ready templates ───────────────────────────────────────────────────────────── */
+.composer__templates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* A ROW per template, not a grid of tiles: what a manager reads in order to choose between
+ * six is the one-line preview of what each one actually says, and that needs a line. */
+.composer__template {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  inline-size: 100%;
+  text-align: start;
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--fg);
+}
+
+.composer__template:hover {
+  border-color: var(--emphasis);
+}
+
+.composer__template:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.composer__template[aria-pressed='true'] {
+  border-color: var(--emphasis);
+  background: var(--emphasis-tint);
+}
+
+.composer__template-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.composer__template-name {
+  font-weight: var(--weight-medium);
+}
+
+/* One line of the template's own words. It has to be one line, or six templates become a
+ * page of prose nobody reads. */
+.composer__template-hint {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── the dynamic-tag pills ─────────────────────────────────────────────────────────── */
+.composer__tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block-start: var(--space-2);
+}
+
+.composer__tags-label {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.composer__tag {
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--emphasis);
+  cursor: pointer;
+
+  /* A literal stack rather than a `--font-mono` token: the design system has no mono
+   * token, and referencing one that does not exist is a phantom `tokens-are-defined`
+   * catches. These pills are code-like placeholders and read as such. */
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-caption);
+  padding-block: 0.1rem;
+  padding-inline: var(--space-2);
+}
+
+.composer__tag:hover {
+  border-color: var(--emphasis);
+}
+
+.composer__tag:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The phone. The prototype draws a status bar over the notification, and it is worth
+ * copying for one reason: it is what tells a manager at a glance that they are looking at a
+ * LOCK SCREEN rather than at a panel in this app. */
+.push-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.push-preview__phone {
+  inline-size: 100%;
+  max-inline-size: 22rem;
+  margin-inline: auto;
+  padding: var(--space-3);
+  border-radius: var(--radius-xl);
+  background: var(--fg);
+  border: var(--border-width-hairline) solid var(--border-strong);
+}
+
+.push-preview__status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-block-end: var(--space-2);
+  margin-block-end: var(--space-2);
+  border-block-end: var(--border-width-hairline) solid color-mix(in srgb, var(--on-fg) 20%, transparent);
+  color: color-mix(in srgb, var(--on-fg) 70%, transparent);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.push-preview__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+
+  /* A translucent plate over the dark ground, the way a real notification sits. */
+  background: color-mix(in srgb, var(--on-fg) 92%, transparent);
+  color: var(--fg);
+}
+
+.push-preview__app {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+}
+
+.push-preview__app-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--weight-medium);
+  color: var(--fg);
+}
+
+/* The app's own square mark, the way a notification carries one. */
+.push-preview__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  border-radius: var(--radius-sm);
+  background: var(--emphasis);
+  color: var(--on-emphasis);
+  font-size: 0.65rem;
+  font-weight: var(--weight-semibold);
+}
+
+.push-preview__title {
+  font-size: var(--text-label);
+}
+
+.push-preview__body {
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+}
+
+/* ── the send time ─────────────────────────────────────────────────────────────────── */
+.composer__when {
+  display: flex;
+  gap: var(--space-2);
+  margin-block-end: var(--space-2);
+}
+
+/* Two mutually exclusive choices drawn as a pair rather than a select: there are exactly
+ * two, and both are worth reading before choosing. */
+.composer__choice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  flex: 1;
+  padding: var(--space-3) var(--space-2);
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+}
+
+.composer__choice:hover {
+  border-color: var(--emphasis);
+}
+
+.composer__choice:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.composer__choice[aria-pressed='true'] {
+  background: var(--emphasis-tint);
+  border-color: var(--emphasis);
+  color: var(--fg);
+}

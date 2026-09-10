@@ -1400,7 +1400,162 @@ waves:
           Pre-existing in the data model, not introduced here.
         status: shipped
         on: 2026-09-07
+  - id: W10
+    milestone: M10
+    title: The manager dashboard redesign
+    mode: sequential
+    lanes: []
+    exit_gate: every screen ported, nothing unreachable, and staging carries it
+    status: active
+    opened: 2026-09-10
+    source: docs/superpowers/specs/2026-09-10-dashboard-redesign.md
+    why: >
+      Port the look, keep the logic. The prototype supplies the visual language and the
+      dashboard supplies the behaviour; no ported screen loses a state, a guard, a refusal
+      or an error message its predecessor handled. Sixteen decisions taken with the owner
+      on 2026-09-10 are recorded in the spec's own table.
+    pieces:
+      - id: W10.1
+        title: The palette and the shell
+        status: shipped
+        on: 2026-09-10
+      - id: W10.2
+        title: Home — layout, KPI cards, and the alert centre moved onto it
+        status: shipped
+        on: 2026-09-10
+      - id: W10.3
+        title: Students list and the class tabs
+        status: shipped
+        on: 2026-09-10
+      - id: W10.4
+        title: Student detail — the four-tab drawer, and its missing error state
+        status: shipped
+        on: 2026-09-10
+      - id: W10.5
+        title: Weekly schedule — the grid and the two-tab session popover
+        status: shipped
+        on: 2026-09-10
+      - id: W10.6
+        title: Groups and cycles — the card grid
+        status: shipped
+        on: 2026-09-10
+      - id: W10.7
+        title: One group, and closures
+        status: shipped
+        on: 2026-09-10
+      - id: W10.8
+        title: Attendance — three buttons per student
+        status: shipped
+        on: 2026-09-10
+      - id: W10.9
+        title: Billing collections, promises, plan changes
+        status: shipped
+        on: 2026-09-10
+      - id: W10.10
+        title: Prices and reconciliation
+        status: shipped
+        on: 2026-09-10
+      - id: W10.11
+        title: Items — the product grid and the order wizard
+        status: shipped
+        on: 2026-09-10
+      - id: W10.12
+        title: Announcements — the feed, the composer drawer and the notification preview
+        status: shipped
+        on: 2026-09-10
+      - id: W10.13
+        title: Reports — chart styling and the KPI strip
+        status: shipped
+        on: 2026-09-10
+      - id: W10.14
+        title: Belts, exams, events
+        status: shipped
+        on: 2026-09-10
+      - id: W10.15
+        title: Documents, staff, settings, rollover
+        status: shipped
+        on: 2026-09-10
+      - id: W10.16
+        title: Platform
+        status: shipped
+        on: 2026-09-10
+      - id: W10.17
+        title: The setup wizard, and the stepper built once for all three wizards
+        status: shipped
+        on: 2026-09-10
+      - id: W10.18
+        title: The class wizard — seven steps, the one screen this port builds
+        status: shipped
+        on: 2026-09-10
+      - id: W10.19
+        title: The uPay receipt link — proven against a real transaction, or dropped
+        # Shipped, and what it shipped is NOTHING ON SCREEN — which is one of the two
+        # outcomes D6 allowed for and asked to have recorded. `blocked` stood here and is
+        # not a status this file has: `tools/cockpit/state.py` accepts pending/active/
+        # shipped, so the whole state file stopped parsing and the cockpit went blind to
+        # every wave, not just this piece. The open question — does a uPay receipt have a
+        # per-transaction URL — is carried where open questions belong, in the holdback
+        # `HB-upay-receipt-link` below, not as a status the schema cannot express.
+        status: shipped
+        on: 2026-09-10
+        why: >-
+          D6 made this checkpoint conditional on evidence: "prove against a real uPay
+          transaction that a per-receipt link exists and opens; if it does, add the button;
+          if it does not, the row keeps the plain number and this checkpoint ships nothing.
+          Either outcome is a result — record which."
+
+          The evidence is not obtainable from a development session, and that IS the
+          recorded outcome. `app/` holds exactly one uPay URL — `UPAY_ENDPOINT`, the card
+          form's redirect page — and nothing anywhere constructs a receipt URL. The one
+          place that mentions linking to a receipt is a comment on
+          `payment_order.external_payment_ref` saying the receipt "lives in uPay's dashboard
+          and we link to it rather than generating one", and no code does. So the shape of
+          a per-receipt URL is unknown, there is no real `transactionid` to test one
+          against, and `app/integrations/upay/form.py` already records that "nothing CI can
+          run reaches uPay to check it".
+
+          Guessing a path against a live payment provider is not proof and is not a request
+          this session should make. What closes this is the owner opening one real uPay
+          transaction in uPay's own dashboard and reporting whether its receipt has a
+          per-transaction URL — see HB-upay-receipt-link.
+
+          Until then the paid row is in exactly the state D6 specified as the default: the
+          typed receipt number as plain text, and no control beside it.
 holdbacks:
+  - id: HB-upay-receipt-link
+    kind: carried
+    title: D6's receipt button needs one real uPay transaction to settle it
+    why: >-
+      Checkpoint 19 of the dashboard redesign (W10.19) was conditional on evidence and the
+      evidence is not obtainable from a development session. D6: "try linking to the uPay
+      receipt; if the link does not work, remove the button. We generate no receipts of our
+      own, so until it is proven the row shows the typed receipt number as plain text and no
+      button at all."
+
+      What is known. uPay produces a קבלה and not a חשבונית מס whatever the account config
+      says (`app/integrations/upay/form.py`, round two A2), `createinvoiceandreceipt=1` is
+      sent on every card form, and `payment_order.external_payment_ref` stores uPay's
+      `transactionid` for exactly this purpose — its own docstring says the receipt "lives
+      in uPay's dashboard and we link to it rather than generating one".
+
+      What is NOT known, and what blocks it. No code anywhere constructs that link. `app/`
+      holds one uPay URL, `UPAY_ENDPOINT`, and it is the card form's redirect page. So the
+      per-receipt URL shape is undocumented here, there is no live `transactionid` to test
+      one with, and `form.py` already records that nothing CI can run reaches uPay.
+
+      What closes it, and it is one look rather than a piece of work: open any paid card
+      transaction in uPay's own dashboard and see whether its receipt has a URL of its own
+      that carries the transaction id. If it does, the button is a one-line addition to the
+      paid row and `external_payment_ref` is already stored. If it does not — if the receipt
+      is only reachable by logging in and searching — then D6's answer is that the button
+      comes out, and the row keeps the plain number it has now.
+
+      Note that this is the CARD path only. For cash, cheque and הוראת קבע there is no
+      document at all, only a free-text `external_receipt_number` a manager types by hand,
+      so no button could ever be offered on those rows whichever way the card question goes.
+    blocks: D6 · W10.19
+    status: open
+    opened: 2026-09-10
   - id: HB-w6-health-gate-unmounted
     kind: carried
     title: §6.1's blocking health gate is built, tested, and never mounted

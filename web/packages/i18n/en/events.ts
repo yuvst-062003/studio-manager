@@ -90,6 +90,10 @@ export const events: Bundle = {
   'nonRespondersReminded': 'The non-responders were reminded',
   'reminderSent': 'Reminder sent',
   'roster.empty': 'No students are attached to this event',
+  // §3.10's named gap: POST /events/{id}/attendance was in the client and no dashboard
+  // screen called it.
+  'roster.markAttended': 'Mark attended',
+  'roster.markFailed': 'We could not mark attendance. Please try again.',
 
   'addToCalendar': 'Add to calendar',
   'attendance.take': 'Take attendance for this event',
@@ -200,6 +204,11 @@ export const events: Bundle = {
   // -- 5b / 5d — the belt system ------------------------------------------------------
   'form.cancel': 'Cancel',
   'belt.delete': 'Delete rank',
+  // §3.9's named gap: PATCH /belt-ranks/{id} was in the client and no screen called it.
+  'belt.rename': 'Rename',
+  'belt.renameSave': 'Save',
+  'belt.renameCancel': 'Cancel',
+  'belt.renameFailed': 'We could not rename the rank. Please try again.',
   'belt.edit': 'Edit rank',
   'belt.save': 'Save rank',
   'belt.preview': 'Preview',

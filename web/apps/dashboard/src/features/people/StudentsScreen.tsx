@@ -325,6 +325,51 @@ export function StudentsScreen({
           while `baselineCount` is a real, whole-roster number: an unknown total renders
           the count alone (`people.student.countSubtitle`) rather than a denominator that
           understates what is hidden — a wrong number is worse than none. */}
+      {/* D1 — the class filter is a row of chips rather than a dropdown.
+          The prototype draws five of these across the top of every list screen and they
+          filter nothing; ours filter for real, against `class_id`, which the students
+          endpoint already takes. Chips rather than a select because the club has two
+          classes today and expects more: a select hides its options until opened, and a
+          manager scanning for "who is in נוער" should not have to open anything.
+
+          The prototype puts a count on each chip. Ours do not, and that is deliberate:
+          the students endpoint returns a cursor page with no total, so `baselineCount` is
+          only knowable when the whole roster fits in a single page. A per-class count
+          would either be N extra requests or an invented number, and this spec's own rule
+          is that every number is traced to an endpoint or deleted. A count endpoint is
+          the honest way to add them later.
+
+          Still only when there is more than one class: one chip beside "הכל" narrows
+          nothing. */}
+      {classes.length > 1 ? (
+        <div
+          aria-label={t(locale, 'people.filter.class')}
+          className="people-class-tabs"
+          data-testid="students-class-tabs"
+          role="group"
+        >
+          <button
+            aria-pressed={classId === ''}
+            data-testid="students-class-tab-all"
+            onClick={() => setClassId('')}
+            type="button"
+          >
+            {t(locale, 'people.filter.classAny')}
+          </button>
+          {classes.map((klass) => (
+            <button
+              aria-pressed={classId === klass.id}
+              data-testid={`students-class-tab-${klass.id}`}
+              key={klass.id}
+              onClick={() => setClassId(klass.id)}
+              type="button"
+            >
+              {klass.name}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       <div className="studio-filter-bar">
         <TextField
           data-testid="students-search"
@@ -347,23 +392,6 @@ export function StudentsScreen({
             </option>
           ))}
         </SelectField>
-        {/* Drawn only when the club HAS more than one class: a filter offering one choice
-            narrows nothing and costs a control on a row that is already busy. */}
-        {classes.length > 1 ? (
-          <SelectField
-            data-testid="students-class-filter"
-            label={t(locale, 'people.filter.class')}
-            onChange={(event) => setClassId(event.target.value)}
-            value={classId}
-          >
-            <option value="">{t(locale, 'people.filter.classAny')}</option>
-            {classes.map((klass) => (
-              <option key={klass.id} value={klass.id}>
-                {klass.name}
-              </option>
-            ))}
-          </SelectField>
-        ) : null}
         {loaded ? (
           <span className="people-filter-result" data-testid="students-result-count">
             {baselineCount !== null

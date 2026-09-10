@@ -19,6 +19,7 @@ import { LoadFailed } from '../primitives/LoadFailed'
 import type { Locale } from '@studio/i18n'
 import { useSlot } from '../slots'
 import { Button } from '../primitives/Button'
+import { Stepper } from '../wizard/Stepper'
 import { WIZARD_STEP_ORDER } from './types'
 import type { SetupProgress, WizardStep, WizardStepId, WizardStepProps } from './types'
 
@@ -144,7 +145,6 @@ export function SetupWizard({
   const StepBody = active?.render
   const position = current ? WIZARD_STEP_ORDER.indexOf(current) + 1 : 0
 
-  const done = steps.filter((step) => step.status !== 'pending').length
   const last = position === WIZARD_STEP_ORDER.length
 
   return (
@@ -200,18 +200,6 @@ export function SetupWizard({
           {t(locale, 'common.setup.openDashboard')}
         </Button>
       </header>
-
-      <div
-        aria-hidden="true"
-        className="setup-progress"
-        data-testid="setup-progress"
-        data-done={done}
-      >
-        <div
-          className="setup-progress__fill"
-          style={{ inlineSize: `${(done / WIZARD_STEP_ORDER.length) * 100}%` }}
-        />
-      </div>
 
       <div className="setup-body">
         <main data-testid="setup-step-body">
@@ -298,50 +286,49 @@ export function SetupWizard({
               welcome heading: 5c shows it once and 5d–5f never show it again, but an owner
               abandons a wizard on step 3, not step 1. */}
           <p className="setup-rail__reassure">{t(locale, 'common.setup.nothingSentYet')}</p>
-          <ol
-            aria-label={t(locale, 'common.setup.progressLabel')}
-            className="setup-rail__list"
-          >
-            {steps.map((step, index) => {
-              const registered = entries.some((entry) => entry.key === step.id)
-              const state =
-                step.id === current ? 'current' : step.status !== 'pending' ? 'done' : 'upcoming'
-              return (
-                <li key={step.id}>
-                  <button
-                    type="button"
-                    aria-current={step.id === current ? 'step' : undefined}
-                    className="setup-rail__node"
-                    data-testid={`setup-rail-${step.id}`}
-                    data-status={step.status}
-                    data-state={state}
-                    data-registered={registered ? undefined : 'false'}
-                    // NOT disabled when unregistered (2026-08-30): a dead rail button
-                    // read as "payments and belts don't work". The body now explains
-                    // where the step is edited and links there.
-                    onClick={() => setActiveId(step.id as WizardStepId)}
-                  >
-                    <span aria-hidden="true" className="setup-rail__dot">
-                      {/* A skip is an ANSWER but not a finish — drawn as its own mark
-                          (owner report 2026-08-30: "finished them all, still says 6/7,
-                          and it doesn't show what's missing"). The ✓ it used to share
-                          with done made the two states indistinguishable by eye. */}
-                      {state === 'done' ? (step.status === 'skipped' ? '—' : '✓') : index + 1}
-                    </span>
-                    <span>{t(locale, `common.setup.step.${step.id}`)}</span>
-                    {/* Never a circle alone (SC 1.4.1) — the state is written out, and
-                        off-screen because the circle already says it to a sighted reader. */}
-                    <span
-                      className="studio-visually-hidden"
-                      data-testid={`setup-rail-${step.id}-status`}
-                    >
-                      {statusLabel(locale, step.status)}
-                    </span>
-                  </button>
-                </li>
-              )
-            })}
-          </ol>
+          {/* §3.19's port — the shared `Stepper`, the same component the class wizard
+              (§3.21) and the year rollover (§3.17) mount. Third consumer, and the one this
+              checkpoint is named for.
+
+              `stateVisible` is ON here for the same reason it is on for rollover: setup is
+              answered over days, and an owner reported the exact failure hiding it causes —
+              "finished them all, still says 6/7, and it doesn't show what's missing".
+              `stateLabel` carries setup's own status words rather than the stepper's
+              generic ones, and `idPrefix` keeps the names this rail's tests already use.
+
+              A skip is an ANSWER but not a finish, and the `—` that distinguishes it from a
+              finish's `✓` is the Stepper's own mark for `skipped`. That is the whole point
+              of the shared component carrying a `skipped` state at all.
+
+              An UNREGISTERED step — one this surface has not built, which is four of seven
+              in the staff app — is not disabled. That was learned here first (2026-08-30: a
+              dead rail button read as "payments and belts don't work") and the Stepper
+              inherits it: reachable, so the body can explain where the step is edited. */}
+          <Stepper
+            idPrefix="setup-rail"
+            label={t(locale, 'common.setup.progressLabel')}
+            locale={locale}
+            nodes={steps.map((step) => ({
+              id: step.id,
+              title: t(locale, `common.setup.step.${step.id}`),
+              state:
+                step.id === current
+                  ? ('current' as const)
+                  : step.status === 'skipped'
+                    ? ('skipped' as const)
+                    : step.status === 'done'
+                      ? ('done' as const)
+                      : ('upcoming' as const),
+              stateLabel: statusLabel(locale, step.status),
+              reachable: true,
+              // The percentage counts steps ANSWERED, not where the owner is standing. A
+              // manager who paged back to step 1 has not undone anything, and `state` says
+              // `current` for that step — which is why the count cannot be read off it.
+              settled: step.status !== 'pending',
+            }))}
+            onPick={(stepId) => setActiveId(stepId as WizardStepId)}
+            stateVisible
+          />
           {/* The way OUT (2026-08-30) — a wizard whose last step ends with nowhere to go
               strands the owner on its own panel. Answered means done OR skipped: a club
               that sells nothing skipped items and is still finished. `#/` is home in both

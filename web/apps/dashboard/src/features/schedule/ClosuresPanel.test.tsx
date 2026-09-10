@@ -189,3 +189,70 @@ describe('ClosuresPanel', () => {
     }
   })
 })
+
+// §3.4's named gap, closed in checkpoint 7: "**no handling for a failed API call**" — a
+// closure that failed to save looked identical to one that succeeded until the list failed
+// to refresh, and a failed LIST left the panel blank for ever with no list, no empty state
+// and no error.
+describe('a failed call says so (§3.4)', () => {
+  it('shows the failure screen when the closure list cannot be loaded, and retries', async () => {
+    let calls = 0
+    const client = stub({
+      listClosures: vi.fn(async () => {
+        calls += 1
+        if (calls === 1) throw new Error('offline')
+        return EXISTING
+      }),
+    })
+    renderPanel(client)
+    // Not the empty state: "we could not load this" and "you have declared none" are
+    // different sentences, and the panel used to render neither.
+    expect(await screen.findByText(t('he', 'common.loadFailed.body'))).toBeInTheDocument()
+    expect(screen.queryByText(t('he', 'schedule.closure.empty'))).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: t('he', 'common.loadFailed.retry') }))
+    expect(await screen.findByText('שיפוץ')).toBeInTheDocument()
+  })
+
+  it('reports a failed manual save and KEEPS what the manager typed', async () => {
+    const client = stub({
+      createClosure: vi.fn(async () => {
+        throw new Error('500')
+      }),
+    })
+    renderPanel(client)
+    await userEvent.type(screen.getByTestId('closure-from'), '2027-01-05')
+    await userEvent.type(screen.getByTestId('closure-to'), '2027-01-07')
+    await userEvent.type(screen.getByTestId('closure-reason'), 'שיפוץ')
+    await userEvent.click(screen.getByTestId('add-closure'))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      t('he', 'schedule.closure.saveFailed'),
+    )
+    // Clearing the fields on failure would make a retry mean retyping a date range the
+    // manager already typed once.
+    expect(screen.getByTestId('closure-reason')).toHaveValue('שיפוץ')
+    expect(screen.getByTestId('closure-from')).toHaveValue('2027-01-05')
+    // And no success line beside the failure — the outcome and the error must not both be
+    // on screen saying opposite things.
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('reports a failed preset apply and KEEPS the ticks, so pressing again retries', async () => {
+    const client = stub({
+      createClosure: vi.fn(async () => {
+        throw new Error('500')
+      }),
+    })
+    renderPanel(client)
+    await openPresets()
+    const [first] = screen.getAllByTestId('preset-day')
+    await userEvent.click(first as HTMLElement)
+    await userEvent.click(screen.getByTestId('apply-presets'))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      t('he', 'schedule.closure.saveFailed'),
+    )
+    expect(first).toBeChecked()
+  })
+})

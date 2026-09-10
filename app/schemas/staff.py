@@ -81,7 +81,7 @@ class StaffInvitationIn(BaseModel):
             "whole studio (2026-09-09). Non-empty means the grants written are class-scoped "
             "and no studio-wide one is written at all — a studio row beside them would hand "
             "back exactly the club-wide authority the scoping withholds. Only valid with "
-            "`roles: [\"manager\"]`; a coach's scope is the roster `group_ids` puts them on."
+            '`roles: ["manager"]`; a coach\'s scope is the roster `group_ids` puts them on.'
         ),
     )
 
@@ -98,4 +98,18 @@ class StaffInvitationOut(BaseModel):
 
 
 class StaffRolesIn(BaseModel):
+    """The staff-row editor. Roles, and — since 2026-09-10 — the person's own details.
+
+    The owner's report was "אי אפשר לערוך איש צוות", and it was accurate: this took `roles`
+    and nothing else, so a coach invited with a typo in their name carried it for ever. The
+    invite form is the only place a name is ever written and nothing could rewrite it.
+
+    `None` means NOT MENTIONED and never "set to empty". The role editor sends `{roles}`
+    alone and must keep doing so without blanking a name, which is the distinction every
+    partial update has to get right and the one a test here pins.
+    """
+
     roles: list[str] = Field(min_length=1, max_length=3)
+    first_name: str | None = Field(default=None, max_length=100)
+    last_name: str | None = Field(default=None, max_length=100)
+    email: str | None = Field(default=None, min_length=3, max_length=320)

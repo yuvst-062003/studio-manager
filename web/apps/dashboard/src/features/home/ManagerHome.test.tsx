@@ -5,6 +5,7 @@
 // and an uncovered class must not render like a covered one.
 import { render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { fill } from '@studio/core'
 import { t } from '@studio/i18n'
 import { ManagerHome } from './ManagerHome'
 import { summariseSessions, todayFrom, weekBounds } from './homeClient'
@@ -55,28 +56,37 @@ describe('ManagerHome', () => {
     expect(screen.getAllByText('מועדון גלדיאטור')).toHaveLength(1)
   })
 
-  it('shows the money band as three tiles that each link to collections', async () => {
+  it('shows the money as two cards, with households folded into the debt one', async () => {
+    // Was three tiles. The ported composition gives each card a value AND a secondary
+    // figure on the same baseline, so the household count belongs beside the amount it
+    // qualifies rather than in a tile of its own — the prototype's own arrangement.
     renderHome(data())
     await waitFor(() => {
-      expect(screen.getAllByRole('link', { name: /₪|12/ }).length).toBeGreaterThanOrEqual(3)
+      expect(screen.getAllByRole('link', { name: /₪/ }).length).toBeGreaterThanOrEqual(2)
     })
     // Households, not students: one guardian with three children in arrears is one call.
-    expect(screen.getByText('12')).toBeInTheDocument()
+    expect(screen.getByText(fill(t('he', 'common.dash.home.money.households'), { count: 12 })))
+      .toBeInTheDocument()
   })
 
-  it('lists only the alert kinds with something in them, and never a zero row', async () => {
+  it('shows an operational figure even when it is zero, now that it is a card', async () => {
+    // The rule this replaces was "never a zero ROW", and it was right: a list of counts
+    // reads as a queue, and a queue with a zero in it is noise. A KPI card is not a queue
+    // — it is a fixed headline, and a headline reading 0 is the good news a manager came
+    // for. The card the list's rows became therefore renders at zero, deliberately.
     renderHome(data())
     await screen.findByText(t('he', 'common.dash.home.attention.health'))
-    expect(screen.getByText(t('he', 'common.dash.home.attention.noCoach'))).toBeInTheDocument()
-    // unmarked is 0 in the fixture — a zero row is noise on a screen built to be scanned.
-    expect(screen.queryByText(t('he', 'common.dash.home.attention.unmarked'))).toBeNull()
+    expect(screen.getByText(t('he', 'common.dash.home.attention.unmarked'))).toBeInTheDocument()
   })
 
-  it('says so explicitly when nothing needs attention, rather than hiding the region', async () => {
-    // Behavioural: the absence of alerts is the answer a manager came for. A hidden
-    // region is indistinguishable from a region that failed to load.
-    renderHome(data({ attention: { missingHealth: 0, noCoach: 0, unmarked: 0 } }))
-    await screen.findByText(t('he', 'common.dash.home.attention.none'))
+  it('says nothing needs attention by showing the zeroes, not by hiding the cards', async () => {
+    // Same rule as before, carried differently: the absence of alerts is the answer a
+    // manager came for, and a hidden region is indistinguishable from one that failed to
+    // load. It used to be a sentence; it is now two cards reading 0, which says it more
+    // precisely — you can see WHICH things are clear.
+    const { container } = renderHome(data({ attention: { missingHealth: 0, noCoach: 0, unmarked: 0 } }))
+    await screen.findByText(t('he', 'common.dash.home.attention.health'))
+    expect(container.querySelectorAll('.dash-kpi[data-tone="neutral"]').length).toBe(2)
   })
 
   it('renders no money band at all when that one region failed', async () => {
@@ -250,33 +260,37 @@ describe('the attendance bars (2026-08-30)', () => {
 })
 
 describe('B6.2 — the two-column body', () => {
-  it('puts today\'s classes ahead of the attendance chart, both in the wide column', async () => {
-    // B6.2: "today's classes moves to the top of the wide column" — it is currently the
-    // last thing on the page and answers "what needs me today?"
+  it("puts today's classes in the wide column and the chart beside it", async () => {
+    // The ported layout: today's classes fills the wide column and the attendance chart
+    // takes the narrow one, which is the prototype's own split. Both used to be stacked in
+    // the wide column with the attention list beside them; that list is now the KPI band.
     const { container } = renderHome(data())
     await screen.findByText('מתחילים')
     const main = container.querySelector('.dash-home__main')
+    const side = container.querySelector('.dash-home__side')
     expect(main).not.toBeNull()
+    expect(side).not.toBeNull()
     const todayHeading = screen.getByRole('heading', { name: t('he', 'common.dash.home.today.title') })
     const chartHeading = screen.getByRole('heading', {
       name: t('he', 'common.dash.home.attendanceChart.title'),
     })
     expect(main?.contains(todayHeading)).toBe(true)
-    expect(main?.contains(chartHeading)).toBe(true)
-    const position = todayHeading.compareDocumentPosition(chartHeading)
-    expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(side?.contains(chartHeading)).toBe(true)
   })
 
-  it('keeps "requires attention" in the narrow side column', async () => {
-    // `attention.title` and `money.overdueHint` are both "דורש טיפול" by design (the hint
-    // under the overdue-families tile echoes the section it links to) — so this asserts
-    // by heading role, not by text, to find the section rather than the tile's hint.
+  it('carries what needs attention in the KPI band, above the body', async () => {
+    // The "requires attention" list is gone and its counts are cards. It had to go: the
+    // band showed the same two numbers the list did, and one number in two places on one
+    // screen is worse than either alone. The band sits above the body so those figures are
+    // the first thing read, which is what the list in a side column never achieved.
     const { container } = renderHome(data())
-    const heading = await screen.findByRole('heading', {
-      name: t('he', 'common.dash.home.attention.title'),
-    })
-    const side = container.querySelector('.dash-home__side')
-    expect(side).not.toBeNull()
-    expect(side?.contains(heading)).toBe(true)
+    await screen.findByText(t('he', 'common.dash.home.attention.health'))
+    const band = container.querySelector('.dash-home__kpis')
+    const body = container.querySelector('.dash-home__body')
+    expect(band).not.toBeNull()
+    expect(band?.querySelectorAll('.dash-kpi').length).toBe(4)
+    expect(body).not.toBeNull()
+    if (!band || !body) throw new Error('band and body both render')
+    expect(band.compareDocumentPosition(body) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 })

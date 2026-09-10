@@ -91,6 +91,22 @@ const PREVIEW: ImpactPreview = {
 
 function stubClient(overrides: Partial<ScheduleClient> = {}): ScheduleClient {
   return {
+    listClasses: vi.fn(async () => [
+      {
+        id: 'c1',
+        name: "ג'ודו",
+        description: null,
+        discipline: null,
+        color: null,
+        isActive: true,
+      },
+    ]),
+    createClass: vi.fn(async () => {
+      throw new Error('not in this test')
+    }),
+    updateClass: vi.fn(async () => {
+      throw new Error('not in this test')
+    }),
     listGroups: vi.fn(async () => [{ id: 'g1', name: 'מתחילים', className: "ג'ודו", classId: 'c1', isActive: true }]),
     listSessions: vi.fn(async () => SESSIONS),
     getSchedule: vi.fn(async () => RULES),
@@ -298,5 +314,54 @@ describe('GroupSchedulePage (6a)', () => {
         /margin-(left|right)|padding-(left|right)|(^|;)\s*(left|right):/,
       )
     }
+  })
+})
+
+// Checkpoint 7. `putSchedule` had a `try/finally` and no `catch` on both paths, so a
+// rejected call cleared `busy` and did nothing else — on the one screen whose whole job is
+// "read what the change does before it happens", silence is the worst available answer.
+describe('a failed schedule call says so', () => {
+  it('reports a failed preview instead of a button that does nothing', async () => {
+    const client = stubClient({
+      putSchedule: vi.fn(async () => {
+        throw new Error('500')
+      }),
+    })
+    render(<GroupSchedulePage client={client} groupId="g1" groupName="מתחילים" locale="he" />)
+    await waitFor(() => expect(screen.getAllByTestId('rule-row').length).toBeGreaterThan(0))
+    await userEvent.click(screen.getByTestId('save-rules'))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      t('he', 'schedule.group.previewFailed'),
+    )
+    // And no dialog: the manager must not be shown an impact that was never computed.
+    expect(screen.queryByTestId('impact-preview')).not.toBeInTheDocument()
+    // The button comes back — `finally` still clears `busy`, and a permanently disabled
+    // button after one failure would be a second dead end on top of the first.
+    expect(screen.getByTestId('save-rules')).not.toBeDisabled()
+  })
+
+  it('closes the dialog and reports a failed apply, rather than inviting a blind retry', async () => {
+    let calls = 0
+    const client = stubClient({
+      putSchedule: vi.fn(async (_groupId: string, body: { apply?: boolean }) => {
+        calls += 1
+        if (body.apply) throw new Error('500')
+        return PREVIEW
+      }),
+    })
+    render(<GroupSchedulePage client={client} groupId="g1" groupName="מתחילים" locale="he" />)
+    await waitFor(() => expect(screen.getAllByTestId('rule-row').length).toBeGreaterThan(0))
+    await userEvent.click(screen.getByTestId('save-rules'))
+    await screen.findByTestId('impact-preview')
+    await userEvent.click(screen.getByTestId('confirm'))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      t('he', 'schedule.group.applyFailed'),
+    )
+    // A partially-applied rewrite of a year is not something to retry blind. The dialog
+    // closes so the next attempt starts by re-reading the impact.
+    await waitFor(() => expect(screen.queryByTestId('impact-preview')).not.toBeInTheDocument())
+    expect(calls).toBe(2)
   })
 })

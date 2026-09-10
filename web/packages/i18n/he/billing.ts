@@ -252,6 +252,7 @@ export const billing: Bundle = {
   'payment.method.cheque': 'צ׳ק',
   'payment.method.bank_transfer': 'העברה בנקאית',
   'payment.saved': 'התשלום נרשם',
+  'payment.failed': 'לא הצלחנו לרשום את התשלום. הפרטים נשמרו בטופס — נסו שוב.',
   'payment.allocatedOldestFirst': 'התשלום שויך לחיובים הוותיקים ביותר',
   'payment.unallocated': 'יתרה לא משויכת',
 
@@ -277,6 +278,12 @@ export const billing: Bundle = {
   'debt.empty': 'אין חובות פתוחים במועדון',
   'debt.total': 'סה״כ חוב פתוח',
   'debt.aging.title': 'גיל החוב',
+  // Checkpoint 9 — the prototype's filter pills, and the WhatsApp nudge beside the push one.
+  'debt.filterAging': 'סינון לפי ותק החוב',
+  'debt.filterAll': 'הכול',
+  'debt.whatsapp': 'וואטסאפ',
+  'debt.whatsappTitle': 'תזכורת תשלום — מועדון הג׳ודו',
+  'debt.whatsappBody': 'שלום {{name}}, נשמח להסדיר יתרה של {{amount}} ₪. תודה!',
   'debt.aging.0_30': '0–30 ימים',
   'debt.aging.31_60': '31–60 ימים',
   'debt.aging.60_plus': 'מעל 60 ימים',
@@ -392,6 +399,9 @@ export const billing: Bundle = {
   'plan.activeTo': 'בתוקף עד',
   'plan.appliesTo': 'חל על',
   'plan.empty': 'לא הוגדרו מסלולים',
+  // §3.20's named gap: both write paths on this screen had no catch at all.
+  'plan.createFailed': 'לא הצלחנו ליצור את המסלול. הפרטים נשמרו בטופס — נסו שוב.',
+  'plan.closeFailed': 'לא הצלחנו לסגור את המסלול. המחיר הישן עדיין בתוקף — נסו שוב.',
   // §5.10 — plans are versioned, never edited in place, so history stays explicable.
   'plan.versionedHint': 'שינוי מחיר סוגר את המסלול הקיים ופותח חדש. חיובים קודמים נשמרים',
   'plan.closeCurrent': 'סגירת המסלול הנוכחי',
@@ -441,6 +451,10 @@ export const billing: Bundle = {
   'filter.all': 'הכל',
   'debt.balance': 'יתרה',
   'debt.monthsInDebt': 'חודשים בחוב',
+  // The same fact as a sentence rather than a column header — the debt card labels its own
+  // figures, where the table it replaced labelled a column once at the top.
+  'debt.monthsInDebtCount': '{{count}} חודשים בחוב',
+  'debt.totalFiltered': 'סה״כ בסינון',
   'debt.sortBy': 'מיון',
   'debt.collectedThisMonth': 'נגבה החודש',
   // §3.3 -- no `{{percent}}` here any more. The KPI card composes the number through

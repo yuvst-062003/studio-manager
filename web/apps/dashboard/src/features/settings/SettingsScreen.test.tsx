@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
+import { ThemeProvider } from '@studio/ui'
 import { SettingsScreen } from './SettingsScreen'
 
 const STUDIO = {
@@ -32,11 +33,15 @@ function stub(onPatch?: (body: unknown) => void) {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('SettingsScreen', () => {
-  it('renders every section 3f lists, including the ones M1 does not own', async () => {
-    // A manager who cannot find מחירים concludes it is missing, not that it is next.
+  it('renders the five sections the rail now carries', async () => {
+    // Was "renders every section 3f lists, including the ones M1 does not own", asserting
+    // eight. Its reasoning — "a manager who cannot find מחירים concludes it is missing,
+    // not that it is next" — was answered by giving each of those screens a door in the
+    // sidebar; carrying them here as well is what made settings a second menu. Where each
+    // one went is listed in the test below.
     stub()
     render(<SettingsScreen locale="he" />)
-    for (const key of ['studio', 'prices', 'payments', 'documents', 'attendance', 'notifications', 'users', 'belts']) {
+    for (const key of ['studio', 'structure', 'payments', 'appearance', 'users']) {
       expect(await screen.findByTestId(`settings-section-${key}`)).toBeInTheDocument()
     }
   })
@@ -54,27 +59,55 @@ describe('SettingsScreen', () => {
     expect(screen.getByTestId('standing-order-links')).toBeInTheDocument()
   })
 
-  it('links each section to the screen that owns it — nothing reads "not yet available" (2026-08-30)', async () => {
-    // The rail's six stubs outlived their screens: prices, documents, attendance, alerts,
-    // staff and belts all exist as routes, so a disabled button under each name was a
-    // stale promise. A settings section whose editor lives on its own screen is a LINK to
-    // that screen, the same hash navigation the shell uses.
+  // Rewritten 2026-09-10. The previous version asserted that six rail entries were LINKS
+  // to the screens that own them — prices, documents, attendance, notifications, users and
+  // belts. That was the right fix in August, when it replaced six disabled stubs reading
+  // "not yet available". It is the wrong shape now: every one of those six also has a door
+  // in the sidebar, so the rail was a second menu to the same places, and the owner asked
+  // why settings held all of it. §3.19's answer is five tabs, four of which render in
+  // place. This test now guards the smaller rail rather than the bigger one.
+  it('is five tabs, and only staff still navigates away (§3.19)', async () => {
     stub()
     render(<SettingsScreen locale="he" />)
-    const expected: Record<string, string> = {
-      prices: '#/prices',
-      documents: '#/documents',
-      attendance: '#/attendance',
-      notifications: '#/alerts',
-      users: '#/staff',
-      belts: '#/belts',
+    await screen.findByTestId('settings-panel-studio')
+
+    // In place: no href, and clicking one swaps the panel rather than leaving the screen.
+    for (const key of ['studio', 'structure', 'payments', 'appearance']) {
+      expect(screen.getByTestId(`settings-section-${key}`)).not.toHaveAttribute('href')
     }
-    for (const [key, hash] of Object.entries(expected)) {
-      const entry = await screen.findByTestId(`settings-section-${key}`)
-      expect(entry).toHaveAttribute('href', hash)
-      expect(entry).not.toHaveTextContent(t('he', 'common.settings.notYetAvailable'))
+
+    // The one deliberate exception. §3.19: "`#/staff` is the real thing and the settings
+    // tab should link to it" — rather than grow the prototype's hardcoded three-person
+    // list and its toast-only "add staff member" button.
+    expect(screen.getByTestId('settings-section-users')).toHaveAttribute('href', '#/staff')
+
+    // The four that left. Each is a sidebar door of its own; a rail entry for it was the
+    // duplication being removed, not a route being deleted.
+    for (const key of ['prices', 'documents', 'attendance', 'notifications', 'belts']) {
+      expect(screen.queryByTestId(`settings-section-${key}`)).not.toBeInTheDocument()
     }
-    expect(screen.getByTestId('settings-section-studio')).toBeEnabled()
+  })
+
+  // Retiring `overflowDoors()` took the sidebar entries for the setup wizard and the
+  // training-year rollover with it, so this pair of links is now the only way to reach
+  // either from the chrome. `unreachable-screens.test.ts` guards components, not routes —
+  // it would not have caught their loss.
+  it('keeps the two once-a-year flows reachable from the appearance tab', async () => {
+    stub()
+    // `ThemeProvider` and not a bare render: the appearance tab mounts `ThemeControl`,
+    // which reads the theme context and throws without it. `App.tsx` wraps the whole app
+    // in one (App.tsx:665), so this is the harness catching up with the component rather
+    // than a wrapper invented for the test.
+    render(
+      <ThemeProvider>
+        <SettingsScreen locale="he" />
+      </ThemeProvider>,
+    )
+    await userEvent.click(await screen.findByTestId('settings-section-appearance'))
+    const panel = await screen.findByTestId('settings-panel-appearance')
+    expect(panel).toBeInTheDocument()
+    expect(screen.getByTestId('settings-link-setup')).toHaveAttribute('href', '#/setup')
+    expect(screen.getByTestId('settings-link-rollover')).toHaveAttribute('href', '#/rollover')
   })
 
   it('gives every toggle a state label in words', async () => {
@@ -340,14 +373,70 @@ describe('the studio logo', () => {
     uploadStub(415)
     render(<SettingsScreen locale="he" />)
     await userEvent.upload(await screen.findByTestId('settings-logo-input'), png())
-    expect(await screen.findByTestId('settings-logo-error')).toHaveTextContent(
+    // `ImagePicker` derives its error node's id from the input's, so this moved from
+    // `settings-logo-error` when the bare file input became the picker (2026-09-10). The
+    // assertion it makes is unchanged: a 415 says WHICH formats, never "save failed".
+    expect(await screen.findByTestId('settings-logo-input-error')).toHaveTextContent(
       t('he', 'common.setup.studio.logoRejected'),
     )
   })
 
-  it('shows the placeholder while no logo is set', async () => {
+  // Was "shows the placeholder while no logo is set", which asserted a `<p>` reading
+  // "גררו לוגו 512×512" — a paragraph that looked like a drop zone and accepted nothing,
+  // sitting beside the browser's own grey English "Choose File" button. The owner asked
+  // for a pressable empty square with a picture icon instead. The state being guarded is
+  // the same one: with no logo set, the control must invite an upload rather than show a
+  // broken image.
+  it('offers a pressable empty square while no logo is set', async () => {
     uploadStub()
     render(<SettingsScreen locale="he" />)
-    expect(await screen.findByTestId('settings-logo-empty')).toBeInTheDocument()
+    const frame = await screen.findByTestId('settings-logo-input-frame')
+    // A <label> wrapping the input is what makes the whole square a hit target without an
+    // onClick, and is what keeps the control keyboard-reachable.
+    expect(frame.tagName).toBe('LABEL')
+    expect(frame).toContainElement(screen.getByTestId('settings-logo-input'))
+    // The 512×512 the generic empty label cannot carry.
+    expect(frame).toHaveTextContent(t('he', 'common.setup.studio.logoDrop'))
+    // No preview image while nothing is set.
+    expect(frame.querySelector('img')).toBeNull()
+  })
+})
+
+// Checkpoint 15 — §3.19's named defect: "`GET /api/v1/studio` failure is swallowed — the
+// panel never leaves its loading state."
+describe('a failed studio read says so', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('shows the failure and a retry, not טוען… for ever', async () => {
+    let calls = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        calls += 1
+        if (calls === 1) return new Response('{}', { status: 500 })
+        return new Response(JSON.stringify(STUDIO), { status: 200 })
+      }),
+    )
+    render(<SettingsScreen locale="he" />)
+
+    expect(await screen.findByText(t('he', 'common.loadFailed.body'))).toBeInTheDocument()
+    // NOT the loading line: "we could not load this" and "this is still coming" are
+    // different sentences, and the old code showed only the second, for ever.
+    expect(screen.queryByTestId('settings-loading')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: t('he', 'common.loadFailed.retry') }))
+    expect(await screen.findByTestId('settings-panel-studio')).toBeInTheDocument()
+  })
+
+  it('treats a non-2xx as a failure, not as a studio with no name', async () => {
+    // The old code read `response.json()` whatever the status, so a 500 whose body happened
+    // to parse became a studio object with every field undefined — and the form rendered
+    // it as blanks a manager could then SAVE over their real details.
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 503 })))
+    render(<SettingsScreen locale="he" />)
+    expect(await screen.findByText(t('he', 'common.loadFailed.body'))).toBeInTheDocument()
+    expect(screen.queryByTestId('settings-panel-studio')).not.toBeInTheDocument()
   })
 })

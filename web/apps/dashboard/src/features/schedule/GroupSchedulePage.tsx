@@ -12,8 +12,7 @@
 // Jerusalem-pinned formatter. Mixing the two up is how every summer class lands an hour
 // early.
 import { useCallback, useEffect, useState } from 'react'
-import type { CSSProperties } from 'react'
-import { Button, Card, EmptyState, StatusChip } from '@studio/ui'
+import { Button, EmptyState, PageHeader, StatusChip } from '@studio/ui'
 import { formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -25,49 +24,6 @@ import { cancelReasonLabel } from './client'
 import type { ImpactPreview, ScheduleClient, ScheduleRule, SessionRow, TrainingYear } from './client'
 
 const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const
-
-const pageStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--space-6)',
-  inlineSize: '100%',
-}
-
-const ruleRowStyle: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  alignItems: 'end',
-  gap: 'var(--space-3)',
-  paddingBlock: 'var(--space-3)',
-  borderBlockEnd: 'var(--border-width-hairline) solid var(--border)',
-}
-
-const fieldStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--space-1)',
-  fontSize: 'var(--text-label)',
-}
-
-const sessionRowStyle: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  alignItems: 'center',
-  gap: 'var(--space-3)',
-  paddingBlock: 'var(--space-2)',
-  borderBlockEnd: 'var(--border-width-hairline) solid var(--border)',
-}
-
-/* A season is ~100 rows per group; unscrolled they made this page a kilometre long and
-   buried the schedule editor above them (2026-08-30). */
-const sessionListStyle: CSSProperties = {
-  maxBlockSize: '24rem',
-  overflowY: 'auto',
-}
-
-const noteStyle: CSSProperties = { color: 'var(--text-secondary)', fontSize: 'var(--text-caption)' }
-
-const errorStyle: CSSProperties = { color: 'var(--danger)' }
 
 /** `17:00:00` from the API, `17:00` in an `<input type="time">`. */
 const toInput = (value: string): string => value.slice(0, 5)
@@ -188,6 +144,11 @@ export function GroupSchedulePage({
           apply: false,
         }),
       )
+    } catch {
+      // Without this the promise rejected unhandled and the button simply did nothing:
+      // no dialog, no message. On the screen whose whole job is "read what the change
+      // does before it happens", silence is the worst available answer.
+      setError(t(locale, 'schedule.group.previewFailed'))
     } finally {
       setBusy(false)
     }
@@ -206,10 +167,17 @@ export function GroupSchedulePage({
         setRules(await client.getSchedule(groupId))
       }
       setPreview(null)
+    } catch {
+      // The dialog is CLOSED and the error surfaces on the page behind it. Leaving the
+      // dialog open with an error inside would invite a second press of Confirm, and a
+      // partially-applied rewrite of a year is not something to retry blind — the manager
+      // should re-read the impact, which means asking for the preview again.
+      setPreview(null)
+      setError(t(locale, 'schedule.group.applyFailed'))
     } finally {
       setBusy(false)
     }
-  }, [client, effectiveFrom, groupId, payload, year])
+  }, [client, effectiveFrom, groupId, locale, payload, year])
 
   if (noActiveYear) {
     return (
@@ -221,53 +189,67 @@ export function GroupSchedulePage({
   }
 
   return (
-    <section aria-labelledby="group-schedule-title" style={pageStyle}>
-      <h2 id="group-schedule-title">{groupName}</h2>
+    <section aria-labelledby="group-schedule-title" className="group-page">
+      <PageHeader
+        subtitle={t(locale, 'schedule.group.subtitle')}
+        title={groupName}
+        titleId="group-schedule-title"
+      />
 
       {/* What this group IS, for a training plan: base, extra or private, and whether it
           is an invite list. Here rather than on the groups index because the manager is
           already looking at ONE group, and the eligibility checklist is about this one.
-          Carded, like every sibling section: unfenced, the page read as one loose run of
+          Panelled, like every sibling section: unfenced, the page read as one loose run of
           controls (2026-08-30). */}
-      <Card>
+      <div className="group-panel">
         <GroupTrainingPanel locale={locale} groupId={groupId} />
-      </Card>
+      </div>
 
       {/* 2026-09-09 — the CLASS's roster, above the group's own picker, because that is the
           order the work happens in: a coach joins the class, and only then can they be put
           on one of its groups. The picker below reads this list, so the two are one screen
           rather than two places to keep in step. */}
       {klass ? (
-        <Card>
+        <div className="group-panel">
           <ClassCoachPanel
             classId={klass.id}
             className={klass.name}
             locale={locale}
             onChanged={() => setRosterVersion((n) => n + 1)}
           />
-        </Card>
+        </div>
       ) : null}
 
       {/* F4.1 — coach assignment lives on the group page; the staff screen's uncovered
-          alert links here. */}
-      <Card>
+          alert links here.
+
+          Merged 2026-09-10: main's BEHAVIOUR, this branch's LOOK. Both panels arrived from
+          main wrapped in `<Card>`, which this page no longer imports — the redesign gave
+          every section on it the same `.group-panel` fence, and two of eight in a different
+          shell would read as two different kinds of thing. The props are main's and are not
+          decoration: `classId` and `rosterVersion` are what make the group's picker read
+          the class's roster live. */}
+      <div className="group-panel">
         <GroupCoachPanel
           classId={klass?.id}
           groupId={groupId}
           locale={locale}
           rosterVersion={rosterVersion}
         />
-      </Card>
+      </div>
 
-      <Card>
-      <section aria-labelledby="rules-title">
-        <h3 id="rules-title">{t(locale, 'schedule.rules.title')}</h3>
-        {loaded && rules.length === 0 ? <p>{t(locale, 'schedule.rules.empty')}</p> : null}
+      <section aria-labelledby="rules-title" className="group-panel">
+        <h3 className="group-panel__title" id="rules-title">
+          {t(locale, 'schedule.rules.title')}
+        </h3>
+        {loaded && rules.length === 0 ? (
+          <p className="group-panel__note">{t(locale, 'schedule.rules.empty')}</p>
+        ) : null}
 
         <div data-testid="weekly-rules">
           {rules.map((rule, index) => (
-            <div key={rule.id ?? `new-${index}`} data-testid="rule-row" style={ruleRowStyle}>
-              <label style={fieldStyle}>
+            <div className="rule-row" data-testid="rule-row" key={rule.id ?? `new-${index}`}>
+              <label className="group-field">
                 {t(locale, 'schedule.rules.weekday')}
                 <select
                   value={rule.weekday}
@@ -281,7 +263,7 @@ export function GroupSchedulePage({
                   ))}
                 </select>
               </label>
-              <label style={fieldStyle}>
+              <label className="group-field">
                 {t(locale, 'schedule.rules.startTime')}
                 <input
                   type="time"
@@ -290,7 +272,7 @@ export function GroupSchedulePage({
                   onChange={(event) => updateRule(index, { start_time: event.target.value })}
                 />
               </label>
-              <label style={fieldStyle}>
+              <label className="group-field">
                 {t(locale, 'schedule.rules.endTime')}
                 <input
                   type="time"
@@ -310,44 +292,50 @@ export function GroupSchedulePage({
           ))}
         </div>
 
-        <Button
-          variant="secondary"
-          data-testid="add-rule"
-          onClick={() => setRules((current) => [...current, blankRule(groupId, effectiveFrom)])}
-        >
-          {t(locale, 'schedule.rules.add')}
-        </Button>
+        <div className="group-panel__actions">
+          <Button
+            variant="secondary"
+            data-testid="add-rule"
+            onClick={() => setRules((current) => [...current, blankRule(groupId, effectiveFrom)])}
+          >
+            {t(locale, 'schedule.rules.add')}
+          </Button>
 
-        <label style={fieldStyle}>
-          {t(locale, 'schedule.group.changeFrom')}
-          <input
-            type="date"
-            data-testid="effective-from"
-            value={effectiveFrom}
-            onChange={(event) => setEffectiveFrom(event.target.value)}
-          />
-        </label>
+          <label className="group-field">
+            {t(locale, 'schedule.group.changeFrom')}
+            <input
+              type="date"
+              data-testid="effective-from"
+              value={effectiveFrom}
+              onChange={(event) => setEffectiveFrom(event.target.value)}
+            />
+          </label>
+
+          <Button data-testid="save-rules" disabled={busy} onClick={() => void requestPreview()}>
+            {t(locale, 'schedule.group.reviewChange')}
+          </Button>
+        </div>
 
         {error ? (
-          <p role="alert" style={errorStyle}>
+          <p className="group-panel__error" role="alert">
             {error}
           </p>
         ) : null}
-
-        <Button data-testid="save-rules" disabled={busy} onClick={() => void requestPreview()}>
-          {t(locale, 'schedule.group.reviewChange')}
-        </Button>
       </section>
-      </Card>
 
-      <section aria-labelledby="sessions-title">
-        <h3 id="sessions-title">{t(locale, 'schedule.group.sessions')}</h3>
-        <Card>
-          <div style={sessionListStyle}>
+      <section aria-labelledby="sessions-title" className="group-panel">
+        <h3 className="group-panel__title" id="sessions-title">
+          {t(locale, 'schedule.group.sessions')}
+        </h3>
+        {/* A season is ~100 rows per group; unscrolled they made this page a kilometre
+            long and buried the schedule editor above them (2026-08-30). */}
+        <ul aria-label={t(locale, 'schedule.group.sessions')} className="group-sessions">
           {sessions.map((session) => (
-            <div key={session.id} data-testid="session-row" style={sessionRowStyle}>
-              <span>{formatDateInStudioZone(session.starts_at, locale)}</span>
-              <span data-testid="session-time">
+            <li className="session-row" data-testid="session-row" key={session.id}>
+              <span className="session-row__when">
+                {formatDateInStudioZone(session.starts_at, locale)}
+              </span>
+              <span className="session-row__time" data-testid="session-time" dir="ltr">
                 {formatTimeInStudioZone(session.starts_at, locale)}
                 {'–'}
                 {formatTimeInStudioZone(session.ends_at, locale)}
@@ -360,17 +348,20 @@ export function GroupSchedulePage({
                   labels are exclusive here. Showing them together reads as two separate
                   facts about one lesson when it is really one. */}
               {session.is_ad_hoc ? (
-                <span style={noteStyle}>{t(locale, 'schedule.session.adHoc')}</span>
+                <span className="session-row__note">{t(locale, 'schedule.session.adHoc')}</span>
               ) : session.is_manually_edited ? (
-                <span style={noteStyle}>{t(locale, 'schedule.session.manuallyEdited')}</span>
+                <span className="session-row__note">
+                  {t(locale, 'schedule.session.manuallyEdited')}
+                </span>
               ) : null}
               {session.cancel_reason ? (
-                <span style={noteStyle}>{cancelReasonLabel(locale, session.cancel_reason)}</span>
+                <span className="session-row__note">
+                  {cancelReasonLabel(locale, session.cancel_reason)}
+                </span>
               ) : null}
-            </div>
+            </li>
           ))}
-          </div>
-        </Card>
+        </ul>
       </section>
 
       {preview ? (

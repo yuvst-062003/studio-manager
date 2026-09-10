@@ -88,7 +88,24 @@ export const people: Bundle = {
   // -- 4a's attendance section (dashboard) ---------------------------------------
   'student.attendance': 'היסטוריית נוכחות',
   'student.attendanceEmpty': 'עדיין לא נרשמה נוכחות',
+  'student.belt': 'דרגה נוכחית',
+  'student.presentOf': 'נוכח ב-{{present}} מתוך {{total}}',
+  'student.weeklyVolume': 'אימונים בשבוע',
+  'student.statusHistory': 'היסטוריית סטטוס',
+  'student.historyEmpty': 'אין שינויי סטטוס',
+  'guardian.phone': 'טלפון הורה',
   'student.attendanceMarkedOn': 'סומן בתאריך',
+
+  // -- 4a's tab strip (dashboard redesign) — groups the card's existing sections under
+  // four tabs instead of one long scroll. The freeze/convert/mark-lost actions stay
+  // outside the tabs; they act on the student, not on a tab.
+  'student.tab.legend': 'לשונית תצוגה',
+  'student.tab.general': 'כללי',
+  'student.tab.training': 'אימונים',
+  'student.tab.finance': 'כספים',
+  'student.tab.health': 'בריאות',
+  'student.tab.healthHint': 'מסמכי הבריאות מנוהלים במסך המסמכים.',
+  'student.tab.healthLink': 'מעבר למסך המסמכים',
 
   // -- guardians (§5.3) ----------------------------------------------------------
   'guardian.one': 'הורה',
@@ -331,6 +348,7 @@ export const people: Bundle = {
   'freeze.from': 'מתאריך',
   'freeze.to': 'עד תאריך',
   'freeze.openEnded': 'ללא תאריך סיום',
+  'freeze.until': 'מוקפא עד {{date}}',
   'freeze.reason': 'סיבה',
   'freeze.submit': 'הקפאה',
   'freeze.active': 'החברות מוקפאת',
@@ -1177,4 +1195,5 @@ export const people: Bundle = {
   'bookTrial.error.email': 'כתובת אימייל לא תקינה',
   'bookTrial.error.consent': 'יש לאשר את התקנון כדי להמשיך',
   'bookTrial.error.health': 'נא לענות על הצהרת הבריאות',
+  'alerts.subtitle': 'כל מה שדורש החלטה — במקום אחד, כולל מה שריק.',
 }

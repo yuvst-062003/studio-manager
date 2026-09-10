@@ -86,10 +86,13 @@ async function rowFor(name: string): Promise<HTMLElement> {
 }
 
 describe('5b — the belt system', () => {
-  it('rings every swatch in the table, with no opt-out anywhere', async () => {
+  it('rings every swatch on the screen, with no opt-out anywhere', async () => {
+    // Twelve, not six, since checkpoint 14: the progression strip draws each rung too, and
+    // the rule is EVERY swatch — a strip whose bars skipped the ring would be exactly the
+    // fill-only bug D7 exists to prevent, reintroduced one component over.
     renderScreen()
     const bars = await screen.findAllByRole('img')
-    expect(bars).toHaveLength(6)
+    expect(bars).toHaveLength(12)
     for (const bar of bars) {
       expect(bar).toHaveClass('studio-belt-bar')
       // The ring is BeltBar's own inline box-shadow. Asserted on every bar, not a sample:
@@ -102,7 +105,10 @@ describe('5b — the belt system', () => {
     // app/models/belts.py: "a second bar is how the fill-only bug D7 exists to prevent
     // comes back". One bar, one gradient.
     renderScreen()
-    const bar = await screen.findByRole('img', { name: /צהובה-כתומה/ })
+    // Both the strip and the table draw this rank, and the rule is about EACH bar rather
+    // than about how many there are.
+    const bars = await screen.findAllByRole('img', { name: /צהובה-כתומה/ })
+    const bar = bars[0] as HTMLElement
     expect(bar.style.background).toContain('linear-gradient')
     // D10 — never a hard-coded physical direction. BeltBar splits on the block axis, which
     // is the same in both writing modes.
@@ -249,5 +255,80 @@ describe('dragging a belt to a new place in the ladder', () => {
     const row = await rowFor('צהובה')
     expect(within(row).getByRole('button', { name: t('he', 'events.belt.moveUp') })).toBeInTheDocument()
     expect(within(row).getByRole('button', { name: t('he', 'events.belt.moveDown') })).toBeInTheDocument()
+  })
+})
+
+// Checkpoint 14 — §3.9's progression strip, and the rename that had no caller.
+/** `makeClient` takes a ladder, not overrides; these tests need one method swapped. */
+function clientWith(over: Partial<DashboardBeltsClient>): DashboardBeltsClient {
+  return { ...makeClient(), ...over } as DashboardBeltsClient
+}
+
+describe('the progression strip (§3.9)', () => {
+  it('draws the ladder as an ordered run of rungs, above the editing table', async () => {
+    // A ladder is an ORDER, and a row-per-rank table shows order as vertical position,
+    // which is the one thing a table is worst at making obvious.
+    renderScreen()
+    const strip = await screen.findByTestId('belt-strip')
+    expect(strip.tagName).toBe('OL')
+    expect(strip.querySelectorAll('li')).toHaveLength(6)
+  })
+
+  it('names how many people are on each rung, from the row the API already sends', async () => {
+    // The prototype prints an invented training count in the same place; `LadderRankOut`
+    // carries the real one.
+    renderScreen(makeClient([rank({ holders: 7 })]))
+    const strip = await screen.findByTestId('belt-strip')
+    expect(strip).toHaveTextContent('7')
+  })
+
+  it('keeps the table — the strip is the display, the table is the editor', async () => {
+    renderScreen()
+    await screen.findByTestId('belt-strip')
+    expect(screen.getByRole('table')).toBeInTheDocument()
+  })
+})
+
+describe('renaming a rank (§3.9’s named gap)', () => {
+  it('sends the WHOLE rank, not just the new name', async () => {
+    // `BeltRankIn` is a whole body, not a patch of one field: leaving `order_index` or
+    // `color_hex` out would move or blank the rung as a side effect of correcting a typo.
+    const updateRank = vi.fn().mockResolvedValue(LADDER[0])
+    renderScreen(clientWith({ updateRank }))
+    await screen.findByTestId('belt-strip')
+    await userEvent.click(screen.getByTestId('rank-rename-open-r1'))
+    await userEvent.clear(screen.getByTestId('rank-rename-r1'))
+    await userEvent.type(screen.getByTestId('rank-rename-r1'), 'חגורה לבנה')
+    await userEvent.click(screen.getByTestId('rank-save-r1'))
+
+    await waitFor(() => expect(updateRank).toHaveBeenCalled())
+    const [, body] = updateRank.mock.calls[0] as [string, Record<string, unknown>]
+    expect(body.name).toBe('חגורה לבנה')
+    expect(body.order_index).toBe(0)
+    expect(body.color_hex).toBe('#FFFFFF')
+  })
+
+  it('refuses to save an empty name', async () => {
+    renderScreen()
+    await screen.findByTestId('belt-strip')
+    await userEvent.click(screen.getByTestId('rank-rename-open-r1'))
+    await userEvent.clear(screen.getByTestId('rank-rename-r1'))
+    expect(screen.getByTestId('rank-save-r1')).toBeDisabled()
+  })
+
+  it('says so when the rename fails, rather than closing on a write that did not happen', async () => {
+    renderScreen(
+      clientWith({
+        updateRank: vi.fn(async () => {
+          throw new Error('500')
+        }) as unknown as DashboardBeltsClient['updateRank'],
+      }),
+    )
+    await screen.findByTestId('belt-strip')
+    await userEvent.click(screen.getByTestId('rank-rename-open-r1'))
+    await userEvent.click(screen.getByTestId('rank-save-r1'))
+    expect(await screen.findByTestId('rank-rename-failed')).toBeInTheDocument()
+    // Still open, with what was typed.
+    expect(screen.getByTestId('rank-rename-r1')).toBeInTheDocument()
   })
 })

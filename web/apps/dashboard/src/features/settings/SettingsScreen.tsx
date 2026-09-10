@@ -27,7 +27,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { apiFetch, useAuthedImage } from '@studio/core'
-import { Card, PageHeader, SectionHeader, Switch, TextField } from '@studio/ui'
+import {
+  Card,
+  LoadFailed,
+  PageHeader,
+  SectionHeader,
+  Switch,
+  TextField,
+  ThemeControl,
+} from '@studio/ui'
+import { ImagePicker } from '../../shared/ImagePicker'
 import { StructurePanel } from './StructurePanel'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -55,27 +64,34 @@ type StudioDetails = {
   landing_photos?: LandingPhoto[]
 }
 
-//: 3f's own left rail, in its own order. An entry with an `href` is a section whose
-//: editor lives on its own screen — the rail LINKS there rather than stubbing a panel.
-//: These six spent two waves disabled under "עדיין לא זמין" while their screens shipped
-//: one by one; a settings rail promising a screen that already exists is the stale kind
-//: of promise the cockpit rule exists to prevent (closed 2026-08-30).
+//: The five tabs §3.19 asked for, replacing the nine-entry rail.
+//:
+//: The rail used to carry nine sections of which only three rendered in place — `studio`,
+//: `structure` and `payments` — while the other six were links out to screens that own
+//: themselves: prices → `#/prices`, documents → `#/documents`, attendance → `#/attendance`,
+//: notifications → `#/alerts`, users → `#/staff`, belts → `#/belts`. Every one of those six
+//: also has a door in the sidebar, so the rail was a second menu to the same places, and
+//: §3.19's verdict is the one applied here: *"the five-tab layout is a better organisation
+//: than a rail where two-thirds of the entries navigate away."* The owner asked the same
+//: question in their own words on 2026-09-10 — "does settings need all of this".
+//:
+//: Five entries, four of which render in place. `users` stays a link and is the single
+//: deliberate exception, because §3.19 says so in as many words: `#/staff` is the real
+//: screen and this tab should point at it rather than grow a second, weaker staff list —
+//: which is exactly what the prototype's own settings view does wrong (a hardcoded
+//: three-person list and an "add staff member" button that only raises a toast).
 const SECTIONS: readonly { key: string; href?: string }[] = [
   { key: 'studio' },
-  // F4.3 — classes and halls. Settings-cadence edits live here; #/groups stays the
+  // F4.3 — classes and halls. Settings-cadence edits live here; #/classes stays the
   // weekly working screen.
   { key: 'structure' },
-  { key: 'prices', href: '#/prices' },
   // Owned since the 2026-08-27 payment-routes pass: this is where the הוראת קבע link per
   // price plan is set. One screen answers "how may a family pay this club".
   { key: 'payments' },
-  { key: 'documents', href: '#/documents' },
-  { key: 'attendance', href: '#/attendance' },
-  // 'התראות ותבניות' — the alert centre is where the notification templates and the
-  // reminder ladder surface today.
-  { key: 'notifications', href: '#/alerts' },
+  // New. §3.19 — "take the theme-and-language tab as the home for `ThemeControl`, which
+  // currently lives only in the sidebar."
+  { key: 'appearance' },
   { key: 'users', href: '#/staff' },
-  { key: 'belts', href: '#/belts' },
 ]
 
 const PARENT_LOCALES = ['he', 'en', 'ru'] as const
@@ -99,6 +115,17 @@ const layoutStyle: CSSProperties = {
 }
 
 const railStyle: CSSProperties = { listStyle: 'none', margin: 0, padding: 0 }
+
+/** The two once-a-year links in the appearance tab. Logical properties throughout —
+ *  `.claude/rules/ui-rtl-a11y.md`, and the app is RTL. */
+const annualStyle: CSSProperties = {
+  listStyle: 'none',
+  margin: 0,
+  padding: 0,
+  display: 'grid',
+  gap: 'var(--space-2)',
+  marginBlockStart: 'var(--space-3)',
+}
 
 const rowStyle: CSSProperties = {
   display: 'flex',
@@ -187,20 +214,31 @@ export function SettingsScreen({ locale }: { locale: Locale }) {
   const [saveState, setSaveState] = useState<'idle' | 'saved' | 'failed'>('idle')
   const [photoError, setPhotoError] = useState<string | null>(null)
   const [logoError, setLogoError] = useState<string | null>(null)
+  /** §3.19's named defect, closed. `attempt` re-runs the read on retry. */
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const logoUrl = useAuthedImage(details?.logo_url ?? null)
 
   useEffect(() => {
     let alive = true
     void apiFetch('/api/v1/studio')
-      .then(async (response) => (await response.json()) as StudioDetails)
+      .then(async (response) => {
+        // §3.19's named defect: the failure was swallowed to `undefined`, so a manager
+        // whose network dropped sat on `טוען…` for ever with no error and no retry —
+        // indistinguishable from a slow request that was still coming.
+        if (!response.ok) throw new Error(String(response.status))
+        return (await response.json()) as StudioDetails
+      })
       .then((next) => {
         if (alive) setDetails(next)
       })
-      .catch(() => undefined)
+      .catch(() => {
+        if (alive) setLoadFailed(true)
+      })
     return () => {
       alive = false
     }
-  }, [])
+  }, [attempt])
 
   const save = (fields: Partial<StudioDetails>) => {
     setSaveState('idle')
@@ -357,53 +395,91 @@ export function SettingsScreen({ locale }: { locale: Locale }) {
             <StandingOrderLinksPanel locale={locale} client={billingClient} />
             <PrepayTermsPanel locale={locale} client={billingClient} />
           </div>
+        ) : section === 'appearance' ? (
+          <Card>
+            <div data-testid="settings-panel-appearance">
+              <SectionHeader
+                level={3}
+                title={t(locale, 'common.settings.section.appearance')}
+              />
+              {/* §3.19 — the theme control's home. It is ALSO still in the sidebar and in
+                  the narrow-viewport drawer, deliberately: this tab is where a manager
+                  looks for it, the sidebar is where a manager reaches for it, and the
+                  control is stateless chrome over `ThemeProvider`, so two mounts cannot
+                  disagree. Nothing is moved out of the sidebar here — removing it would
+                  take the switch away from every screen to put it on one. */}
+              <ThemeControl
+                labels={{
+                  light: t(locale, 'common.theme.light'),
+                  dark: t(locale, 'common.theme.dark'),
+                  system: t(locale, 'common.theme.system'),
+                }}
+                legend={t(locale, 'common.theme.legend')}
+                stateLabels={{
+                  light: t(locale, 'common.theme.state.light'),
+                  dark: t(locale, 'common.theme.state.dark'),
+                }}
+              />
+
+              {/* The two once-a-year flows. They live HERE rather than in the sidebar
+                  because that is what they are — a manager runs each of them once and then
+                  does not look at them again for a year, which is the worst possible claim
+                  on a permanent nav slot. Retiring `overflowDoors()` is what made a home
+                  for them necessary, and this is that home. */}
+              <SectionHeader level={3} title={t(locale, 'common.settings.annual.title')} />
+              <p>{t(locale, 'common.settings.annual.hint')}</p>
+              <ul style={annualStyle}>
+                <li>
+                  <a data-testid="settings-link-setup" href="#/setup">
+                    {t(locale, 'common.settings.annual.setup')}
+                  </a>
+                </li>
+                <li>
+                  <a data-testid="settings-link-rollover" href="#/rollover">
+                    {t(locale, 'common.settings.annual.rollover')}
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </Card>
         ) : (
         <Card>
-          {details === null ? (
+          {loadFailed ? (
+            <LoadFailed
+              locale={locale}
+              onRetry={() => {
+                setLoadFailed(false)
+                setAttempt((n) => n + 1)
+              }}
+            />
+          ) : details === null ? (
             <p data-testid="settings-loading">{t(locale, 'common.setup.loading')}</p>
           ) : (
             <div data-testid="settings-panel-studio">
               <SectionHeader level={3} title={t(locale, 'common.settings.section.studio')} />
 
-              {/* `logo_url` is a token-guarded API path, so the bytes come through
+              {/* One control instead of three. This used to be a preview `<img>`, a
+                  paragraph reading "גררו לוגו 512×512" that looked like a drop zone and
+                  accepted nothing, and a `<label>` around a bare file input — which the
+                  browser draws as a grey English "Choose File" button beside the words "no
+                  file selected". The owner asked for a pressable empty square with a
+                  picture icon; `ImagePicker` is that, and the empty-state words carry the
+                  512×512 the generic label cannot.
+
+                  `logo_url` is a token-guarded API path, so the bytes still come through
                   `useAuthedImage` rather than straight off the attribute — a bare src
-                  resolved against this app's host and sent no header (2026-08-30). */}
-              {logoUrl ? (
-                <img
-                  src={logoUrl}
-                  alt={t(locale, 'common.setup.studio.logoAlt')}
-                  width={128}
-                  height={128}
-                  style={{ maxInlineSize: '100%', height: 'auto' }}
-                />
-              ) : (
-                <p data-testid="settings-logo-empty">
-                  {t(locale, 'common.setup.studio.logoDrop')}
-                </p>
-              )}
-              {/* The control that was missing. A real `<label>` wrapping the input, like
-                  the landing-photo uploader below — a file input with only a placeholder
-                  paragraph beside it is the state this screen was in. */}
-              <label>
-                {t(locale, 'common.setup.studio.logoChoose')}
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  style={{ display: 'block' }}
-                  data-testid="settings-logo-input"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0]
-                    if (file) uploadLogo(file)
-                    // The same file again after a rejection must refire onChange.
-                    event.target.value = ''
-                  }}
-                />
-              </label>
-              {logoError ? (
-                <p role="alert" data-testid="settings-logo-error">
-                  {t(locale, logoError)}
-                </p>
-              ) : null}
+                  resolved against this app's host and sent no header (2026-08-30). No
+                  `onRemove`: there is no DELETE for the logo, and a remove button that
+                  cannot remove is worse than none. */}
+              <ImagePicker
+                locale={locale}
+                onChoose={uploadLogo}
+                previewUrl={logoUrl}
+                label={t(locale, 'common.setup.studio.logoChoose')}
+                hint={t(locale, 'common.setup.studio.logoDrop')}
+                error={logoError ? t(locale, logoError) : null}
+                testId="settings-logo-input"
+              />
 
               <TextField
                 label={t(locale, 'common.setup.studio.name')}

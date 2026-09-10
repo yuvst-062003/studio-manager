@@ -94,6 +94,10 @@ export const events: Bundle = {
   'nonRespondersReminded': 'Напоминание отправлено тем, кто не ответил',
   'reminderSent': 'Напоминание отправлено',
   'roster.empty': 'К мероприятию не привязан ни один ученик',
+  // §3.10's named gap: POST /events/{id}/attendance was in the client and no dashboard
+  // screen called it.
+  'roster.markAttended': 'Отметить присутствие',
+  'roster.markFailed': 'Не удалось отметить присутствие. Попробуйте ещё раз.',
 
   'addToCalendar': 'Добавить в календарь',
   'attendance.take': 'Отметить посещаемость на мероприятии',
@@ -204,6 +208,11 @@ export const events: Bundle = {
   // -- 5b / 5d — the belt system ------------------------------------------------------
   'form.cancel': 'Отмена',
   'belt.delete': 'Удалить степень',
+  // §3.9's named gap: PATCH /belt-ranks/{id} was in the client and no screen called it.
+  'belt.rename': 'Переименовать',
+  'belt.renameSave': 'Сохранить',
+  'belt.renameCancel': 'Отмена',
+  'belt.renameFailed': 'Не удалось переименовать степень. Попробуйте ещё раз.',
   'belt.edit': 'Редактировать степень',
   'belt.save': 'Сохранить степень',
   'belt.preview': 'Предпросмотр',

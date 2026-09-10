@@ -63,7 +63,24 @@ export const people: Bundle = {
   'status.membershipHistory': 'История занятий в клубе',
   'student.attendance': 'История посещаемости',
   'student.attendanceEmpty': 'Посещаемость ещё не отмечалась',
+  'student.belt': 'Текущий пояс',
+  'student.presentOf': 'Присутствовал {{present}} из {{total}}',
+  'student.weeklyVolume': 'Тренировок в неделю',
+  'student.statusHistory': 'История статуса',
+  'student.historyEmpty': 'Изменений статуса нет',
+  'guardian.phone': 'Телефон родителя',
   'student.attendanceMarkedOn': 'Отмечено',
+
+  // -- 4a's tab strip (dashboard redesign) — groups the card's existing sections under
+  // four tabs instead of one long scroll. The freeze/convert/mark-lost actions stay
+  // outside the tabs; they act on the student, not on a tab.
+  'student.tab.legend': 'Вкладка отображения',
+  'student.tab.general': 'Общее',
+  'student.tab.training': 'Тренировки',
+  'student.tab.finance': 'Финансы',
+  'student.tab.health': 'Здоровье',
+  'student.tab.healthHint': 'Медицинские документы находятся на экране документов.',
+  'student.tab.healthLink': 'Перейти к экрану документов',
 
   'guardian.one': 'Родитель',
   'guardian.plural': 'Родители',
@@ -280,6 +297,7 @@ export const people: Bundle = {
   'freeze.from': 'С',
   'freeze.to': 'По',
   'freeze.openEnded': 'Без даты окончания',
+  'freeze.until': 'Заморожен до {{date}}',
   'freeze.reason': 'Причина',
   'freeze.submit': 'Заморозить',
   'freeze.active': 'Членство заморожено',
@@ -1019,4 +1037,5 @@ export const people: Bundle = {
   'bookTrial.error.email': 'Некорректный адрес электронной почты',
   'bookTrial.error.consent': 'Чтобы продолжить, примите устав клуба',
   'bookTrial.error.health': 'Ответьте на медицинскую декларацию',
+  'alerts.subtitle': 'Всё, что ждёт решения — в одном месте, включая пустые очереди.',
 }

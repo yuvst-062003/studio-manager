@@ -160,11 +160,17 @@ export const DEFAULT_TARGETS: EventTargetOut[] = [{ target_type: 'studio', targe
 
 export function EventForm({
   client,
+  defaultDate = null,
   initialTargets = DEFAULT_TARGETS,
   locale,
   onSaved,
 }: {
   client: DashboardEventsClient
+  /** `YYYY-MM-DD` from D14's calendar slot, or null when the form was opened from the
+   *  events screen and no day is implied. Only the DATE: the slot's hour is the hour a
+   *  lesson would start, and an event's own start time is a separate decision — a
+   *  competition is not a class in the same square. */
+  defaultDate?: string | null
   /** §5.8's targeting, as the form OPENS. It was a fixed `targets` prop and every caller
    *  passed `[]`, which is why nothing the dashboard published ever reached anybody; the
    *  audience is now edited here, on the screen that decides it. */
@@ -175,7 +181,9 @@ export function EventForm({
   const [type, setType] = useState<EventType>('competition')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [startsAt, setStartsAt] = useState('')
+  // `datetime-local` wants `YYYY-MM-DDTHH:mm`. The time is left at 09:00 rather than
+  // guessed from the slot, for the reason `defaultDate` records above.
+  const [startsAt, setStartsAt] = useState(defaultDate ? `${defaultDate}T09:00` : '')
   const [endsAt, setEndsAt] = useState('')
   const [atClub, setAtClub] = useState('club')
   const [locationText, setLocationText] = useState('')

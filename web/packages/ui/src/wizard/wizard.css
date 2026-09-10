@@ -1,0 +1,243 @@
+/* The shared stepper. One definition for the class wizard, the setup wizard and rollover.
+ *
+ * The rail scrolls inline rather than wrapping: seven nodes on a 390px phone would stack
+ * into a column that pushes the step body off the screen, and a manager reading "step 3 of
+ * 7" wants the rail to be a strip, not a table of contents. */
+
+/* The container the narrow rules below query. A MEDIA query would read the viewport, and
+ * the viewport is the wrong number: the staff app mounts the setup wizard inside a ~440px
+ * phone shell on a 1440px screen, so the rail is narrow while the window is not. Only the
+ * rail's own width answers "do seven labels fit here". */
+.studio-stepper-shell {
+  container-name: studio-stepper;
+  container-type: inline-size;
+  inline-size: 100%;
+  min-inline-size: 0;
+}
+
+/* ── the completion line ─────────────────────────────────────────────────────────────
+ * One line across the full width, with the figure it represents beside its label. The rail
+ * below says WHICH steps are done; this says how much of the whole is. */
+.studio-stepper__progress {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-block-end: var(--space-2);
+}
+
+.studio-stepper__progress-label {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+}
+
+.studio-stepper__progress-value {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  color: var(--emphasis);
+  font-variant-numeric: tabular-nums;
+}
+
+/* `--border`, not `--disabled-surface`: on the white surface the disabled tint is within a
+ * few percent of the ground, so at 0% the bar read as nothing at all and a manager could
+ * not see there was one to fill. An empty bar has to be visible or it says nothing. */
+.studio-stepper__track {
+  block-size: 0.375rem;
+  border-radius: var(--radius-pill);
+  background: var(--border);
+  overflow: hidden;
+  margin-block-end: var(--space-3);
+}
+
+/* `inline-size` is set inline from the percentage, so the fill grows toward the reading
+ * start edge in RTL and the other way in LTR without a physical property anywhere. */
+.studio-stepper__fill {
+  display: block;
+  block-size: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--emphasis);
+  transition: inline-size var(--motion-base) var(--ease-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-stepper__fill {
+    transition: none;
+  }
+}
+
+.studio-stepper {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  overflow-x: auto;
+  padding-block-end: var(--space-2);
+}
+
+.studio-stepper__node {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.studio-stepper__node:last-child {
+  flex: none;
+}
+
+.studio-stepper__button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  background: transparent;
+  border: 0;
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.studio-stepper__button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The numbered circle. Its state drives BOTH the tint and the mark inside it, so the two
+ * cannot disagree — and the state is also in the accessibility tree as a word. */
+.studio-stepper__mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  border-radius: var(--radius-pill);
+  border: var(--border-width-hairline) solid var(--border-strong);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.studio-stepper__button[data-state='current'] {
+  color: var(--fg);
+}
+
+.studio-stepper__button[data-state='current'] .studio-stepper__mark {
+  background: var(--emphasis);
+  border-color: var(--emphasis);
+  color: var(--on-emphasis);
+}
+
+.studio-stepper__button[data-state='done'] {
+  color: var(--text-secondary);
+}
+
+.studio-stepper__button[data-state='done'] .studio-stepper__mark {
+  background: var(--emphasis-tint);
+  border-color: var(--emphasis);
+  color: var(--emphasis);
+}
+
+/* A skip is an answer but not a finish, and it looks like neither of the other two. */
+.studio-stepper__button[data-state='skipped'] .studio-stepper__mark {
+  background: var(--disabled-surface);
+  border-style: dashed;
+}
+
+.studio-stepper__text {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+
+.studio-stepper__title {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.studio-stepper__subtitle {
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* The rule between two nodes. It flips with `dir` on its own — it is a flex sibling, not a
+ * positioned element — which is why there is no physical property here.
+ *
+ * A hairline in `--border` was too faint to read as a CONNECTION: seven nodes with an
+ * almost-invisible gap between them look like seven separate buttons rather than one path
+ * walked in order. So it is a drawn line — two pixels, rounded, on the strong border — and
+ * the stretch already walked is the emphasis colour, which makes the rail say the same
+ * thing as the bar above it. */
+.studio-stepper__rule {
+  flex: 1;
+  min-inline-size: var(--space-4);
+  block-size: 0.125rem;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+}
+
+.studio-stepper__rule[data-state='done'],
+.studio-stepper__rule[data-state='skipped'] {
+  background: var(--emphasis);
+}
+
+/* The state on the face of the node, for a flow answered over days rather than in one
+ * sitting — the year rollover. Off everywhere else, where the mark and the tint say enough
+ * and seven state words would be noise. */
+.studio-stepper__state {
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.studio-stepper__button[data-state='done'] .studio-stepper__state {
+  color: var(--emphasis);
+}
+
+/* ── narrow ──────────────────────────────────────────────────────────────────────────
+ * A manager on a phone is a normal case (§6.4), and the staff app mounts the setup wizard
+ * in a shell about 440px wide. Seven labelled nodes do not fit there at any font size, and
+ * squeezing them is what makes a rail unreadable rather than merely small.
+ *
+ * So below the breakpoint the rail becomes what a narrow rail can be: the numbered marks,
+ * scrolling, with the CURRENT step named and the rest reachable by their number. Nothing
+ * is hidden from a screen reader — the title and the state stay in the DOM for every node,
+ * and only their VISIBILITY changes. */
+@container studio-stepper (width < 52rem) {
+  .studio-stepper__subtitle {
+    display: none;
+  }
+}
+
+@container studio-stepper (width < 34rem) {
+  /* No growing, no shrinking: the strip scrolls instead of compressing. */
+  .studio-stepper__node {
+    flex: none;
+  }
+
+  .studio-stepper__rule {
+    min-inline-size: var(--space-3);
+  }
+
+  /* Named where the manager IS; numbered everywhere else. Nothing is hidden from a screen
+   * reader — the title and the state stay in the DOM for every node, and only their
+   * VISIBILITY changes. */
+  .studio-stepper__button:not([data-state='current']) .studio-stepper__text,
+  .studio-stepper__button:not([data-state='current']) .studio-stepper__state {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}

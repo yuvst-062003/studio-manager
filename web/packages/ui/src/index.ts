@@ -2,6 +2,7 @@ import './fonts.css'
 import './tokens.css'
 import './primitives/primitives.css'
 import './setup-wizard/setup-wizard.css'
+import './wizard/wizard.css'
 
 export { HelloProof } from './HelloProof'
 export { ThemeProvider, useTheme } from './ThemeProvider'
@@ -145,6 +146,11 @@ export type { SwUpdateDetail } from './sw-update/swUpdate'
 // It lives in @studio/ui and not in an app feature directory because §5.1 says "the staff
 // app and dashboard route them into" it: both mount the same wizard in place.
 export { AccessibilityMenu, applyA11ySettings } from './primitives/AccessibilityMenu'
+// The horizontal stepper, shared by the three wizards that have one — the class wizard
+// (§3.21), the setup wizard (§3.19) and rollover (§3.17). Built once, in `packages/ui`,
+// so the port does not copy a progress bar three times.
+export { Stepper } from './wizard/Stepper'
+export type { StepperNode, StepperState } from './wizard/Stepper'
 export { SetupWizard } from './setup-wizard/SetupWizard'
 export { SetupIncompleteBanner } from './setup-wizard/SetupIncompleteBanner'
 export type { SetupClient } from './setup-wizard/SetupWizard'

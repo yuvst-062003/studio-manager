@@ -30,12 +30,13 @@ import {
   registerM1WizardSteps,
   useDocumentLocale,
 } from '@studio/ui'
-import type { SideNavGroup } from '@studio/ui'
+import type { SideNavGroup, SideNavItem } from '@studio/ui'
 import { DevBar } from '@studio/ui/dev-bar'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { ScheduleSection } from './features/schedule/ScheduleSection'
 import { makeScheduleClient } from './features/schedule/client'
+import { makeClassWizardClient } from './features/schedule/class-wizard/client'
 // §5/C12 of the staff app redesign — the manager's side of §6.1's coach unavailability:
 // an alert-centre card and the resolution popup it opens (decisions 10, 11, 12).
 import { registerCoachConstraintAlerts } from './features/schedule/register'
@@ -47,6 +48,8 @@ import './features/settings/settings.css'
 import './features/schedule/schedule.css'
 import './features/belts/belts-wizard.css'
 import './features/attendance/attendance.css'
+import './features/billing/billing.css'
+import './features/comms/comms.css'
 import { useToday } from './features/schedule/useToday'
 // §5.15's rollover — "the single highest-leverage screen in the product", and the one flow
 // a manager runs once a year. Its own route rather than a panel inside `#/schedule`,
@@ -57,6 +60,7 @@ import { SettingsScreen } from './features/settings/SettingsScreen'
 import {
   AddStudentScreen,
   AlertCentre,
+  AlertSections,
   SharingCards,
   StudentDetailScreen,
   StudentsScreen,
@@ -148,23 +152,8 @@ if (import.meta.env.DEV || import.meta.env.VITE_DEV_TOOLS === 'true') {
 
 // F10 — the doors a coach's role cannot open stay out of their nav. The API was never
 // the hole (/staff is ManagerOrOwner, fees are redacted); the hole was offering doors
-// that answer 403.
-const MANAGER_ONLY_KEYS = new Set([
-  'rollover',
-  'alerts',
-  'billing',
-  'prices',
-  // A catalogue is a price list. Invariant 3 keeps fees out of a coach's responses; this
-  // keeps the door that answers 403 out of their nav.
-  'items',
-  'documents',
-  'reports',
-  'staff',
-  'settings',
-  'setup',
-  'closures',
-])
-
+// that answer 403. `doors()` decides which doors exist; this set is the refusal behind
+// them, for anyone who types the hash anyway.
 const MANAGER_ONLY_ROUTES = new Set([
   'rollover',
   'alerts',
@@ -188,6 +177,30 @@ const STAFF_APP_URL = '/staff'
 /** Logical properties throughout, not `margin-top`/`max-width`: the app is RTL and
  *  .claude/rules/ui-rtl-a11y.md says so. `maxInlineSize` because §6.4 is desktop-first —
  *  ungapped, a 43-character token got an input stretched across the whole 1100px. */
+/** The current-view chip in the header (2026-09-10).
+ *
+ * The prototype's header names the screen you are on, beside the club's name. Ours named
+ * only the club — so every one of the nine destinations rendered an identical bar, and the
+ * owner's screenshot of it was a title and an unstyled search box.
+ *
+ * It reads from `doors()`, the SAME list the sidebar and the drawer read. A hand-written
+ * switch over routes here would be a fourth place that has to be told about a new screen,
+ * and the whole point of that function is that there is one.
+ */
+const viewChipStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 'var(--space-2)',
+  paddingBlock: 'var(--space-1)',
+  paddingInline: 'var(--space-3)',
+  border: 'var(--border-width-hairline) solid var(--border)',
+  borderRadius: 'var(--radius-pill, 999px)',
+  background: 'var(--ground)',
+  color: 'var(--text-secondary)',
+  fontSize: 'var(--text-caption)',
+  whiteSpace: 'nowrap',
+}
+
 const inviteStyle: CSSProperties = {
   display: 'grid',
   gap: 'var(--space-2)',
@@ -195,28 +208,6 @@ const inviteStyle: CSSProperties = {
   maxInlineSize: '24rem',
 }
 
-const NAV = [
-  { key: 'home', labelKey: 'common.dash.home.title', href: '#/home' },
-  { key: 'schedule', labelKey: 'schedule.week.title', href: '#/schedule' },
-  { key: 'groups', labelKey: 'schedule.groups.title', href: '#/groups' },
-  { key: 'closures', labelKey: 'schedule.closure.title', href: '#/closures' },
-  { key: 'rollover', labelKey: 'schedule.rollover.nav', href: '#/rollover' },
-  { key: 'students', labelKey: 'people.student.plural', href: '#/students' },
-  { key: 'alerts', labelKey: 'people.alerts.title', href: '#/alerts' },
-  { key: 'billing', labelKey: 'billing.debt.title', href: '#/billing' },
-  { key: 'prices', labelKey: 'common.dash.nav.prices', href: '#/prices' },
-  { key: 'items', labelKey: 'billing.product.title', href: '#/items' },
-  { key: 'attendance', labelKey: 'common.nav.attendance', href: '#/attendance' },
-  { key: 'comms', labelKey: 'common.nav.announcements', href: '#/comms' },
-  { key: 'documents', labelKey: 'common.dash.nav.documents', href: '#/documents' },
-  { key: 'reports', labelKey: 'common.dash.nav.reports', href: '#/reports' },
-  { key: 'events', labelKey: 'events.title', href: '#/events' },
-  { key: 'belts', labelKey: 'events.belt.title', href: '#/belts' },
-  { key: 'exams', labelKey: 'events.exam.plural', href: '#/exams' },
-  { key: 'staff', labelKey: 'common.dash.nav.staff', href: '#/staff' },
-  { key: 'settings', labelKey: 'common.dash.nav.settings', href: '#/settings' },
-  { key: 'setup', labelKey: 'common.dash.nav.setup', href: '#/setup' },
-]
 
 export type DashboardRoute =
   | 'events'
@@ -256,7 +247,17 @@ export function routeFromHash(hash: string): DashboardRoute {
   // this screen has been looked at on real data. Flipping the fallback is a one-line
   // change here and an open question in the proposal, not something to do silently.
   if (name === 'home') return 'home'
-  if (name === 'schedule' || name === 'closures' || name.startsWith('groups')) return 'schedule'
+  if (
+    name === 'schedule' ||
+    name === 'closures' ||
+    name.startsWith('groups') ||
+    // Checkpoint 6, second pass: `#/classes` and `#/classes/<id>` are the classes
+    // index and one class's groups. Same vertical, same route — `ScheduleSection`
+    // decides between its own five hashes, which is what keeps this file to one
+    // branch per vertical rather than one per screen.
+    name.startsWith('classes')
+  )
+    return 'schedule'
   // §5.15's rollover. One hash and one screen: the wizard's own seven steps are its
   // internal state, not routes — a manager who bookmarked step 5 would land on a step the
   // server may since have answered, and `resume_at` is the only correct answer to "where
@@ -291,12 +292,31 @@ export function routeFromHash(hash: string): DashboardRoute {
   // `auth_identity`, above every studio. `PlatformSection` refuses on its own.
   if (name === 'platform') return 'platform'
   if (name === 'staff' || name === 'settings' || name === 'setup') return name
-  return 'schedule'
+  // D16 (2026-09-10) — the empty hash lands on the manager home, not the weekly board.
+  // The 2026-08-27 pass made the board the landing screen because the home of that day
+  // "landed nowhere"; it now carries the money band, today's classes, the attendance
+  // trend and — from checkpoint 2 — the alert centre, so it is the screen that answers
+  // "what needs me this morning" before the timetable does.
+  return 'home'
 }
 
-/** `#/events/<id>` → 7c; `#/events/new` → 7b; bare `#/events` → 7a's roundup. */
+/** `#/events/<id>` → 7c; `#/events/new` → 7b; bare `#/events` → 7a's roundup.
+ *
+ * The query string is stripped. D14 lets the calendar hand a slot's date to the event form
+ * as `#/events/new?date=2026-09-10`, and without this the sub-route read
+ * `new?date=2026-09-10` — which matches neither `'new'` nor an event id, so the app tried to
+ * load an event whose id was a query string and showed a not-found for a link it had just
+ * written itself. */
 export function eventRouteFrom(hash: string): string {
-  return hash.replace(/^#\/?events\/?/, '')
+  return hash.replace(/^#\/?events\/?/, '').split('?')[0] ?? ''
+}
+
+/** The `?date=YYYY-MM-DD` D14 puts on `#/events/new`, or null. Validated rather than
+ *  trusted: it reaches `new Date()` in the form, and a hand-typed hash is user input. */
+export function eventDateFrom(hash: string): string | null {
+  const query = hash.split('?')[1] ?? ''
+  const value = new URLSearchParams(query).get('date')
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null
 }
 
 /** `#/students/<id>` → the card; `#/students/new` → 3c; bare `#/students` → the table. */
@@ -337,6 +357,174 @@ function useSideNavBadges(enabled: boolean): { debtHouseholds: number; missingDo
 
 /** DashNav's three groups, from the canvas's own order. `hash` breaks the one tie the
  *  route enum cannot: `#/groups` collapses into the schedule vertical. */
+/**
+ * The nine doors, built once and used by BOTH the sidebar and the drawer.
+ *
+ * Before the 2026-09-10 redesign these were two hand-maintained structures — a flat
+ * `NAV` array feeding the drawer and a grouped `sideNavGroups()` feeding the sidebar —
+ * and they had already drifted: `closures`, `exams` and `setup` existed in one and not
+ * the other, so three destinations were reachable on a phone and unreachable on a
+ * desktop. One source is the fix, and it is why this returns items rather than groups.
+ *
+ * D1 of the redesign takes 19 destinations to 9. Nothing is deleted: every absorbed
+ * destination is reached from inside the door that now owns it. That was scaffolded by an
+ * `overflowDoors()` group holding the absorbed entries until each checkpoint moved them —
+ * the scaffolding is gone as of 2026-09-10, and `sideNavGroups()` below lists where each
+ * one landed.
+ */
+/** A door carries both forms: the sidebar renders `label`, the drawer reads `labelKey`. */
+type Door = SideNavItem & { labelKey: string }
+
+function doors(
+  route: DashboardRoute,
+  hash: string,
+  locale: Locale,
+  canSeeMoney: boolean,
+  badges: { debtHouseholds: number; missingDocuments: number },
+  isPlatformAdmin: boolean,
+): Door[] {
+  const onGroups = hash.startsWith('#/groups') || hash.startsWith('#/classes')
+  // No `onClosures` carve-out any more. It existed because closures had a door of its own
+  // in `overflowDoors()`, so on `#/closures` both that door and the weekly calendar lit up
+  // and the sidebar claimed the manager was in two places at once (seen on the checkpoint-7
+  // capture). Retiring the overflow group removed the competitor: §2.3 makes the calendar
+  // the door that OWNS closures, so it should be the current one there, and carving it out
+  // now would light nothing at all.
+  const items: Door[] = [
+    {
+      key: 'home',
+      label: t(locale, 'common.dash.home.title'),
+      labelKey: 'common.dash.home.title',
+      hint: t(locale, 'common.dash.hint.home'),
+      href: '#/home',
+      icon: <Icon name="home" />,
+      // D16 makes this the landing screen, and D8 puts the alert centre on it.
+      active: route === 'home' || route === 'alerts',
+    },
+    {
+      key: 'schedule',
+      label: t(locale, 'common.dash.nav.weekly'),
+      labelKey: 'common.dash.nav.weekly',
+      hint: t(locale, 'common.dash.hint.schedule'),
+      href: '#/schedule',
+      icon: <Icon name="calendar" />,
+      // D14 — events live in the calendar rather than in a door of their own.
+      active: (route === 'schedule' && !onGroups) || route === 'events',
+    },
+    {
+      key: 'students',
+      label: t(locale, 'people.student.plural'),
+      labelKey: 'people.student.plural',
+      hint: t(locale, 'common.dash.hint.students'),
+      href: '#/students',
+      icon: <Icon name="students" />,
+      active: route === 'students',
+    },
+    {
+      key: 'groups',
+      label: t(locale, 'common.dash.nav.groups'),
+      labelKey: 'common.dash.nav.groups',
+      hint: t(locale, 'common.dash.hint.groups'),
+      href: '#/classes',
+      icon: <Icon name="groups" />,
+      active: onGroups || route === 'belts' || route === 'exams',
+    },
+    {
+      key: 'comms',
+      label: t(locale, 'common.nav.announcements'),
+      labelKey: 'common.nav.announcements',
+      hint: t(locale, 'common.dash.hint.comms'),
+      href: '#/comms',
+      icon: <Icon name="messages" />,
+      active: route === 'comms',
+    },
+  ]
+
+  if (!canSeeMoney) {
+    // A coach opening this app gets six doors rather than nine. Attendance is its own
+    // door for them precisely because the door that absorbs it — reports — is one their
+    // role cannot open, and folding it there would take the chase list away from the
+    // person who does the chasing.
+    items.push({
+      key: 'attendance',
+      label: t(locale, 'common.nav.attendance'),
+      labelKey: 'common.nav.attendance',
+      hint: t(locale, 'common.dash.hint.attendance'),
+      href: '#/attendance',
+      icon: <Icon name="attendance" />,
+      active: route === 'attendance',
+    })
+    return items
+  }
+
+  items.push(
+    {
+      key: 'items',
+      label: t(locale, 'billing.product.title'),
+      labelKey: 'billing.product.title',
+      hint: t(locale, 'common.dash.hint.items'),
+      href: '#/items',
+      icon: <Icon name="payments" />,
+      active: route === 'items',
+    },
+    {
+      key: 'billing',
+      label: t(locale, 'billing.debt.title'),
+      labelKey: 'billing.debt.title',
+      hint: t(locale, 'common.dash.hint.billing'),
+      href: '#/billing',
+      icon: <Icon name="payments" />,
+      active: route === 'billing' || route === 'prices',
+      badge:
+        badges.debtHouseholds > 0 ? { text: String(badges.debtHouseholds), tone: 'red' } : undefined,
+    },
+    {
+      key: 'reports',
+      label: t(locale, 'common.dash.nav.reports'),
+      labelKey: 'common.dash.nav.reports',
+      hint: t(locale, 'common.dash.hint.reports'),
+      href: '#/reports',
+      icon: <Icon name="reports" />,
+      active: route === 'reports' || route === 'attendance',
+    },
+    {
+      key: 'settings',
+      label: t(locale, 'common.dash.nav.settings'),
+      labelKey: 'common.dash.nav.settings',
+      hint: t(locale, 'common.dash.hint.settings'),
+      href: '#/settings',
+      icon: <Icon name="settings" />,
+      active: route === 'settings' || route === 'staff' || route === 'setup',
+      badge:
+        badges.missingDocuments > 0
+          ? { text: String(badges.missingDocuments), tone: 'amber' }
+          : undefined,
+    },
+  )
+  // §18.1's operator console. Gated on platform-admin and NOT on `canSeeMoney`:
+  // platform-admin is not a role inside a studio, it is a row on the global
+  // `auth_identity` that sits above every studio -- so a club owner does not get this and
+  // an operator gets it whichever club they happen to be looking at.
+  //
+  // A door of its own rather than a section of settings, because it belongs to neither
+  // this club nor any other: everything above this line is about ONE studio and this is
+  // about all of them. It moved here when `overflowDoors()` was retired; it was the only
+  // entry in that group that never had a checkpoint to retire it, because it never had
+  // anywhere else to go.
+  if (isPlatformAdmin) {
+    items.push({
+      key: 'platform',
+      label: t(locale, 'common.platform.title'),
+      labelKey: 'common.platform.title',
+      hint: t(locale, 'common.platform.nav'),
+      href: '#/platform',
+      icon: <Icon name="settings" />,
+      active: route === 'platform',
+    })
+  }
+  return items
+}
+
 function sideNavGroups(
   route: DashboardRoute,
   hash: string,
@@ -345,190 +533,33 @@ function sideNavGroups(
   badges: { debtHouseholds: number; missingDocuments: number },
   isPlatformAdmin: boolean,
 ): SideNavGroup[] {
-  const onGroups = hash.startsWith('#/groups')
+  // ONE group. `overflowDoors()` used to add a second, labelled מועדון, holding the ten
+  // destinations D1 absorbed so that none of them became unreachable on the day the nav
+  // shrank from nineteen doors to nine. Every checkpoint named in those entries has since
+  // shipped, and nobody removed them — so the sidebar carried nine doors, then a second
+  // menu of eight more, and the owner asked on 2026-09-10 why it was there and why it was
+  // not organised. It was scaffolding that outlived its building.
+  //
+  // Each absorbed destination now has a real link in the door that owns it, added in the
+  // same commit as this deletion rather than promised for a later one:
+  //   closures  → the calendar's own header (WeekBoard)
+  //   exams     → beside the ladder (BeltsIndex)
+  //   prices    → the collections header (CollectionsScreen)
+  //   setup     → settings, appearance tab, "once a year"
+  //   rollover  → settings, appearance tab, "once a year"
+  //   staff     → settings, the `users` tab links out (§3.19 asks for exactly this)
+  //   documents → the manager home's money band
+  //   attendance→ the manager home, twice
+  //   alerts    → the alert centre renders ON the home (D8), so the route is a duplicate
+  //               of a screen the manager already lands on
+  //   platform  → a door of its own below, for the one identity that has it
   const groups: SideNavGroup[] = [
     {
-      key: 'daily',
+      key: 'main',
       label: t(locale, 'common.dash.nav.daily'),
-      items: [
-        {
-          // The rendered sidebar is built HERE, not from the NAV array above — which is
-          // why adding the home screen to that array left it unreachable, exactly the
-          // defect the canvas audit found twelve times and this screen was meant to avoid.
-          key: 'home',
-          label: t(locale, 'common.dash.home.title'),
-          hint: t(locale, 'common.dash.hint.home'),
-          href: '#/home',
-          icon: <Icon name="home" />,
-          active: route === 'home',
-        },
-        {
-          key: 'schedule',
-          label: t(locale, 'common.dash.nav.weekly'),
-          hint: t(locale, 'common.dash.hint.schedule'),
-          href: '#/schedule',
-          icon: <Icon name="calendar" />,
-          active: route === 'schedule' && !onGroups,
-        },
-        {
-          key: 'attendance',
-          label: t(locale, 'common.nav.attendance'),
-          hint: t(locale, 'common.dash.hint.attendance'),
-          href: '#/attendance',
-          icon: <Icon name="attendance" />,
-          active: route === 'attendance',
-        },
-        {
-          key: 'comms',
-          label: t(locale, 'common.nav.announcements'),
-          hint: t(locale, 'common.dash.hint.comms'),
-          href: '#/comms',
-          icon: <Icon name="messages" />,
-          active: route === 'comms',
-        },
-      ],
-    },
-    {
-      key: 'club',
-      label: t(locale, 'common.dash.nav.club'),
-      items: [
-        {
-          key: 'students',
-          label: t(locale, 'people.student.plural'),
-          hint: t(locale, 'common.dash.hint.students'),
-          href: '#/students',
-          icon: <Icon name="students" />,
-          active: route === 'students',
-        },
-        {
-          key: 'groups',
-          label: t(locale, 'common.dash.nav.groups'),
-          hint: t(locale, 'common.dash.hint.groups'),
-          href: '#/groups',
-          icon: <Icon name="groups" />,
-          active: onGroups,
-        },
-        {
-          key: 'events',
-          label: t(locale, 'events.title'),
-          hint: t(locale, 'common.dash.hint.events'),
-          href: '#/events',
-          icon: <Icon name="events" />,
-          active: route === 'events',
-        },
-        {
-          key: 'belts',
-          label: t(locale, 'common.dash.nav.beltsExams'),
-          hint: t(locale, 'common.dash.hint.belts'),
-          href: '#/belts',
-          icon: <Icon name="belts" />,
-          active: route === 'belts' || route === 'exams',
-        },
-      ],
+      items: doors(route, hash, locale, canSeeMoney, badges, isPlatformAdmin),
     },
   ]
-  if (canSeeMoney) {
-    groups[1]!.items.push(
-      {
-        key: 'staff',
-        label: t(locale, 'common.dash.nav.staff'),
-        hint: t(locale, 'common.dash.hint.staff'),
-        href: '#/staff',
-        icon: <Icon name="profile" />,
-        active: route === 'staff',
-      },
-      {
-        key: 'rollover',
-        label: t(locale, 'common.dash.nav.rollover'),
-        hint: t(locale, 'common.dash.hint.rollover'),
-        href: '#/rollover',
-        icon: <Icon name="sync" />,
-        active: route === 'rollover',
-      },
-    )
-  }
-  if (canSeeMoney) {
-    groups.push({
-      key: 'money',
-      label: t(locale, 'common.dash.nav.money'),
-      items: [
-        {
-          key: 'billing',
-          label: t(locale, 'billing.debt.title'),
-          hint: t(locale, 'common.dash.hint.billing'),
-          href: '#/billing',
-          icon: <Icon name="payments" />,
-          active: route === 'billing',
-          badge:
-            badges.debtHouseholds > 0
-              ? { text: String(badges.debtHouseholds), tone: 'red' }
-              : undefined,
-        },
-        {
-          key: 'prices',
-          label: t(locale, 'common.dash.nav.prices'),
-          hint: t(locale, 'common.dash.hint.prices'),
-          href: '#/prices',
-          icon: <Icon name="belts" />,
-          active: route === 'prices',
-        },
-        {
-          // In כסף rather than in מועדון: an item is a price list. `11a`'s handover sheet
-          // and `12e`'s shop both read this catalogue, and both create charges from it.
-          key: 'items',
-          label: t(locale, 'billing.product.title'),
-          hint: t(locale, 'common.dash.hint.items'),
-          href: '#/items',
-          icon: <Icon name="payments" />,
-          active: route === 'items',
-        },
-        {
-          key: 'documents',
-          label: t(locale, 'common.dash.nav.documents'),
-          hint: t(locale, 'common.dash.hint.documents'),
-          href: '#/documents',
-          icon: <Icon name="documents" />,
-          active: route === 'documents',
-          badge:
-            badges.missingDocuments > 0
-              ? { text: String(badges.missingDocuments), tone: 'amber' }
-              : undefined,
-        },
-        {
-          key: 'reports',
-          label: t(locale, 'common.dash.nav.reports'),
-          hint: t(locale, 'common.dash.hint.reports'),
-          href: '#/reports',
-          icon: <Icon name="reports" />,
-          active: route === 'reports',
-        },
-      ],
-    })
-  }
-  // §18.1's console, in its own group at the bottom. Gated on platform-admin and NOT on
-  // `canSeeMoney`: platform-admin is not a role in a studio, it is a row on the global
-  // `auth_identity` that sits above every studio, so an owner does not get this and an
-  // operator gets it whichever club they happen to be looking at.
-  //
-  // Its own group rather than an item inside כסף or מועדון, because it belongs to neither:
-  // everything above this line is about ONE club, and everything in here is about all of
-  // them. `web/tools/__tests__/unreachable-screens.test.ts` requires the link to exist —
-  // a routed screen nothing links to has shipped in this app four times.
-  if (isPlatformAdmin) {
-    groups.push({
-      key: 'platform',
-      label: t(locale, 'common.platform.nav'),
-      items: [
-        {
-          key: 'platform',
-          label: t(locale, 'common.platform.title'),
-          href: '#/platform',
-          icon: <Icon name="settings" />,
-          active: route === 'platform',
-        },
-      ],
-    })
-  }
   return groups
 }
 
@@ -550,6 +581,7 @@ export default function App() {
   const { route, hash } = useHashRoute()
   const studentRoute = studentRouteFrom(hash)
   const eventRoute = eventRouteFrom(hash)
+  const eventDate = eventDateFrom(hash)
   const beltsClassId = hash.replace(/^#\/?belts\/?/, '')
   const examRoute = hash.replace(/^#\/?exams\/?/, '')
   const [locale, setLocale] = useState<Locale>('he')
@@ -623,6 +655,9 @@ export default function App() {
   // object every render would re-fetch progress forever.
   const setupClient = useMemo(() => makeSetupClient(apiFetch), [])
   const scheduleClient = useMemo(() => makeScheduleClient(apiFetch), [])
+  // §3.21's class wizard reaches seven verticals' endpoints, so it carries its own
+  // client rather than widening the schedule one with prices, products and staff.
+  const classWizardClient = useMemo(() => makeClassWizardClient(apiFetch), [])
   const homeClient = useMemo(() => makeHomeClient(apiFetch), [])
   const peopleClient = useMemo(() => makeDashboardPeopleClient(apiFetch), [])
   const eventsClient = useMemo(() => makeDashboardEventsClient(apiFetch), [])
@@ -733,12 +768,41 @@ export default function App() {
         <AppShell
           title={session.activeStudioName ?? ''}
           logoUrl={studioLogoUrl}
-          items={canSeeMoney ? NAV : NAV.filter((entry) => !MANAGER_ONLY_KEYS.has(entry.key))}
+          // The SAME `doors()` the sidebar reads, and now nothing else — the overflow
+          // group it used to concatenate is gone. Two hand-maintained structures drifted
+          // once already and left three destinations reachable on a phone and not on a
+          // desktop; one source is what stops that recurring.
+          items={doors(route, hash, locale, canSeeMoney, badges, session.isPlatformAdmin).map(
+            (item) => ({ key: item.key, labelKey: item.labelKey, href: item.href }),
+          )}
           locale={locale}
           // F9 — one search, every screen, keyboard-reachable ('/'). Manager-only, like the
           // route behind it. In the CHROME rather than in the page: as a child of the shell
           // it rendered inside <main> and moved with each screen's layout.
           headerEnd={canSeeMoney ? <GlobalSearch locale={locale} /> : null}
+          // Which of the nine doors is open, named. Derived from the same `doors()` the
+          // sidebar reads -- see `viewChipStyle`. Rendered only when a door claims the
+          // current route: a student card or an event page is reached from a row rather
+          // than from the menu, and naming its parent door there would be a lie about
+          // where the manager is.
+          headerStart={
+            (() => {
+              const current = doors(
+                route,
+                hash,
+                locale,
+                canSeeMoney,
+                badges,
+                session.isPlatformAdmin,
+              ).find((door) => door.active)
+              return current ? (
+                <span data-testid="header-view-chip" style={viewChipStyle}>
+                  {current.icon}
+                  <strong>{current.label}</strong>
+                </span>
+              ) : null
+            })()
+          }
           sideNav={
             <SideNav
               label={t(locale, 'common.nav.menu')}
@@ -752,17 +816,11 @@ export default function App() {
                 badges,
                 session.isPlatformAdmin,
               )}
-              settingsItem={
-                canSeeMoney
-                  ? {
-                      key: 'settings',
-                      label: t(locale, 'common.dash.nav.settings'),
-                      href: '#/settings',
-                      icon: <Icon name="settings" />,
-                      active: route === 'settings',
-                    }
-                  : undefined
-              }
+              // No `settingsItem`. It pinned a second הגדרות to the foot of the sidebar
+              // while `doors()` already returns one as the ninth door, so the word appeared
+              // twice in one menu — the duplication the owner reported on 2026-09-10. The
+              // pinned slot made sense when settings was NOT one of the doors; since the
+              // nav shrank to nine it has been a second link to the same screen.
               appearance={
                 // 3f's light/dark/system switch, in the sidebar rather than only in the
                 // drawer. `ThemeProvider` has always wrapped this app, so a preference set
@@ -840,6 +898,15 @@ export default function App() {
               studioId={session.activeStudioId ?? ''}
               studioName={session.activeStudioName ?? undefined}
               today={today}
+              // D8. Composed here because the sections need the people client and the home
+              // screen deliberately holds none — it owns no data and performs no mutation.
+              // Manager-only: every registered section reads an endpoint a coach's role
+              // cannot open, and a column of empty alert cards is worse than no column.
+              alerts={
+                canSeeMoney ? (
+                  <AlertSections client={peopleClient} emptyState="hide" locale={locale} />
+                ) : undefined
+              }
             />
           ) : null}
           {route === 'schedule' ? (
@@ -848,6 +915,7 @@ export default function App() {
               client={scheduleClient}
               hash={hash}
               today={today}
+              wizardClient={classWizardClient}
               // §3.2 — 'coaches never see money'. The plan badge on a roster row is read
               // from a manager-only route, so the permission travels with the request to
               // draw it rather than the roster deciding for itself.
@@ -857,10 +925,14 @@ export default function App() {
           {route === 'students' && studentRoute === 'new' ? (
             <AddStudentScreen locale={locale} client={peopleClient} />
           ) : null}
-          {route === 'students' && studentRoute && studentRoute !== 'new' ? (
-            <StudentDetailScreen studentId={studentRoute} locale={locale} client={peopleClient} />
-          ) : null}
-          {route === 'students' && !studentRoute ? (
+          {/* The list stays mounted and the card slides in OVER it — the prototype opens a
+              side popup, not a second screen, and that is the design.
+
+              Both halves are kept rather than one: `#/students/<id>` still addresses the
+              card, so a pasted link opens the list with the card already open. The
+              prototype cannot do that — it has no routing at all — and a drawer that
+              cannot be linked to is a drawer a manager cannot send to anyone. */}
+          {route === 'students' && studentRoute !== 'new' ? (
             <>
               {/* §5.4b + §5.4a — the two links a club shares, where people are managed. */}
               {canSeeMoney ? <SharingCards locale={locale} /> : null}
@@ -871,6 +943,17 @@ export default function App() {
                   globalThis.location.hash = `#/students/${id}`
                 }}
               />
+              {studentRoute ? (
+                <StudentDetailScreen
+                  client={peopleClient}
+                  key={studentRoute}
+                  locale={locale}
+                  onClose={() => {
+                    globalThis.location.hash = '#/students'
+                  }}
+                  studentId={studentRoute}
+                />
+              ) : null}
             </>
           ) : null}
           {route === 'alerts' ? <AlertCentre locale={locale} client={peopleClient} /> : null}
@@ -915,6 +998,9 @@ export default function App() {
           {route === 'events' && eventRoute === 'new' ? (
             <EventForm
               client={eventsClient}
+              // D14 — the day of the calendar slot the manager pressed, so the date is not
+              // retyped on a form reached from a specific square of a specific week.
+              defaultDate={eventDate}
               locale={locale}
               onSaved={(id) => {
                 globalThis.location.hash = `#/events/${id}`

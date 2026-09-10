@@ -115,6 +115,10 @@ export const events: Bundle = {
   'nonRespondersReminded': 'נשלחה תזכורת למי שטרם ענו',
   'reminderSent': 'התזכורת נשלחה',
   'roster.empty': 'אף חניך לא שויך לאירוע',
+  // §3.10's named gap: POST /events/{id}/attendance was in the client and no dashboard
+  // screen called it.
+  'roster.markAttended': 'סימון הגעה',
+  'roster.markFailed': 'לא הצלחנו לסמן הגעה. נסו שוב.',
 
   'addToCalendar': 'הוסף ליומן',
   'attendance.take': 'סימון נוכחות באירוע',
@@ -237,6 +241,11 @@ export const events: Bundle = {
   // -- 5b / 5d — the belt system ------------------------------------------------------
   'form.cancel': 'ביטול',
   'belt.delete': 'מחיקת דרגה',
+  // §3.9's named gap: PATCH /belt-ranks/{id} was in the client and no screen called it.
+  'belt.rename': 'שינוי שם',
+  'belt.renameSave': 'שמירה',
+  'belt.renameCancel': 'ביטול',
+  'belt.renameFailed': 'לא הצלחנו לשנות את שם הדרגה. נסו שוב.',
   'belt.edit': 'עריכת דרגה',
   'belt.save': 'שמירת דרגה',
   'belt.preview': 'תצוגה מקדימה',

@@ -29,6 +29,7 @@ import {
 import type { RowAction } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { Modal } from '../../shared/Modal'
 import './staff.css'
 
 type StaffGroup = { id: string; name: string }
@@ -82,6 +83,23 @@ export function StaffScreen({ locale }: { locale: Locale }) {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [roles, setRoles] = useState<string[]>(['lead_coach'])
+  // The groups an invited coach lands on. `POST /staff/invitations` has always accepted
+  // `group_ids` and `invite_staff` puts the coach on those rosters immediately -- the
+  // Person row exists before the invitation is accepted, which is what makes that
+  // possible. This screen simply never sent the key, so every coach invited here started
+  // with no group and read "ללא קבוצה" for ever (owner report, 2026-09-10).
+  const [inviteGroups, setInviteGroups] = useState<string[]>([])
+  const [allGroups, setAllGroups] = useState<StaffGroup[]>([])
+  // The member editor's draft. Name and email became editable on 2026-09-10 — the owner's
+  // "אי אפשר לערוך איש צוות" — once `PATCH /staff/{id}` learned to take more than `roles`.
+  const [draftFirst, setDraftFirst] = useState('')
+  const [draftLast, setDraftLast] = useState('')
+  const [draftEmail, setDraftEmail] = useState('')
+  // Group membership, as a wanted SET. Saving diffs it against what the row already has and
+  // sends one call per difference — there is no bulk endpoint, and inventing one to save
+  // two requests would be a schema decision made by a form.
+  const [draftGroups, setDraftGroups] = useState<string[]>([])
+  const [savingMember, setSavingMember] = useState(false)
   const [inviteFailed, setInviteFailed] = useState(false)
   // The one-time code, shown after create or resend and never reproducible.
   const [issuedToken, setIssuedToken] = useState<{ email: string; token: string } | null>(null)
@@ -111,6 +129,41 @@ export function StaffScreen({ locale }: { locale: Locale }) {
 
   const reload = () => setAttempt((n) => n + 1)
 
+  // Loaded when the form OPENS rather than on mount: most visits to this screen never
+  // invite anyone, and the list is only ever read by the form.
+  //
+  // ABOVE the early returns below, not beside `submitInvite` where it was first written —
+  // a hook after a conditional return changes the hook order between renders, and React
+  // failed every test in this file with "change in the order of Hooks called by
+  // StaffScreen" rather than anything about groups.
+  //
+  // A failed read leaves the picker empty rather than blocking the invite: a coach with no
+  // group is the state being fixed, but it is still better than an invite that cannot be
+  // sent at all.
+  useEffect(() => {
+    // Either form that shows the group picker: the invite form, and the member editor.
+    if (!inviting && editingRoles === null) return
+    let live = true
+    void apiFetch('/api/v1/groups?limit=200')
+      .then((response) =>
+        response.ok ? (response.json() as Promise<{ items: StaffGroup[] }>) : null,
+      )
+      .then((body) => {
+        // Filtered, not trusted. Every row is rendered with `key={group.id}`, and a
+        // response whose items carry no `id` produces a React key warning and a list of
+        // blank labels rather than an error — which is exactly what a test stub answering
+        // every URL with the staff payload did. A malformed response should render nothing
+        // here, not something broken.
+        if (live && body) {
+          setAllGroups(body.items.filter((group) => Boolean(group?.id && group?.name)))
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [inviting, editingRoles])
+
   if (failed) {
     return (
       <section aria-labelledby="staff-title">
@@ -130,6 +183,12 @@ export function StaffScreen({ locale }: { locale: Locale }) {
   if (payload === null)
     return <p data-testid="staff-loading">{t(locale, 'common.setup.loading')}</p>
 
+  // The row the editor is open on. Looked up rather than stored, so it always reflects the
+  // latest reload rather than a copy taken when the dialog opened.
+  const editingMember =
+    editingRoles === null
+      ? null
+      : (payload.items.find((row) => row.person_id === editingRoles) ?? null)
   const uncovered = payload.groups_without_coach
   const totalHours = payload.items.reduce((sum, member) => sum + (member.weekly_hours ?? 0), 0)
   const people = payload.items.filter((member) => member.person_id !== null).length
@@ -156,19 +215,61 @@ export function StaffScreen({ locale }: { locale: Locale }) {
   function openRoleEditor(member: StaffMember) {
     setEditingRoles(member.person_id)
     setDraftRoles(member.roles.filter((role) => role !== 'owner'))
+    setDraftFirst(member.first_name ?? '')
+    setDraftLast(member.last_name ?? '')
+    setDraftEmail(member.email ?? '')
+    setDraftGroups(member.groups.map((group) => group.id))
   }
 
-  function saveRoles(member: StaffMember) {
-    void json(`/api/v1/staff/${member.person_id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roles: draftRoles }),
-    })
-      .then(() => {
-        setEditingRoles(null)
-        reload()
+  /**
+   * One save for the whole row: the person's details and roles in a single PATCH, then one
+   * call per group that was added or removed.
+   *
+   * The group calls come AFTER the PATCH and are awaited, not fired alongside it, so a
+   * failure leaves a state a manager can read: the details saved and the roster did not, in
+   * that order, rather than a half-applied mixture with no order at all.
+   */
+  async function saveRoles(member: StaffMember) {
+    setSavingMember(true)
+    try {
+      await json(`/api/v1/staff/${member.person_id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roles: draftRoles,
+          first_name: draftFirst.trim(),
+          last_name: draftLast.trim(),
+          // An empty box means "no email on file", which the column already renders as
+          // blank — so it is sent as null rather than as the empty string, which would
+          // fail the schema's `min_length=3`.
+          email: draftEmail.trim() || null,
+        }),
       })
-      .catch(() => setRefusal(t(locale, 'common.staff.invite.failed')))
+      const had = member.groups.map((group) => group.id)
+      for (const id of draftGroups.filter((group) => !had.includes(group))) {
+        await json(`/api/v1/groups/${id}/staff`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          // The role the coach holds on that roster. `lead_coach` unless they are only ever
+          // an assistant — a manager is studio-wide and is admitted either way.
+          body: JSON.stringify({
+            person_id: member.person_id,
+            role: draftRoles.includes('assistant_coach') && !draftRoles.includes('lead_coach')
+              ? 'assistant_coach'
+              : 'lead_coach',
+          }),
+        })
+      }
+      for (const id of had.filter((group) => !draftGroups.includes(group))) {
+        await json(`/api/v1/groups/${id}/staff/${member.person_id}`, { method: 'DELETE' })
+      }
+      setEditingRoles(null)
+      reload()
+    } catch {
+      setRefusal(t(locale, 'common.staff.invite.failed'))
+    } finally {
+      setSavingMember(false)
+    }
   }
 
   function resendInvitation(member: StaffMember) {
@@ -217,6 +318,7 @@ export function StaffScreen({ locale }: { locale: Locale }) {
           roles,
           first_name: firstName.trim() || null,
           last_name: lastName.trim() || null,
+          group_ids: inviteGroups,
         }),
       })) as { email: string; token: string }
       setIssuedToken({ email: body.email, token: body.token })
@@ -224,6 +326,7 @@ export function StaffScreen({ locale }: { locale: Locale }) {
       setEmail('')
       setFirstName('')
       setLastName('')
+      setInviteGroups([])
       reload()
     } catch {
       setInviteFailed(true)
@@ -324,6 +427,30 @@ export function StaffScreen({ locale }: { locale: Locale }) {
               />
             ))}
           </fieldset>
+          {/* Optional, and says so: a manager may not know the roster yet, and the server
+              treats an empty list as "no groups" exactly as it did before this control
+              existed. Hidden entirely when the club has no groups, rather than shown as an
+              empty box that reads like a failure. */}
+          {allGroups.length > 0 ? (
+            <fieldset data-testid="invite-groups">
+              <legend>{t(locale, 'common.staff.invite.groups')}</legend>
+              <p>{t(locale, 'common.staff.invite.groupsHint')}</p>
+              {allGroups.map((group) => (
+                <Checkbox
+                  checked={inviteGroups.includes(group.id)}
+                  key={group.id}
+                  label={group.name}
+                  onChange={() =>
+                    setInviteGroups((current) =>
+                      current.includes(group.id)
+                        ? current.filter((id) => id !== group.id)
+                        : [...current, group.id],
+                    )
+                  }
+                />
+              ))}
+            </fieldset>
+          ) : null}
           {inviteFailed ? (
             <p data-testid="invite-failed">{t(locale, 'common.staff.invite.failed')}</p>
           ) : null}
@@ -432,51 +559,6 @@ export function StaffScreen({ locale }: { locale: Locale }) {
                   return <RowActions actions={actions} triggerLabel={triggerLabel} />
                 }
 
-                // `member.person_id !== null` guards against `editingRoles`'s closed-state
-                // value (`null`) coincidentally matching a row that has no person yet —
-                // this branch is for staffed members, who always carry a real id.
-                if (member.person_id !== null && editingRoles === member.person_id) {
-                  return (
-                    <div
-                      className="staff-role-editor"
-                      data-testid={`role-editor-${member.person_id}`}
-                    >
-                      <fieldset className="staff-role-editor__roles">
-                        <legend>{t(locale, 'common.staff.invite.roles')}</legend>
-                        {GRANTABLE.map((role) => (
-                          <Checkbox
-                            checked={draftRoles.includes(role)}
-                            key={role}
-                            label={t(locale, `common.staff.role.${role}`)}
-                            onChange={() => setDraftRoles((current) => toggleRole(current, role))}
-                          />
-                        ))}
-                      </fieldset>
-                      {/* B4.2 — the ten hand-styled pills a table cell used to carry now
-                        live here, where permissions are edited anyway. */}
-                      <div className="staff-role-editor__permissions">
-                        <p className="staff-role-editor__permissions-label">
-                          {t(locale, 'common.staff.col.permissions')}
-                        </p>
-                        <ul className="staff-permission-list">
-                          {member.permissions.map((permission) => (
-                            <li className="staff-permission-list__item" key={permission}>
-                              {t(locale, `common.staff.perm.${permission}`)}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      <Button
-                        data-testid={`save-roles-${member.person_id}`}
-                        disabled={draftRoles.length === 0}
-                        onClick={() => saveRoles(member)}
-                      >
-                        {t(locale, 'common.staff.actions.saveRoles')}
-                      </Button>
-                    </div>
-                  )
-                }
-
                 // 2026-08-28: the owner row now carries the ROLE editor too — the owner
                 // granting themselves lead_coach is how "the manager coaches the groups
                 // I pick" starts. Ownership itself stays immovable: the server re-adds it
@@ -484,7 +566,7 @@ export function StaffScreen({ locale }: { locale: Locale }) {
                 const actions: RowAction[] = [
                   {
                     id: 'editRoles',
-                    label: t(locale, 'common.staff.actions.editRoles'),
+                    label: t(locale, 'common.staff.actions.editMember'),
                     onSelect: () => openRoleEditor(member),
                   },
                 ]
@@ -509,6 +591,98 @@ export function StaffScreen({ locale }: { locale: Locale }) {
           rows={payload.items}
         />
       </div>
+
+      {/* The member editor, as a dialog.
+          It used to render INSIDE the actions cell — a `10rem` column — which was survivable
+          while it held three checkboxes and is not now that it holds a name, an email, the
+          roles and the group roster. It is also the answer to the owner's "אי אפשר לערוך
+          איש צוות": before 2026-09-10 the only editable thing about a staff member was
+          which roles they held. */}
+      {editingMember ? (
+        <Modal
+          locale={locale}
+          onClose={() => setEditingRoles(null)}
+          testId="member-editor"
+          title={displayName(editingMember, locale)}
+          width="32rem"
+        >
+          <TextField
+            label={t(locale, 'common.staff.invite.firstName')}
+            onChange={(event) => setDraftFirst(event.target.value)}
+            value={draftFirst}
+          />
+          <TextField
+            label={t(locale, 'common.staff.invite.lastName')}
+            onChange={(event) => setDraftLast(event.target.value)}
+            value={draftLast}
+          />
+          <TextField
+            label={t(locale, 'common.staff.invite.email')}
+            onChange={(event) => setDraftEmail(event.target.value)}
+            value={draftEmail}
+          />
+
+          <fieldset className="staff-role-editor__roles">
+            <legend>{t(locale, 'common.staff.invite.roles')}</legend>
+            {GRANTABLE.map((role) => (
+              <Checkbox
+                checked={draftRoles.includes(role)}
+                key={role}
+                label={t(locale, `common.staff.role.${role}`)}
+                onChange={() => setDraftRoles((current) => toggleRole(current, role))}
+              />
+            ))}
+          </fieldset>
+
+          {/* The other half of "ללא קבוצה". The invite form can now put a coach on a
+              roster; this is where one is moved or taken off afterwards, which needed
+              `DELETE /groups/{id}/staff/{person_id}` — an endpoint that did not exist until
+              this change, though classes have had their equivalent for months. */}
+          {allGroups.length > 0 ? (
+            <fieldset data-testid="member-groups">
+              <legend>{t(locale, 'common.staff.invite.groups')}</legend>
+              {allGroups.map((group) => (
+                <Checkbox
+                  checked={draftGroups.includes(group.id)}
+                  key={group.id}
+                  label={group.name}
+                  onChange={() =>
+                    setDraftGroups((current) =>
+                      current.includes(group.id)
+                        ? current.filter((id) => id !== group.id)
+                        : [...current, group.id],
+                    )
+                  }
+                />
+              ))}
+            </fieldset>
+          ) : null}
+
+          {/* B4.2 — the ten hand-styled pills a table cell used to carry live here, where
+              permissions are read while they are being changed. Read-only: they are derived
+              from the roles above and are never stored. */}
+          <div className="staff-role-editor__permissions">
+            <p className="staff-role-editor__permissions-label">
+              {t(locale, 'common.staff.col.permissions')}
+            </p>
+            <ul className="staff-permission-list">
+              {editingMember.permissions.map((permission) => (
+                <li className="staff-permission-list__item" key={permission}>
+                  {t(locale, `common.staff.perm.${permission}`)}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <Button
+            data-testid={`save-roles-${editingMember.person_id}`}
+            disabled={draftRoles.length === 0 || savingMember}
+            onClick={() => void saveRoles(editingMember)}
+          >
+            {t(locale, 'common.staff.actions.saveMember')}
+          </Button>
+        </Modal>
+      ) : null}
     </section>
   )
 }

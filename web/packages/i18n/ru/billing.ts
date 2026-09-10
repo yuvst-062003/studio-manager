@@ -189,6 +189,7 @@ export const billing: Bundle = {
   'payment.method.cheque': 'Чек',
   'payment.method.bank_transfer': 'Банковский перевод',
   'payment.saved': 'Платёж записан',
+  'payment.failed': 'Не удалось записать платёж. Введённое сохранено — попробуйте ещё раз.',
   'payment.allocatedOldestFirst': 'Зачтено в самые старые начисления',
   'payment.unallocated': 'Нераспределённый остаток',
 
@@ -213,6 +214,12 @@ export const billing: Bundle = {
   'debt.empty': 'По клубу задолженности нет',
   'debt.total': 'Всего задолженности',
   'debt.aging.title': 'Возраст долга',
+  // Checkpoint 9 — the prototype's filter pills, and the WhatsApp nudge beside the push one.
+  'debt.filterAging': 'Фильтр по сроку долга',
+  'debt.filterAll': 'Все',
+  'debt.whatsapp': 'WhatsApp',
+  'debt.whatsappTitle': 'Напоминание об оплате — клуб дзюдо',
+  'debt.whatsappBody': 'Здравствуйте, {{name}}! Будем рады погашению остатка {{amount}} ₪. Спасибо!',
   'debt.aging.0_30': '0–30 дней',
   'debt.aging.31_60': '31–60 дней',
   'debt.aging.60_plus': 'Более 60 дней',
@@ -312,6 +319,9 @@ export const billing: Bundle = {
   'plan.activeTo': 'Действует до',
   'plan.appliesTo': 'Применяется к',
   'plan.empty': 'Тарифы не заданы',
+  // §3.20's named gap: both write paths on this screen had no catch at all.
+  'plan.createFailed': 'Не удалось создать тариф. Введённое сохранено — попробуйте ещё раз.',
+  'plan.closeFailed': 'Не удалось закрыть тариф. Старая цена всё ещё действует — попробуйте ещё раз.',
   'plan.versionedHint': 'Изменение цены закрывает текущий тариф и открывает новый. Прошлые начисления сохраняются',
   'plan.closeCurrent': 'Закрыть текущий тариф',
 
@@ -341,6 +351,10 @@ export const billing: Bundle = {
   'filter.all': 'Все',
   'debt.balance': 'Баланс',
   'debt.monthsInDebt': 'Месяцев долга',
+  // The same fact as a sentence rather than a column header — the debt card labels its own
+  // figures, where the table it replaced labelled a column once at the top.
+  'debt.monthsInDebtCount': 'Месяцев долга: {{count}}',
+  'debt.totalFiltered': 'Итого в фильтре',
   'debt.sortBy': 'Сортировка',
   'debt.collectedThisMonth': 'Собрано в этом месяце',
   'debt.collectedShare': 'от ожидаемого',

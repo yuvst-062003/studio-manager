@@ -1106,3 +1106,197 @@ describe('the household detail drill (2026-08-30)', () => {
     ).toBeInTheDocument()
   })
 })
+
+// Checkpoint 9 — what the collections screen takes from the prototype.
+describe('the aging filter pills', () => {
+  const SPREAD = [
+    household({ payerPersonId: 'fresh', daysOverdue: 5 }),
+    household({ payerPersonId: 'mid', daysOverdue: 45 }),
+    household({ payerPersonId: 'old', daysOverdue: 90 }),
+    household({ payerPersonId: 'older', daysOverdue: 200 }),
+  ]
+
+  it('carries a live count on every pill, which is what makes them worth having', () => {
+    // A manager who cannot see that 60+ holds two households has no reason to press it.
+    renderCollections({ households: SPREAD })
+    const pills = within(screen.getByTestId('aging-pills'))
+    expect(pills.getByTestId('aging-pill-all')).toHaveTextContent('4')
+    expect(pills.getByTestId('aging-pill-0_30')).toHaveTextContent('1')
+    expect(pills.getByTestId('aging-pill-31_60')).toHaveTextContent('1')
+    expect(pills.getByTestId('aging-pill-60_plus')).toHaveTextContent('2')
+  })
+
+  it('counts off the households ON SCREEN, so a pill never filters to nothing', () => {
+    renderCollections({ households: [household({ daysOverdue: 5 })] })
+    const pills = within(screen.getByTestId('aging-pills'))
+    expect(pills.getByTestId('aging-pill-60_plus')).toHaveTextContent('0')
+  })
+
+  it('filters the list for real, and says which pill is chosen through aria-pressed', async () => {
+    renderCollections({ households: SPREAD })
+    expect(screen.getAllByTestId('household-block')).toHaveLength(4)
+
+    await userEvent.click(screen.getByTestId('aging-pill-60_plus'))
+    expect(screen.getByTestId('aging-pill-60_plus')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('aging-pill-all')).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getAllByTestId('household-block')).toHaveLength(2)
+  })
+
+  it('shows no pills at all when there is no debt to filter', () => {
+    // The empty state is the goal state for a well-run club; a row of zeroes over it would
+    // be four controls that do nothing.
+    renderCollections({ households: [] })
+    expect(screen.queryByTestId('aging-pills')).not.toBeInTheDocument()
+  })
+})
+
+describe('the WhatsApp nudge', () => {
+  it('opens the conversation composed, and sends nothing on the manager’s behalf', () => {
+    // The button beside it goes through `POST /reminders/debt`, which is PUSH — and push is
+    // exactly what a family that has not opened the app in a month does not receive.
+    renderCollections()
+    const link = screen.getByTestId('whatsapp-payer-1')
+    expect(link).toHaveAttribute('target', '_blank')
+    const href = link.getAttribute('href') ?? ''
+    expect(href).toMatch(/^https:\/\/wa\.me\/\?text=/)
+    // The family's name and the amount they owe, in the message.
+    expect(decodeURIComponent(href)).toContain('משפחת כהן')
+    expect(decodeURIComponent(href)).toContain('640')
+  })
+
+  it('carries no phone number — the link opens a chooser, not a number', () => {
+    // `wa.me/?text=` and not `wa.me/<number>`: nothing about who to send to leaves this
+    // screen, and the manager picks the conversation in WhatsApp.
+    renderCollections()
+    const href = screen.getByTestId('whatsapp-payer-1').getAttribute('href') ?? ''
+    expect(href).not.toMatch(/wa\.me\/\d/)
+  })
+
+  it('names the family by its students when the payer read came back short', () => {
+    renderCollections({
+      households: [household({ payerName: '', studentNames: ['דנה', 'יוסי'] })],
+    })
+    const href = screen.getByTestId('whatsapp-payer-1').getAttribute('href') ?? ''
+    expect(decodeURIComponent(href)).toContain('דנה')
+  })
+})
+
+describe('the money band', () => {
+  it('is four tiles in the manager home’s own shape, not four bare cards', () => {
+    // The home's band and this one show the same club's money. Two tile designs for one
+    // fact is how a manager starts wondering whether they mean different things.
+    renderCollections()
+    for (const id of ['kpi-debt', 'kpi-collected', 'kpi-subscriptions', 'kpi-failed']) {
+      expect(screen.getByTestId(id)).toHaveClass('dash-kpi')
+    }
+  })
+
+  it('tones the two money tiles semantically, and leaves the count uncoloured', () => {
+    // `3e`'s token table gives the subscription count `--border` rather than a semantic
+    // tone: it is informational, and a tone would claim a meaning it has not got.
+    renderCollections()
+    expect(screen.getByTestId('kpi-debt')).toHaveAttribute('data-tone', 'debt')
+    expect(screen.getByTestId('kpi-collected')).toHaveAttribute('data-tone', 'paid')
+    expect(screen.getByTestId('kpi-subscriptions')).not.toHaveAttribute('data-tone')
+  })
+
+  it('tones the failed-charge tile only when there ARE failed charges', () => {
+    renderCollections({ failedCharges: 0 })
+    expect(screen.getByTestId('kpi-failed')).not.toHaveAttribute('data-tone')
+  })
+})
+
+// Checkpoint 10 — §3.20's named gap, three times: "no error handling at all — no `.catch`,
+// so a failed create rejects unhandled and the form simply appears to do nothing."
+describe('a failed write on the prices screen says so', () => {
+  const PLAN = {
+    id: 'p1',
+    name: 'פעמיים בשבוע',
+    sessions_per_week: 2,
+    monthly_amount_agorot: 32_000,
+    registration_fee_agorot: 0,
+    active_from: '2026-09-01',
+    active_to: null,
+    class_id: 'c1',
+    standing_order_link_url: null,
+  }
+
+  function renderPlans(client: DashboardBillingClient) {
+    render(
+      <PricePlansScreen
+        classes={[{ id: 'c1', name: "ג'ודו" }]}
+        client={client}
+        locale={LOCALE}
+        onChanged={() => undefined}
+        plans={[PLAN]}
+      />,
+    )
+  }
+
+  it('reports a failed create and KEEPS what the manager typed', async () => {
+    const client = stub({
+      createPricePlan: vi.fn(async () => {
+        throw new Error('500')
+      }),
+    })
+    renderPlans(client)
+    // By id, not by label: `מחיר חודשי` is also the plan row's own wording above, and an
+    // unscoped label query would not know which one it meant.
+    await userEvent.type(screen.getByTestId('plan-monthly'), '320')
+    await userEvent.selectOptions(screen.getByTestId('plan-class'), 'c1')
+    await userEvent.click(screen.getByTestId('wizard-plan-freq-2'))
+    await userEvent.click(screen.getByTestId('plan-save'))
+
+    expect(await screen.findByTestId('plan-write-failed')).toHaveTextContent(
+      t(LOCALE, 'billing.plan.createFailed'),
+    )
+    // A retry must not mean retyping an amount the manager already typed once.
+    expect(screen.getByTestId('plan-monthly')).toHaveValue('320')
+  })
+
+  it('reports a failed close and says the OLD price is still in force', async () => {
+    // The more dangerous of the two: §5.10 versions a plan so a price change never rewrites
+    // history, and closing one IS how a price change is done. Silence here reads as "the new
+    // price is live" while every charge keeps being raised at the old one.
+    const client = stub({
+      closePricePlan: vi.fn(async () => {
+        throw new Error('500')
+      }),
+    })
+    renderPlans(client)
+    await userEvent.click(screen.getAllByTestId('plan-row')[0]!)
+    await userEvent.click(screen.getByTestId('plan-close'))
+
+    expect(await screen.findByTestId('plan-write-failed')).toHaveTextContent(
+      t(LOCALE, 'billing.plan.closeFailed'),
+    )
+    // And the card stays open, so the manager is not left wondering what happened.
+    expect(screen.getByTestId('plan-close')).toBeInTheDocument()
+  })
+})
+
+describe('a failed payment says so', () => {
+  it('reports it, and keeps the amount and date', async () => {
+    // A manager who has just taken 320 shekels in cash and sees nothing happen has no way
+    // to tell whether the payment was recorded.
+    renderCollections({
+      client: stub({
+        recordPayment: vi.fn(async () => {
+          throw new Error('500')
+        }),
+      }),
+    })
+    await userEvent.click(screen.getAllByTestId('record-cash')[0]!)
+    await userEvent.type(screen.getByLabelText(t(LOCALE, 'billing.payment.amount')), '320')
+    await userEvent.type(screen.getByLabelText(t(LOCALE, 'billing.payment.date')), '2026-11-12')
+    await userEvent.click(screen.getByTestId('record-payment-submit'))
+
+    expect(await screen.findByTestId('record-payment-failed')).toHaveTextContent(
+      t(LOCALE, 'billing.payment.failed'),
+    )
+    expect(screen.getByLabelText(t(LOCALE, 'billing.payment.amount'))).toHaveValue('320')
+    // No success panel beside the failure — the two must never both be on screen saying
+    // opposite things.
+    expect(screen.queryByTestId('record-payment-result')).not.toBeInTheDocument()
+  })
+})

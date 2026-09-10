@@ -100,6 +100,13 @@ class ReportService:
                     else:
                         target["pending_agorot"] += charge.amount_agorot
 
+        # `set(buckets) - {None}` is `set[UUID | None]` as far as mypy is concerned:
+        # subtracting a set does not narrow the element type, so the None it removes at
+        # runtime is still in the type it hands to `_class_names(set[UUID])`. A comprehension
+        # with an explicit guard narrows, which is what the annotation needed.
+        #
+        # Two sessions fixed this line independently and wrote the same expression, which is
+        # why the merge conflict here was a comment and not a behaviour.
         names = self._class_names({cid for cid in buckets if cid is not None})
 
         def _out(class_id: uuid.UUID | None, bucket: dict[str, Any]) -> dict[str, Any]:

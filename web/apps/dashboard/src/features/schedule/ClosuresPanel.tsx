@@ -12,55 +12,12 @@
 // server sends (D-M2-4). `name` is the fallback and the text written into
 // `studio_closure.reason`; the label a manager reads is translated like everything else.
 import { useCallback, useEffect, useState } from 'react'
-import type { CSSProperties } from 'react'
-import { Button, Card, Checkbox, EmptyState } from '@studio/ui'
+import { Button, Checkbox, EmptyState, LoadFailed, PageHeader, StatusChip } from '@studio/ui'
 import { formatDateInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { fill } from './client'
 import type { Closure, HolidayPreset, ScheduleClient } from './client'
-
-const panelStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--space-5)',
-  inlineSize: '100%',
-}
-
-const rowStyle: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 'var(--space-3)',
-  alignItems: 'center',
-  paddingBlock: 'var(--space-2)',
-  borderBlockEnd: 'var(--border-width-hairline) solid var(--border)',
-}
-
-const formStyle: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 'var(--space-3)',
-  alignItems: 'end',
-}
-
-const fieldStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--space-1)',
-  fontSize: 'var(--text-label)',
-}
-
-const fieldsetStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--space-2)',
-  border: 'var(--border-width-hairline) solid var(--border)',
-  borderRadius: 'var(--radius-md)',
-  padding: 'var(--space-4)',
-}
-
-const noteStyle: CSSProperties = { color: 'var(--text-secondary)', fontSize: 'var(--text-caption)' }
-const errorStyle: CSSProperties = { color: 'var(--danger)' }
 
 /** A bare calendar date rendered at Jerusalem noon, so it never slips a day. */
 const asLabel = (day: string, locale: Locale): string =>
@@ -80,6 +37,8 @@ export function ClosuresPanel({
 }) {
   const [closures, setClosures] = useState<Closure[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
   const [presets, setPresets] = useState<HolidayPreset[] | null>(null)
   const [ticked, setTicked] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
@@ -91,19 +50,30 @@ export function ClosuresPanel({
   useEffect(() => {
     let live = true
     void (async () => {
-      const loadedClosures = await client.listClosures(trainingYearId)
-      if (!live) return
-      setClosures(loadedClosures)
-      setLoaded(true)
+      try {
+        const loadedClosures = await client.listClosures(trainingYearId)
+        if (!live) return
+        setClosures(loadedClosures)
+        setLoaded(true)
+      } catch {
+        // Without this the screen stayed at `loaded === false` for ever: no list, no empty
+        // state, no error — the same blank panel a studio with no closures gets.
+        if (live) setLoadFailed(true)
+      }
     })()
     return () => {
       live = false
     }
-  }, [client, trainingYearId])
+  }, [attempt, client, trainingYearId])
 
   const showPresets = useCallback(async () => {
-    setPresets(await client.listHolidayPresets(year))
-  }, [client, year])
+    setError(null)
+    try {
+      setPresets(await client.listHolidayPresets(year))
+    } catch {
+      setError(t(locale, 'common.loadFailed.body'))
+    }
+  }, [client, locale, year])
 
   const refresh = useCallback(async () => {
     setClosures(await client.listClosures(trainingYearId))
@@ -117,17 +87,27 @@ export function ClosuresPanel({
     }
     setError(null)
     let cancelled = 0
-    for (const preset of chosen) {
-      const result = await client.createClosure({
-        training_year_id: trainingYearId,
-        date_from: preset.date_from,
-        date_to: preset.date_to,
-        // The label the manager saw, so the stored reason matches the screen they ticked
-        // it on rather than the server's fallback.
-        reason: t(locale, `schedule.closure.preset.${preset.key}`),
-        source: 'holiday_preset',
-      })
-      cancelled += result.sessions_cancelled
+    try {
+      for (const preset of chosen) {
+        const result = await client.createClosure({
+          training_year_id: trainingYearId,
+          date_from: preset.date_from,
+          date_to: preset.date_to,
+          // The label the manager saw, so the stored reason matches the screen they ticked
+          // it on rather than the server's fallback.
+          reason: t(locale, `schedule.closure.preset.${preset.key}`),
+          source: 'holiday_preset',
+        })
+        cancelled += result.sessions_cancelled
+      }
+    } catch {
+      // §3.4's named defect. A failed POST used to reject unhandled: the ticks stayed, no
+      // outcome line appeared, and the list refreshed to the same contents — indis-
+      // tinguishable from a closure that saved. The ticks are LEFT ticked deliberately, so
+      // pressing again retries the same choice rather than asking the manager to rebuild it.
+      setOutcome(null)
+      setError(t(locale, 'schedule.closure.saveFailed'))
+      return
     }
     setTicked(new Set())
     setOutcome(fill(t(locale, 'schedule.closure.cancelled'), { count: cancelled }))
@@ -146,13 +126,22 @@ export function ClosuresPanel({
       return
     }
     setError(null)
-    const result = await client.createClosure({
-      training_year_id: trainingYearId,
-      date_from: from,
-      date_to: to,
-      reason,
-      source: 'manual',
-    })
+    let result
+    try {
+      result = await client.createClosure({
+        training_year_id: trainingYearId,
+        date_from: from,
+        date_to: to,
+        reason,
+        source: 'manual',
+      })
+    } catch {
+      // The three fields are NOT cleared on failure — clearing them would make a retry
+      // mean retyping a date range the manager already typed once.
+      setOutcome(null)
+      setError(t(locale, 'schedule.closure.saveFailed'))
+      return
+    }
     setOutcome(fill(t(locale, 'schedule.closure.cancelled'), { count: result.sessions_cancelled }))
     setFrom('')
     setTo('')
@@ -160,37 +149,73 @@ export function ClosuresPanel({
     await refresh()
   }, [client, from, locale, reason, refresh, to, trainingYearId])
 
+  const header = (
+    <PageHeader
+      subtitle={t(locale, 'schedule.closure.subtitle')}
+      title={t(locale, 'schedule.closure.title')}
+      titleId="closures-title"
+    />
+  )
+
+  // A failed list is its own screen, not a blank one. Retry re-runs the effect.
+  if (loadFailed) {
+    return (
+      <section aria-labelledby="closures-title" className="closures">
+        {header}
+        <LoadFailed
+          locale={locale}
+          onRetry={() => {
+            setLoadFailed(false)
+            setAttempt((n) => n + 1)
+          }}
+        />
+      </section>
+    )
+  }
+
   return (
-    <section aria-labelledby="closures-title" style={panelStyle}>
-      <h2 id="closures-title">{t(locale, 'schedule.closure.title')}</h2>
+    <section aria-labelledby="closures-title" className="closures">
+      {header}
 
       {loaded && closures.length === 0 ? (
         <EmptyState title={t(locale, 'schedule.closure.empty')} />
       ) : (
-        <Card>
+        <ul aria-label={t(locale, 'schedule.closure.title')} className="closures__list">
           {closures.map((closure) => (
-            <div key={closure.id} data-testid="closure-row" style={rowStyle}>
-              <span>
+            <li className="closure-row" data-testid="closure-row" key={closure.id}>
+              <span className="closure-row__when" dir="ltr">
                 {asLabel(closure.date_from, locale)}
-                {closure.date_to !== closure.date_from ? ` – ${asLabel(closure.date_to, locale)}` : ''}
+                {closure.date_to !== closure.date_from
+                  ? ` – ${asLabel(closure.date_to, locale)}`
+                  : ''}
               </span>
-              <span>{closure.reason}</span>
-              <span style={noteStyle}>
-                {closure.source === 'manual'
-                  ? t(locale, 'schedule.closure.source.manual')
-                  : t(locale, 'schedule.closure.source.holidayPreset')}
-              </span>
-            </div>
+              <span className="closure-row__reason">{closure.reason}</span>
+              {/* Manual or holiday preset, as a chip rather than a grey word. Both are
+                  `planned` — the source is a fact about who typed it, not a state, and
+                  giving one of them a warning tone would read as "this one is a problem". */}
+              <StatusChip
+                label={
+                  closure.source === 'manual'
+                    ? t(locale, 'schedule.closure.source.manual')
+                    : t(locale, 'schedule.closure.source.holidayPreset')
+                }
+                status="planned"
+              />
+            </li>
           ))}
-        </Card>
+        </ul>
       )}
 
       {error ? (
-        <p role="alert" style={errorStyle}>
+        <p className="closures__error" role="alert">
           {error}
         </p>
       ) : null}
-      {outcome ? <p role="status">{outcome}</p> : null}
+      {outcome ? (
+        <p className="closures__outcome" role="status">
+          {outcome}
+        </p>
+      ) : null}
 
       {/* §5.6 — an OFFER. The button reveals proposals; it closes nothing. */}
       <Button variant="secondary" data-testid="holiday-presets" onClick={() => void showPresets()}>
@@ -198,37 +223,39 @@ export function ClosuresPanel({
       </Button>
 
       {presets ? (
-        <fieldset style={fieldsetStyle}>
+        <fieldset className="closures__presets">
           <legend>{t(locale, 'schedule.closure.preset.subtitle')}</legend>
-          {presets.map((preset) => (
-            <Checkbox
-              key={preset.key}
-              data-testid="preset-day"
-              // Unticked on arrival, and there is a test for it: a preset that arrived
-              // ticked would be a closure applied on the manager's behalf.
-              checked={ticked.has(preset.key)}
-              label={`${t(locale, `schedule.closure.preset.${preset.key}`)} · ${asLabel(
-                preset.date_from,
-                locale,
-              )}`}
-              onChange={(event) =>
-                setTicked((current) => {
-                  const next = new Set(current)
-                  if (event.target.checked) next.add(preset.key)
-                  else next.delete(preset.key)
-                  return next
-                })
-              }
-            />
-          ))}
+          <div className="closures__preset-grid">
+            {presets.map((preset) => (
+              <Checkbox
+                key={preset.key}
+                data-testid="preset-day"
+                // Unticked on arrival, and there is a test for it: a preset that arrived
+                // ticked would be a closure applied on the manager's behalf.
+                checked={ticked.has(preset.key)}
+                label={`${t(locale, `schedule.closure.preset.${preset.key}`)} · ${asLabel(
+                  preset.date_from,
+                  locale,
+                )}`}
+                onChange={(event) =>
+                  setTicked((current) => {
+                    const next = new Set(current)
+                    if (event.target.checked) next.add(preset.key)
+                    else next.delete(preset.key)
+                    return next
+                  })
+                }
+              />
+            ))}
+          </div>
           <Button data-testid="apply-presets" onClick={() => void applyPresets()}>
             {t(locale, 'schedule.closure.preset.apply')}
           </Button>
         </fieldset>
       ) : null}
 
-      <div style={formStyle}>
-        <label style={fieldStyle}>
+      <div className="closures__form">
+        <label className="closures__field">
           {t(locale, 'schedule.closure.dateFrom')}
           <input
             type="date"
@@ -237,7 +264,7 @@ export function ClosuresPanel({
             onChange={(event) => setFrom(event.target.value)}
           />
         </label>
-        <label style={fieldStyle}>
+        <label className="closures__field">
           {t(locale, 'schedule.closure.dateTo')}
           <input
             type="date"
@@ -246,7 +273,7 @@ export function ClosuresPanel({
             onChange={(event) => setTo(event.target.value)}
           />
         </label>
-        <label style={fieldStyle}>
+        <label className="closures__field closures__field--wide">
           {t(locale, 'schedule.closure.reason')}
           <input
             type="text"

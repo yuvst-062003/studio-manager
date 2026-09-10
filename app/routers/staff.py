@@ -110,7 +110,14 @@ def change_staff_roles(
 ) -> None:
     try:
         staff_service.change_roles(
-            session, person_id, roles=body.roles, actor_person_id=_person_id(request), at=now()
+            session,
+            person_id,
+            roles=body.roles,
+            first_name=body.first_name,
+            last_name=body.last_name,
+            email=body.email,
+            actor_person_id=_person_id(request),
+            at=now(),
         )
     except staff_service.StaffError as exc:
         raise _staff_error(exc) from exc

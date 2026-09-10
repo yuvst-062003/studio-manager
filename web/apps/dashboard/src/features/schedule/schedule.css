@@ -269,6 +269,18 @@
   color: var(--text-muted);
 }
 
+/* D14's question, before either form. Stacked rather than side by side: the two labels are
+ * different lengths in all three locales, and a row would size one button to the other. */
+.week-slot-popover__choices {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.week-slot-popover__choices > p {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-label);
+}
+
 /* `3a`'s filter bar. A fieldset, so it has no border of its own to reset away. */
 .week-filter {
   display: flex;
@@ -405,46 +417,895 @@
  * however many there are; `3a`'s week/month board above is a different component in
  * the same file. */
 
-/* B3.1 — the identity column's name link. A bare `<a>` already carries the app's accent
- * colour (`primitives.css:935`) and the UA default underline, which is what made a
- * SECOND link-button beside it redundant. This still gives it the app's own
- * underline-on-hover affordance (the same shape as `msignin__legal a`) rather than
- * leaving the browser default always-on: an always-underlined name reads noisier next
- * to a table full of plain text than a name that underlines when the pointer or focus
- * says "this one, specifically". */
-.groups-table__name {
-  text-decoration: none;
-}
-
-.groups-table__name:hover,
-.groups-table__name:focus-visible {
-  text-decoration: underline;
-}
-
-/* B3.5 — the `ללא יום` column: its header AND its count both end-align, so a
- * right-aligned number sits under a right-aligned label instead of floating away from
- * it. `.groups-table__align-end` is the shared shape (`text-align: end` — never
- * `right`, so it flips with `dir` — and `inline-size: 100%` so a `text-align` on an
- * inline `<span>`/`<th>` child has a box to align inside); `.groups-table__unscheduled`
- * adds the tabular-numeral formatting the count alone needs. The cell's own default
- * `text-align: start` and the header's are both `primitives.css`'s and stay out of
- * this file's set — these classes align a wrapper INSIDE the cell/header, not the
- * `<td>`/`<th>` itself. */
-.groups-table__align-end {
-  display: block;
-  inline-size: 100%;
-  text-align: end;
-}
-
-.groups-table__unscheduled {
-  font-variant-numeric: tabular-nums;
-}
-
 /* B3.3/B3.6 — the stated gap's line inside the header's two-line subtitle. Caption
- * weight and the muted token, so it reads as a footnote about a column that is not
+ * weight and the muted token, so it reads as a footnote about a fact that is not
  * there yet rather than as a second sentence describing the screen. */
 .groups-table__subtitle-note {
   display: inline-block;
   font-size: var(--text-caption);
   color: var(--text-muted);
+}
+
+/* ═══ The groups card grid ════════════════════════════════════════════════════════
+ * Checkpoint 6. The prototype's `ProgramsView` grid, minus the occupancy bar D2 cut.
+ *
+ * `auto-fill` rather than `auto-fit`: a club with two groups should get two cards at
+ * their natural width, not two cards stretched across a 1440px board. */
+.groups-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  gap: var(--space-4);
+}
+
+.group-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+}
+
+.group-card:hover {
+  border-color: var(--border-strong);
+}
+
+.group-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+/* The tinted mark the prototype puts on every card head. Structural, not semantic —
+ * every group card carries the same one, so it takes the emphasis tint rather than a
+ * state colour. */
+.group-card__badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  inline-size: 2.25rem;
+  block-size: 2.25rem;
+  border-radius: var(--radius-md);
+  background: var(--emphasis-tint);
+
+  /* The hairline the prototype puts round every card mark. Without it the tint floats. */
+  border: var(--border-width-hairline) solid var(--emphasis);
+  color: var(--emphasis);
+}
+
+.group-card__titles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+  flex: 1;
+}
+
+.group-card__eyebrow {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--emphasis);
+  letter-spacing: 0.04em;
+}
+
+/* B3.1 — the name link IS the door to the schedule editor. A bare `<a>` already carries
+ * the app's accent colour and the UA underline; this gives it the app's own
+ * underline-on-hover affordance instead, because an always-underlined name reads noisier
+ * on a card than one that underlines when the pointer or focus says "this one". */
+.group-card__name {
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  color: var(--fg);
+  text-decoration: none;
+}
+
+a.group-card__name:hover,
+a.group-card__name:focus-visible {
+  text-decoration: underline;
+}
+
+/* The tinted well the prototype groups its facts into — one recessed block, so the four
+ * label/value pairs read as one object rather than four loose lines. */
+.group-card__well {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  font-size: var(--text-caption);
+}
+
+.group-card__fact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/* The label carries the icon, so the two never separate — and the icon rides on the
+ * label's own colour, which is what makes a `data-tone` change both at once. */
+.group-card__fact > dt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.group-card__fact-icon {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--emphasis);
+}
+
+.group-card__fact > dd {
+  margin: 0;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+/* The unscheduled count above zero. The label sits beside it in every state, so the
+ * colour is the second signal and never the only one. */
+
+/* Above zero the whole row turns — icon, label and count — so the state is carried by the
+ * mark and the wording as well as the colour. */
+.group-card__fact[data-tone='danger'] > dd {
+  color: var(--danger);
+  font-weight: var(--weight-semibold);
+}
+
+.group-card__fact[data-tone='danger'] .group-card__fact-icon {
+  color: var(--danger);
+}
+
+/* Present only while a rename is open — see the component. */
+.group-card__foot {
+  display: flex;
+  align-items: end;
+  gap: var(--space-2);
+  padding-block-start: var(--space-3);
+  border-block-start: var(--border-width-hairline) solid var(--border);
+  margin-block-start: auto;
+}
+
+/* ═══ The session card ════════════════════════════════════════════════════════════
+ * Ported from the prototype's week grid: a title with its start time badged beside it, a
+ * coach·room meta line, then a rule and a foot stating where the session sits against the
+ * clock. `data-when` is the third axis — `data-coverage` says whether anyone is teaching
+ * it and `data-status` whether it was cancelled; neither says whether it is happening now. */
+.week-block__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.week-block__title {
+  font-size: var(--text-label);
+  font-weight: var(--weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.week-block__time {
+  flex-shrink: 0;
+  font-size: var(--text-micro);
+  font-variant-numeric: tabular-nums;
+  padding-block: 1px;
+  padding-inline: var(--space-1);
+  border-radius: var(--radius-xs);
+  background: var(--disabled-surface);
+  color: var(--text-secondary);
+}
+
+.week-block__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  font-size: var(--text-micro);
+  color: var(--text-muted);
+  overflow: hidden;
+}
+
+.week-block__meta > bdi + bdi::before {
+  content: '·';
+  margin-inline-end: var(--space-1);
+}
+
+.week-block__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  padding-block-start: var(--space-1);
+  border-block-start: var(--border-width-hairline) solid var(--border);
+  font-size: var(--text-micro);
+}
+
+.week-block__state {
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+}
+
+.week-block__sub {
+  color: var(--pending);
+}
+
+/* Live is the one state worth spending the accent on: it is what a manager scans for. */
+.week-block[data-when='live'] {
+  border-color: var(--emphasis);
+}
+
+.week-block[data-when='live'] .week-block__state,
+.week-block[data-when='live'] .week-block__time {
+  color: var(--emphasis);
+}
+
+.week-block[data-when='live'] .week-block__time {
+  background: var(--emphasis-tint);
+}
+
+.week-block[data-when='past'] {
+  opacity: 0.75;
+}
+
+/* ═══ One group, and closures ═════════════════════════════════════════════════════
+ * Checkpoint 7. Both screens were laid out entirely in inline `CSSProperties` objects,
+ * which is why neither could pick up the studio-os surface treatment — an inline style
+ * has no token to re-value. The rules below are the same shapes, moved where the palette
+ * can reach them.
+ *
+ * §3.3 asks for "card styling and section headers only" here: the group page keeps its
+ * structure, because `ImpactDialog` is the safety mechanism and the prototype has no
+ * per-group page at all to teach it anything. */
+.group-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  inline-size: 100%;
+}
+
+.group-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+}
+
+.group-panel__title {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+}
+
+.group-panel__note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.group-panel__error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-caption);
+}
+
+.group-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+}
+
+.group-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-label);
+  color: var(--text-secondary);
+}
+
+.rule-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+  padding-block: var(--space-3);
+  border-block-end: var(--border-width-hairline) solid var(--border);
+}
+
+/* A season is ~100 rows per group; unscrolled they made this page a kilometre long and
+ * buried the schedule editor above them (2026-08-30). */
+.group-sessions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-block-size: 24rem;
+  overflow-y: auto;
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.session-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding-block: var(--space-2);
+  padding-inline: var(--space-3);
+  border-block-end: var(--border-width-hairline) solid var(--border);
+  font-size: var(--text-caption);
+}
+
+.session-row:last-child {
+  border-block-end: none;
+}
+
+.session-row__time {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.session-row__note {
+  color: var(--text-muted);
+}
+
+/* ── the impact dialog ──────────────────────────────────────────────────────────── */
+.impact-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-inline-size: 34rem;
+  inline-size: 100%;
+}
+
+.impact-dialog__group {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+}
+
+/* §3.3's one named gain: three counts read faster as three tiles than as three text
+ * rows. `auto-fit` here rather than `auto-fill` — there are always exactly three, and
+ * they should fill the dialog's width. */
+.impact-dialog__counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: var(--space-2);
+}
+
+/* The protected three, held back from the changing three. Not a colour that claims a
+ * meaning — see the component's note on `StatTone`. */
+.impact-tile--muted {
+  background: var(--ground);
+}
+
+.impact-tile--muted .studio-stat-tile__value {
+  color: var(--text-secondary);
+}
+
+.impact-dialog__list {
+  margin: 0;
+  padding-inline-start: var(--space-5);
+  color: var(--text-secondary);
+}
+
+.impact-dialog__hint {
+  display: block;
+  margin-block-start: var(--space-1);
+}
+
+.impact-dialog__actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+}
+
+/* ── closures ───────────────────────────────────────────────────────────────────── */
+.closures {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  inline-size: 100%;
+  align-items: start;
+}
+
+.closures__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  inline-size: 100%;
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+}
+
+.closure-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-block-end: var(--border-width-hairline) solid var(--border);
+}
+
+.closure-row:last-child {
+  border-block-end: none;
+}
+
+.closure-row__when {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  min-inline-size: 11rem;
+}
+
+.closure-row__reason {
+  flex: 1;
+  font-weight: var(--weight-medium);
+}
+
+.closures__error {
+  margin: 0;
+  color: var(--danger);
+}
+
+.closures__outcome {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.closures__presets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  inline-size: 100%;
+  align-items: start;
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+}
+
+/* Sixteen Israeli holidays in one column is a scroll; in a grid it is a glance. */
+.closures__preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: var(--space-2);
+  inline-size: 100%;
+}
+
+.closures__form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+  inline-size: 100%;
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+}
+
+.closures__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-label);
+  color: var(--text-secondary);
+}
+
+.closures__field--wide {
+  flex: 1;
+  min-inline-size: 12rem;
+}
+
+/* ═══ Classes — `#/classes` ═══════════════════════════════════════════════════════
+ * Checkpoint 6, second pass. The prototype's `ProgramsView` curriculum tab: one card per
+ * class, with its discipline as an eyebrow, its description under the name, and how many
+ * groups it holds in the foot. Opening one is how you reach its groups.
+ *
+ * D2 still holds — no capacity, no occupancy bar. The group count is a number this screen
+ * can count from data it already has, which is what makes it honest. */
+.classes-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr));
+  gap: var(--space-4);
+}
+
+.class-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+}
+
+.class-card:hover {
+  border-color: var(--border-strong);
+}
+
+.class-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+/* One neutral mark on every class card. The per-class colour was cut by the owner, so
+ * there is no token to tint this by and nothing here pretends there is. */
+.class-card__badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  border-radius: var(--radius-lg);
+  background: var(--emphasis-tint);
+  border: var(--border-width-hairline) solid var(--emphasis);
+  color: var(--emphasis);
+}
+
+.class-card__titles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+  flex: 1;
+}
+
+.class-card__eyebrow {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--emphasis);
+  letter-spacing: 0.04em;
+}
+
+.class-card__name {
+  font-size: var(--text-title);
+  font-weight: var(--weight-semibold);
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.class-card__name:hover,
+.class-card__name:focus-visible {
+  text-decoration: underline;
+}
+
+.class-card__description {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+}
+
+.class-card__foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-block-start: var(--space-3);
+  border-block-start: var(--border-width-hairline) solid var(--border);
+  margin-block-start: auto;
+  font-size: var(--text-caption);
+}
+
+.class-card__count {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.class-card__open {
+  font-weight: var(--weight-medium);
+  color: var(--accent);
+}
+
+/* The way back up out of one class's groups. */
+.groups-back {
+  display: inline-block;
+  margin-block-end: var(--space-2);
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+}
+
+.groups-create {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-2);
+}
+
+/* ═══ The class wizard — §3.21 ═════════════════════════════════════════════════════
+ * Seven steps on one page, the shared stepper across the top, and a step body that owns
+ * its own reads and writes. The container is a screen and not a modal: it is seven steps
+ * long, it survives a reload, and every one of its steps is a real hash a manager can
+ * bookmark or open in a tab. */
+.class-wizard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  inline-size: 100%;
+}
+
+.class-wizard__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.class-wizard__title {
+  margin: 0;
+  font-size: var(--text-display);
+  font-weight: var(--weight-semibold);
+}
+
+.class-wizard__subtitle {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.class-wizard__body {
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+}
+
+.class-wizard__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.class-wizard__count {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+
+  /* Pushed to the reading end when Back is absent on step 1. */
+  margin-inline-start: auto;
+}
+
+/* ── one step's body ────────────────────────────────────────────────────────────── */
+.wizard-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  align-items: stretch;
+}
+
+.wizard-step__lead {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.wizard-step__note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.wizard-step__error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-caption);
+}
+
+.wizard-step__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-label);
+  color: var(--text-secondary);
+}
+
+.wizard-step__field > textarea {
+  font-family: inherit;
+  font-size: var(--text-body);
+  color: var(--fg);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  resize: vertical;
+}
+
+.wizard-step__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+}
+
+.wizard-step__box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+  margin: 0;
+  padding: var(--space-4);
+  background: var(--ground);
+}
+
+.wizard-step__box > legend,
+.wizard-step__box > h3 {
+  padding: 0;
+  margin: 0;
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+}
+
+.wizard-step__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding-block-start: var(--space-3);
+  border-block-start: var(--border-width-hairline) solid var(--border);
+}
+
+/* ── the lists a step renders ───────────────────────────────────────────────────── */
+.wizard-list,
+.wizard-groups,
+.wizard-coach-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.wizard-list__item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.wizard-list__name {
+  font-weight: var(--weight-medium);
+  flex: 1;
+}
+
+.wizard-list__meta {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.wizard-groups__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.wizard-groups__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.wizard-groups__ages {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.wizard-groups__locked {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.wizard-rules {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.wizard-rules__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-2);
+}
+
+/* ── the belt ladder, step 4 ────────────────────────────────────────────────────── */
+.wizard-ladder {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.wizard-ladder__rung {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+}
+
+/* The belt's own colour, which is a FACT about the belt and comes from the row rather than
+ * from a token — a white belt is white in every theme. It sits beside the name, never
+ * instead of it. */
+.wizard-ladder__swatch {
+  inline-size: 0.75rem;
+  block-size: 0.75rem;
+  border-radius: var(--radius-pill);
+  border: var(--border-width-hairline) solid var(--border-strong);
+}
+
+.wizard-ladder__kyu {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── the summary, step 7 ────────────────────────────────────────────────────────── */
+.wizard-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3);
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.wizard-summary__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-caption);
+}
+
+.wizard-summary__row > dt {
+  color: var(--text-muted);
+}
+
+/* `> dd` again, and stylelint is right that it reads after a more specific sibling — the
+ * two never meet, one being inside a summary row and the other inside a group card's
+ * fact, but the rule is about the file's readability rather than the cascade. Named
+ * rather than reordered: moving it would split the summary block in half. */
+/* stylelint-disable-next-line no-descending-specificity */
+.wizard-summary__row > dd {
+  margin: 0;
 }

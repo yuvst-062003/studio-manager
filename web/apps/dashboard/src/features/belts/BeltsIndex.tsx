@@ -48,6 +48,17 @@ export function BeltsIndex({ locale }: { locale: Locale }) {
     <section aria-labelledby="belts-index-title" data-testid="belts-index">
       <div className="studio-page-header">
         <h2 id="belts-index-title">{t(locale, 'events.belt.title')}</h2>
+        {/* The exams roundup, beside the ladder it belongs to. `#/exams` was a door of its
+            own in `overflowDoors()` and had NO other link anywhere in the app — retiring
+            that group without this anchor would have made a routed screen unreachable. */}
+        <a
+          className="studio-btn"
+          data-testid="belts-exams-link"
+          data-variant="ghost"
+          href="#/exams"
+        >
+          {t(locale, 'events.exam.plural')}
+        </a>
       </div>
       <ul style={listStyle}>
         {classes.map((row) => (

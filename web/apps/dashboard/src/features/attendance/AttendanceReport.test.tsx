@@ -443,7 +443,7 @@ describe('artboard 1e — the Quick View roster', () => {
         ]}
       />,
     )
-    const summary = screen.getByTestId('quickview-summary')
+    const summary = screen.getByTestId('quickview-stats')
     expect(summary).toHaveTextContent('נוכח')
     expect(summary).toHaveTextContent('נעדר')
     expect(summary).toHaveTextContent('לא סומן')
@@ -460,7 +460,7 @@ describe('artboard 1e — the Quick View roster', () => {
         roster={[row({ status: 'unmarked' })]}
       />,
     )
-    await userEvent.click(screen.getByTestId('quickview-row-student-1'))
+    await userEvent.click(screen.getByTestId('quickview-mark-present-student-1'))
     expect(onMark).toHaveBeenCalledWith('student-1', 'present')
   })
 
@@ -477,7 +477,7 @@ describe('artboard 1e — the Quick View roster', () => {
         roster={[row({ status: 'absent_excused', has_absence_report: true })]}
       />,
     )
-    await userEvent.click(screen.getByTestId('quickview-row-student-1'))
+    await userEvent.click(screen.getByTestId('quickview-mark-present-student-1'))
     expect(onMark).not.toHaveBeenCalled()
     expect(screen.getByTestId('quickview-note-student-1')).toHaveTextContent('הודיעו מראש')
   })
@@ -714,7 +714,7 @@ describe('B1.4 — סימון כאן opens QuickViewRoster in place', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'פעולות עבור מתחילים' }))
     await userEvent.click(screen.getByRole('menuitem', { name: 'סימון כאן' }))
     await screen.findByTestId('quickview-roster')
-    await userEvent.click(screen.getByTestId('quickview-row-s1'))
+    await userEvent.click(screen.getByTestId('quickview-mark-present-s1'))
     await waitFor(() =>
       expect(client.mark).toHaveBeenCalledWith('session-1', { studentId: 's1', status: 'present' }),
     )

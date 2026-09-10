@@ -11,27 +11,54 @@
 // without adding a dependency, which .claude/rules/ui-rtl-a11y.md says not to do without
 // asking").
 import { useEffect, useMemo, useState } from 'react'
-import { EmptyState } from '@studio/ui'
+import { EmptyState, LoadFailed } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { ClassesScreen } from './ClassesScreen'
+import { ClassWizard } from './class-wizard/ClassWizard'
 import { ClosuresPanel } from './ClosuresPanel'
 import { GroupSchedulePage } from './GroupSchedulePage'
 import { GroupsAndCycles } from './GroupsAndCycles'
 import { WeekBoard } from './WeekBoard'
-import type { GroupSummary, ScheduleClient, TrainingYear } from './client'
+import type { ClassSummary, GroupSummary, ScheduleClient, TrainingYear } from './client'
+import type { ClassWizardClient } from './class-wizard/client'
 
-export type ScheduleView = 'week' | 'groups' | 'group' | 'closures'
+export type ScheduleView =
+  | 'week'
+  | 'classes'
+  | 'classGroups'
+  | 'classWizard'
+  | 'group'
+  | 'closures'
 
 export interface ScheduleRoute {
   view: ScheduleView
   groupId?: string
+  classId?: string
 }
 
-/** `#/schedule` · `#/groups` · `#/groups/<id>` · `#/closures`. Anything else is the board. */
+/**
+ * `#/schedule` · `#/classes` · `#/classes/new` · `#/classes/<id>` · `#/classes/<id>/edit` ·
+ * `#/groups/<id>` · `#/closures`. Anything else is the board.
+ *
+ * `#/groups` — the flat list of every group in the club — resolves to the classes index
+ * rather than 404-ing: it is the hash the nav pointed at until this checkpoint, so it is
+ * in real bookmarks, and the screen it named has been replaced rather than deleted.
+ *
+ * `new` is matched BEFORE the id pattern, the same way `#/students/new` is: a literal that
+ * looks like an id is how a create route becomes a 404 for one unlucky uuid.
+ */
 export function scheduleRoute(hash: string): ScheduleRoute {
   const path = hash.replace(/^#\/?/, '')
   if (path === 'closures') return { view: 'closures' }
-  if (path === 'groups') return { view: 'groups' }
+  if (path === 'classes' || path === 'groups') return { view: 'classes' }
+  // Creating: the wizard with no class behind it yet.
+  if (path === 'classes/new') return { view: 'classWizard' }
+  // Editing: the same wizard, opened on what the class already has.
+  const editing = /^classes\/([^/]+)\/edit$/.exec(path)
+  if (editing?.[1]) return { view: 'classWizard', classId: editing[1] }
+  const klass = /^classes\/([^/]+)$/.exec(path)
+  if (klass?.[1]) return { view: 'classGroups', classId: klass[1] }
   const group = /^groups\/(.+)$/.exec(path)
   if (group?.[1]) return { view: 'group', groupId: group[1] }
   // An unknown hash resolves to the week board rather than to a blank page — the same rule
@@ -43,19 +70,27 @@ export function ScheduleSection({
   locale,
   client,
   hash,
+  wizardClient,
   today,
   canSeeMoney = false,
 }: {
   locale: Locale
   client: ScheduleClient
   hash: string
+  /** The wizard's own client — seven verticals' endpoints, injected like every other. */
+  wizardClient: ClassWizardClient
   /** An ISO instant. A prop, not `new Date()`, all the way down. */
   today: string
   /** §3.2 — coaches never see money, so only a manager gets the plan badge on a roster. */
   canSeeMoney?: boolean
 }) {
   const route = scheduleRoute(hash)
-  const needsGroups = route.view === 'groups' || route.view === 'group'
+  // The classes index counts each class's groups, so it needs the same list the drill-in
+  // renders — one read for both rather than a count endpoint the API does not have.
+  const needsGroups =
+    route.view === 'classes' || route.view === 'classGroups' || route.view === 'group'
+  // The wizard fetches for itself, step by step — it is seven screens' worth of data and
+  // loading all of it up here would make opening step 1 wait on step 6.
   const needsYear = route.view === 'closures'
 
   const [groups, setGroups] = useState<GroupSummary[] | null>(null)
@@ -66,6 +101,30 @@ export function ScheduleSection({
   const groupList = useMemo(() => groups ?? [], [groups])
   const [year, setYear] = useState<TrainingYear | null>(null)
   const [yearLoaded, setYearLoaded] = useState(false)
+  // F1a — a failed year lookup must not read as "there is no active year". The two send a
+  // manager to different places: one to the rollover screen to open a year, the other back
+  // in a minute.
+  const [yearFailed, setYearFailed] = useState(false)
+  const [yearAttempt, setYearAttempt] = useState(0)
+  // The class a drill-in is inside. Read rather than derived from its groups: a class with
+  // no groups yet has none to take a name from, and that is exactly the manager who most
+  // needs the screen to say which class they opened.
+  const [klass, setKlass] = useState<ClassSummary | null>(null)
+
+  useEffect(() => {
+    if (route.view !== 'classGroups' || !route.classId) return
+    const wanted = route.classId
+    let live = true
+    void client
+      .listClasses()
+      .then((rows) => {
+        if (live) setKlass(rows.find((row) => row.id === wanted) ?? null)
+      })
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [client, route.classId, route.view])
 
   useEffect(() => {
     // 3a needs sessions, not groups. Fetching a roster to draw a calendar is a request the
@@ -73,8 +132,9 @@ export function ScheduleSection({
     if (!needsGroups) return
     let live = true
     void (async () => {
-      const loaded = await client.listGroups()
-      if (live) setGroups(loaded)
+      // Same reason as the year below: a rejection nobody catches outlives the component.
+      const loaded = await client.listGroups().catch(() => null)
+      if (live && loaded) setGroups(loaded)
     })()
     return () => {
       live = false
@@ -85,18 +145,38 @@ export function ScheduleSection({
     if (!needsYear) return
     let live = true
     void (async () => {
-      const years = await client.listTrainingYears()
+      // Caught, and not only for the screen's sake: an uncaught rejection here escapes the
+      // effect after the component has gone, which surfaces as an unhandled rejection in
+      // the test run and as a console error in a browser — a failure with no owner.
+      const years = await client.listTrainingYears().catch(() => null)
       if (!live) return
+      if (years === null) {
+        setYearFailed(true)
+        setYearLoaded(true)
+        return
+      }
       setYear(years.find((candidate) => candidate.status === 'active') ?? null)
       setYearLoaded(true)
     })()
     return () => {
       live = false
     }
-  }, [client, needsYear])
+  }, [client, needsYear, yearAttempt])
 
   if (route.view === 'closures') {
     if (!yearLoaded) return null
+    if (yearFailed) {
+      return (
+        <LoadFailed
+          locale={locale}
+          onRetry={() => {
+            setYearFailed(false)
+            setYearLoaded(false)
+            setYearAttempt((n) => n + 1)
+          }}
+        />
+      )
+    }
     if (!year) {
       return (
         <EmptyState
@@ -136,14 +216,47 @@ export function ScheduleSection({
     )
   }
 
-  if (route.view === 'groups') {
+  if (route.view === 'classWizard') {
+    return (
+      <ClassWizard
+        classId={route.classId ?? null}
+        client={wizardClient}
+        locale={locale}
+        onExit={(classId) => {
+          globalThis.location.hash = classId ? `#/classes/${classId}` : '#/classes'
+        }}
+      />
+    )
+  }
+
+  if (route.view === 'classGroups') {
+    if (groups === null) return null
+    const mine = groupList.filter((group) => group.classId === route.classId)
     return (
       <GroupsAndCycles
+        backHref="#/classes"
+        classId={route.classId}
+        className={klass?.name}
+        client={client}
+        discipline={klass?.discipline}
+        groups={mine}
+        hrefForGroup={(groupId) => `#/groups/${groupId}`}
         locale={locale}
+        onChanged={() => setGroupsVersion((n) => n + 1)}
+        today={today}
+      />
+    )
+  }
+
+  if (route.view === 'classes') {
+    if (groups === null) return null
+    return (
+      <ClassesScreen
         client={client}
         groups={groupList}
-        today={today}
-        hrefForGroup={(groupId) => `#/groups/${groupId}`}
+        hrefForClass={(classId) => `#/classes/${classId}`}
+        hrefForWizard={(classId) => (classId ? `#/classes/${classId}/edit` : '#/classes/new')}
+        locale={locale}
         onChanged={() => setGroupsVersion((n) => n + 1)}
       />
     )

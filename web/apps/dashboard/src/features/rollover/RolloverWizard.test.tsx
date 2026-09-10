@@ -220,8 +220,11 @@ describe('RolloverWizard · the rail', () => {
       announce: 'pending',
     }
     for (const stepId of ROLLOVER_STEP_ORDER) {
-      const chip = screen.getByTestId(`rollover-rail-${stepId}`)
-      expect(chip).toHaveAttribute('data-status', expected[stepId])
+      // Checkpoint 15 — the rail is the shared `Stepper` now, whose own attribute is
+      // `data-state` and whose vocabulary calls the step being worked on `current`
+      // whatever its status. The WORD is what this test is about and it is unchanged:
+      // §3.17 asked to take the stepper's treatment and keep the status words, and
+      // `stateLabel` is how the node carries rollover's own.
       expect(screen.getByTestId(`rollover-rail-${stepId}-status`)).toHaveTextContent(
         t('he', `schedule.rollover.status.${expected[stepId]}`),
       )
@@ -239,8 +242,16 @@ describe('RolloverWizard · the rail', () => {
     for (const stepId of ROLLOVER_STEP_ORDER) {
       expect(screen.getByTestId(`rollover-rail-${stepId}`)).toBeInTheDocument()
     }
-    expect(screen.getByTestId('rollover-rail-prices')).toBeDisabled()
-    expect(screen.getByTestId('rollover-rail-year')).toBeEnabled()
+    // Checkpoint 15 — the shared `Stepper` does not DISABLE an unreachable node, which is
+    // the lesson `SetupWizard`'s rail learned: a dead button reads as "this step doesn't
+    // work". It is pressable, does not move, and says why in its title. The property this
+    // test protects is unchanged — a step the server did not send is visible and cannot be
+    // opened.
+    expect(screen.getByTestId('rollover-rail-prices')).toHaveAttribute(
+      'title',
+      t('he', 'common.stepper.locked'),
+    )
+    expect(screen.getByTestId('rollover-rail-year')).not.toHaveAttribute('title')
   })
 
   it('has one h1 and starts the steps at h2', async () => {

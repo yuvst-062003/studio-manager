@@ -23,7 +23,24 @@ def test_every_wave_in_the_milestone_plan_is_present():
     # W9S is the 2026-09-06 staff-app redesign — five tabs ported from the AI Studio
     # prototype, thirteen checkpoints. Acknowledged here, which is what this literal asks
     # for; it caught the wave arriving in state.yaml before anyone had said so out loud.
-    assert ids == ["W0", "W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8C", "W9D", "W9E", "W9S"]
+    # W10 is the 2026-09-10 manager-dashboard redesign — nineteen checkpoints porting the
+    # AI Studio prototype's look onto the dashboard. Acknowledged the same way, and it
+    # caught this one too.
+    assert ids == [
+        "W0",
+        "W1",
+        "W2",
+        "W3",
+        "W4",
+        "W5",
+        "W6",
+        "W7",
+        "W8C",
+        "W9D",
+        "W9E",
+        "W9S",
+        "W10",
+    ]
 
 
 def test_the_parallel_waves_name_their_two_lanes():

@@ -105,7 +105,31 @@ export interface GroupSummary {
   isActive: boolean
 }
 
+/** One class — a חוג. The thing groups belong to, and what `#/classes` lists. */
+export interface ClassSummary {
+  id: string
+  name: string
+  description: string | null
+  discipline: string | null
+  /** A token NAME, never a hex literal — G13. `null` until a class has been given one. */
+  color: string | null
+  isActive: boolean
+}
+
+/** What the edit popup and the create form send. Every field optional on a PATCH: the
+ *  server writes only what was set, so absence leaves a column alone. */
+export interface ClassDraft {
+  name?: string
+  description?: string | null
+  discipline?: string | null
+  color?: string | null
+  is_active?: boolean
+}
+
 export interface ScheduleClient {
+  listClasses(): Promise<ClassSummary[]>
+  createClass(draft: ClassDraft): Promise<ClassSummary>
+  updateClass(classId: string, draft: ClassDraft): Promise<ClassSummary>
   listGroups(): Promise<GroupSummary[]>
   listSessions(query: {
     from: string
@@ -159,8 +183,57 @@ async function json<T>(response: Response): Promise<T> {
   return (await response.json()) as T
 }
 
+/** The API's snake_case row, in the shape the screens read. */
+function asClass(row: {
+  id: string
+  name: string
+  description: string | null
+  discipline: string | null
+  color: string | null
+  is_active: boolean
+}): ClassSummary {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    discipline: row.discipline,
+    color: row.color,
+    isActive: row.is_active,
+  }
+}
+
+type ClassRow = Parameters<typeof asClass>[0]
+
 export function makeScheduleClient(fetcher: Fetcher): ScheduleClient {
   return {
+    async listClasses() {
+      const body = await json<{ items: ClassRow[] }>(await fetcher(`${API}/classes`))
+      return body.items.map(asClass)
+    },
+    async createClass(draft) {
+      return asClass(
+        await json<ClassRow>(
+          await fetcher(`${API}/classes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(draft),
+          }),
+        ),
+      )
+    },
+    async updateClass(classId, draft) {
+      // PATCH, not PUT: `ClassUpdate` writes only the fields the body SETS, so the popup
+      // can send the three it edits without nulling `color` for a class that has one.
+      return asClass(
+        await json<ClassRow>(
+          await fetcher(`${API}/classes/${classId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(draft),
+          }),
+        ),
+      )
+    },
     async listGroups() {
       // Two reads rather than one, because `/groups` carries `class_id` and 4b shows the
       // class name. Both are M1's endpoints and neither is written from this lane.

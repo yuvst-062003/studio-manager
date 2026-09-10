@@ -8,11 +8,19 @@
 // The volume comes from a manager-only route. `price_plan_id` is what invariant 3's detector
 // reads as a financial field, so it never travels on the coach-reachable card.
 import { useEffect, useState } from 'react'
-import type { CSSProperties } from 'react'
-import { AttendanceStrip, BeltBar, Button, Card, StatusChip } from '@studio/ui'
+import { forwardRef } from 'react'
+import type { ReactNode } from 'react'
+import {
+  BeltBar,
+  Button,
+  LoadFailed,
+  SectionHeader,
+  StatusChip,
+  useModalDialog,
+} from '@studio/ui'
 import type { AttendanceStripItem } from '@studio/ui'
 import { ClassPricesCard } from '../billing/ClassPricesCard'
-import { formatDateInStudioZone } from '@studio/core'
+import { fill, formatDateInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { chipToneFor } from './StudentsScreen'
@@ -51,22 +59,75 @@ const STRIP_LABEL: Record<AttendanceStripItem['state'], string> = {
  *  why `GET /students/{id}/attendance` bakes in neither and the caller trims. */
 const MARKS_ON_THE_CARD = 12
 
-const pageStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(18rem, 1fr))',
-  gap: 'var(--space-4)',
-  // §6.4 — 'a manager checking cover from a phone is a normal case rather than an error.'
-  inlineSize: '100%',
+/** Dashboard redesign — the four tabs the card's existing sections are grouped under.
+ *  `general` is first and is the default: it is what a manager opens the card to check
+ *  first, before training, money, or health. */
+type DetailTab = 'general' | 'training' | 'finance' | 'health'
+
+/**
+ * The drawer the card lives in: a scrim, and a panel pinned to the inline-start edge.
+ *
+ * `onClose` absent means "render in place" — no scrim, no panel, just the card. That is
+ * what a narrow viewport gets, where a drawer over a table has nowhere to sit, and what the
+ * tests mount.
+ */
+const Shell = forwardRef<
+  HTMLDivElement,
+  { locale: Locale; onClose?: () => void; children: ReactNode }
+>(function Shell({ locale, onClose, children }, ref) {
+  if (!onClose) return <>{children}</>
+  return (
+    <>
+      {/* The scrim closes on click, as the prototype's does. It carries no role: it is
+          decoration plus a convenience, and the panel's own close button and Escape are
+          the paths that have to work. */}
+      <div className="student-drawer__scrim" data-testid="student-drawer-scrim" onClick={onClose} />
+      <div
+        aria-label={t(locale, 'people.student.one')}
+        aria-modal="true"
+        className="student-drawer"
+        data-testid="student-drawer"
+        ref={ref}
+        role="dialog"
+      >
+        {children}
+      </div>
+    </>
+  )
+})
+
+/** One labelled field box, as the prototype's drawer draws them: the label above, the
+ *  value in a filled well beneath it. A `<dl>` row rather than a pair of divs — these are
+ *  label/value pairs and the markup should say so. */
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="student-card__field">
+      <dt className="student-card__field-label">{label}</dt>
+      <dd className="student-card__field-value">{children}</dd>
+    </div>
+  )
+}
+
+/** The avatar stands in for a photograph the product does not store. Decision 3 chose
+ *  initials over building photo upload: a photograph of a minor brings a consent and a
+ *  retention question with it, and neither is worth opening for a decoration. */
+export function initialsOf(first: string, last: string): string {
+  return `${first.trim().charAt(0)}${last.trim().charAt(0)}`
 }
 
 export function StudentDetailScreen({
   studentId,
   locale,
   client,
+  onClose,
 }: {
   studentId: string
   locale: Locale
   client: DashboardPeopleClient
+  /** Closing returns to the list. Optional so the card can still be rendered on its own —
+   *  a narrow viewport has no room for a drawer over a table, and the tests mount it
+   *  directly. Without it the scrim is not drawn and the panel fills its container. */
+  onClose?: () => void
 }) {
   const [student, setStudent] = useState<StudentDetail | null>(null)
   const [enrollments, setEnrollments] = useState<EnrollmentOut[]>([])
@@ -88,6 +149,15 @@ export function StudentDetailScreen({
   const [lostReason, setLostReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [reloads, setReloads] = useState(0)
+  const [failed, setFailed] = useState(false)
+  // Dashboard redesign — the card's existing sections sit under four tabs instead of one
+  // long scroll. Purely a display grouping: nothing here changes what is fetched or when.
+  const [tab, setTab] = useState<DetailTab>('general')
+  // Focus in, Tab trapped, Escape out, focus restored. `aria-modal` is a promise about the
+  // rest of the page being unavailable; the browser does nothing to keep it, so a drawer
+  // that sets the attribute and stops there tells a screen-reader user the page is inert
+  // while a keyboard user tabs straight through it into the table behind.
+  const dialogRef = useModalDialog(onClose !== undefined, onClose ?? (() => undefined))
 
   useEffect(() => {
     let live = true
@@ -109,8 +179,17 @@ export function StudentDetailScreen({
         setPlan(pricePlan)
         setGroups(groupList.items)
         setMarks(attendance.items)
+        // Cleared on success rather than at the top of the effect: a synchronous setState
+        // in the effect body is a render every load pays for, and the retry below is the
+        // only thing that re-enters here anyway.
+        setFailed(false)
       })
-      .catch(() => undefined)
+      // Was `.catch(() => undefined)`, which is how a dead card and a slow one became the
+      // same screen: `student` stayed null, the gate below returned the loading
+      // placeholder, and it stayed there forever with no message and nothing to press.
+      // The four reads above are NOT best-effort — the two that are (`groups`,
+      // `attendance`) catch for themselves and fall back to an empty list.
+      .catch(() => live && setFailed(true))
     return () => {
       live = false
     }
@@ -136,6 +215,10 @@ export function StudentDetailScreen({
     }
   }
 
+  // The failure branch comes FIRST: `student` is null in both states, so checking the
+  // placeholder first would render it over a failure that had already been detected.
+  if (failed) return <LoadFailed locale={locale} onRetry={() => setReloads((n) => n + 1)} />
+
   if (!student) return <p data-testid="student-detail-loading" />
 
   const live = enrollments.filter((enrollment) => enrollment.ended_on == null)
@@ -156,134 +239,291 @@ export function StudentDetailScreen({
       }
     })
 
+  const primary = (student.guardians ?? []).find((g) => g.is_primary) ?? student.guardians?.[0]
+  const firstGroup = live[0]
+
   return (
-    <section style={pageStyle} aria-labelledby="detail-title" data-testid="student-detail">
-      <div>
-        <h1 id="detail-title">
-          <bdi>{`${student.first_name} ${student.last_name}`}</bdi>
-        </h1>
-        <StatusChip
-          status={chipToneFor(student.status)}
-          label={t(locale, `people.status.${student.status}`)}
-        />
-        {student.current_belt_color_hex ? (
-          <BeltBar
-            colorHex={student.current_belt_color_hex}
-            label={student.current_belt_name ?? ''}
-          />
-        ) : null}
-        {student.status === 'frozen' ? (
-          <p data-testid="detail-frozen">
-            {t(locale, 'people.freeze.active')}
-            {student.frozen_until
-              ? ` — ${formatDateInStudioZone(student.frozen_until, locale)}`
-              : ''}
+    <Shell locale={locale} onClose={onClose} ref={dialogRef}>
+    <section className="student-card" data-testid="student-detail">
+      {/* The header: avatar, name, its chips, and the one-line who-and-where beneath. */}
+      <header className="student-card__header">
+        <span aria-hidden="true" className="student-card__avatar">
+          {initialsOf(student.first_name, student.last_name)}
+        </span>
+        <div className="student-card__identity">
+          <div className="student-card__name-row">
+            <h1>
+              <bdi>
+                {student.first_name} {student.last_name}
+              </bdi>
+            </h1>
+            <StatusChip
+              label={t(locale, `people.status.${student.status}`)}
+              status={chipToneFor(student.status)}
+            />
+            {student.current_belt_name ? (
+              <span className="student-card__belt">
+                <BeltBar colorHex={student.current_belt_color_hex ?? '#000000'} label={student.current_belt_name} />
+                <bdi>{student.current_belt_name}</bdi>
+              </span>
+            ) : null}
+          </div>
+          <p className="student-card__sub">
+            {firstGroup ? <bdi>{firstGroup.group_name}</bdi> : null}
+            {primary?.display_name ? <bdi>{primary.display_name}</bdi> : null}
           </p>
+        </div>
+        {onClose ? (
+          <button
+            aria-label={t(locale, 'common.a11y.close')}
+            className="student-card__close"
+            data-testid="student-drawer-close"
+            onClick={onClose}
+            type="button"
+          >
+            ✕
+          </button>
+        ) : (
+          <a className="student-card__back" href="#/students">
+            {t(locale, 'people.student.plural')}
+          </a>
+        )}
+      </header>
+
+      {student.status === 'frozen' && student.frozen_until ? (
+        <p className="student-card__frozen" data-testid="detail-frozen">
+          {fill(t(locale, 'people.freeze.until'), {
+            date: formatDateInStudioZone(student.frozen_until, locale),
+          })}
+        </p>
+      ) : null}
+
+      {/* Underlined tabs, as the prototype draws them — not a segmented pill. */}
+      <div className="student-card__tabs" role="tablist">
+        {(['general', 'training', 'finance', 'health'] as const).map((key) => (
+          <button
+            aria-selected={tab === key}
+            className="student-card__tab"
+            data-testid={`detail-tab-${key}`}
+            key={key}
+            onClick={() => setTab(key)}
+            role="tab"
+            type="button"
+          >
+            {t(locale, `people.student.tab.${key}`)}
+          </button>
+        ))}
+      </div>
+
+      <div className="student-card__body">
+        {tab === 'general' ? (
+          <>
+            <SectionHeader title={t(locale, 'people.student.tab.general')} />
+            <dl className="student-card__fields">
+              <Field label={t(locale, 'people.student.groups')}>
+                {live.length === 0 ? (
+                  '—'
+                ) : (
+                  <ul className="student-card__stack" data-testid="detail-enrollment">
+                    {live.map((enrollment) => (
+                      <li key={enrollment.id}>
+                        <bdi>{enrollment.group_name}</bdi>{' '}
+                        <span className="student-card__muted" data-testid="detail-weekdays">
+                          {enrollment.attends_weekdays == null
+                            ? t(locale, 'people.weekdays.allDays')
+                            : enrollment.attends_weekdays
+                                .map((day) => t(locale, `people.weekdays.${day}`))
+                                .join(' · ')}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Field>
+              <Field label={t(locale, 'people.student.weeklyVolume')}>
+                <span data-testid="detail-weekly-volume">{plan?.weekly_volume ?? '—'}</span>
+              </Field>
+              <Field label={t(locale, 'people.guardian.plural')}>
+                {(student.guardians ?? []).length === 0 ? (
+                  '—'
+                ) : (
+                  <ul className="student-card__stack">
+                    {(student.guardians ?? []).map((guardian) => (
+                      <li data-testid="detail-guardian" key={guardian.person_id}>
+                        {guardian.display_name ? (
+                          <bdi>{guardian.display_name}</bdi>
+                        ) : guardian.email ? (
+                          <>
+                            <bdi>{guardian.email}</bdi>{' '}
+                            <span
+                              className="student-card__muted"
+                              data-testid="detail-guardian-pending"
+                            >
+                              {t(locale, 'people.guardian.notRegisteredYet')}
+                            </span>
+                          </>
+                        ) : (
+                          <bdi>{t(locale, 'people.guardian.noContactInfo')}</bdi>
+                        )}
+                        {guardian.is_primary ? (
+                          <span className="student-card__muted" data-testid="detail-primary">
+                            {t(locale, 'people.guardian.primary')}
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Field>
+              <Field label={t(locale, 'people.guardian.phone')}>
+                {primary?.phone ? (
+                  <a dir="ltr" href={`tel:${primary.phone}`}>
+                    {primary.phone}
+                  </a>
+                ) : (
+                  '—'
+                )}
+              </Field>
+            </dl>
+          </>
+        ) : null}
+
+        {tab === 'training' ? (
+          <>
+            <SectionHeader title={t(locale, 'people.student.tab.training')} />
+            <dl className="student-card__fields">
+              <Field label={t(locale, 'people.student.groups')}>
+                {firstGroup ? (
+                  <span className="student-card__stack-inline">
+                    <bdi>{firstGroup.group_name}</bdi>
+                    <span className="student-card__muted">
+                      {firstGroup.attends_weekdays == null
+                        ? t(locale, 'people.weekdays.allDays')
+                        : firstGroup.attends_weekdays
+                            .map((day) => t(locale, `people.weekdays.${day}`))
+                            .join(' · ')}
+                    </span>
+                  </span>
+                ) : (
+                  '—'
+                )}
+              </Field>
+              <Field label={t(locale, 'people.student.belt')}>
+                {student.current_belt_name ? (
+                  <span className="student-card__belt">
+                    <BeltBar
+                      colorHex={student.current_belt_color_hex ?? '#000000'}
+                      label={student.current_belt_name}
+                    />
+                    <bdi>{student.current_belt_name}</bdi>
+                  </span>
+                ) : (
+                  '—'
+                )}
+              </Field>
+            </dl>
+
+            {/* The attendance log. Each mark is its own dated cell carrying a WORD, not a
+                tick: a row of identical ticks says one thing nine times, and says nothing
+                about which lesson. The summary above counts the same marks. */}
+            <div className="student-card__panel" data-testid="detail-attendance">
+              <div className="student-card__panel-head">
+                <span className="student-card__field-label">
+                  {t(locale, 'people.student.attendance')}
+                </span>
+                {strip.length > 0 ? (
+                  <span className="student-card__present-count">
+                    {fill(t(locale, 'people.student.presentOf'), {
+                      present: marks.slice(0, MARKS_ON_THE_CARD).filter((m) => m.status === 'present').length,
+                      total: strip.length,
+                    })}
+                  </span>
+                ) : null}
+              </div>
+              {strip.length === 0 ? (
+                <p className="student-card__muted" data-testid="detail-attendance-empty">
+                  {t(locale, 'people.student.attendanceEmpty')}
+                </p>
+              ) : (
+                <ol className="student-card__marks">
+                  {marks
+                    .slice(0, MARKS_ON_THE_CARD)
+                    .reverse()
+                    .map((row) => {
+                      const state = STRIP_STATE[row.status] ?? 'unmarked'
+                      // The DEVICE clock, which is when the lesson was — `marked_at` is
+                      // when the queue reached the server, and for an offline coach those
+                      // are different days.
+                      const when = new Date(row.device_marked_at)
+                      return (
+                        <li
+                          className="student-card__mark"
+                          data-state={state}
+                          data-testid="detail-mark"
+                          key={row.id}
+                        >
+                          <span className="student-card__mark-day">
+                            {t(locale, `people.weekdays.${when.getDay()}`)}
+                          </span>
+                          <span className="student-card__mark-date" dir="ltr">
+                            {formatDateInStudioZone(row.device_marked_at, locale)}
+                          </span>
+                          <span className="student-card__mark-state">
+                            {t(locale, STRIP_LABEL[state])}
+                          </span>
+                        </li>
+                      )
+                    })}
+                </ol>
+              )}
+            </div>
+
+            <div className="student-card__panel">
+              <span className="student-card__field-label">
+                {t(locale, 'people.student.statusHistory')}
+              </span>
+              {history.length === 0 ? (
+                <p className="student-card__muted">{t(locale, 'people.student.historyEmpty')}</p>
+              ) : (
+                <ol className="student-card__stack" data-testid="detail-history">
+                  {history.map((row) => (
+                    <li key={row.id}>
+                      <span>{t(locale, `people.status.${row.to_status}`)}</span>
+                      <span className="student-card__muted">
+                        {formatDateInStudioZone(row.changed_at, locale)}
+                      </span>
+                      {row.reason ? (
+                        <span className="student-card__muted">
+                          <bdi>{row.reason}</bdi>
+                        </span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          </>
+        ) : null}
+
+        {tab === 'finance' ? (
+          <>
+            <SectionHeader title={t(locale, 'people.student.tab.finance')} />
+            <ClassPricesCard locale={locale} studentId={studentId} />
+          </>
+        ) : null}
+
+        {tab === 'health' ? (
+          <>
+            <SectionHeader title={t(locale, 'people.student.tab.health')} />
+            <p className="student-card__muted">
+              {t(locale, 'people.student.tab.healthHint')}{' '}
+              <a href="#/documents">{t(locale, 'people.student.tab.healthLink')}</a>
+            </p>
+          </>
         ) : null}
       </div>
 
-      <Card>
-        <h2>{t(locale, 'people.student.groups')}</h2>
-        {/* C11 — every live enrollment, with its C12 pattern. */}
-        <ul>
-          {live.map((enrollment) => (
-            <li key={enrollment.id} data-testid="detail-enrollment">
-              <bdi>{enrollment.group_name}</bdi>
-              <span data-testid="detail-weekdays">
-                {enrollment.attends_weekdays == null
-                  ? t(locale, 'people.weekdays.allDays')
-                  : enrollment.attends_weekdays
-                      .map((day) => t(locale, `people.weekdays.${day}`))
-                      .join(' · ')}
-              </span>
-            </li>
-          ))}
-        </ul>
-        {/* How much this child actually trains. It used to sit on the read-only plan card
-            the per-class editor replaced, and it belongs here rather than inside that
-            editor: it is a fact about ENROLMENTS, and §5.10 wants it visible so a mismatch
-            between what a child attends and what they are billed for is noticeable at the
-            moment the price is set. */}
-        <p data-testid="detail-weekly-volume">
-          {t(locale, 'people.convert.weeklyVolume')}: {plan?.weekly_volume ?? 0}
-        </p>
-      </Card>
-
-      {/* Was a read-only badge naming `student.price_plan_id`, which is now only the
-          FALLBACK — what a child pays for any class nobody has priced. The per-class editor
-          replaces it rather than sitting beside it: two boxes both showing a child's price
-          leaves a manager working out which one wins, and the fallback is still named here,
-          on every row it actually applies to, with its amount. */}
-      <ClassPricesCard locale={locale} studentId={studentId} />
-
-      <Card>
-        <h2>{t(locale, 'people.guardian.plural')}</h2>
-        <ul>
-          {(student.guardians ?? []).map((guardian) => (
-            <li key={guardian.person_id} data-testid="detail-guardian">
-              {/* Decision 20 — the 3-field add-student form sends a guardian email and no
-                  name, so `display_name` is `""` until the parent finishes the wizard. A
-                  blank row told the manager nothing; the email plus a hint at least says
-                  who this is and that they are not done yet. */}
-              {guardian.display_name ? (
-                <bdi>{guardian.display_name}</bdi>
-              ) : guardian.email ? (
-                <>
-                  <bdi>{guardian.email}</bdi>{' '}
-                  <span data-testid="detail-guardian-pending">
-                    {t(locale, 'people.guardian.notRegisteredYet')}
-                  </span>
-                </>
-              ) : (
-                <bdi>{t(locale, 'people.guardian.noContactInfo')}</bdi>
-              )}
-              {guardian.is_primary ? (
-                <span data-testid="detail-primary">{t(locale, 'people.guardian.primary')}</span>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      </Card>
-
-      <Card>
-        {/* `GET /students/{id}/attendance` was built, manager-scoped and called by nothing.
-            The card had four sections and could not answer the question a manager asks
-            about a child immediately before telephoning their parent.
-
-            No coach note is rendered, and the strip has nowhere to put one: §5.13 makes it
-            a coach's written opinion about a child, and `AttendanceOut` carries it only
-            because the roster it was built for needs it. */}
-        <h2>{t(locale, 'people.student.attendance')}</h2>
-        <div data-testid="detail-attendance">
-          {strip.length === 0 ? (
-            // §5.14 makes `unmarked` a real state so a coach who forgot the register does
-            // not look like a child who stopped coming. A blank strip would say exactly
-            // the thing that state exists to prevent.
-            <p data-testid="detail-attendance-empty">
-              {t(locale, 'people.student.attendanceEmpty')}
-            </p>
-          ) : (
-            <AttendanceStrip items={strip} locale={locale} />
-          )}
-        </div>
-      </Card>
-
-      <Card>
-        <h2>{t(locale, 'people.status.history')}</h2>
-        {/* §5.4a computes the funnel from these rows; 4a renders the same rows as a
-            timeline, so a manager reads the same history the report is built on. */}
-        <ol>
-          {history.map((row) => (
-            <li key={row.id} data-testid="detail-history">
-              {t(locale, `people.status.${row.to_status}`)} —{' '}
-              {formatDateInStudioZone(row.changed_at, locale)}
-              {row.reason ? ` · ${row.reason}` : ''}
-            </li>
-          ))}
-        </ol>
-      </Card>
-
-      <div>
+      <div className="student-card__footer">
         {freezing ? (
           <>
             <label>
@@ -407,5 +647,6 @@ export function StudentDetailScreen({
         )}
       </div>
     </section>
+    </Shell>
   )
 }

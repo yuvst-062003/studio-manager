@@ -1,0 +1,357 @@
+/* Checkpoint 9 — the collections screen.
+ *
+ * The KPI band reuses `.dash-kpi` from the manager home rather than defining a second tile:
+ * the two screens show the same club's money, and two tile designs for one fact is how a
+ * manager starts wondering whether they mean different things. Only the grid is here. */
+.dash-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: var(--space-4);
+}
+
+/* The prototype's filter pills. This is the THIRD copy of this shape — `people-class-tabs`
+ * and `groups-class-tabs` are the others — and three is where it stops being cheaper than a
+ * primitive. Promoting it is a `packages/ui` change and this is a dashboard checkpoint, so
+ * it is noted rather than done: the next screen that needs pills should promote all four.
+ *
+ * What is different here and belongs to this screen: each pill carries a live count. */
+.collections-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-block: var(--space-3);
+}
+
+.collections-pills > button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-label);
+  padding-block: var(--space-2);
+  padding-inline: var(--space-4);
+  white-space: nowrap;
+}
+
+.collections-pills > button:hover {
+  border-color: var(--emphasis);
+  color: var(--fg);
+}
+
+.collections-pills > button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* `aria-pressed` carries the state to assistive tech and drives the styling from the same
+ * attribute, so the two cannot disagree — the chosen pill is never only a colour. */
+.collections-pills > button[aria-pressed='true'] {
+  background: var(--emphasis);
+  border-color: var(--emphasis);
+  color: var(--on-emphasis);
+  font-weight: var(--weight-medium);
+}
+
+/* The count rides inside the pill on its own ground, so the number reads as a quantity
+ * rather than as part of the label. */
+.collections-pills__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 1.5rem;
+  padding-inline: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--disabled-surface);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-caption);
+}
+
+.collections-pills > button[aria-pressed='true'] .collections-pills__count {
+  background: color-mix(in srgb, var(--on-emphasis) 22%, transparent);
+  color: var(--on-emphasis);
+}
+
+/* ── the debt list ──────────────────────────────────────────────────────────────────
+ * Eleven controls on one line is what the row used to be. The prototype's transaction row
+ * is three bands — who, what state, what you can do about it — and that is what this is.
+ * The amount is the figure a manager scans for, so it is the largest thing on the card
+ * rather than the eighth item in a row. */
+.collections-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.debt-card {
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+}
+
+.debt-card:hover {
+  border-color: var(--border-strong);
+}
+
+.debt-card__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.debt-card__who {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 12rem;
+}
+
+.debt-card__students {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.debt-card__state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1;
+}
+
+.debt-card__amount {
+  font-size: var(--text-title);
+  font-weight: var(--weight-semibold);
+}
+
+.debt-card__months,
+.debt-card__rung {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.debt-card__credit {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+}
+
+.debt-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-inline-start: auto;
+}
+
+.debt-card__outcome {
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+}
+
+/* The expanded charge list. Inside the card, on the recessed ground, so it reads as this
+ * family's detail rather than as a new section. */
+.debt-card__charges {
+  list-style: none;
+  margin-block-start: var(--space-3);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.debt-card__charge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-label);
+  color: var(--text-secondary);
+}
+
+.debt-card__charge-label {
+  flex: 1;
+}
+
+.debt-card__charge-date {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The total, under the list. It is the FILTERED total when a pill is pressed — a sum that
+ * ignored the filter above it would answer a question nobody asked. */
+.collections-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin: 0;
+  padding-block-start: var(--space-3);
+  border-block-start: var(--border-width-hairline) solid var(--border);
+  font-weight: var(--weight-medium);
+}
+
+/* Checkpoint 10 — the two writes on the prices screen that used to fail in silence. */
+.plans-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-caption);
+}
+
+/* ── the item catalogue ─────────────────────────────────────────────────────────────
+ * Checkpoint 11. The prototype's product grid: the photo leads, then the name and price,
+ * then the sizes, then the controls. The screen this replaces stacked every item as a
+ * full-width row with the photo LAST, which is the opposite order to the one a manager
+ * shopping their own catalogue reads in.
+ *
+ * No stock number anywhere — `Product` refuses inventory by an explicit product decision
+ * recorded in its own docstring, and §4 rule 1. The prototype draws "184 units"; drawing
+ * one here would mean inventing it at render time. */
+.items-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: var(--space-4);
+}
+
+.item-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-3);
+}
+
+.item-card:hover {
+  border-color: var(--border-strong);
+}
+
+/* A fixed ratio so a grid of items keeps its rows aligned whatever shape the photos are —
+ * and so an item with no photo yet is the same size as one with. Capped, because a club
+ * that has not uploaded photos yet would otherwise get a page of large empty rectangles:
+ * the ratio governs the shape, the cap governs how much of the screen it may take. */
+.item-card__photo {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 3 / 2;
+  max-block-size: 9rem;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+}
+
+.item-card__photo > img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+/* The whole photo box is the file control now, so it fills its parent and says so with a
+ * pointer. `.item-card__photo` keeps the 3:2 ratio and the crop; this only makes it
+ * pressable. */
+.item-card__photo-drop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 100%;
+  block-size: 100%;
+  cursor: pointer;
+}
+
+.item-card__photo-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  text-align: center;
+}
+
+/* Visually hidden, NOT `display: none`: the input must stay focusable and stay in the
+ * accessibility tree, or the picker becomes mouse-only. This is the same treatment
+ * `shared/ImagePicker.tsx` gives its own input, for the same reason. */
+.item-card__photo-input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The retired chip sits ON the photo, so a retired item reads as retired before the eye
+ * reaches its name — and it is a word, never a dimmed thumbnail alone. */
+.item-card__retired {
+  position: absolute;
+  inset-block-start: var(--space-2);
+  inset-inline-start: var(--space-2);
+}
+
+.item-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.item-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.item-card__name {
+  font-weight: var(--weight-semibold);
+}
+
+.item-card__price {
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+
+.item-card__sizes {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.item-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding-block-start: var(--space-3);
+  border-block-start: var(--border-width-hairline) solid var(--border);
+  margin-block-start: auto;
+  font-size: var(--text-caption);
+}
+
+.item-card__error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-caption);
+}

@@ -60,7 +60,24 @@ export const people: Bundle = {
   'status.membershipHistory': 'Membership history',
   'student.attendance': 'Attendance history',
   'student.attendanceEmpty': 'No attendance recorded yet',
+  'student.belt': 'Current belt',
+  'student.presentOf': 'Present at {{present}} of {{total}}',
+  'student.weeklyVolume': 'Sessions per week',
+  'student.statusHistory': 'Status history',
+  'student.historyEmpty': 'No status changes',
+  'guardian.phone': 'Guardian phone',
   'student.attendanceMarkedOn': 'Marked on',
+
+  // -- 4a's tab strip (dashboard redesign) — groups the card's existing sections under
+  // four tabs instead of one long scroll. The freeze/convert/mark-lost actions stay
+  // outside the tabs; they act on the student, not on a tab.
+  'student.tab.legend': 'Display tab',
+  'student.tab.general': 'General',
+  'student.tab.training': 'Training',
+  'student.tab.finance': 'Finance',
+  'student.tab.health': 'Health',
+  'student.tab.healthHint': 'Health documents are managed on the documents screen.',
+  'student.tab.healthLink': 'Go to the documents screen',
 
   'guardian.one': 'Guardian',
   'guardian.plural': 'Guardians',
@@ -276,6 +293,7 @@ export const people: Bundle = {
   'freeze.from': 'From',
   'freeze.to': 'Until',
   'freeze.openEnded': 'No end date',
+  'freeze.until': 'Frozen until {{date}}',
   'freeze.reason': 'Reason',
   'freeze.submit': 'Freeze',
   'freeze.active': 'Membership is frozen',
@@ -1019,4 +1037,5 @@ export const people: Bundle = {
   'bookTrial.error.email': 'That email address is not valid',
   'bookTrial.error.consent': 'You need to accept the terms to continue',
   'bookTrial.error.health': 'Please answer the health declaration',
+  'alerts.subtitle': 'Everything waiting on a decision — in one place, empty queues included.',
 }

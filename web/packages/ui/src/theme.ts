@@ -4,7 +4,7 @@ export type ResolvedTheme = 'light' | 'dark'
 export const THEME_STORAGE_KEY = 'studio.theme'
 
 /** Which palette a surface wears. See `docs/design/decisions.md`. */
-export type Surface = 'inward' | 'outward' | 'staff'
+export type Surface = 'inward' | 'outward' | 'staff' | 'studio-os'
 
 /**
  * The `--ground` value per theme, so a manifest and a meta tag cannot drift from
@@ -35,6 +35,10 @@ export const GROUND_COLOR: Record<Surface, Record<ResolvedTheme, string>> = {
     light: '#f6f9fd',
     dark: '#090d16',
   },
+  'studio-os': {
+    light: '#f2f5f3',
+    dark: '#101319',
+  },
 }
 
 /** The inward palette, kept under its original name for the two apps that wear it. */
@@ -49,6 +53,7 @@ export function surfaceOf(element: { dataset: DOMStringMap } | null | undefined)
   const surface = element?.dataset.surface
   if (surface === 'outward') return 'outward'
   if (surface === 'staff') return 'staff'
+  if (surface === 'studio-os') return 'studio-os'
   return 'inward'
 }
 

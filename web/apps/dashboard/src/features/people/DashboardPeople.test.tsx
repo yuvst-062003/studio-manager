@@ -707,6 +707,15 @@ describe('AddStudentScreen — 3c', () => {
   })
 })
 
+/** Open one of the student card's four tabs. The cards used to be one long scroll; the
+ *  redesign groups them, so a test asserting on `training` content has to get there the
+ *  way a manager does. */
+async function openDetailTab(locale: 'he', key: 'general' | 'training' | 'finance' | 'health') {
+  await userEvent.click(
+    await screen.findByRole('tab', { name: t(locale, `people.student.tab.${key}`) }),
+  )
+}
+
 // -- 4a: the manager's card -----------------------------------------------------
 
 describe('StudentDetailScreen — 4a', () => {
@@ -714,7 +723,46 @@ describe('StudentDetailScreen — 4a', () => {
     render(<StudentDetailScreen studentId="st1" locale="he" client={makeClient()} />)
     expect(await screen.findByTestId('student-detail')).toBeInTheDocument()
     expect(screen.getByTestId('detail-enrollment')).toBeInTheDocument()
+    await openDetailTab('he', 'training')
     expect(screen.getByTestId('detail-history')).toBeInTheDocument()
+  })
+
+  it('offers a retry when the card fails to load, rather than a permanent placeholder', async () => {
+    // The defect this was written for: the load was `Promise.all(...).catch(() => undefined)`
+    // and the screen gated on `if (!student) return <p data-testid="student-detail-loading" />`.
+    // A failed fetch therefore left `student` null forever, so a dead card and a slow one
+    // were the same screen — an empty box with no message and nothing to press. Found in
+    // the 2026-09-10 audit; §3.6 of the redesign spec.
+    const client = makeClient({ student: vi.fn(() => Promise.reject(new Error('offline'))) })
+    render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
+
+    expect(await screen.findByTestId('load-failed')).toBeInTheDocument()
+    expect(screen.queryByTestId('student-detail-loading')).not.toBeInTheDocument()
+  })
+
+  it('reloads the card when the retry is pressed', async () => {
+    // A retry that does not re-fetch is a button that renders and does nothing, which the
+    // F2 guard exists to stop and which a `location.reload()` would hide rather than fix.
+    let attempt = 0
+    const client = makeClient({
+      student: vi.fn(() => {
+        attempt += 1
+        return attempt === 1
+          ? Promise.reject(new Error('offline'))
+          : Promise.resolve({
+              ...summary(),
+              current_belt_color_hex: '#ffffff',
+              current_belt_name: 'לבנה',
+              guardians: [],
+            })
+      }),
+    })
+    render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
+
+    await userEvent.click(await screen.findByTestId('load-failed-retry'))
+
+    expect(await screen.findByTestId('student-detail')).toBeInTheDocument()
+    expect(attempt).toBe(2)
   })
 
   it('shows the C11 volume beside the plan field', async () => {
@@ -757,10 +805,20 @@ describe('StudentDetailScreen — 4a', () => {
     expect(screen.getByTestId('detail-mark-lost')).toBeInTheDocument()
   })
 
-  it('renders narrow as well as wide', async () => {
+  it('lays out from a stylesheet, with no physical properties, so it can render narrow', async () => {
     // §6.4 — 'a manager checking cover from a phone is a normal case rather than an error.'
-    render(<StudentDetailScreen studentId="st1" locale="he" client={makeClient()} />)
-    expect(await screen.findByTestId('student-detail')).toHaveStyle({ display: 'grid' })
+    //
+    // This used to assert `display: grid` on an inline style object. That style was the
+    // auto-fit card grid the redesign replaced, and asserting it pinned an implementation
+    // detail rather than the rule. jsdom resolves no stylesheet, so the breakpoint itself
+    // cannot be checked here — what CAN be, and is what actually breaks a narrow render in
+    // an RTL document, is a physical `left`/`margin-left` sneaking into an inline style.
+    const { container } = render(
+      <StudentDetailScreen studentId="st1" locale="he" client={makeClient()} />,
+    )
+    const card = await screen.findByTestId('student-detail')
+    expect(card).toHaveClass('student-card')
+    noPhysicalCss(container)
   })
 
   // -- Decision 20's nameless guardian --------------------------------------------
@@ -815,14 +873,20 @@ describe('StudentDetailScreen — 4a', () => {
   // history — and the one question a manager asks about a child before phoning their
   // parent ("has she been coming?") had no answer on the screen.
 
-  it('shows the student’s attendance history, through the shared strip', async () => {
+  it('shows the attendance history as dated marks, not anonymous ticks', async () => {
+    // Was the shared `AttendanceStrip`. It drew one glyph per mark with no date on it, so a
+    // child who attended nine times rendered as nine identical ticks — one bit of
+    // information repeated nine times, saying nothing about WHICH lesson. The owner's
+    // verdict on seeing it was "the 9 ✅ is irrelevant", and it was.
+    //
+    // The prototype draws each mark as a dated cell carrying a word, and every part of that
+    // is already on the row: `device_marked_at` is the day the lesson happened.
     const client = makeClient()
     render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
 
-    expect(await screen.findByTestId('detail-attendance')).toBeInTheDocument()
-    // The SAME primitive parent `2c` and staff `9c` render, so the three surfaces cannot
-    // drift into three different pictures of one child's attendance.
-    expect(screen.getByTestId('attendance-strip')).toBeInTheDocument()
+    await openDetailTab('he', 'training')
+    const section = await screen.findByTestId('detail-attendance')
+    expect(within(section).getAllByTestId('detail-mark')).toHaveLength(3)
     expect(client.attendance).toHaveBeenCalledWith('st1')
   })
 
@@ -832,17 +896,17 @@ describe('StudentDetailScreen — 4a', () => {
     // right is the opposite order, so the screen reverses it rather than drawing a
     // history that runs backwards.
     render(<StudentDetailScreen studentId="st1" locale="he" client={makeClient()} />)
+    await openDetailTab('he', 'training')
     const section = await screen.findByTestId('detail-attendance')
 
-    // `role="img"` with an accessible name is what `AttendanceMark` renders; the legend's
-    // copies of it are `aria-hidden`, so they are not in this list. Scoped to the section
-    // because the belt bar in the header is a labelled `img` too.
-    const labels = within(section)
-      .getAllByRole('img')
-      .map((node) => node.getAttribute('aria-label') ?? '')
-    expect(labels).toHaveLength(3)
-    expect(labels[0]).toContain(t('he', 'attendance.roster.present'))
-    expect(labels[2]).toContain(t('he', 'attendance.roster.absent'))
+    // Read off the VISIBLE word in each cell rather than an `aria-label` on a glyph — the
+    // log states each mark in words, so the assertion can read what a manager reads.
+    const states = within(section)
+      .getAllByTestId('detail-mark')
+      .map((node) => node.textContent ?? '')
+    expect(states).toHaveLength(3)
+    expect(states[0]).toContain(t('he', 'attendance.roster.present'))
+    expect(states[2]).toContain(t('he', 'attendance.roster.absent'))
   })
 
   it('says so when nothing has been marked, rather than drawing an empty strip', async () => {
@@ -854,6 +918,7 @@ describe('StudentDetailScreen — 4a', () => {
     } as unknown as Partial<DashboardPeopleClient>)
     render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
 
+    await openDetailTab('he', 'training')
     expect(await screen.findByTestId('detail-attendance-empty')).toHaveTextContent(
       t('he', 'people.student.attendanceEmpty'),
     )
@@ -874,6 +939,7 @@ describe('StudentDetailScreen — 4a', () => {
       ),
     } as unknown as Partial<DashboardPeopleClient>)
     render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
+    await openDetailTab('he', 'training')
     await screen.findByTestId('detail-attendance')
 
     expect(document.body.textContent ?? '').not.toContain('הגיעה עצובה')
@@ -887,6 +953,7 @@ describe('StudentDetailScreen — 4a', () => {
     } as unknown as Partial<DashboardPeopleClient>)
     render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
 
+    await openDetailTab('he', 'training')
     expect(await screen.findByTestId('detail-history')).toBeInTheDocument()
     expect(screen.getByTestId('detail-attendance-empty')).toBeInTheDocument()
   })
