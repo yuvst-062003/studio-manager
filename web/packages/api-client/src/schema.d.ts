@@ -997,6 +997,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/classes/{class_id}/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Class Staff
+         * @description Who coaches this class, main coach first.
+         *
+         *     Readable by any staff member: §3.2 makes MANAGING staff a manager's act, but knowing who
+         *     else teaches your class is neither a financial nor a personal-data read, and a coach app
+         *     that could not show it would be worse than useless on the mat.
+         */
+        get: operations["list_class_staff_api_v1_classes__class_id__staff_get"];
+        put?: never;
+        /**
+         * Add Class Staff
+         * @description Owner, 2026-09-09: "if a coach is in both, the studio manager needs to add his
+         *     details in both classes." So this is per class, and a person genuinely holds two rows.
+         *
+         *     200 rather than 201 when the coach was already there: re-adding creates nothing, and a
+         *     role change on an existing row is an edit rather than a creation. Saying 201 to both
+         *     makes a correct retry indistinguishable from a first assignment in any log that reads
+         *     status codes -- the same reasoning as the group route above.
+         */
+        post: operations["add_class_staff_api_v1_classes__class_id__staff_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/classes/{class_id}/staff/{person_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Class Staff
+         * @description Closes the row rather than deleting it -- who taught a class last year is history the
+         *     sessions already point at.
+         *
+         *     409 while they still hold one of this class's groups. Letting it through would create
+         *     the exact state the assignment rule forbids, made by the act meant to tidy up, and the
+         *     next reader could not tell a bug from an exception somebody meant.
+         */
+        delete: operations["remove_class_staff_api_v1_classes__class_id__staff__person_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/closures": {
         parameters: {
             query?: never;
@@ -7055,6 +7114,30 @@ export interface components {
              */
             student_id: string;
         };
+        /**
+         * ClassCoachOut
+         * @description One coach of one class, as a roster screen reads them.
+         *
+         *     Carries `display_name` because every caller wants it and the alternative is each screen
+         *     joining `person` for itself -- which is where two screens start showing the same coach
+         *     under two different names.
+         */
+        ClassCoachOut: {
+            /** Display Name */
+            display_name: string;
+            /**
+             * From Date
+             * Format: date
+             */
+            from_date: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Role */
+            role: string;
+        };
         /** ClassCreate */
         ClassCreate: {
             /** Color */
@@ -7116,6 +7199,31 @@ export interface components {
             is_active: boolean;
             /** Name */
             name: string;
+        };
+        /**
+         * ClassStaffCreate
+         * @description Put a person on a class's coaching roster.
+         *
+         *     The role pattern is the GROUP one deliberately: "main coach" and "assistant" mean the
+         *     same thing at both levels, and a second vocabulary for one idea is how two screens end
+         *     up disagreeing about who runs a class. `manager` is not here -- a manager scoped to a
+         *     class is a role assignment, not somebody on the mat.
+         */
+        ClassStaffCreate: {
+            /** From Date */
+            from_date?: string | null;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Role */
+            role: string;
+        };
+        /** ClassStaffListResponse */
+        ClassStaffListResponse: {
+            /** Items */
+            items: components["schemas"]["ClassCoachOut"][];
         };
         /** ClosureCreate */
         ClosureCreate: {
@@ -12138,6 +12246,11 @@ export interface components {
         };
         /** StaffInvitationIn */
         StaffInvitationIn: {
+            /**
+             * Class Ids
+             * @description Classes this MANAGER runs, for a manager scoped to classes rather than to the whole studio (2026-09-09). Non-empty means the grants written are class-scoped and no studio-wide one is written at all — a studio row beside them would hand back exactly the club-wide authority the scoping withholds. Only valid with `roles: ["manager"]`; a coach's scope is the roster `group_ids` puts them on.
+             */
+            class_ids?: string[];
             /** Email */
             email: string;
             /** First Name */
@@ -12823,6 +12936,11 @@ export interface components {
         StudioMembershipOut: {
             /** Is Guardian */
             is_guardian: boolean;
+            /**
+             * Managed Class Ids
+             * @default []
+             */
+            managed_class_ids: string[];
             /**
              * Person Id
              * Format: uuid
@@ -15145,6 +15263,102 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ClassOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_class_staff_api_v1_classes__class_id__staff_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassStaffListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_class_staff_api_v1_classes__class_id__staff_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClassStaffCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassCoachOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_class_staff_api_v1_classes__class_id__staff__person_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                class_id: string;
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

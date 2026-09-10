@@ -74,6 +74,16 @@ class StaffInvitationIn(BaseModel):
             "sign in. Empty means no group yet, which §3.3 allows."
         ),
     )
+    class_ids: list[uuid.UUID] = Field(
+        default_factory=list,
+        description=(
+            "Classes this MANAGER runs, for a manager scoped to classes rather than to the "
+            "whole studio (2026-09-09). Non-empty means the grants written are class-scoped "
+            "and no studio-wide one is written at all — a studio row beside them would hand "
+            "back exactly the club-wide authority the scoping withholds. Only valid with "
+            "`roles: [\"manager\"]`; a coach's scope is the roster `group_ids` puts them on."
+        ),
+    )
 
 
 class StaffInvitationOut(BaseModel):

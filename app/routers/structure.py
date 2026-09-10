@@ -17,16 +17,24 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 
-from app.core.auth_context import AnyStaff, ManagerOrOwner
+from app.core.auth_context import (
+    AnyStaff,
+    ManagerOfClass,
+    ManagerOrOwner,
+    StaffOrClassManager,
+)
 from app.core.clock import now
-from app.core.tenancy import TenantSessionDep
+from app.core.tenancy import TenantSessionDep, require_current_studio_id
 from app.routers.health_templates import TemplateReader
 from app.schemas.structure import (
     DEFAULT_PAGE_SIZE,
     MAX_PAGE_SIZE,
+    ClassCoachOut,
     ClassCreate,
     ClassListResponse,
     ClassOut,
+    ClassStaffCreate,
+    ClassStaffListResponse,
     GroupCreate,
     GroupListResponse,
     GroupOut,
@@ -39,6 +47,13 @@ from app.schemas.structure import (
     LocationCreate,
     LocationListResponse,
     LocationOut,
+)
+from app.services.structure.class_staff import (
+    BadClassRoleError,
+    ClassStaffNotFoundError,
+    ClassStaffService,
+    NotAClassCoachError,
+    StillCoachingError,
 )
 from app.services.structure.service import DuplicateNameError, NotFoundError, StructureService
 
@@ -227,6 +242,13 @@ def assign_group_staff(
         )
     except NotFoundError as exc:
         raise _not_found() from exc
+    except NotAClassCoachError as exc:
+        # 422 and NOT 403: the manager is allowed to do this, the person is not eligible
+        # yet. The message names the class, because the next action is to add them to it.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "not_a_class_coach", "message": str(exc)},
+        ) from exc
     session.commit()
     # 201 means Created. Re-assigning a coach who is already on the group creates
     # nothing, and saying otherwise would make a correct retry indistinguishable from a
@@ -234,6 +256,109 @@ def assign_group_staff(
     if not created:
         response.status_code = status.HTTP_200_OK
     return GroupStaffOut.model_validate(row, from_attributes=True)
+
+
+# -- a class's own coaches (2026-09-09) ---------------------------------------
+@router.get("/classes/{class_id}/staff", response_model=ClassStaffListResponse)
+def list_class_staff(
+    _: StaffOrClassManager, class_id: uuid.UUID, session: TenantSessionDep
+) -> ClassStaffListResponse:
+    """Who coaches this class, main coach first.
+
+    Readable by any staff member: §3.2 makes MANAGING staff a manager's act, but knowing who
+    else teaches your class is neither a financial nor a personal-data read, and a coach app
+    that could not show it would be worse than useless on the mat.
+    """
+    rows = ClassStaffService(session).coaches(class_id)
+    return ClassStaffListResponse(
+        items=[
+            ClassCoachOut(
+                person_id=row.person_id,
+                display_name=row.display_name,
+                role=row.role,
+                from_date=row.from_date,
+            )
+            for row in rows
+        ]
+    )
+
+
+@router.post(
+    "/classes/{class_id}/staff",
+    response_model=ClassCoachOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_class_staff(
+    _: ManagerOfClass,
+    class_id: uuid.UUID,
+    body: ClassStaffCreate,
+    response: Response,
+    session: TenantSessionDep,
+) -> ClassCoachOut:
+    """Owner, 2026-09-09: "if a coach is in both, the studio manager needs to add his
+    details in both classes." So this is per class, and a person genuinely holds two rows.
+
+    200 rather than 201 when the coach was already there: re-adding creates nothing, and a
+    role change on an existing row is an edit rather than a creation. Saying 201 to both
+    makes a correct retry indistinguishable from a first assignment in any log that reads
+    status codes -- the same reasoning as the group route above.
+    """
+    service = ClassStaffService(session)
+    try:
+        row, created = service.add_coach(
+            require_current_studio_id(),
+            class_id,
+            body.person_id,
+            role=body.role,
+            from_date=body.from_date or now().date(),
+        )
+    except ClassStaffNotFoundError as exc:
+        raise _not_found() from exc
+    except BadClassRoleError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "refused", "message": str(exc)},
+        ) from exc
+    session.commit()
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    for coach in service.coaches(class_id):
+        if coach.person_id == row.person_id:
+            return ClassCoachOut(
+                person_id=coach.person_id,
+                display_name=coach.display_name,
+                role=coach.role,
+                from_date=coach.from_date,
+            )
+    # Unreachable: the row was just written and `coaches` reads the live rows.
+    raise _not_found()
+
+
+@router.delete("/classes/{class_id}/staff/{person_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_class_staff(
+    _: ManagerOfClass,
+    class_id: uuid.UUID,
+    person_id: uuid.UUID,
+    session: TenantSessionDep,
+) -> Response:
+    """Closes the row rather than deleting it -- who taught a class last year is history the
+    sessions already point at.
+
+    409 while they still hold one of this class's groups. Letting it through would create
+    the exact state the assignment rule forbids, made by the act meant to tidy up, and the
+    next reader could not tell a bug from an exception somebody meant.
+    """
+    try:
+        ClassStaffService(session).remove_coach(class_id, person_id, on=now().date())
+    except ClassStaffNotFoundError as exc:
+        raise _not_found() from exc
+    except StillCoachingError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "still_coaching", "message": str(exc)},
+        ) from exc
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # -- health templates (conflict C3) -------------------------------------------

@@ -137,6 +137,10 @@ class PricePlan(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
         ),
         CheckConstraint("monthly_amount_agorot >= 0", name="price_plan_monthly_non_negative"),
         Index("ix_price_plan_studio_id_active_from", "studio_id", "active_from"),
+        # Declared here because revision 0027 CREATED it and this model never mentioned it,
+        # so the autogenerate gate saw an index it did not know and wanted to drop one the
+        # per-class price editor reads on every load.
+        Index("ix_price_plan_studio_id_class_id", "studio_id", "class_id"),
     )
 
     name: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -271,6 +275,10 @@ class Product(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
         # would then be asking whether a character is in a word.
         CheckConstraint("jsonb_typeof(sizes) = 'array'", name="product_sizes_is_array"),
         Index("ix_product_studio_id_is_active", "studio_id", "is_active"),
+        # Same as `price_plan`'s below-the-line index: created by revision 0027, never
+        # declared. The parent shop's query is (studio, class, active) and nothing else, so
+        # letting autogenerate drop it would take the index off the hottest read in the app.
+        Index("ix_product_studio_id_class_id", "studio_id", "class_id"),
     )
 
     name: Mapped[str] = mapped_column(String(120), nullable=False)

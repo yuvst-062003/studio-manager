@@ -172,7 +172,9 @@ def test_a_group_carries_the_days_it_trains(client, studio, a_group, with_slots)
 def test_a_group_carries_the_times_it_trains(client, studio, a_group, with_slots):
     """L1 -- region 4 and 13c's schedule cards draw `days · HH:MM`. 14:00 UTC in September
     is 17:00 in Jerusalem; both fixture sessions start then, so the set has one member."""
-    groups = client.get(f"/api/v1/public/studios/{studio.slug}/groups").json()["items"]
+    groups = client.get(
+        f"/api/v1/public/studios/{studio.slug}/groups", headers=DEV_NOW_HEADERS
+    ).json()["items"]
     group = next(g for g in groups if uuid.UUID(g["id"]) == a_group)
     assert group["training_times"] == ["17:00"]
 
@@ -194,7 +196,9 @@ def test_a_group_whose_sessions_are_all_one_length_reports_that_one_value(
     client, studio, a_group, with_slots
 ):
     """Both fixture sessions run the default one hour, so the card gets one number."""
-    groups = client.get(f"/api/v1/public/studios/{studio.slug}/groups").json()["items"]
+    groups = client.get(
+        f"/api/v1/public/studios/{studio.slug}/groups", headers=DEV_NOW_HEADERS
+    ).json()["items"]
     group = next(g for g in groups if uuid.UUID(g["id"]) == a_group)
     assert group["training_durations_min"] == [60]
 
@@ -334,7 +338,9 @@ def test_a_groups_locations_come_from_its_sessions_deduplicated(
         session.location_id = hall.id
     monkeypatch.setattr(public_router, "schedule_reader", lambda _session: fake)
 
-    groups = client.get(f"/api/v1/public/studios/{studio.slug}/groups").json()["items"]
+    groups = client.get(
+        f"/api/v1/public/studios/{studio.slug}/groups", headers=DEV_NOW_HEADERS
+    ).json()["items"]
     group = next(g for g in groups if uuid.UUID(g["id"]) == a_group)
     assert group["locations"] == ["אולם א"]
 

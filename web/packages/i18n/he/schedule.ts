@@ -323,6 +323,21 @@ export const schedule: Bundle = {
   // -- groups and cycles (4b) ------------------------------------------------------
   'groups.title': 'קבוצות ומחזורים',
   'group.coaches.title': 'מאמני הקבוצה',
+  // ── מאמני החוג (2026-09-09) ───────────────────────────────────────────────────
+  // The roster a group assignment is drawn FROM. Owner: "only class coaches can be
+  // assigned to the class", so the group picker below reads this list and nothing wider.
+  'class.coaches.title': 'מאמני החוג',
+  'class.coaches.hint': 'רק מאמנים שרשומים כאן אפשר לשבץ לקבוצות של החוג הזה. מאמן שמלמד בשני חוגים נרשם בשניהם בנפרד.',
+  'class.coaches.empty': 'עדיין לא רשומים מאמנים לחוג הזה',
+  'class.coaches.person': 'איש צוות',
+  'class.coaches.choose': 'בחרו איש צוות',
+  'class.coaches.role': 'תפקיד',
+  'class.coaches.add': 'הוספה לחוג',
+  'class.coaches.remove': 'הסרה',
+  'class.coaches.addFailed': 'ההוספה נכשלה. נסו שוב.',
+  'class.coaches.removeFailed': 'ההסרה נכשלה. נסו שוב.',
+  // The one refusal a manager can act on, so it says what to do rather than "failed".
+  'class.coaches.removeBlocked': 'המאמן עדיין משובץ לקבוצה בחוג הזה. הסירו אותו מהקבוצה קודם.',
   'group.coaches.empty': 'לא שובץ מאמן לקבוצה',
   'group.coaches.person': 'איש צוות',
   'groups.create': 'קבוצה חדשה',

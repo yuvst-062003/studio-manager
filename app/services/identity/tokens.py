@@ -61,6 +61,12 @@ class AccessClaims:
     is_platform_admin: bool
     issued_at: datetime
     expires_at: datetime
+    #: Classes this person MANAGES, when their grant is scoped to one class rather than to
+    #: the studio. Separate from `roles` on purpose: folded in, a class-scoped `manager`
+    #: would read as a plain one to `require_roles` and open the whole studio. Last in the
+    #: dataclass because it is the only field with a default -- the three call sites that
+    #: build claims for a real session all pass it.
+    managed_class_ids: tuple[uuid.UUID, ...] = ()
 
 
 def _uuid_or_none(raw: Any) -> uuid.UUID | None:
@@ -74,6 +80,7 @@ def mint_access_token(claims: AccessClaims, *, key: str) -> str:
         "sid": str(claims.active_studio_id) if claims.active_studio_id else None,
         "aap": str(claims.acting_as_person_id) if claims.acting_as_person_id else None,
         "roles": list(claims.roles),
+        "mcls": [str(class_id) for class_id in claims.managed_class_ids],
         "dev": claims.is_developer,
         "demo": claims.studio_is_demo,
         "padm": claims.is_platform_admin,
@@ -124,6 +131,7 @@ def verify_access_token(token: str, *, key: str, at: datetime) -> AccessClaims:
         active_studio_id=active_studio_id,
         acting_as_person_id=acting_as_person_id,
         roles=tuple(payload.get("roles") or ()),
+        managed_class_ids=tuple(uuid.UUID(str(raw)) for raw in (payload.get("mcls") or ())),
         is_developer=bool(payload.get("dev", False)),
         studio_is_demo=bool(payload.get("demo", False)),
         is_platform_admin=bool(payload.get("padm", False)),

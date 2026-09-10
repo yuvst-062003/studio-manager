@@ -14,8 +14,10 @@ from datetime import date, datetime
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import require_current_studio_id
 from app.models.person import Person, RoleAssignment
 from app.models.structure import Class, Group, GroupStaff, Location
+from app.services.structure.class_staff import ClassStaffService
 
 
 class DuplicateNameError(Exception):
@@ -247,6 +249,14 @@ class StructureService:
         StructureService.get_group(session, group_id)
         if session.get(Person, person_id) is None:
             raise NotFoundError(str(person_id))
+        # Owner, 2026-09-09: "only class coaches can be assigned to the class." Enforced
+        # HERE rather than by hiding people in a picker, because a picker that merely hides
+        # an outsider is a picker an API call goes around -- and this decides who stands in
+        # front of a class of children. A studio manager or the owner is exempt: they are
+        # studio-wide staff by definition, and they are also who does the assigning.
+        ClassStaffService(session).admit_to_group(
+            require_current_studio_id(), person_id, group_id, role=role
+        )
 
         existing = session.execute(
             select(GroupStaff).where(

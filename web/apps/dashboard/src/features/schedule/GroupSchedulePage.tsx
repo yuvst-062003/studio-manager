@@ -18,6 +18,7 @@ import { formatDateInStudioZone, formatTimeInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { GroupTrainingPanel } from '../training/GroupTrainingPanel'
+import { ClassCoachPanel } from './ClassCoachPanel'
 import { GroupCoachPanel } from './GroupCoachPanel'
 import { ImpactDialog } from './ImpactDialog'
 import { cancelReasonLabel } from './client'
@@ -94,6 +95,12 @@ export function GroupSchedulePage({
   groupName: string
   client: ScheduleClient
 }) {
+  //: Which class this group belongs to. Resolved here rather than threaded in as a prop:
+  //: the page already takes `groupName` and not the group itself, and two coach panels need
+  //: the class — so it is fetched once and shared instead of twice and possibly disagreeing.
+  const [klass, setKlass] = useState<{ id: string; name: string } | null>(null)
+  //: Bumped when the class roster changes, so the group picker below re-reads it.
+  const [rosterVersion, setRosterVersion] = useState(0)
   const [rules, setRules] = useState<ScheduleRule[]>([])
   const [sessions, setSessions] = useState<SessionRow[]>([])
   const [year, setYear] = useState<TrainingYear | null>(null)
@@ -101,6 +108,23 @@ export function GroupSchedulePage({
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [preview, setPreview] = useState<ImpactPreview | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    void client
+      .listGroups()
+      .then((rows) => {
+        if (!alive) return
+        const found = rows.find((row) => row.id === groupId)
+        setKlass(
+          found && found.classId ? { id: found.classId, name: found.className || '' } : null,
+        )
+      })
+      .catch(() => alive && setKlass(null))
+    return () => {
+      alive = false
+    }
+  }, [client, groupId])
   const [busy, setBusy] = useState(false)
   const [effectiveFrom, setEffectiveFrom] = useState('')
 
@@ -209,10 +233,30 @@ export function GroupSchedulePage({
         <GroupTrainingPanel locale={locale} groupId={groupId} />
       </Card>
 
+      {/* 2026-09-09 — the CLASS's roster, above the group's own picker, because that is the
+          order the work happens in: a coach joins the class, and only then can they be put
+          on one of its groups. The picker below reads this list, so the two are one screen
+          rather than two places to keep in step. */}
+      {klass ? (
+        <Card>
+          <ClassCoachPanel
+            classId={klass.id}
+            className={klass.name}
+            locale={locale}
+            onChanged={() => setRosterVersion((n) => n + 1)}
+          />
+        </Card>
+      ) : null}
+
       {/* F4.1 — coach assignment lives on the group page; the staff screen's uncovered
           alert links here. */}
       <Card>
-        <GroupCoachPanel groupId={groupId} locale={locale} />
+        <GroupCoachPanel
+          classId={klass?.id}
+          groupId={groupId}
+          locale={locale}
+          rosterVersion={rosterVersion}
+        />
       </Card>
 
       <Card>

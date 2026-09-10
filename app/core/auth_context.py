@@ -19,6 +19,7 @@ claimed anything*.
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Awaitable, Callable
 from typing import Annotated
 
@@ -58,6 +59,11 @@ class AuthContextMiddleware(BaseHTTPMiddleware):
             # auth router resolved the studio.
             request.state.studio_id = claims.active_studio_id
             request.state.roles = claims.roles
+            # Kept OUT of `roles` on purpose (see `resolution.py`): a class-scoped manager
+            # must not read as a studio one. Routes that mean to honour the grant ask for
+            # this list explicitly, so a route that has not been taught about it refuses
+            # them -- which is the safe direction for a permission.
+            request.state.managed_class_ids = claims.managed_class_ids
             # §19.6's two inputs, both from VERIFIED claims. Deriving either after
             # verification -- a database read, a config lookup -- would be a second source
             # of truth for a decision that already has one.
@@ -114,6 +120,78 @@ def require_roles(*allowed: str) -> Callable[[Request], None]:
 #: §3.2 -- 'Create/edit classes, groups, schedules' and 'Manage staff and role
 #: assignments'. A coach who can create a group can assign themselves to it.
 ManagerOrOwner = Annotated[None, Depends(require_roles("owner", "manager"))]
+
+
+def _managed_class_ids(request: Request) -> tuple[uuid.UUID, ...]:
+    raw = getattr(request.state, "managed_class_ids", ()) or ()
+    return tuple(raw)
+
+
+def require_class_scope(request: Request) -> None:
+    """Owner, a STUDIO manager, or the manager of the class named in the path.
+
+    A class-scoped manager is deliberately absent from `request.state.roles` -- folded in,
+    their grant would read as a studio one and open every manager route in the product
+    (`resolution.py` says why at length). So honouring the grant is opt-in, per route, and
+    a route that has not opted in refuses them. That is the safe direction: a permission
+    that has to be granted explicitly cannot leak by omission.
+
+    Reads `class_id` off the path rather than taking it as an argument, because FastAPI
+    resolves a dependency before the handler's own parameters and the path is where the
+    value already is. A route without a `class_id` path parameter therefore gets the
+    studio-wide answer and nothing else, which is what it should get.
+    """
+    if getattr(request.state, "identity_id", None) is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "unauthenticated", "message": "sign in first"},
+        )
+    roles = set(getattr(request.state, "roles", ()) or ())
+    if roles & {"owner", "manager"}:
+        return
+    raw = request.path_params.get("class_id")
+    try:
+        class_id = uuid.UUID(str(raw))
+    except TypeError, ValueError:
+        class_id = None
+    if class_id is not None and class_id in _managed_class_ids(request):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail={"code": "forbidden", "message": "this action is not yours"},
+    )
+
+
+def require_staff_or_class_manager(request: Request) -> None:
+    """`AnyStaff`, widened to include a manager of any class.
+
+    A class manager holds no row in `roles` at all, so without this they are not staff by
+    any measure and could not read the roster of the very class they run. Widened HERE
+    rather than inside `AnyStaff` itself: that alias gates attendance, rosters and half the
+    coach app, and quietly admitting a new kind of caller to all of it is exactly the sort
+    of change that should be made one route at a time.
+    """
+    if getattr(request.state, "identity_id", None) is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "unauthenticated", "message": "sign in first"},
+        )
+    roles = set(getattr(request.state, "roles", ()) or ())
+    if roles & {"owner", "manager", "lead_coach", "assistant_coach"}:
+        return
+    if _managed_class_ids(request):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail={"code": "forbidden", "message": "this action is not yours"},
+    )
+
+
+#: A write on ONE class: owner, a studio manager, or that class's own manager.
+ManagerOfClass = Annotated[None, Depends(require_class_scope)]
+
+#: A read any staff member may make, including a manager scoped to a class.
+StaffOrClassManager = Annotated[None, Depends(require_staff_or_class_manager)]
 
 #: §3.2 -- 'View students in own groups' reaches every staff role, and a roster is
 #: unreadable without the group it belongs to. Refusing reads to coaches would break the

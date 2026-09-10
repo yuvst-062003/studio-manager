@@ -120,6 +120,60 @@ class Group(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     is_invite_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
+#: The roles a coach holds ON A CLASS. Deliberately the same two as `GROUP_STAFF_ROLES`
+#: rather than a new pair: "main coach" and "assistant" mean the same thing at both levels,
+#: and a second vocabulary for one idea is how two screens end up disagreeing about who runs
+#: a class. `manager` is NOT here -- a manager scoped to a class is a `role_assignment` with
+#: `scope_type='class'`, because a manager is not on the mat.
+CLASS_STAFF_ROLES = ("lead_coach", "assistant_coach")
+
+
+class ClassStaff(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
+    """Who coaches a class, and which of them runs it.
+
+    Owner, 2026-09-09: "per class there is its own class main coach and assistance coaches.
+    They are not shareable between classes. If a coach is in both, the studio manager needs
+    to add his details in both classes."
+
+    Until this existed, coaching was recorded one level DOWN -- on the group -- so "who
+    coaches judo" could only be derived from the groups a person happened to be on, and "who
+    is judo's main coach" could not be said at all. `uq_class_staff_live` is what makes the
+    owner's sentence literally true: one live row per (class, person), so a coach who
+    teaches judo AND karate holds two rows and leaving one leaves the other standing.
+
+    **This roster is what makes an assignment legal.** `StructureService.assign_staff`
+    refuses a coach who is not on the roster of the group's class, and the session staffing
+    path refuses the same. That is the rule the owner asked for -- "only class coaches can be
+    assigned to the class" -- and it lives here rather than in a screen, because a screen
+    that merely hides someone is a screen an API call goes around.
+    """
+
+    __tablename__ = "class_staff"
+    __tenant_table_args__ = (
+        CheckConstraint("role IN ('lead_coach', 'assistant_coach')", name="class_staff_role"),
+        CheckConstraint("to_date IS NULL OR to_date >= from_date", name="class_staff_date_range"),
+        Index(
+            "uq_class_staff_live",
+            "class_id",
+            "person_id",
+            unique=True,
+            postgresql_where=text("to_date IS NULL"),
+        ),
+        Index("ix_class_staff_studio_id_class_id", "studio_id", "class_id"),
+        Index("ix_class_staff_studio_id_person_id", "studio_id", "person_id"),
+    )
+
+    class_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("class.id", ondelete="RESTRICT"), nullable=False
+    )
+    person_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("person.id", ondelete="RESTRICT"), nullable=False
+    )
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    from_date: Mapped[date] = mapped_column(Date, nullable=False)
+    to_date: Mapped[date | None] = mapped_column(Date)
+
+
 class GroupStaff(UUIDPrimaryKey, TimestampColumns, TenantMixin, Base):
     """§4.3 -- `group_staff  group_id, person_id, role(lead_coach|assistant_coach),
     from, to?`. `from` and `to` are SQL reserved words, so the columns are `from_date`
