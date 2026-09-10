@@ -210,3 +210,124 @@
   color: var(--danger);
   font-size: var(--text-caption);
 }
+
+/* ── the item catalogue ─────────────────────────────────────────────────────────────
+ * Checkpoint 11. The prototype's product grid: the photo leads, then the name and price,
+ * then the sizes, then the controls. The screen this replaces stacked every item as a
+ * full-width row with the photo LAST, which is the opposite order to the one a manager
+ * shopping their own catalogue reads in.
+ *
+ * No stock number anywhere — `Product` refuses inventory by an explicit product decision
+ * recorded in its own docstring, and §4 rule 1. The prototype draws "184 units"; drawing
+ * one here would mean inventing it at render time. */
+.items-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: var(--space-4);
+}
+
+.item-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-3);
+}
+
+.item-card:hover {
+  border-color: var(--border-strong);
+}
+
+/* A fixed ratio so a grid of items keeps its rows aligned whatever shape the photos are —
+ * and so an item with no photo yet is the same size as one with. Capped, because a club
+ * that has not uploaded photos yet would otherwise get a page of large empty rectangles:
+ * the ratio governs the shape, the cap governs how much of the screen it may take. */
+.item-card__photo {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 3 / 2;
+  max-block-size: 9rem;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+}
+
+.item-card__photo > img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.item-card__photo-empty {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+/* The retired chip sits ON the photo, so a retired item reads as retired before the eye
+ * reaches its name — and it is a word, never a dimmed thumbnail alone. */
+.item-card__retired {
+  position: absolute;
+  inset-block-start: var(--space-2);
+  inset-inline-start: var(--space-2);
+}
+
+.item-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.item-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.item-card__name {
+  font-weight: var(--weight-semibold);
+}
+
+.item-card__price {
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+
+.item-card__sizes {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.item-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding-block-start: var(--space-3);
+  border-block-start: var(--border-width-hairline) solid var(--border);
+  margin-block-start: auto;
+  font-size: var(--text-caption);
+}
+
+.item-card__photo-pick {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+}
+
+.item-card__error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-caption);
+}

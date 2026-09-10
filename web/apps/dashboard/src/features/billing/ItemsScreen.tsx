@@ -40,38 +40,6 @@ const columnStyle: CSSProperties = {
   padding: 'var(--space-5)',
 }
 
-const rowStyle: CSSProperties = {
-  alignItems: 'center',
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 'var(--space-3)',
-}
-
-const nameStyle: CSSProperties = {
-  flex: '1 1 auto',
-  fontWeight: 'var(--weight-medium)',
-  minInlineSize: 0,
-}
-
-//: The row's photo. Fixed square so a portrait and a landscape shot do not change the
-//: card's height — the manager is scanning a list, not viewing a gallery.
-const thumbStyle: CSSProperties = {
-  blockSize: '3rem',
-  inlineSize: '3rem',
-  objectFit: 'cover',
-  borderRadius: 'var(--radius-sm)',
-  border: 'var(--border-width-hairline) solid var(--border)',
-  flexShrink: 0,
-}
-
-const photoRowStyle: CSSProperties = {
-  alignItems: 'center',
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 'var(--space-2)',
-  marginBlockStart: 'var(--space-2)',
-}
-
 const hintStyle: CSSProperties = {
   color: 'var(--text-secondary)',
   fontSize: 'var(--text-caption)',
@@ -135,17 +103,53 @@ export function ItemsScreen({
 
   /** One item row. Extracted so the grouped and ungrouped layouts render the same card
    *  rather than two copies that drift apart. */
+  /**
+   * One item, as the prototype's catalogue draws it: **the photo leads**, then the name and
+   * price, then what sizes it comes in, then the controls. The screen it replaces stacked
+   * every item as a full-width row with the photo last, which is the opposite order to the
+   * one a manager shopping their own catalogue reads in.
+   *
+   * Two things the prototype puts on this card are NOT here, both already in §4: a stock
+   * count (rule 1 — `Product` refuses inventory by an explicit decision in its own
+   * docstring, so any number here would be invented at render time) and a
+   * mandatory-in-cart badge, which has no column.
+   */
   const productCard = (product: ProductOut) => (
-    <Card key={product.id}>
-      <div style={rowStyle}>
-        <span style={nameStyle}>{product.name}</span>
+    <li className="item-card" data-testid={`item-card-${product.id}`} key={product.id}>
+      {/* The photo the parent app's shop renders. Uploading is a SECOND step after the item
+          exists, because the object is keyed by the product's own id — there is nothing to
+          upload against until the row has been created. */}
+      <div className="item-card__photo">
+        {product.image_url ? (
+          <ProductThumb productId={product.id} src={product.image_url} />
+        ) : (
+          <span className="item-card__photo-empty">
+            {t(locale, 'billing.product.photoNone')}
+          </span>
+        )}
         {!product.is_active ? (
-          <StatusChip label={t(locale, 'billing.product.retired')} status="cancelled" />
+          <span className="item-card__retired">
+            <StatusChip label={t(locale, 'billing.product.retired')} status="cancelled" />
+          </span>
         ) : null}
-        <MoneyDisplay
-          agorot={product.price_agorot}
-          label={t(locale, 'billing.product.price')}
-        />
+      </div>
+
+      <div className="item-card__body">
+        <div className="item-card__head">
+          <span className="item-card__name">{product.name}</span>
+          <span className="item-card__price">
+            <MoneyDisplay
+              agorot={product.price_agorot}
+              label={t(locale, 'billing.product.price')}
+            />
+          </span>
+        </div>
+        <p className="item-card__sizes">
+          {t(locale, 'billing.product.sizes')}: {sizesLabel(product, locale)}
+        </p>
+      </div>
+
+      <div className="item-card__actions">
         <Button
           aria-label={`${t(locale, 'billing.product.edit')} ${product.name}`}
           onClick={() => {
@@ -157,35 +161,8 @@ export function ItemsScreen({
         >
           {t(locale, 'billing.product.edit')}
         </Button>
-        <Button
-          aria-label={`${
-            product.is_active
-              ? t(locale, 'billing.product.retire')
-              : t(locale, 'billing.product.revive')
-          } ${product.name}`}
-          onClick={() => void setActive(product, !product.is_active)}
-          variant="ghost"
-        >
-          {product.is_active
-            ? t(locale, 'billing.product.retire')
-            : t(locale, 'billing.product.revive')}
-        </Button>
-      </div>
-      <p style={hintStyle}>
-        {t(locale, 'billing.product.sizes')}: {sizesLabel(product, locale)}
-      </p>
-
-      {/* The photo the parent app's shop renders. A SECOND step after the item
-          exists, because the object is keyed by the product's own id — so there is
-          nothing to upload against until the row has been created. */}
-      <div style={photoRowStyle}>
-        {product.image_url ? (
-          <ProductThumb productId={product.id} src={product.image_url} />
-        ) : (
-          <p style={hintStyle}>{t(locale, 'billing.product.photoNone')}</p>
-        )}
         <label
-          style={{ fontSize: 'var(--text-caption)' }}
+          className="item-card__photo-pick"
           // The input carries the accessible name; the label names WHICH product, so
           // a screen full of "Add a photo" is navigable.
           aria-label={`${
@@ -223,13 +200,27 @@ export function ItemsScreen({
             {t(locale, 'billing.product.photoRemove')}
           </Button>
         ) : null}
-        {photoError[product.id] ? (
-          <p role="alert" style={{ ...hintStyle, color: 'var(--danger)' }}>
-            {photoError[product.id]}
-          </p>
-        ) : null}
+        <Button
+          aria-label={`${
+            product.is_active
+              ? t(locale, 'billing.product.retire')
+              : t(locale, 'billing.product.revive')
+          } ${product.name}`}
+          onClick={() => void setActive(product, !product.is_active)}
+          variant="ghost"
+        >
+          {product.is_active
+            ? t(locale, 'billing.product.retire')
+            : t(locale, 'billing.product.revive')}
+        </Button>
       </div>
-    </Card>
+
+      {photoError[product.id] ? (
+        <p className="item-card__error" role="alert">
+          {photoError[product.id]}
+        </p>
+      ) : null}
+    </li>
   )
 
   const save = async () => {
@@ -345,7 +336,7 @@ export function ItemsScreen({
                 ⚠ {t(locale, 'billing.byClass.unfiled')}
               </h2>
               <p style={hintStyle}>{t(locale, 'billing.byClass.unfiledItems')}</p>
-              {unfiled.map((product) => productCard(product))}
+              <ul className="items-grid">{unfiled.map((product) => productCard(product))}</ul>
             </section>
           ) : null}
 
@@ -353,7 +344,7 @@ export function ItemsScreen({
               list. A heading over every row, or a warning nobody can act on, would both be
               noise there. */}
           {classes.length === 0
-            ? visible.map((product) => productCard(product))
+            ? <ul className="items-grid">{visible.map((product) => productCard(product))}</ul>
             : grouped.map((group) => (
                 <section
                   key={group.classId}
@@ -363,7 +354,9 @@ export function ItemsScreen({
                   <h2 id={`items-class-${group.classId}`} style={classHeadingStyle}>
                     <bdi>{group.className}</bdi>
                   </h2>
-                  {group.rows.map((product) => productCard(product))}
+                  <ul className="items-grid">
+                    {group.rows.map((product) => productCard(product))}
+                  </ul>
                 </section>
               ))}
         </>
@@ -396,5 +389,7 @@ export function ItemsScreen({
 function ProductThumb({ productId, src }: { productId: string; src: string }) {
   const url = useAuthedImage(src)
   if (!url) return null
-  return <img alt="" data-testid={`product-thumb-${productId}`} src={url} style={thumbStyle} />
+  // Sized and cropped by `.item-card__photo`, which holds a fixed ratio so a portrait and
+  // a landscape shot leave the grid's rows aligned.
+  return <img alt="" data-testid={`product-thumb-${productId}`} src={url} />
 }

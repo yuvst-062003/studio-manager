@@ -1457,7 +1457,8 @@ waves:
         on: 2026-09-10
       - id: W10.11
         title: Items — the product grid and the order wizard
-        status: planned
+        status: shipped
+        on: 2026-09-10
       - id: W10.12
         title: Announcements — the four-step wizard and the notification preview
         status: planned
