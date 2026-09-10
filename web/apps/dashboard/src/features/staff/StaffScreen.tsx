@@ -82,6 +82,13 @@ export function StaffScreen({ locale }: { locale: Locale }) {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [roles, setRoles] = useState<string[]>(['lead_coach'])
+  // The groups an invited coach lands on. `POST /staff/invitations` has always accepted
+  // `group_ids` and `invite_staff` puts the coach on those rosters immediately -- the
+  // Person row exists before the invitation is accepted, which is what makes that
+  // possible. This screen simply never sent the key, so every coach invited here started
+  // with no group and read "ללא קבוצה" for ever (owner report, 2026-09-10).
+  const [inviteGroups, setInviteGroups] = useState<string[]>([])
+  const [allGroups, setAllGroups] = useState<StaffGroup[]>([])
   const [inviteFailed, setInviteFailed] = useState(false)
   // The one-time code, shown after create or resend and never reproducible.
   const [issuedToken, setIssuedToken] = useState<{ email: string; token: string } | null>(null)
@@ -110,6 +117,33 @@ export function StaffScreen({ locale }: { locale: Locale }) {
   }, [attempt])
 
   const reload = () => setAttempt((n) => n + 1)
+
+  // Loaded when the form OPENS rather than on mount: most visits to this screen never
+  // invite anyone, and the list is only ever read by the form.
+  //
+  // ABOVE the early returns below, not beside `submitInvite` where it was first written —
+  // a hook after a conditional return changes the hook order between renders, and React
+  // failed every test in this file with "change in the order of Hooks called by
+  // StaffScreen" rather than anything about groups.
+  //
+  // A failed read leaves the picker empty rather than blocking the invite: a coach with no
+  // group is the state being fixed, but it is still better than an invite that cannot be
+  // sent at all.
+  useEffect(() => {
+    if (!inviting) return
+    let live = true
+    void apiFetch('/api/v1/groups?limit=200')
+      .then((response) =>
+        response.ok ? (response.json() as Promise<{ items: StaffGroup[] }>) : null,
+      )
+      .then((body) => {
+        if (live && body) setAllGroups(body.items)
+      })
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [inviting])
 
   if (failed) {
     return (
@@ -217,6 +251,7 @@ export function StaffScreen({ locale }: { locale: Locale }) {
           roles,
           first_name: firstName.trim() || null,
           last_name: lastName.trim() || null,
+          group_ids: inviteGroups,
         }),
       })) as { email: string; token: string }
       setIssuedToken({ email: body.email, token: body.token })
@@ -224,6 +259,7 @@ export function StaffScreen({ locale }: { locale: Locale }) {
       setEmail('')
       setFirstName('')
       setLastName('')
+      setInviteGroups([])
       reload()
     } catch {
       setInviteFailed(true)
@@ -324,6 +360,30 @@ export function StaffScreen({ locale }: { locale: Locale }) {
               />
             ))}
           </fieldset>
+          {/* Optional, and says so: a manager may not know the roster yet, and the server
+              treats an empty list as "no groups" exactly as it did before this control
+              existed. Hidden entirely when the club has no groups, rather than shown as an
+              empty box that reads like a failure. */}
+          {allGroups.length > 0 ? (
+            <fieldset data-testid="invite-groups">
+              <legend>{t(locale, 'common.staff.invite.groups')}</legend>
+              <p>{t(locale, 'common.staff.invite.groupsHint')}</p>
+              {allGroups.map((group) => (
+                <Checkbox
+                  checked={inviteGroups.includes(group.id)}
+                  key={group.id}
+                  label={group.name}
+                  onChange={() =>
+                    setInviteGroups((current) =>
+                      current.includes(group.id)
+                        ? current.filter((id) => id !== group.id)
+                        : [...current, group.id],
+                    )
+                  }
+                />
+              ))}
+            </fieldset>
+          ) : null}
           {inviteFailed ? (
             <p data-testid="invite-failed">{t(locale, 'common.staff.invite.failed')}</p>
           ) : null}

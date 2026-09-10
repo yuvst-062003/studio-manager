@@ -349,6 +349,63 @@ describe('F5 — the lifecycle', () => {
     })
   })
 
+  // The owner's report, 2026-09-10: "it makes no sense that they have no group."
+  //
+  // It is a defect, not a display choice. `POST /api/v1/staff/invitations` has accepted
+  // `group_ids` since the field was added (`app/schemas/staff.py`), and `invite_staff` puts
+  // the coach on those rosters IMMEDIATELY — which is only possible because the Person row
+  // is created before the invitation is ever accepted. Its own docstring records that the
+  // setup wizard's step 5 offered this choice from the day it shipped and dropped it on the
+  // floor for the same reason. This screen did the same: the form had no group field and
+  // the request body never carried the key, so every coach invited from the dashboard
+  // started with no group and read as "ללא קבוצה" for ever.
+  it('sends the groups picked on the invite form (2026-09-10)', async () => {
+    const calls: { url: string; body?: Record<string, unknown> }[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (init?.method === 'POST' && url.includes('/staff/invitations')) {
+          calls.push({ url, body: JSON.parse(String(init.body)) })
+          return new Response(
+            JSON.stringify({
+              id: 'inv-2',
+              email: 'coach@example.invalid',
+              expires_at: '2026-09-10T00:00:00Z',
+              token: 'the-one-time-code',
+            }),
+            { status: 201 },
+          )
+        }
+        if (url.includes('/api/v1/groups')) {
+          return new Response(
+            JSON.stringify({ items: [{ id: 'g1', name: 'ילדים א' }, { id: 'g2', name: 'בוגרים' }] }),
+            { status: 200 },
+          )
+        }
+        return new Response(
+          JSON.stringify({ items: [], groups_without_coach: [], sessions_without_coach: 0 }),
+          { status: 200 },
+        )
+      }),
+    )
+    render(<StaffScreen locale="he" />)
+    await userEvent.click(await screen.findByTestId('invite-open'))
+    await userEvent.type(
+      screen.getByLabelText(t('he', 'common.staff.invite.email')),
+      'coach@example.invalid',
+    )
+    await userEvent.click(await screen.findByLabelText('בוגרים'))
+    await userEvent.click(screen.getByTestId('invite-submit'))
+
+    await waitFor(() => expect(calls).toHaveLength(1))
+    expect(calls[0]?.body).toMatchObject({
+      email: 'coach@example.invalid',
+      roles: ['lead_coach'],
+      group_ids: ['g2'],
+    })
+  })
+
   it('renders the sole-lead-coach refusal with the group names', async () => {
     vi.stubGlobal(
       'fetch',

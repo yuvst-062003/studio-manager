@@ -701,4 +701,6 @@ export const common: Bundle = {
   'imagePicker.replace': 'החלפת תמונה',
   'imagePicker.remove': 'הסרת תמונה',
   'imagePicker.preview': 'תצוגה מקדימה',
+  'staff.invite.groups': 'קבוצות (לא חובה)',
+  'staff.invite.groupsHint': 'הקבוצות שהמאמן ישובץ אליהן מיד. אפשר גם לשבץ מאוחר יותר מעמוד הקבוצה.',
 }

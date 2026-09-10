@@ -617,4 +617,6 @@ export const common: Bundle = {
   'imagePicker.replace': 'Replace image',
   'imagePicker.remove': 'Remove image',
   'imagePicker.preview': 'Preview',
+  'staff.invite.groups': 'Groups (optional)',
+  'staff.invite.groupsHint': 'The groups this coach joins immediately. You can also assign them later from the group page.',
 }

@@ -626,4 +626,6 @@ export const common: Bundle = {
   'imagePicker.replace': 'Заменить изображение',
   'imagePicker.remove': 'Удалить изображение',
   'imagePicker.preview': 'Предпросмотр',
+  'staff.invite.groups': 'Группы (необязательно)',
+  'staff.invite.groupsHint': 'Группы, в которые тренер попадёт сразу. Можно назначить и позже со страницы группы.',
 }
