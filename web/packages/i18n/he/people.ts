@@ -90,6 +90,17 @@ export const people: Bundle = {
   'student.attendanceEmpty': 'עדיין לא נרשמה נוכחות',
   'student.attendanceMarkedOn': 'סומן בתאריך',
 
+  // -- 4a's tab strip (dashboard redesign) — groups the card's existing sections under
+  // four tabs instead of one long scroll. The freeze/convert/mark-lost actions stay
+  // outside the tabs; they act on the student, not on a tab.
+  'student.tab.legend': 'לשונית תצוגה',
+  'student.tab.general': 'כללי',
+  'student.tab.training': 'אימונים',
+  'student.tab.finance': 'כספים',
+  'student.tab.health': 'בריאות',
+  'student.tab.healthHint': 'מסמכי הבריאות מנוהלים במסך המסמכים.',
+  'student.tab.healthLink': 'מעבר למסך המסמכים',
+
   // -- guardians (§5.3) ----------------------------------------------------------
   'guardian.one': 'הורה',
   'guardian.plural': 'הורים',

@@ -707,6 +707,15 @@ describe('AddStudentScreen — 3c', () => {
   })
 })
 
+/** Open one of the student card's four tabs. The cards used to be one long scroll; the
+ *  redesign groups them, so a test asserting on `training` content has to get there the
+ *  way a manager does. */
+async function openDetailTab(locale: 'he', key: 'general' | 'training' | 'finance' | 'health') {
+  await userEvent.click(
+    await screen.findByRole('radio', { name: t(locale, `people.student.tab.${key}`) }),
+  )
+}
+
 // -- 4a: the manager's card -----------------------------------------------------
 
 describe('StudentDetailScreen — 4a', () => {
@@ -714,7 +723,46 @@ describe('StudentDetailScreen — 4a', () => {
     render(<StudentDetailScreen studentId="st1" locale="he" client={makeClient()} />)
     expect(await screen.findByTestId('student-detail')).toBeInTheDocument()
     expect(screen.getByTestId('detail-enrollment')).toBeInTheDocument()
+    await openDetailTab('he', 'training')
     expect(screen.getByTestId('detail-history')).toBeInTheDocument()
+  })
+
+  it('offers a retry when the card fails to load, rather than a permanent placeholder', async () => {
+    // The defect this was written for: the load was `Promise.all(...).catch(() => undefined)`
+    // and the screen gated on `if (!student) return <p data-testid="student-detail-loading" />`.
+    // A failed fetch therefore left `student` null forever, so a dead card and a slow one
+    // were the same screen — an empty box with no message and nothing to press. Found in
+    // the 2026-09-10 audit; §3.6 of the redesign spec.
+    const client = makeClient({ student: vi.fn(() => Promise.reject(new Error('offline'))) })
+    render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
+
+    expect(await screen.findByTestId('load-failed')).toBeInTheDocument()
+    expect(screen.queryByTestId('student-detail-loading')).not.toBeInTheDocument()
+  })
+
+  it('reloads the card when the retry is pressed', async () => {
+    // A retry that does not re-fetch is a button that renders and does nothing, which the
+    // F2 guard exists to stop and which a `location.reload()` would hide rather than fix.
+    let attempt = 0
+    const client = makeClient({
+      student: vi.fn(() => {
+        attempt += 1
+        return attempt === 1
+          ? Promise.reject(new Error('offline'))
+          : Promise.resolve({
+              ...summary(),
+              current_belt_color_hex: '#ffffff',
+              current_belt_name: 'לבנה',
+              guardians: [],
+            })
+      }),
+    })
+    render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
+
+    await userEvent.click(await screen.findByTestId('load-failed-retry'))
+
+    expect(await screen.findByTestId('student-detail')).toBeInTheDocument()
+    expect(attempt).toBe(2)
   })
 
   it('shows the C11 volume beside the plan field', async () => {
@@ -819,6 +867,7 @@ describe('StudentDetailScreen — 4a', () => {
     const client = makeClient()
     render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
 
+    await openDetailTab('he', 'training')
     expect(await screen.findByTestId('detail-attendance')).toBeInTheDocument()
     // The SAME primitive parent `2c` and staff `9c` render, so the three surfaces cannot
     // drift into three different pictures of one child's attendance.
@@ -832,6 +881,7 @@ describe('StudentDetailScreen — 4a', () => {
     // right is the opposite order, so the screen reverses it rather than drawing a
     // history that runs backwards.
     render(<StudentDetailScreen studentId="st1" locale="he" client={makeClient()} />)
+    await openDetailTab('he', 'training')
     const section = await screen.findByTestId('detail-attendance')
 
     // `role="img"` with an accessible name is what `AttendanceMark` renders; the legend's
@@ -854,6 +904,7 @@ describe('StudentDetailScreen — 4a', () => {
     } as unknown as Partial<DashboardPeopleClient>)
     render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
 
+    await openDetailTab('he', 'training')
     expect(await screen.findByTestId('detail-attendance-empty')).toHaveTextContent(
       t('he', 'people.student.attendanceEmpty'),
     )
@@ -874,6 +925,7 @@ describe('StudentDetailScreen — 4a', () => {
       ),
     } as unknown as Partial<DashboardPeopleClient>)
     render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
+    await openDetailTab('he', 'training')
     await screen.findByTestId('detail-attendance')
 
     expect(document.body.textContent ?? '').not.toContain('הגיעה עצובה')
@@ -887,6 +939,7 @@ describe('StudentDetailScreen — 4a', () => {
     } as unknown as Partial<DashboardPeopleClient>)
     render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
 
+    await openDetailTab('he', 'training')
     expect(await screen.findByTestId('detail-history')).toBeInTheDocument()
     expect(screen.getByTestId('detail-attendance-empty')).toBeInTheDocument()
   })

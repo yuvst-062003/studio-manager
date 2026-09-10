@@ -1429,7 +1429,8 @@ waves:
         on: 2026-09-10
       - id: W10.4
         title: Student detail — the four-tab drawer, and its missing error state
-        status: planned
+        status: shipped
+        on: 2026-09-10
       - id: W10.5
         title: Weekly schedule — the grid and the two-tab session popover
         status: planned

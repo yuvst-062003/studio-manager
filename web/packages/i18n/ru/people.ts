@@ -65,6 +65,17 @@ export const people: Bundle = {
   'student.attendanceEmpty': 'Посещаемость ещё не отмечалась',
   'student.attendanceMarkedOn': 'Отмечено',
 
+  // -- 4a's tab strip (dashboard redesign) — groups the card's existing sections under
+  // four tabs instead of one long scroll. The freeze/convert/mark-lost actions stay
+  // outside the tabs; they act on the student, not on a tab.
+  'student.tab.legend': 'Вкладка отображения',
+  'student.tab.general': 'Общее',
+  'student.tab.training': 'Тренировки',
+  'student.tab.finance': 'Финансы',
+  'student.tab.health': 'Здоровье',
+  'student.tab.healthHint': 'Медицинские документы находятся на экране документов.',
+  'student.tab.healthLink': 'Перейти к экрану документов',
+
   'guardian.one': 'Родитель',
   'guardian.plural': 'Родители',
   'guardian.add': 'Добавить родителя',

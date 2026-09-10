@@ -95,3 +95,35 @@
   color: var(--on-emphasis);
   font-weight: var(--weight-medium);
 }
+
+/* Dashboard redesign — 4a's health tab. There is no health card on this screen yet, so
+ * the tab holds a single muted line pointing at where the data actually lives instead of
+ * an empty card. */
+.people-detail-health-hint {
+  color: var(--text-muted);
+  margin-block: var(--space-2);
+}
+
+/* The student card's group list. The group name and its weekday list are two adjacent
+ * inline elements with nothing between them, which rendered as one run-on word. A gap
+ * rather than a literal separator in the markup: a separator between the tags is an
+ * inlined user-facing string, and G4 fails the build on those. */
+.people-detail-groups {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.people-detail-groups > li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: baseline;
+}
+
+.people-detail-groups > li > [data-testid='detail-weekdays'],
+.people-detail-groups > li > [data-testid='detail-primary'],
+.people-detail-groups > li > [data-testid='detail-guardian-pending'] {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}

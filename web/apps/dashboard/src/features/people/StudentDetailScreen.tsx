@@ -9,7 +9,15 @@
 // reads as a financial field, so it never travels on the coach-reachable card.
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { AttendanceStrip, BeltBar, Button, Card, StatusChip } from '@studio/ui'
+import {
+  AttendanceStrip,
+  BeltBar,
+  Button,
+  Card,
+  LoadFailed,
+  SegmentedControl,
+  StatusChip,
+} from '@studio/ui'
 import type { AttendanceStripItem } from '@studio/ui'
 import { ClassPricesCard } from '../billing/ClassPricesCard'
 import { formatDateInStudioZone } from '@studio/core'
@@ -51,6 +59,11 @@ const STRIP_LABEL: Record<AttendanceStripItem['state'], string> = {
  *  why `GET /students/{id}/attendance` bakes in neither and the caller trims. */
 const MARKS_ON_THE_CARD = 12
 
+/** Dashboard redesign — the four tabs the card's existing sections are grouped under.
+ *  `general` is first and is the default: it is what a manager opens the card to check
+ *  first, before training, money, or health. */
+type DetailTab = 'general' | 'training' | 'finance' | 'health'
+
 const pageStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(18rem, 1fr))',
@@ -88,6 +101,10 @@ export function StudentDetailScreen({
   const [lostReason, setLostReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [reloads, setReloads] = useState(0)
+  const [failed, setFailed] = useState(false)
+  // Dashboard redesign — the card's existing sections sit under four tabs instead of one
+  // long scroll. Purely a display grouping: nothing here changes what is fetched or when.
+  const [tab, setTab] = useState<DetailTab>('general')
 
   useEffect(() => {
     let live = true
@@ -109,8 +126,17 @@ export function StudentDetailScreen({
         setPlan(pricePlan)
         setGroups(groupList.items)
         setMarks(attendance.items)
+        // Cleared on success rather than at the top of the effect: a synchronous setState
+        // in the effect body is a render every load pays for, and the retry below is the
+        // only thing that re-enters here anyway.
+        setFailed(false)
       })
-      .catch(() => undefined)
+      // Was `.catch(() => undefined)`, which is how a dead card and a slow one became the
+      // same screen: `student` stayed null, the gate below returned the loading
+      // placeholder, and it stayed there forever with no message and nothing to press.
+      // The four reads above are NOT best-effort — the two that are (`groups`,
+      // `attendance`) catch for themselves and fall back to an empty list.
+      .catch(() => live && setFailed(true))
     return () => {
       live = false
     }
@@ -135,6 +161,10 @@ export function StudentDetailScreen({
       setBusy(false)
     }
   }
+
+  // The failure branch comes FIRST: `student` is null in both states, so checking the
+  // placeholder first would render it over a failure that had already been detected.
+  if (failed) return <LoadFailed locale={locale} onRetry={() => setReloads((n) => n + 1)} />
 
   if (!student) return <p data-testid="student-detail-loading" />
 
@@ -182,106 +212,152 @@ export function StudentDetailScreen({
         ) : null}
       </div>
 
-      <Card>
-        <h2>{t(locale, 'people.student.groups')}</h2>
-        {/* C11 — every live enrollment, with its C12 pattern. */}
-        <ul>
-          {live.map((enrollment) => (
-            <li key={enrollment.id} data-testid="detail-enrollment">
-              <bdi>{enrollment.group_name}</bdi>
-              <span data-testid="detail-weekdays">
-                {enrollment.attends_weekdays == null
-                  ? t(locale, 'people.weekdays.allDays')
-                  : enrollment.attends_weekdays
-                      .map((day) => t(locale, `people.weekdays.${day}`))
-                      .join(' · ')}
-              </span>
-            </li>
-          ))}
-        </ul>
-        {/* How much this child actually trains. It used to sit on the read-only plan card
-            the per-class editor replaced, and it belongs here rather than inside that
-            editor: it is a fact about ENROLMENTS, and §5.10 wants it visible so a mismatch
-            between what a child attends and what they are billed for is noticeable at the
-            moment the price is set. */}
-        <p data-testid="detail-weekly-volume">
-          {t(locale, 'people.convert.weeklyVolume')}: {plan?.weekly_volume ?? 0}
-        </p>
-      </Card>
+      {/* Dashboard redesign — the sections below used to be one long scroll; they are now
+          grouped under four tabs, and only the matching group renders. The tab strip is a
+          display grouping only: it fetches nothing and calls nothing itself. */}
+      <SegmentedControl
+        legend={t(locale, 'people.student.tab.legend')}
+        onValueChange={(next) => setTab(next as DetailTab)}
+        options={[
+          { value: 'general', label: t(locale, 'people.student.tab.general') },
+          { value: 'training', label: t(locale, 'people.student.tab.training') },
+          { value: 'finance', label: t(locale, 'people.student.tab.finance') },
+          { value: 'health', label: t(locale, 'people.student.tab.health') },
+        ]}
+        value={tab}
+      />
 
-      {/* Was a read-only badge naming `student.price_plan_id`, which is now only the
-          FALLBACK — what a child pays for any class nobody has priced. The per-class editor
-          replaces it rather than sitting beside it: two boxes both showing a child's price
-          leaves a manager working out which one wins, and the fallback is still named here,
-          on every row it actually applies to, with its amount. */}
-      <ClassPricesCard locale={locale} studentId={studentId} />
-
-      <Card>
-        <h2>{t(locale, 'people.guardian.plural')}</h2>
-        <ul>
-          {(student.guardians ?? []).map((guardian) => (
-            <li key={guardian.person_id} data-testid="detail-guardian">
-              {/* Decision 20 — the 3-field add-student form sends a guardian email and no
-                  name, so `display_name` is `""` until the parent finishes the wizard. A
-                  blank row told the manager nothing; the email plus a hint at least says
-                  who this is and that they are not done yet. */}
-              {guardian.display_name ? (
-                <bdi>{guardian.display_name}</bdi>
-              ) : guardian.email ? (
-                <>
-                  <bdi>{guardian.email}</bdi>{' '}
-                  <span data-testid="detail-guardian-pending">
-                    {t(locale, 'people.guardian.notRegisteredYet')}
+      {tab === 'general' ? (
+        <>
+          <Card>
+            <h2>{t(locale, 'people.student.groups')}</h2>
+            {/* C11 — every live enrollment, with its C12 pattern.
+                The class carries a gap: the group name and the weekday list are two
+                adjacent inline elements, and with nothing between them they rendered as
+                one run-on word — "ג׳וניוריםכל הימים". Spaced in CSS rather than by a
+                literal between the tags, because a separator in the markup would be an
+                inlined user-facing string, which G4 fails the build on. */}
+            <ul className="people-detail-groups">
+              {live.map((enrollment) => (
+                <li key={enrollment.id} data-testid="detail-enrollment">
+                  <bdi>{enrollment.group_name}</bdi>
+                  <span data-testid="detail-weekdays">
+                    {enrollment.attends_weekdays == null
+                      ? t(locale, 'people.weekdays.allDays')
+                      : enrollment.attends_weekdays
+                          .map((day) => t(locale, `people.weekdays.${day}`))
+                          .join(' · ')}
                   </span>
-                </>
-              ) : (
-                <bdi>{t(locale, 'people.guardian.noContactInfo')}</bdi>
-              )}
-              {guardian.is_primary ? (
-                <span data-testid="detail-primary">{t(locale, 'people.guardian.primary')}</span>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      </Card>
-
-      <Card>
-        {/* `GET /students/{id}/attendance` was built, manager-scoped and called by nothing.
-            The card had four sections and could not answer the question a manager asks
-            about a child immediately before telephoning their parent.
-
-            No coach note is rendered, and the strip has nowhere to put one: §5.13 makes it
-            a coach's written opinion about a child, and `AttendanceOut` carries it only
-            because the roster it was built for needs it. */}
-        <h2>{t(locale, 'people.student.attendance')}</h2>
-        <div data-testid="detail-attendance">
-          {strip.length === 0 ? (
-            // §5.14 makes `unmarked` a real state so a coach who forgot the register does
-            // not look like a child who stopped coming. A blank strip would say exactly
-            // the thing that state exists to prevent.
-            <p data-testid="detail-attendance-empty">
-              {t(locale, 'people.student.attendanceEmpty')}
+                </li>
+              ))}
+            </ul>
+            {/* How much this child actually trains. It used to sit on the read-only plan
+                card the per-class editor replaced, and it belongs here rather than inside
+                that editor: it is a fact about ENROLMENTS, and §5.10 wants it visible so a
+                mismatch between what a child attends and what they are billed for is
+                noticeable at the moment the price is set. */}
+            <p data-testid="detail-weekly-volume">
+              {t(locale, 'people.convert.weeklyVolume')}: {plan?.weekly_volume ?? 0}
             </p>
-          ) : (
-            <AttendanceStrip items={strip} locale={locale} />
-          )}
-        </div>
-      </Card>
+          </Card>
 
-      <Card>
-        <h2>{t(locale, 'people.status.history')}</h2>
-        {/* §5.4a computes the funnel from these rows; 4a renders the same rows as a
-            timeline, so a manager reads the same history the report is built on. */}
-        <ol>
-          {history.map((row) => (
-            <li key={row.id} data-testid="detail-history">
-              {t(locale, `people.status.${row.to_status}`)} —{' '}
-              {formatDateInStudioZone(row.changed_at, locale)}
-              {row.reason ? ` · ${row.reason}` : ''}
-            </li>
-          ))}
-        </ol>
-      </Card>
+          <Card>
+            <h2>{t(locale, 'people.guardian.plural')}</h2>
+            {/* Same run-on as the group list above — "לביא אזולאיהורה ראשי" — and the same
+                fix, for the same reason: the separator belongs in CSS, not between the
+                tags where it would be an inlined string. */}
+            <ul className="people-detail-groups">
+              {(student.guardians ?? []).map((guardian) => (
+                <li key={guardian.person_id} data-testid="detail-guardian">
+                  {/* Decision 20 — the 3-field add-student form sends a guardian email and
+                      no name, so `display_name` is `""` until the parent finishes the
+                      wizard. A blank row told the manager nothing; the email plus a hint
+                      at least says who this is and that they are not done yet. */}
+                  {guardian.display_name ? (
+                    <bdi>{guardian.display_name}</bdi>
+                  ) : guardian.email ? (
+                    <>
+                      <bdi>{guardian.email}</bdi>{' '}
+                      <span data-testid="detail-guardian-pending">
+                        {t(locale, 'people.guardian.notRegisteredYet')}
+                      </span>
+                    </>
+                  ) : (
+                    <bdi>{t(locale, 'people.guardian.noContactInfo')}</bdi>
+                  )}
+                  {guardian.is_primary ? (
+                    <span data-testid="detail-primary">
+                      {t(locale, 'people.guardian.primary')}
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </>
+      ) : null}
+
+      {tab === 'training' ? (
+        <>
+          <Card>
+            {/* `GET /students/{id}/attendance` was built, manager-scoped and called by
+                nothing. The card had four sections and could not answer the question a
+                manager asks about a child immediately before telephoning their parent.
+
+                No coach note is rendered, and the strip has nowhere to put one: §5.13
+                makes it a coach's written opinion about a child, and `AttendanceOut`
+                carries it only because the roster it was built for needs it. */}
+            <h2>{t(locale, 'people.student.attendance')}</h2>
+            <div data-testid="detail-attendance">
+              {strip.length === 0 ? (
+                // §5.14 makes `unmarked` a real state so a coach who forgot the register
+                // does not look like a child who stopped coming. A blank strip would say
+                // exactly the thing that state exists to prevent.
+                <p data-testid="detail-attendance-empty">
+                  {t(locale, 'people.student.attendanceEmpty')}
+                </p>
+              ) : (
+                <AttendanceStrip items={strip} locale={locale} />
+              )}
+            </div>
+          </Card>
+
+          <Card>
+            <h2>{t(locale, 'people.status.history')}</h2>
+            {/* §5.4a computes the funnel from these rows; 4a renders the same rows as a
+                timeline, so a manager reads the same history the report is built on. */}
+            <ol>
+              {history.map((row) => (
+                <li key={row.id} data-testid="detail-history">
+                  {t(locale, `people.status.${row.to_status}`)} —{' '}
+                  {formatDateInStudioZone(row.changed_at, locale)}
+                  {row.reason ? ` · ${row.reason}` : ''}
+                </li>
+              ))}
+            </ol>
+          </Card>
+        </>
+      ) : null}
+
+      {tab === 'finance' ? (
+        // Was a read-only badge naming `student.price_plan_id`, which is now only the
+        // FALLBACK — what a child pays for any class nobody has priced. The per-class
+        // editor replaces it rather than sitting beside it: two boxes both showing a
+        // child's price leaves a manager working out which one wins, and the fallback is
+        // still named here, on every row it actually applies to, with its amount.
+        <ClassPricesCard locale={locale} studentId={studentId} />
+      ) : null}
+
+      {tab === 'health' ? (
+        // No health card exists on this screen yet — health documents are read on the
+        // documents screen. The tab stays (a manager expects to find health somewhere on
+        // a student's own card) and points at where the data actually lives, rather than
+        // rendering an empty card that promises a section that is not there.
+        <p className="people-detail-health-hint">
+          {t(locale, 'people.student.tab.healthHint')}{' '}
+          <a href="#/documents">{t(locale, 'people.student.tab.healthLink')}</a>
+        </p>
+      ) : null}
 
       <div>
         {freezing ? (
