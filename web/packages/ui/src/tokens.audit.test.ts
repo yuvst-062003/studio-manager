@@ -83,6 +83,16 @@ const STAFF_DARK_SELECTOR = '[data-theme="dark"] [data-surface="staff"]'
 const STAFF = readTokenBlock(STAFF_SELECTOR)
 const STAFF_DARK = readTokenBlock(STAFF_DARK_SELECTOR)
 
+/**
+ * The manager dashboard's own register, added by the 2026-09-10 redesign — the fourth
+ * palette. Read the same way and for the same reason as the two above: a block the
+ * audit does not read is a fork that rots silently.
+ */
+const STUDIO_OS_SELECTOR = '[data-surface="studio-os"]'
+const STUDIO_OS_DARK_SELECTOR = '[data-theme="dark"] [data-surface="studio-os"]'
+const STUDIO_OS = readTokenBlock(STUDIO_OS_SELECTOR)
+const STUDIO_OS_DARK = readTokenBlock(STUDIO_OS_DARK_SELECTOR)
+
 /** What a token actually resolves to on each of the six surface-and-theme combinations. */
 const EFFECTIVE = {
   light: LIGHT,
@@ -92,6 +102,8 @@ const EFFECTIVE = {
   'outward dark': { ...LIGHT, ...DARK, ...OUTWARD, ...OUTWARD_DARK },
   'staff light': { ...LIGHT, ...STAFF },
   'staff dark': { ...LIGHT, ...DARK, ...STAFF, ...STAFF_DARK },
+  'studio-os light': { ...LIGHT, ...STUDIO_OS },
+  'studio-os dark': { ...LIGHT, ...DARK, ...STUDIO_OS, ...STUDIO_OS_DARK },
 } as const
 
 describe('the roles table and tokens.css are in exact bijection', () => {
@@ -100,7 +112,7 @@ describe('the roles table and tokens.css are in exact bijection', () => {
     expect(Object.keys(DARK).length).toBeGreaterThan(10)
   })
 
-  it('declares no custom property outside the six audited blocks', () => {
+  it('declares no custom property outside the eight audited blocks', () => {
     // The backstop for the parser itself. A token declared inside `html { }`, inside a
     // media query, or in a second `:root { }` would otherwise never reach TOKEN_ROLES
     // and would be audited by nothing at all.
@@ -114,6 +126,8 @@ describe('the roles table and tokens.css are in exact bijection', () => {
       ...Object.keys(OUTWARD_DARK),
       ...Object.keys(STAFF),
       ...Object.keys(STAFF_DARK),
+      ...Object.keys(STUDIO_OS),
+      ...Object.keys(STUDIO_OS_DARK),
     ])
     expect([...declared].filter((t) => !audited.has(t))).toEqual([])
   })
@@ -171,6 +185,7 @@ it('GROUND_COLOR.inward matches the stylesheet', () => {
 const OVERLAY_SURFACES = [
   { label: 'outward', groundKey: 'outward', light: OUTWARD, dark: OUTWARD_DARK },
   { label: 'staff', groundKey: 'staff', light: STAFF, dark: STAFF_DARK },
+  { label: 'studio-os', groundKey: 'studio-os', light: STUDIO_OS, dark: STUDIO_OS_DARK },
 ] as const
 
 describe.each(OVERLAY_SURFACES)('the $label surface is a theme, not a fork', ({ groundKey, light, dark }) => {

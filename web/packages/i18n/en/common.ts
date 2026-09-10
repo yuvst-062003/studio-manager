@@ -163,6 +163,7 @@ export const common: Bundle = {
   'dash.hint.items': 'Items for sale — gi, belts and gear',
   'dash.hint.documents': 'Health declarations — who signed and who is missing',
   'dash.hint.reports': 'Reports — revenue, attendance, retention and belts',
+  'dash.hint.settings': 'Club settings — details, documents, staff and the year rollover',
   'dash.nav.daily': 'Day to day',
   'dash.nav.club': 'Club',
   'dash.nav.money': 'Money & documents',

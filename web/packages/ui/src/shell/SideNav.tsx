@@ -27,14 +27,32 @@ function Item({ item }: { item: SideNavItem }) {
   return (
     <a
       href={item.href}
-      title={item.hint}
-      aria-description={item.hint}
+      // The hint is now VISIBLE text inside the link (below), which by default would fold
+      // it into the link's accessible name — "חניכים ומתאמנים תיקים, חגורות והצהרות" where
+      // a screen reader used to hear "חניכים". Naming the title span keeps the name the
+      // label alone and demotes the hint back to a description, so what a screen reader
+      // announces is unchanged by a purely visual decision.
+      aria-labelledby={`sidenav-title-${item.key}`}
+      aria-describedby={item.hint ? `sidenav-hint-${item.key}` : undefined}
       aria-current={item.active ? 'page' : undefined}
       data-testid={`sidenav-${item.key}`}
       className={item.active ? 'studio-sidenav__item studio-sidenav__item--active' : 'studio-sidenav__item'}
     >
       {item.icon}
-      <span className="studio-sidenav__label">{item.label}</span>
+      {/* Two lines, not one — the 2026-09-10 redesign renders the hint rather than hiding
+          it in a tooltip. It was already written for every item and already the item's
+          accessible description; a sentence a manager can only reach by hovering is a
+          sentence most of them never read. */}
+      <span className="studio-sidenav__label">
+        <span id={`sidenav-title-${item.key}`} className="studio-sidenav__title">
+          {item.label}
+        </span>
+        {item.hint ? (
+          <span id={`sidenav-hint-${item.key}`} className="studio-sidenav__hint">
+            {item.hint}
+          </span>
+        ) : null}
+      </span>
       {item.badge ? (
         <span className={`studio-sidenav__badge studio-sidenav__badge--${item.badge.tone}`}>
           {item.badge.text}

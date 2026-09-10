@@ -53,11 +53,13 @@ describe('routeFromHash', () => {
     // §5.15's rollover is one hash and one screen: the wizard's seven steps are its own
     // state, and `resume_at` is the only correct answer to "where was I".
     ['#/rollover', 'rollover'],
-    // The design pass retired `home`: 3a/1e draw the weekly board as the manager's
-    // landing, so the bare hash — and any unknown one — resolves to the board rather
-    // than to the "בחרו מסך מהתפריט" page that used to land nowhere.
-    ['', 'schedule'],
-    ['#/nothing-here', 'schedule'],
+    // D16 of the 2026-09-10 redesign restored `home` as the landing screen. The 2026-08-27
+    // pass had made the weekly board the landing because the home of THAT day "landed
+    // nowhere" — an empty "בחרו מסך מהתפריט" page. It no longer does: it carries the money
+    // band, today's classes, the attendance trend and the alert centre, so the bare hash —
+    // and any unknown one — resolves to the screen that says what needs attention.
+    ['', 'home'],
+    ['#/nothing-here', 'home'],
     ['#/comms', 'comms'],
     ['#/documents', 'documents'],
     ['#/prices', 'prices'],
@@ -243,10 +245,13 @@ describe('every route the manager can reach has a door (2026-08-29)', () => {
     expect(link).toHaveAttribute('href', '#/home')
   })
 
-  it('resolves that hash to its own route rather than falling through to the board', async () => {
+  it('resolves that hash to its own route, and is now the fallback too', async () => {
     expect(routeFromHash('#/home')).toBe('home')
-    // And the fallback is still the board: `#/` is deliberately NOT the home yet.
-    expect(routeFromHash('#/')).toBe('schedule')
+    // D16 (2026-09-10) flipped this. The line above used to read `toBe('schedule')` with
+    // the comment "`#/` is deliberately NOT the home yet" — "yet" being the operative
+    // word: the home was waiting to be looked at on real data before it became the
+    // landing. It has been, and it now carries the alert centre.
+    expect(routeFromHash('#/')).toBe('home')
   })
 })
 

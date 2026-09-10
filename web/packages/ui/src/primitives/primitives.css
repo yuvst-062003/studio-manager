@@ -1132,7 +1132,7 @@ a:not(.tw-scope a) {
   padding: 12px 8px 8px;
 }
 
-.studio-sidenav__item {
+.studio-sidenav .studio-sidenav__item {
   display: flex;
   align-items: center;
   gap: 11px;
@@ -1144,13 +1144,13 @@ a:not(.tw-scope a) {
   text-decoration: none;
 }
 
-.studio-sidenav__item:hover {
+.studio-sidenav .studio-sidenav__item:hover {
   background: var(--ground);
   color: var(--fg);
 }
 
-.studio-sidenav__item--active,
-.studio-sidenav__item--active:hover {
+.studio-sidenav .studio-sidenav__item--active,
+.studio-sidenav .studio-sidenav__item--active:hover {
   background: var(--emphasis);
   color: var(--on-emphasis);
   font-weight: var(--weight-medium);
@@ -1159,6 +1159,30 @@ a:not(.tw-scope a) {
 .studio-sidenav__label {
   flex: 1;
   min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.studio-sidenav .studio-sidenav__title {
+  font-weight: var(--weight-medium);
+  line-height: 1.25;
+}
+
+/* The second line of a nav entry. Muted against the item's own colour rather than a
+ * fixed grey, so it stays legible when the active item inverts to `--on-emphasis`. */
+.studio-sidenav .studio-sidenav__hint {
+  font-size: var(--text-micro);
+  line-height: 1.3;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-sidenav .studio-sidenav__item--active .studio-sidenav__hint {
+  color: inherit;
+  opacity: 0.78;
 }
 
 .studio-sidenav__badge {

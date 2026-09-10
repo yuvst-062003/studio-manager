@@ -378,6 +378,95 @@
   --emphasis-tint: #17233b;
 }
 
+/* ═══ THE STUDIO-OS SURFACE ═══════════════════════════════════════════════════════
+ * The manager dashboard's own register, added by the 2026-09-10 redesign. Fourth
+ * surface, and the same shape as the two above: a re-VALUING of tokens that already
+ * exist, brand tier and structural palette only, never the semantic band.
+ *
+ * Values are read from the redesign prototype's `src/index.css` `@theme` block as a
+ * VISUAL REFERENCE, not copied as CSS. Two corrections were forced and are marked
+ * where they land:
+ *
+ * 1. The prototype defines NO light palette at all — its `@theme` is Material-3 dark
+ *    throughout and its document hardcodes `class="dark"`. Its own "light mode" is an
+ *    illusion: `isLight` appears thirteen times in its settings view and zero times in
+ *    the other nine screens. The light half below is therefore derived, the same way
+ *    `outward` and `staff` derived theirs, rather than shipped missing.
+ * 2. Its mint `#4edea3` cannot carry text or fill an emphasis control on a light
+ *    ground. Darkened for light mode; the mint itself survives untouched in dark,
+ *    where it was designed to sit.
+ *
+ * One thing deliberately NOT imported: the prototype's `--color-error: #ffb4ab`. The
+ * semantic band is out of reach (D2), which is what keeps a debt banner the studio's
+ * red on a mint app exactly as it stays red on the blue staff app. */
+
+[data-surface="studio-os"] {
+  --brand-primary: #0f7a5a;
+  --brand-on-primary: #fff;
+
+  /* The surface ladder: page → card → raised. The prototype's five-step container
+   * ramp collapses onto the four rungs that exist here; a fifth would be a token this
+   * block invented, which the audit refuses. */
+  --ground: #f2f5f3;
+  --surface: #f8faf9;
+  --surface-raised: #fff;
+  --disabled-surface: #e9eeeb;
+
+  /* The prototype's ground becomes the ink in light mode. Its own near-black is
+   * already the darkest value it names, and reusing it keeps the two halves of this
+   * surface recognisably the same palette rather than two unrelated schemes. */
+  --fg: #101319;
+  --on-fg: #f2f5f3;
+  --emphasis: #0f7a5a;
+  --on-emphasis: #fff;
+  --text-secondary: #333f39;
+
+  /* NOT in the prototype, which names only two text weights. Derived to sit between
+   * them with real headroom over the 4.5:1 floor rather than on it. */
+  --text-muted: #59665f;
+  --border: #d9e2dd;
+
+  /* `--border-strong` is a control boundary (SC 1.4.11, D12), so it owes 3:1 against
+   * the ground. The prototype's light-on-light outline pair does not reach it. */
+  --border-strong: #74827b;
+  --accent: #0b5f46;
+  --on-accent: #fff;
+  --belt-ring: #101319;
+  --scrim: rgb(16 19 25 / 45%);
+  --emphasis-tint: #e4f5ee;
+}
+
+[data-theme="dark"][data-surface="studio-os"],
+[data-theme="dark"] [data-surface="studio-os"] {
+  /* This half IS the prototype: ground, the container ladder, both text weights and
+   * the mint are its own values, transcribed. Its ramp already lightens with
+   * elevation, which is the direction dark mode needs everywhere else in this file. */
+  --brand-primary: #4edea3;
+  --brand-on-primary: #003824;
+  --ground: #101319;
+  --surface: #191c22;
+  --surface-raised: #1d2026;
+  --disabled-surface: #272a30;
+  --fg: #e1e2eb;
+  --on-fg: #101319;
+  --emphasis: #4edea3;
+  --on-emphasis: #003824;
+  --text-secondary: #bbcabf;
+
+  /* The third weight the prototype does not name, derived here as it was in light. */
+  --text-muted: #93a49a;
+  --border: #3c4a42;
+  --border-strong: #86948a;
+  --accent: #4edea3;
+  --on-accent: #003824;
+  --belt-ring: #e1e2eb;
+  --scrim: rgb(0 0 0 / 62%);
+
+  /* A dark wash of the mint, so an emphasised chip reads as raised rather than as a
+   * bright rectangle on a near-black page. */
+  --emphasis-tint: #10241c;
+}
+
 *,
 *::before,
 *::after {

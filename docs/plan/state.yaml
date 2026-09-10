@@ -1400,6 +1400,73 @@ waves:
           Pre-existing in the data model, not introduced here.
         status: shipped
         on: 2026-09-07
+  - id: W10
+    milestone: M10
+    title: The manager dashboard redesign
+    mode: sequential
+    lanes: []
+    exit_gate: every screen ported, nothing unreachable, and staging carries it
+    status: active
+    opened: 2026-09-10
+    source: docs/superpowers/specs/2026-09-10-dashboard-redesign.md
+    why: >
+      Port the look, keep the logic. The prototype supplies the visual language and the
+      dashboard supplies the behaviour; no ported screen loses a state, a guard, a refusal
+      or an error message its predecessor handled. Sixteen decisions taken with the owner
+      on 2026-09-10 are recorded in the spec's own table.
+    pieces:
+      - id: W10.1
+        title: The palette and the shell
+        status: shipped
+        on: 2026-09-10
+      - id: W10.2
+        title: Home — layout, KPI cards, and the alert centre moved onto it
+        status: planned
+      - id: W10.3
+        title: Students list and the class tabs
+        status: planned
+      - id: W10.4
+        title: Student detail — the four-tab drawer, and its missing error state
+        status: planned
+      - id: W10.5
+        title: Weekly schedule — the grid and the two-tab session popover
+        status: planned
+      - id: W10.6
+        title: Groups and cycles — the card grid
+        status: planned
+      - id: W10.7
+        title: One group, and closures
+        status: planned
+      - id: W10.8
+        title: Attendance — three buttons per student
+        status: planned
+      - id: W10.9
+        title: Billing collections, promises, plan changes
+        status: planned
+      - id: W10.10
+        title: Prices and reconciliation
+        status: planned
+      - id: W10.11
+        title: Items — the product grid and the order wizard
+        status: planned
+      - id: W10.12
+        title: Announcements — the four-step wizard and the notification preview
+        status: planned
+      - id: W10.13
+        title: Reports — chart styling and the KPI strip
+        status: planned
+      - id: W10.14
+        title: Belts, exams, events
+        status: planned
+      - id: W10.15
+        title: Documents, staff, settings, setup, rollover
+        status: planned
+      - id: W10.16
+        title: Platform
+        status: planned
+      - id: W10.17
+        title: The uPay receipt link — proven against a real transaction, or dropped
+        status: planned
 holdbacks:
   - id: HB-w6-health-gate-unmounted
     kind: carried

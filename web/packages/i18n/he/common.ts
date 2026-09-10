@@ -187,6 +187,7 @@ export const common: Bundle = {
   'dash.hint.items': 'פריטים למכירה — ג׳ודוגי, חגורות וציוד',
   'dash.hint.documents': 'הצהרות בריאות — מי חתם ומי חסר',
   'dash.hint.reports': 'דוחות — הכנסות, נוכחות, שימור וחגורות',
+  'dash.hint.settings': 'הגדרות המועדון — פרטים, מסמכים, צוות ומעבר שנה',
   'dash.nav.daily': 'יומיום',
   'dash.nav.club': 'מועדון',
   'dash.nav.money': 'כספים ומסמכים',
