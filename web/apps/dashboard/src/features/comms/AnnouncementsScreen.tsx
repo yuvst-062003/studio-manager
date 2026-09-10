@@ -14,11 +14,12 @@
 //
 // **A lead coach is offered only their own groups.** §3.2 — and a picker offering a scope the
 // API will refuse is a 403 the manager discovers after writing the message.
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, Card, EmptyState, LoadFailed, SegmentedControl, TextField } from '@studio/ui'
+import { Card, EmptyState, LoadFailed } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { AnnouncementWizard } from './AnnouncementWizard'
 import { DeliveryReport } from './DeliveryReport'
 import { InstallState } from './InstallState'
 import type {
@@ -33,23 +34,6 @@ const pageStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 'var(--space-4)',
-}
-
-const sectionStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--space-2)',
-}
-
-// 2026-08-30 (owner request) — the preview beside the composer, not under it: at the
-// INLINE-END, so it sits on the left of a Hebrew screen and the right of an English one.
-// `auto-fit` collapses the two columns on a phone; DOM order keeps the composer first,
-// which in RTL puts it on the right and the preview on the left with no branch.
-const composerGridStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(20rem, 1fr))',
-  gap: 'var(--space-5)',
-  alignItems: 'start',
 }
 
 const titleStyle: CSSProperties = {
@@ -95,8 +79,9 @@ export function AnnouncementsScreen({
   const [loaded, setLoaded] = useState(false)
   const [loadFailed, setLoadFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
-  const [title, setTitle] = useState('')
-  const [body, setBody] = useState('')
+  // `title` and `body` live in the wizard now — they are what step 2 collects, and this
+  // screen's job is the audience count and the list.
+  const [sending, setSending] = useState(false)
   const [scopeType, setScopeType] = useState<AnnouncementScope>(
     canPublishStudioWide ? 'studio' : 'group',
   )
@@ -149,33 +134,30 @@ export function AnnouncementsScreen({
   // A count fetched for a different scope is not this scope's answer, so it reads as absent
   // rather than as a number.
   const recipientCount = audience !== null && audience.scope === scopeKey ? audience.count : null
-  const canSend = title.trim() !== '' && body.trim() !== '' && audienceChosen
 
-  const scopeChoices = useMemo(
-    () => scopes.filter((option) => option.type === scopeType),
-    [scopes, scopeType],
-  )
-
-  const send = useCallback(async () => {
-    const created = await client
-      .create({
-        title,
-        body,
-        scope_type: scopeType,
-        scope_id: scopeType === 'studio' ? null : scopeId,
-      })
-      .catch(() => null)
-    if (!created) return
-    const published = await client.publish(created.id).catch(() => null)
-    setTitle('')
-    setBody('')
-    setSent(published !== null)
-    await refresh()
+  const send = useCallback(async (title: string, body: string) => {
+    setSending(true)
+    try {
+      const created = await client
+        .create({
+          title,
+          body,
+          scope_type: scopeType,
+          scope_id: scopeType === 'studio' ? null : scopeId,
+        })
+        .catch(() => null)
+      if (!created) return
+      const published = await client.publish(created.id).catch(() => null)
+      setSent(published !== null)
+      await refresh()
+    } finally {
+      setSending(false)
+    }
     // Deliberately does NOT open the delivery report. A manager who has just sent a note
     // about a summer BBQ wants confirmation that it went, not a delivery audit — and a
     // report that appears after every send is one people learn to dismiss without reading,
     // which costs exactly the case it exists for.
-  }, [client, title, body, scopeType, scopeId, refresh])
+  }, [client, scopeType, scopeId, refresh])
 
   if (loadFailed) {
     return (
@@ -193,92 +175,21 @@ export function AnnouncementsScreen({
     <div style={pageStyle} data-testid="dashboard-announcements">
       <h1 style={titleStyle}>{t(locale, 'comms.announcement.title')}</h1>
 
-      <Card>
-        <section style={composerGridStyle} aria-labelledby="composer-title">
-        <div style={sectionStyle}>
-          <h2 id="composer-title" style={titleStyle}>
-            {t(locale, 'comms.announcement.create')}
-          </h2>
-
-          <TextField
-            label={t(locale, 'comms.announcement.subject')}
-            onChange={(event) => setTitle(event.target.value)}
-            value={title}
-          />
-          <TextField
-            label={t(locale, 'comms.announcement.body')}
-            multiline
-            onChange={(event) => setBody(event.target.value)}
-            rows={4}
-            value={body}
-          />
-
-          {/* -- קהל יעד ------------------------------------------------------ */}
-          <h3 style={titleStyle}>{t(locale, 'comms.audience.title')}</h3>
-          {canPublishStudioWide ? null : (
-            <p style={hintStyle}>{t(locale, 'comms.audience.limitedToOwnGroups')}</p>
-          )}
-          <SegmentedControl
-            legend={t(locale, 'comms.audience.title')}
-            onValueChange={(next) => {
-              setScopeType(next as AnnouncementScope)
-              setScopeId(null)
-            }}
-            options={[
-              // A lead coach never sees the studio-wide option: §5.11's grant is "their own
-              // groups", and offering a scope the API will refuse is a 403 discovered after
-              // the message is written.
-              ...(canPublishStudioWide
-                ? [{ value: 'studio', label: t(locale, 'comms.audience.studio') }]
-                : []),
-              ...(canPublishStudioWide
-                ? [{ value: 'class', label: t(locale, 'comms.audience.class') }]
-                : []),
-              { value: 'group', label: t(locale, 'comms.audience.group') },
-            ]}
-            value={scopeType}
-          />
-
-          {scopeType === 'studio' ? null : (
-            <div style={sectionStyle}>
-              {scopeChoices.map((option) => (
-                <Button
-                  key={option.id}
-                  onClick={() => setScopeId(option.id)}
-                  variant={scopeId === option.id ? 'primary' : 'secondary'}
-                >
-                  {option.name}
-                </Button>
-              ))}
-            </div>
-          )}
-
-          {audienceChosen && recipientCount !== null ? (
-            <p style={lineStyle} data-testid="audience-size">
-              {t(locale, 'comms.audience.recipients').replace('{{count}}', String(recipientCount))}
-            </p>
-          ) : (
-            <p style={hintStyle} data-testid="audience-none">
-              {t(locale, 'comms.audience.none')}
-            </p>
-          )}
-
-          <Button disabled={!canSend} onClick={() => void send()}>
-            {t(locale, 'comms.announcement.publish')}
-          </Button>
-          {sent ? (
-            <p style={lineStyle} data-testid="announcement-sent">
-              {t(locale, 'comms.announcement.published')}
-            </p>
-          ) : null}
-        </div>
-
-        {/* The תצוגה מקדימה pane lived here — beside the composer since the morning's
-            owner request — and was removed entirely on a second owner request the same
-            day (2026-08-30). `truncateForLockScreen` stays exported: the truncation rule
-            it encodes is still true of every push the server sends. */}
-        </section>
-      </Card>
+      <AnnouncementWizard
+        canPublishStudioWide={canPublishStudioWide}
+        locale={locale}
+        onScope={(type, id) => {
+          setScopeType(type)
+          setScopeId(id)
+        }}
+        onSend={send}
+        recipientCount={recipientCount}
+        scopeId={scopeId}
+        scopeType={scopeType}
+        scopes={scopes}
+        sending={sending}
+        sent={sent}
+      />
 
       {/* -- what has already gone out ------------------------------------------ */}
       {loaded && rows.length === 0 ? (

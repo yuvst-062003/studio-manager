@@ -1,0 +1,223 @@
+/* Checkpoint 12 — §3.12's four-step broadcast wizard, "the strongest single idea in the
+ * prototype", replacing a flat composer where subject, body, audience and publish sat in
+ * one column. */
+.comms-wizard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+}
+
+.comms-wizard__title {
+  margin: 0;
+  font-size: var(--text-title);
+  font-weight: var(--weight-semibold);
+}
+
+.comms-wizard__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  align-items: stretch;
+  min-block-size: 18rem;
+}
+
+.comms-wizard__lead {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.comms-wizard__note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.comms-wizard__count {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  margin-inline-start: auto;
+}
+
+.comms-wizard__scopes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.comms-wizard__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-block-start: var(--space-3);
+  border-block-start: var(--border-width-hairline) solid var(--border);
+}
+
+/* ── step 1: the templates ─────────────────────────────────────────────────────── */
+.comms-templates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: var(--space-3);
+}
+
+.comms-template {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  inline-size: 100%;
+  text-align: start;
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--fg);
+}
+
+.comms-template:hover {
+  border-color: var(--emphasis);
+}
+
+.comms-template:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.comms-template[aria-pressed='true'] {
+  border-color: var(--emphasis);
+  background: var(--emphasis-tint);
+}
+
+.comms-template__name {
+  font-weight: var(--weight-medium);
+}
+
+.comms-template__hint {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+/* ── step 2: the dynamic-tag pills ─────────────────────────────────────────────── */
+.comms-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.comms-tags__label {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.comms-tag {
+  background: var(--emphasis-tint);
+  border: var(--border-width-hairline) solid var(--emphasis);
+  border-radius: var(--radius-pill);
+  color: var(--emphasis);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--text-caption);
+  padding-block: var(--space-1);
+  padding-inline: var(--space-3);
+}
+
+.comms-tag:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── step 4: the channels, and the lock-screen preview ─────────────────────────── */
+.comms-channels {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.comms-channel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--ground);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: var(--text-label);
+}
+
+/* D7 — the one live channel reads as live, and the two futures read as futures. The state
+ * is a WORD in both cases; the tint is the second signal, never the only one. */
+.comms-channel[data-live='true'] {
+  background: var(--emphasis-tint);
+  border-color: var(--emphasis);
+  color: var(--fg);
+}
+
+.comms-channel[data-live='true'] .comms-channel__state {
+  color: var(--emphasis);
+  font-weight: var(--weight-medium);
+}
+
+.comms-channel__name {
+  font-weight: var(--weight-medium);
+}
+
+/* The phone. Not a picture of a device — a plain rounded plate on the app's own dark
+ * ground, which is what a lock screen is: the point is the CARD inside it, and a drawn
+ * handset with a notch would be decoration competing with the thing being previewed. */
+.push-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.push-preview__phone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5) var(--space-4);
+  border-radius: var(--radius-xl);
+  background: var(--fg);
+}
+
+.push-preview__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  inline-size: 100%;
+  max-inline-size: 20rem;
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+
+  /* A translucent plate over the dark ground, the way a real notification sits. */
+  background: color-mix(in srgb, var(--on-fg) 92%, transparent);
+  color: var(--fg);
+}
+
+.push-preview__app {
+  font-size: var(--text-caption);
+  color: var(--text-muted);
+}
+
+.push-preview__title {
+  font-size: var(--text-body);
+}
+
+.push-preview__body {
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+}

@@ -82,20 +82,80 @@ afterEach(() => {
 })
 
 // -- 4f: קהל יעד ותצוגה מקדימה -------------------------------------------------
-describe('the composer (4f)', () => {
+describe('the broadcast wizard (4f, checkpoint 12)', () => {
+  /** Walks the flat composer's old path through the four steps it became. */
+  async function writeAndReach(step: 'audience' | 'send', title = 'ביטול', body = 'מבוטל') {
+    await userEvent.click(screen.getByTestId('template-blank'))
+    await userEvent.type(screen.getByTestId('wizard-title'), title)
+    await userEvent.type(screen.getByTestId('wizard-body'), body)
+    await userEvent.click(screen.getByTestId('wizard-next'))
+    if (step === 'send') await userEvent.click(screen.getByTestId('wizard-next'))
+  }
+
+  it('opens on the templates rather than on an empty form', async () => {
+    // The whole reason the flat composer became a wizard: it is fine for the third message
+    // a manager sends and no help at all for the first.
+    render(
+      <AnnouncementsScreen canPublishStudioWide client={makeClient()} locale="he" scopes={SCOPES} />,
+    )
+    expect(await screen.findByTestId('wizard-step-kind')).toBeInTheDocument()
+    expect(screen.getByTestId('wizard-templates')).toBeInTheDocument()
+  })
+
+  it('fills the message from a template, and never wipes what was written', async () => {
+    render(
+      <AnnouncementsScreen canPublishStudioWide client={makeClient()} locale="he" scopes={SCOPES} />,
+    )
+    await userEvent.click(await screen.findByTestId('template-closure'))
+    expect(screen.getByTestId('wizard-title')).toHaveValue(t('he', 'comms.template.closure.title'))
+
+    // `blank` writes NOTHING rather than writing emptiness. On the normal path the fields
+    // are already empty, so it reads as "start from scratch"; on the way back from a
+    // template it leaves the manager's own edits alone, which is the kinder of the two and
+    // the only one that cannot destroy typing.
+    await userEvent.click(screen.getByTestId('stepper-kind'))
+    await userEvent.click(screen.getByTestId('template-blank'))
+    expect(screen.getByTestId('wizard-title')).toHaveValue(
+      t('he', 'comms.template.closure.title'),
+    )
+  })
+
+  it('inserts a dynamic tag as literal text, because the SERVER substitutes it', async () => {
+    // Previewing a real name would promise a substitution this screen cannot verify.
+    render(
+      <AnnouncementsScreen canPublishStudioWide client={makeClient()} locale="he" scopes={SCOPES} />,
+    )
+    await userEvent.click(await screen.findByTestId('template-blank'))
+    await userEvent.type(screen.getByTestId('wizard-body'), 'שלום')
+    await userEvent.click(screen.getByTestId('tag-studentName'))
+    expect(screen.getByTestId('wizard-body')).toHaveValue(`שלום ${t('he', 'comms.tag.studentName')}`)
+  })
+
   it('names the audience size before anything is sent', async () => {
     // §5.11's whole silent-failure problem starts here. A manager who cannot see
     // יגיע ל-24 משפחות before pressing send is guessing at twenty-four families.
     render(
+      <AnnouncementsScreen canPublishStudioWide client={makeClient()} locale="he" scopes={SCOPES} />,
+    )
+    await screen.findByTestId('wizard-templates')
+    await writeAndReach('audience')
+    expect(await screen.findByTestId('audience-size')).toHaveTextContent('24')
+  })
+
+  it('uses the real count, never the prototype’s hardcoded one', async () => {
+    // The prototype prints 14 for debt, 9 for missing health and 72 for judo regardless of
+    // the roster. This is whatever `audience-preview` answers.
+    render(
       <AnnouncementsScreen
         canPublishStudioWide
-        client={makeClient()}
+        client={makeClient({ audienceSize: vi.fn().mockResolvedValue({ recipient_count: 3 }) })}
         locale="he"
         scopes={SCOPES}
       />,
     )
-    const size = await screen.findByTestId('audience-size')
-    expect(size).toHaveTextContent('24')
+    await screen.findByTestId('wizard-templates')
+    await writeAndReach('audience')
+    expect(await screen.findByTestId('audience-size')).toHaveTextContent('3')
   })
 
   it('refuses to send with no audience chosen', async () => {
@@ -107,10 +167,14 @@ describe('the composer (4f)', () => {
         scopes={SCOPES}
       />,
     )
+    await screen.findByTestId('wizard-templates')
+    await userEvent.click(screen.getByTestId('template-blank'))
+    await userEvent.type(screen.getByTestId('wizard-title'), 'ביטול')
+    await userEvent.type(screen.getByTestId('wizard-body'), 'מבוטל')
+    await userEvent.click(screen.getByTestId('wizard-next'))
     expect(await screen.findByTestId('audience-none')).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: t('he', 'comms.announcement.publish') }),
-    ).toBeDisabled()
+    // And the step cannot be left: nothing may be sent to nobody.
+    expect(screen.getByTestId('wizard-next')).toBeDisabled()
   })
 
   it('offers a lead coach their own groups and not the whole club', async () => {
@@ -124,24 +188,40 @@ describe('the composer (4f)', () => {
         scopes={SCOPES}
       />,
     )
-    expect(
-      await screen.findByText(t('he', 'comms.audience.limitedToOwnGroups')),
-    ).toBeInTheDocument()
+    await screen.findByTestId('wizard-templates')
+    await writeAndReach('audience')
+    expect(screen.getByText(t('he', 'comms.audience.limitedToOwnGroups'))).toBeInTheDocument()
     expect(screen.queryByLabelText(t('he', 'comms.audience.studio'))).toBeNull()
   })
 
-  it('carries no preview pane — removed on the owner request of 2026-08-30', () => {
+  it('draws one live channel and two stated futures — D7', async () => {
+    // Permanently disabled and marked בקרוב, which is `inert-buttons.test.ts`'s one
+    // exemption and honest in a way hiding them is not: a manager who cannot see that SMS
+    // is coming assumes it never will be.
     render(
-      <AnnouncementsScreen
-        canPublishStudioWide
-        client={makeClient()}
-        locale="he"
-        scopes={SCOPES}
-      />,
+      <AnnouncementsScreen canPublishStudioWide client={makeClient()} locale="he" scopes={SCOPES} />,
     )
-    expect(screen.queryByTestId('preview-pane')).toBeNull()
-    expect(screen.queryByTestId('push-preview')).toBeNull()
-    expect(screen.queryByTestId('inbox-preview')).toBeNull()
+    await screen.findByTestId('wizard-templates')
+    await writeAndReach('send')
+    expect(screen.getByTestId('channel-push')).toHaveTextContent(t('he', 'comms.channel.live'))
+    expect(screen.getByTestId('channel-whatsapp')).toHaveTextContent(t('he', 'comms.channel.soon'))
+    expect(screen.getByTestId('channel-sms')).toHaveTextContent(t('he', 'comms.channel.soon'))
+  })
+
+  it('previews what a lock screen will actually show, truncation included', async () => {
+    // §3.12 asks for this by name. It is the LAST step and not a permanent pane — that is
+    // what the owner removed on 2026-08-30, and this is not that: a manager reaches it
+    // having written the thing.
+    render(
+      <AnnouncementsScreen canPublishStudioWide client={makeClient()} locale="he" scopes={SCOPES} />,
+    )
+    await screen.findByTestId('wizard-templates')
+    await writeAndReach('send', 'א'.repeat(80), 'מבוטל')
+    const preview = screen.getByTestId('push-preview')
+    expect(preview).toBeInTheDocument()
+    // The SAME rule the server applies when it builds the push.
+    expect(screen.getByTestId('push-preview-title').textContent).toHaveLength(40)
+    expect(screen.getByTestId('push-preview-title').textContent?.endsWith('…')).toBe(true)
   })
 
   it('truncates a title that a lock screen would cut', () => {
@@ -155,18 +235,11 @@ describe('the composer (4f)', () => {
     // A delivery report after every send is a screen people learn to dismiss without reading,
     // which costs exactly the one case it exists for — a cancellation a couple of hours out.
     render(
-      <AnnouncementsScreen
-        canPublishStudioWide
-        client={makeClient()}
-        locale="he"
-        scopes={SCOPES}
-      />,
+      <AnnouncementsScreen canPublishStudioWide client={makeClient()} locale="he" scopes={SCOPES} />,
     )
-    await userEvent.type(screen.getByLabelText(t('he', 'comms.announcement.subject')), 'ביטול')
-    await userEvent.type(screen.getByLabelText(t('he', 'comms.announcement.body')), 'מבוטל')
-    await userEvent.click(
-      screen.getByRole('button', { name: t('he', 'comms.announcement.publish') }),
-    )
+    await screen.findByTestId('wizard-templates')
+    await writeAndReach('send')
+    await userEvent.click(screen.getByTestId('wizard-publish'))
 
     expect(await screen.findByTestId('announcement-sent')).toBeInTheDocument()
     expect(screen.queryByTestId('delivery-report')).toBeNull()
@@ -183,12 +256,20 @@ describe('the composer (4f)', () => {
         scopes={SCOPES}
       />,
     )
-    await userEvent.type(screen.getByLabelText(t('he', 'comms.announcement.subject')), 'ביטול')
-    await userEvent.type(screen.getByLabelText(t('he', 'comms.announcement.body')), 'מבוטל')
-    await userEvent.click(
-      screen.getByRole('button', { name: t('he', 'comms.announcement.publish') }),
-    )
+    await screen.findByTestId('wizard-templates')
+    await writeAndReach('send')
+    await userEvent.click(screen.getByTestId('wizard-publish'))
     await waitFor(() => expect(publish).toHaveBeenCalledWith('x1'))
+  })
+
+  it('draws no scheduling step — the prototype promises timing and renders no date', async () => {
+    render(
+      <AnnouncementsScreen canPublishStudioWide client={makeClient()} locale="he" scopes={SCOPES} />,
+    )
+    await screen.findByTestId('wizard-templates')
+    await writeAndReach('send')
+    expect(screen.queryByTestId('wizard-step-schedule')).not.toBeInTheDocument()
+    expect(screen.getByTestId('wizard-position')).toHaveTextContent('4')
   })
 })
 
