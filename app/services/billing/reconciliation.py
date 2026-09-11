@@ -38,6 +38,7 @@ from app.integrations.upay.callback import (
     NotAnOrderIpnError,
     UnobservedIpnOutcomeError,
     parse_ipn,
+    reference_in,
     verify_ipn,
 )
 from app.integrations.upay.ipn import UnparsableIpnAmountError, agorot_from_ipn_amount
@@ -309,10 +310,15 @@ def _query_to_dict(raw_query: str) -> dict[str, str]:
 
 
 def _maybe_uuid(text: str) -> uuid.UUID | None:
-    try:
-        return uuid.UUID(text)
-    except ValueError:
-        return None
+    """The reference this callback names, for the stored column.
+
+    Delegates to `callback.reference_in` rather than parsing the field a second way:
+    `productdescription` carries the club's name in front of the reference since
+    2026-09-11 (bit renders that field to the payer), and a column parsed by one rule
+    beside a verdict computed by another is a reconciliation screen that disagrees with
+    itself in front of a manager.
+    """
+    return reference_in(text)
 
 
 def _maybe_date(text: str) -> date | None:

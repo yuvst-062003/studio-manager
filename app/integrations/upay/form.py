@@ -60,6 +60,48 @@ MAX_INSTALLMENTS = 12
 REFERNAME = "UPAY"
 
 
+#: How much of the club's name rides in front of the order reference in `paymentdetails`.
+#:
+#: `paymentdetails` is uPay's **product description**, and bit renders it to the payer as
+#: what they are paying for -- the first live payment (2026-09-11) showed a real parent the
+#: bare string `96ad0d99-3565-422d-b0a5-cb9993ff6e83` and nothing else, on a screen whose
+#: only other words are "בקשת תשלום מבית העסק באמצעות Upay". The club's name appeared
+#: nowhere, which is indistinguishable from a phishing page.
+#:
+#: A cap rather than the whole name because **uPay documents no length limit for this
+#: field** (`upay-integration.md` lists eleven form fields and no limits), so the shorter
+#: the string the less there is to find out the hard way.
+STUDIO_NAME_IN_DETAILS = 40
+
+#: What separates the two halves. A space-padded middle dot, which is what the parent app
+#: already uses to join a charge label to its month.
+DETAILS_SEPARATOR = " · "
+
+
+def payment_details(studio_name: str, order_public_ref: uuid.UUID) -> str:
+    """uPay's `paymentdetails`: what the PAYER reads, and what comes back as our reference.
+
+    One field doing two jobs, and until 2026-09-11 only the second was served. It returns
+    as `productdescription` (round two B3, three times out of three), so the reference has
+    to be in here -- but bit shows this string to the parent, so the club's name has to be
+    in here too.
+
+    **The name comes first, the reference last, and that ordering is the risk being
+    taken.** If uPay truncates the field somewhere we have not measured, the half that
+    survives is the half the payer needs, and the half that is lost costs an automatic
+    match: `IpnPayload.public_ref` finds no UUID, the callback lands `unmatched`, and it
+    waits on the reconciliation screen for a human. That is a queue, not a dead end -- the
+    money is in the account, `raw_query` keeps every byte, and the order is still
+    identified by the `ipnurl` path the callback arrived on. Reversing the order would
+    protect the match and give the parent back the hex string that started this.
+    """
+    name = " ".join(studio_name.split())[:STUDIO_NAME_IN_DETAILS].strip()
+    if not name:
+        # A studio with no usable name is not a reason to send a form nobody can match.
+        return str(order_public_ref)
+    return f"{name}{DETAILS_SEPARATOR}{order_public_ref}"
+
+
 class TooManyInstallmentsError(ValueError):
     """`max_payments` above what the merchant account offers (`MAX_INSTALLMENTS`)."""
 
@@ -114,8 +156,9 @@ def upay_form_fields(
         "returnurl": return_url,
         "ipnurl": ipn_url,
         # §5.10 -- a UUIDv4 public_ref, never a sequential id: a sequential id here
-        # would let anyone mark any tuition paid.
-        "paymentdetails": str(order_public_ref),
+        # would let anyone mark any tuition paid. Carried INSIDE a string the payer can
+        # read, because bit renders this field to them -- see `payment_details`.
+        "paymentdetails": payment_details(studio.name, order_public_ref),
         # Round two, A1: the dashboard's installment dropdown stops at 12. Behaviour
         # above that was never tested, so M6 clamps rather than finding out in production.
         "maxpayments": str(max_payments),

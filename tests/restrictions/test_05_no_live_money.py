@@ -97,7 +97,11 @@ def test_the_order_reference_is_the_public_ref_not_a_sequential_id():
     """§5.10: 'public_ref is a UUIDv4, never a sequential id. Sequential ids in this
     endpoint would let anyone mark any tuition paid.'"""
     fields = upay_form_fields(studio=_studio(is_demo=False), **COMMON)
-    assert fields["paymentdetails"] == str(COMMON["order_public_ref"])
+    # `in`, not `==`: since 2026-09-11 the field leads with the club's name, because bit
+    # renders it to the payer. What this restriction is about is unchanged -- the
+    # reference in there is a UUIDv4 the server issued and never a sequential id.
+    assert str(COMMON["order_public_ref"]) in fields["paymentdetails"]
+    assert "1" != fields["paymentdetails"]
 
 
 def test_money_crosses_the_boundary_as_integer_arithmetic():

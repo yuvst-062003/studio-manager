@@ -369,6 +369,7 @@ export function JoinWizard({
             onIntentChange={setAlreadyArranged}
             onBack={() => setStep(2)}
             onSubmit={submit}
+            orderStatus={billingClient.orderStatus}
             onDone={(result) => {
               setSubmitResult(result)
               setStep(4)

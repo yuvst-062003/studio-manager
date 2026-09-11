@@ -32,7 +32,9 @@ def test_the_form_carries_the_server_s_amount_and_the_order_s_reference(
     )
     fields = service.form_fields(order.public_ref, base_url="https://studio.example")
     assert fields["amount"] == shekels(MONTHLY_AGOROT * 3)
-    assert fields["paymentdetails"] == str(order.public_ref)
+    # Carried inside the field rather than being the whole of it since 2026-09-11 --
+    # `test_paymentdetails_names_the_club_before_it_carries_the_reference` below owns why.
+    assert str(order.public_ref) in fields["paymentdetails"]
     assert fields["ipnurl"].endswith(f"/api/v1/webhooks/upay/{order.public_ref}")
     assert fields["maxpayments"] == "3"
     assert fields["livesystem"] == "1"
@@ -133,3 +135,53 @@ def test_refername_is_the_value_upay_s_allowlist_actually_accepts(
     )
     fields = service.form_fields(order.public_ref, base_url="https://studio.example")
     assert fields["refername"] == "UPAY"
+
+
+def test_paymentdetails_names_the_club_before_it_carries_the_reference(
+    tenant_session, studio, a_priced_student, three_open_months, a_merchant_email
+):
+    """`paymentdetails` is what the PAYER reads, and it must say who is being paid.
+
+    uPay returns this field as `productdescription`, and bit renders it as the payment's
+    description. The first live payment (2026-09-11) showed the parent a bare UUID and
+    nothing else -- the club's name appeared nowhere on the bit screen, which says only
+    "בקשת תשלום מבית העסק באמצעות Upay". A parent who has been told to expect a judo
+    club and is shown a hex string has every reason to close the page.
+
+    The club name comes FIRST because that is the half a truncated string should keep for
+    the payer; the reference is still in there, and `IpnPayload.public_ref` now finds it
+    anywhere in the field. If uPay ever truncates it away, the callback lands `unmatched`
+    in the reconciliation queue rather than settling the wrong thing -- see the field's own
+    comment in `form.py` for why that is the acceptable failure.
+
+    **Truncation was measured, not assumed.** `upay-integration.md` documents eleven form
+    fields and no length limits, so the same probe that settled `refername` was run against
+    the live account on 2026-09-11 -- one POST per variant, every other field exactly what
+    `form_fields` produces, and the card page read back and searched for the string sent:
+
+        paymentdetails = <uuid>                     (36)  -> 38673 B, echoed verbatim
+        paymentdetails = "מועדון גלדיאטור · <uuid>"  (54)  -> 38739 B, echoed verbatim
+        paymentdetails = <40 Hebrew chars>+uuid      (79)  -> 38841 B, echoed verbatim
+        paymentdetails = <120 Hebrew chars>+uuid    (159)  -> echoed verbatim
+
+    The page grows with the field and contains the whole of it at 159 characters, which is
+    twice `STUDIO_NAME_IN_DETAILS` plus a reference. Nobody paid any of those pages: a
+    fresh UUID belonging to no order was used, so even a stray payment would have landed
+    `unmatched` rather than settling somebody's tuition. Note what this does NOT prove --
+    that the IPN echoes the field verbatim too. Only a live payment shows that, and the
+    parser is tolerant precisely so the unproven half degrades into a queue.
+    """
+    service = OrderService(tenant_session)
+    order = service.create(
+        studio.id,
+        payer_person_id=a_priced_student.payer_person_id,
+        charge_ids=[three_open_months[0]],
+        max_payments=1,
+        at=T0,
+    )
+    details = service.form_fields(order.public_ref, base_url="https://studio.example")[
+        "paymentdetails"
+    ]
+
+    assert details.startswith(studio.name)
+    assert str(order.public_ref) in details

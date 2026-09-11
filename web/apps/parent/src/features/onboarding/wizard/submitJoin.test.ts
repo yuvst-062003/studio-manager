@@ -77,6 +77,7 @@ function makeDeps(options: {
         options.createOrder ??
         vi.fn().mockResolvedValue({ public_ref: 'order-1' } as PaymentOrderOut),
       orderForm: options.orderForm ?? vi.fn().mockResolvedValue(FORM),
+      orderStatus: vi.fn().mockResolvedValue({ status: 'pending' } as PaymentOrderOut),
     } as SubmitJoinDeps['billing'],
     standingOrderLinks: vi.fn().mockResolvedValue(options.standingOrderLinks ?? []),
     savePaymentMethods: (options.savePaymentMethods ??

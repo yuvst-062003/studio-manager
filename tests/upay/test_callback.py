@@ -328,3 +328,39 @@ def test_the_verdicts_and_the_simulator_shapes_are_named_the_same():
 
 def test_the_payload_type_is_what_the_seam_advertises():
     assert isinstance(parse_ipn(_query(IpnShape.SUCCESS)), IpnPayload)
+
+
+# -- the payer-facing half of `paymentdetails` (2026-09-11) -----------------------------
+
+
+def test_a_reference_decorated_with_the_club_s_name_is_still_the_reference():
+    """`paymentdetails` is uPay's PRODUCT DESCRIPTION field, and bit renders it to the
+    payer as what they are paying for.
+
+    Found on 2026-09-11 by the first live payment this system ever took: bit showed the
+    parent the bare string `96ad0d99-3565-422d-b0a5-cb9993ff6e83` where a club name
+    belongs, which reads like a phishing page. One field was doing two jobs -- the payer's
+    description and our order reference -- and only the second one was being served.
+
+    The field now carries both, so this parse must find a UUID INSIDE the string rather
+    than requiring the whole of it to be one. Round two B3's rename still holds: what the
+    form sends as `paymentdetails` comes back as `productdescription`.
+    """
+    raw = _query(IpnShape.SUCCESS) | {"productdescription": f"מועדון גלדיאטור · {REF}"}
+    payload = parse_ipn(raw)
+
+    assert payload.public_ref == REF
+    assert payload.carries_reference
+    assert _verdict(raw) is IpnVerdict.SUCCESS
+
+
+def test_a_description_with_no_reference_in_it_is_not_a_reference():
+    """The tolerance above must not become "any text is close enough". A description
+    carrying no UUID yields no reference, which is what routes a shared-recurring-link
+    payment to the reconciliation queue instead of settling somebody's tuition."""
+    raw = _query(IpnShape.SUCCESS) | {"productdescription": "מועדון גלדיאטור"}
+    payload = parse_ipn(raw)
+
+    assert payload.public_ref is None
+    # Non-empty, so this is NOT the recurring path -- it is a reference we cannot read.
+    assert payload.carries_reference

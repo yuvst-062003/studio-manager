@@ -300,6 +300,18 @@ export const billing: Bundle = {
   // -- uPay orders --------------------------------------------------------------
   'order.status.pending': 'ממתין לאישור',
   'order.status.paid': 'שולם',
+  //: The confirmation moment's chip, beside the crest. Distinct from
+  //: `order.status.paid` on purpose: that word labels a ROW in a list, and a
+  //: full-screen moment that says only 'שולם' reads like a label rather than
+  //: like the club confirming it received the money.
+  'order.paidConfirmed': 'התשלום בוצע בהצלחה',
+  //: The tail of the confirmation line when one payment settled several
+  //: charges. Words rather than a bare '+2': a plus sign next to a Hebrew
+  //: phrase reorders under bidi and renders as '2+', which reads as nothing.
+  'order.andMoreCharges': 'ועוד {{count}} חיובים',
+  //: Hebrew does not agree with '1' the way the plural form does — 'ועוד 1
+  //: חיובים' is simply wrong, and it is the commonest case of the two.
+  'order.andOneMoreCharge': 'ועוד חיוב אחד',
   'order.status.failed': 'נכשל',
   'order.status.amount_mismatch': 'סכום לא תואם',
   'order.status.expired': 'פג תוקף',

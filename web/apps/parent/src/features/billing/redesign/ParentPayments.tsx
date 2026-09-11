@@ -31,6 +31,7 @@ import { methodKey } from '../PaymentHistoryScreen'
 import type { ChargeOut, PaymentOrderOut, PaymentOut, PaymentPromiseOut } from '../billingClient'
 import { PayScreen } from './PayScreen'
 import type { LastPayment } from './PayScreen'
+import { settledFor } from './pay'
 import type { Ask, DebtRow, PayTerms } from './pay'
 
 type WireTerms = {
@@ -214,7 +215,15 @@ export function ParentPayments({ locale }: { locale: Locale }) {
           refresh()
           return
         }
-        setOverlay({ kind: 'checkout', form })
+        // What this payment settles, captured HERE rather than read back from the order:
+        // `debts` carries the child's name and the charge's own note, and the order row
+        // carries neither.
+        setOverlay({
+          kind: 'checkout',
+          form,
+          publicRef,
+          settled: settledFor([...ask.chargeIds], debts ?? []),
+        })
       } catch (thrown) {
         if (thrown instanceof OrderConflictError) {
           // Not a failure the family can retry their way out of, and not one to report as
@@ -236,7 +245,10 @@ export function ParentPayments({ locale }: { locale: Locale }) {
         setBusy(false)
       }
     },
-    [billing, busy, locale, openOrders, refresh],
+    // `debts` is read to build the settlement line. Without it here the line would be
+    // assembled from whatever this callback closed over on its first render — which for a
+    // family whose debts reloaded mid-session names the wrong month.
+    [billing, busy, debts, locale, openOrders, refresh],
   )
 
   /** Open the page the family already has, at the amount it was opened for. */
@@ -251,7 +263,7 @@ export function ParentPayments({ locale }: { locale: Locale }) {
         return
       }
       setConflictRef(null)
-      setOverlay({ kind: 'checkout', form })
+      setOverlay({ kind: 'checkout', form, publicRef: conflictRef })
     } catch {
       setError(t(locale, 'billing.pay.failed'))
     } finally {
@@ -302,11 +314,19 @@ export function ParentPayments({ locale }: { locale: Locale }) {
       {overlay ? (
         <PaymentOverlay
           locale={locale}
-          onClose={() => setOverlay(null)}
+          onClose={() => {
+            // `refresh()` on the X too, not only on completion. A bit payer whose frame
+            // never closed itself used to shut it and find their debt unchanged on the
+            // screen behind -- for a charge that was already settled. The obvious next
+            // thing a parent does with an unchanged debt is pay it again.
+            setOverlay(null)
+            refresh()
+          }}
           onComplete={() => {
             setOverlay(null)
             refresh()
           }}
+          orderStatus={billing.orderStatus}
           request={overlay}
         />
       ) : null}

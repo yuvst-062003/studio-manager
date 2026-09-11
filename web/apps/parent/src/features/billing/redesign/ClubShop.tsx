@@ -226,7 +226,7 @@ export function ClubShop({ locale }: { locale: Locale }) {
         setCheckout({ kind: 'promised', totalAgorot })
         return
       }
-      setOverlay({ kind: 'checkout', form })
+      setOverlay({ kind: 'checkout', form, publicRef })
       setCheckout({ kind: 'placed', lines, totalAgorot, chargeIds })
     } catch {
       setCheckout({ kind: 'settleFailed', lines, totalAgorot, chargeIds })
@@ -282,12 +282,17 @@ export function ClubShop({ locale }: { locale: Locale }) {
       {overlay ? (
         <PaymentOverlay
           locale={locale}
+          // The X deliberately leaves the checkout `placed`: that state is what renders
+          // the pay button again, and reopening reaches the SAME order through
+          // `orderRefFor` rather than a second one the grace window would refuse. The
+          // white-frame defect is fixed by the poll below, not by resetting the cart.
           onClose={() => setOverlay(null)}
           onComplete={() => {
             setOverlay(null)
             // The IPN settles the charges; the shop's own list re-reads on the next open.
             setCheckout({ kind: 'idle' })
           }}
+          orderStatus={billing.orderStatus}
           request={overlay}
         />
       ) : null}

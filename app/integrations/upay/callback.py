@@ -29,6 +29,7 @@ float touching money at all.
 
 from __future__ import annotations
 
+import re
 import uuid
 from collections.abc import Container, Mapping
 from dataclasses import dataclass, fields
@@ -88,6 +89,34 @@ _REQUIRED_KEYS = ("amount", "transactionid", "productdescription")
 #: Round two B1 observed this on every successful payment. Any other value is a payload
 #: shape nobody here has ever seen -- see `UnobservedIpnOutcomeError`.
 _PROVIDER_SUCCESS_CODE = "0"
+
+#: A UUID **anywhere inside** `productdescription`, not the whole of it.
+#:
+#: The outbound half of this field (`form.payment_details`) puts the club's name in front
+#: of the reference, because bit renders `paymentdetails` to the payer and a bare UUID
+#: reads like a phishing page. So the reference arrives embedded in text from 2026-09-11
+#: onwards, and arrives bare on every callback issued before that -- both are real and this
+#: reads both.
+#:
+#: Anchored on the UUID's own shape rather than on the separator: the separator is ours to
+#: choose today and somebody else's to change tomorrow, while the shape of what we are
+#: looking for is fixed. Hyphenated 8-4-4-4-12 only, so a `transactionid` of digits can
+#: never be mistaken for one.
+_REFERENCE = re.compile(
+    r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+)
+
+
+def reference_in(text: str) -> uuid.UUID | None:
+    """The order reference carried by a `productdescription`, or None.
+
+    The one reader of that field's shape. `IpnPayload.public_ref` and
+    `IpnIntake.record`'s `order_public_ref` column both come through here, because a
+    record whose stored reference disagreed with the one the verdict was computed from is
+    a reconciliation screen showing a human the wrong answer confidently.
+    """
+    match = _REFERENCE.search(text)
+    return uuid.UUID(match.group(0)) if match else None
 
 
 class MalformedIpnError(ValueError):
@@ -191,14 +220,13 @@ class IpnPayload:
         Round two B3 [VERIFIED] three times out of three: the field the form sends as
         `paymentdetails` comes back named `productdescription`. That rename is real and is
         not a transcription error.
+
+        **Found inside the field, not equal to it** (2026-09-11). `paymentdetails` is also
+        what bit shows the payer, so it now leads with the club's name -- see
+        `form.payment_details`. A description carrying no UUID still yields None, which is
+        what keeps a shared-recurring-link payment out of somebody else's tuition.
         """
-        text = self.product_description.strip()
-        if not text:
-            return None
-        try:
-            return uuid.UUID(text)
-        except ValueError:
-            return None
+        return reference_in(self.product_description)
 
     def as_raw(self) -> dict[str, str]:
         """Back to uPay's own key names, in round two's order."""

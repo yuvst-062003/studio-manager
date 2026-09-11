@@ -70,6 +70,10 @@ export type SubmitJoinResult = {
   outcomes: PaymentOutcome[]
   /** uPay's card page, to post into the payment frame. */
   checkout: UpayForm | null
+  /** The order `checkout` pays, so the frame can watch it resolve. Carried separately
+   *  rather than read out of `checkout.fields.paymentdetails`: that field is the payer's
+   *  own description since 2026-09-11 and leads with the club's name. */
+  checkoutRef: string | null
   /** An order was opened but this deployment has no live uPay form — a demo studio
    *  (`DEMO_SIMULATOR`). Nothing failed; there is simply nothing to post. */
   checkoutUnavailable: boolean
@@ -84,7 +88,10 @@ export type SubmitJoinDeps = {
   /** Re-mints the access token. A door B parent belonged to no club until `register`
    *  returned, so every `/me/*` read below answers 403 without it. */
   refreshSession: () => Promise<void>
-  billing: Pick<BillingClient, 'openCharges' | 'createPromise' | 'createOrder' | 'orderForm'>
+  billing: Pick<
+    BillingClient,
+    'openCharges' | 'createPromise' | 'createOrder' | 'orderForm' | 'orderStatus'
+  >
   /** `GET /me/standing-order-links`, read AFTER the write — the children it names did
    *  not exist before it. */
   standingOrderLinks: () => Promise<readonly MandateLink[]>
@@ -260,6 +267,7 @@ export async function submitJoin(input: SubmitJoinInput): Promise<SubmitJoinResu
 
   let checkout: UpayForm | null = null
   let checkoutUnavailable = false
+  let checkoutRef: string | null = null
   const mandates: MandateRow[] = []
 
   if (openCharges !== null) {
@@ -316,6 +324,7 @@ export async function submitJoin(input: SubmitJoinInput): Promise<SubmitJoinResu
           checkoutUnavailable = true
         } else {
           checkout = form
+          checkoutRef = order.public_ref
         }
       } catch {
         // Already `not_recorded` / `write_failed` by default.
@@ -349,5 +358,12 @@ export async function submitJoin(input: SubmitJoinInput): Promise<SubmitJoinResu
     }
   }
 
-  return { personId: registered.person_id, outcomes, checkout, checkoutUnavailable, mandates }
+  return {
+    personId: registered.person_id,
+    outcomes,
+    checkout,
+    checkoutRef,
+    checkoutUnavailable,
+    mandates,
+  }
 }

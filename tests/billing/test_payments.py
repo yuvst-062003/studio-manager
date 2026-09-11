@@ -413,7 +413,8 @@ def test_the_form_is_fields_and_not_html(
     assert response.status_code == 200
     body = response.json()
     assert body["action"].startswith("https://app.upay.co.il/")
-    assert body["fields"]["paymentdetails"] == created["public_ref"]
+    # The club's name leads this field and the reference follows it (2026-09-11).
+    assert created["public_ref"] in body["fields"]["paymentdetails"]
     assert body["fields"]["amount"] == "250.00"
     assert body["fields"]["livesystem"] == "1"
     # P1 — the browser goes back to the PARENT APP's return screen, never to the JSON

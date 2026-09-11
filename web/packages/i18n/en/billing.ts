@@ -233,6 +233,9 @@ export const billing: Bundle = {
   // -- uPay orders --------------------------------------------------------------
   'order.status.pending': 'Awaiting confirmation',
   'order.status.paid': 'Paid',
+  'order.paidConfirmed': 'Payment completed',
+  'order.andMoreCharges': 'and {{count}} more charges',
+  'order.andOneMoreCharge': 'and one more charge',
   'order.status.failed': 'Failed',
   'order.status.amount_mismatch': 'Amount mismatch',
   'order.status.expired': 'Expired',

@@ -144,7 +144,7 @@ export function PlanSection({ locale, studentId }: { locale: Locale; studentId: 
       // to pay for ten minutes with only a generic failure to read.
       const publicRef = await billing.orderRefFor([...money.openChargeIds], 1, 0)
       const form = await billing.orderForm(publicRef)
-      setOverlay({ kind: 'checkout', form })
+      setOverlay({ kind: 'checkout', form, publicRef })
     })
   }, [billing, money, run])
 
@@ -211,7 +211,14 @@ export function PlanSection({ locale, studentId }: { locale: Locale; studentId: 
         <PaymentOverlay
           locale={locale}
           request={overlay}
-          onClose={() => setOverlay(null)}
+          orderStatus={billing.orderStatus}
+          onClose={() => {
+            // The X re-reads too: a bit payer's frame never closed itself, so shutting it
+            // used to leave a settled balance on screen still asking to be paid.
+            setOverlay(null)
+            setMoney(null)
+            refresh()
+          }}
           onComplete={() => {
             setOverlay(null)
             // The change and the money are both server state now; re-read rather than

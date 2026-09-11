@@ -236,6 +236,9 @@ export const billing: Bundle = {
   // -- uPay orders --------------------------------------------------------------
   'order.status.pending': 'Ожидает подтверждения',
   'order.status.paid': 'Оплачено',
+  'order.paidConfirmed': 'Оплата прошла успешно',
+  'order.andMoreCharges': 'и ещё {{count}} начислений',
+  'order.andOneMoreCharge': 'и ещё одно начисление',
   'order.status.failed': 'Не прошёл',
   'order.status.amount_mismatch': 'Сумма не совпадает',
   'order.status.expired': 'Истёк срок',

@@ -9,19 +9,27 @@
 // The completion signal below (`postMessage` from `PaymentCompleteSection`, once uPay
 // navigates the iframe to our own `returnurl`) is the part that still needs exercising
 // end-to-end -- see `PaymentCompleteSection.tsx`'s own header.
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Button, useModalDialog } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { submitUpayForm } from './billingClient'
-import type { UpayForm } from './billingClient'
+import type { PaymentOrderOut, UpayForm } from './billingClient'
+import { PaymentSettled } from './PaymentSettled'
+import { useSettledOrder } from './useSettledOrder'
+import type { SettledFor } from './redesign/pay'
 
 export const PAYMENT_OVERLAY_FRAME_NAME = 'upay-payment-overlay'
 export const PAYMENT_OVERLAY_MESSAGE_TYPE = 'upay-payment-complete'
 
 export type PaymentOverlayRequest =
-  | { kind: 'checkout'; form: UpayForm }
+  /** uPay's card page, plus the order it is for. The `publicRef` is carried explicitly
+   *  rather than read back out of `form.fields.paymentdetails`: that field is the PAYER's
+   *  description now and leads with the club's name (2026-09-11), so parsing it here would
+   *  couple this component to a string uPay renders to a human. */
+  | { kind: 'checkout'; form: UpayForm; publicRef: string; settled?: SettledFor | null }
+  /** A standing-order mandate, which is a plain URL uPay hosts and has no order row. */
   | { kind: 'link'; url: string }
 
 const backdropStyle: CSSProperties = {
@@ -47,6 +55,14 @@ const frameWrapStyle: CSSProperties = {
   overflow: 'hidden',
 }
 
+/** The success moment owns the whole dialog: edge to edge, no margin and no rounding, so
+ *  the club's ground reaches every corner the way the launch screen's does. */
+const immersiveWrapStyle: CSSProperties = {
+  position: 'relative',
+  flex: '1 1 auto',
+  overflow: 'hidden',
+}
+
 const frameStyle: CSSProperties = {
   inlineSize: '100%',
   blockSize: '100%',
@@ -58,10 +74,47 @@ export type PaymentOverlayProps = {
   request: PaymentOverlayRequest
   onComplete: (ref: string) => void
   onClose: () => void
+  /** Reads one order's status. **Required, including for a mandate link**, so that a new
+   *  caller cannot quietly reintroduce the postMessage-only overlay that left a bit payer
+   *  watching a white rectangle -- see `useSettledOrder`. */
+  orderStatus: (publicRef: string) => Promise<PaymentOrderOut>
 }
 
-export function PaymentOverlay({ locale, request, onComplete, onClose }: PaymentOverlayProps) {
+export function PaymentOverlay({
+  locale,
+  request,
+  onComplete,
+  onClose,
+  orderStatus,
+}: PaymentOverlayProps) {
   const dialogRef = useModalDialog(true, onClose)
+
+  //: What the order resolved to, or null while the parent is still on uPay's page. The
+  //: frame does not close on this -- it SHOWS it, and closes when the parent is done
+  //: reading. A silent close is fine for a success nobody needed told about and wrong for
+  //: `amount_mismatch`, where money arrived at the wrong amount and nothing is settled.
+  const [settled, setSettled] = useState<PaymentOrderOut | null>(null)
+
+  // The second way to notice, for every uPay route that does not come back to our origin.
+  useSettledOrder({
+    publicRef: request.kind === 'checkout' ? request.publicRef : null,
+    orderStatus,
+    onSettled: (_ref, resolved) => setSettled(resolved),
+  })
+
+  //: Dismissing a RESOLVED frame is not the same as dismissing a live one. `paid` is the
+  //: only outcome that finished what the parent came to do, so it alone reports
+  //: completion; a mismatch, a decline and an expiry all leave them still owing the month,
+  //: which is what `onClose` already means everywhere this component is mounted.
+  const dismissSettled = () => {
+    if (settled?.status === 'paid' && request.kind === 'checkout') onComplete(request.publicRef)
+    else onClose()
+  }
+
+  //: A success takes the whole overlay: no white frame, no padding and no X, because it is
+  //: a moment that ends by itself and there is nothing to close. Every other outcome keeps
+  //: the chrome, because those wait for the parent.
+  const immersive = settled?.status === 'paid'
 
   useEffect(() => {
     if (request.kind === 'checkout') {
@@ -91,23 +144,34 @@ export function PaymentOverlay({ locale, request, onComplete, onClose }: Payment
         style={{ display: 'flex', flexDirection: 'column', blockSize: '100%' }}
         tabIndex={-1}
       >
-        <div style={headerStyle}>
-          <Button
-            data-testid="payment-overlay-close"
-            onClick={onClose}
-            type="button"
-            variant="ghost"
-          >
-            {t(locale, 'reports.privacy.gate.closeFull')}
-          </Button>
-        </div>
-        <div style={frameWrapStyle}>
-          <iframe
-            name={PAYMENT_OVERLAY_FRAME_NAME}
-            src={request.kind === 'link' ? request.url : undefined}
-            style={frameStyle}
-            title={t(locale, 'billing.overlay.title')}
-          />
+        {immersive ? null : (
+          <div style={headerStyle}>
+            <Button
+              data-testid="payment-overlay-close"
+              onClick={onClose}
+              type="button"
+              variant="ghost"
+            >
+              {t(locale, 'reports.privacy.gate.closeFull')}
+            </Button>
+          </div>
+        )}
+        <div style={immersive ? immersiveWrapStyle : frameWrapStyle}>
+          {settled === null ? (
+            <iframe
+              name={PAYMENT_OVERLAY_FRAME_NAME}
+              src={request.kind === 'link' ? request.url : undefined}
+              style={frameStyle}
+              title={t(locale, 'billing.overlay.title')}
+            />
+          ) : (
+            <PaymentSettled
+              locale={locale}
+              onDismiss={dismissSettled}
+              order={settled}
+              settled={request.kind === 'checkout' ? request.settled : null}
+            />
+          )}
         </div>
       </div>
     </div>

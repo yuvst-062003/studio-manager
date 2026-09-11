@@ -21,6 +21,7 @@ import { paymentFrameCopy, step1Copy, step2Copy, step3Copy, step4Copy, studentFo
 import { Step1Agreements } from './Step1Agreements'
 import { Step3Payment } from './Step3Payment'
 import type { RegisterResult, SubmitJoinResult } from './submitJoin'
+import { SETTLED_CLOSE_MS } from '../../billing/PaymentSettled'
 import { emptyStudent } from './types'
 import type { WizardPlan } from './types'
 import type { WizardStep } from './WizardHeader'
@@ -865,6 +866,7 @@ describe('Step3Payment -- the mandates checklist (F2 fix round 1)', () => {
         },
       ],
       checkout: { action: 'https://upay.example/checkout', fields: {} },
+      checkoutRef: 'order-1',
       checkoutUnavailable: false,
       mandates: [],
     }
@@ -880,6 +882,7 @@ describe('Step3Payment -- the mandates checklist (F2 fix round 1)', () => {
         onBack={() => {}}
         onSubmit={async () => result}
         onDone={onDone}
+        orderStatus={async () => ({ status: 'pending' }) as never}
       />,
     )
 
@@ -892,6 +895,77 @@ describe('Step3Payment -- the mandates checklist (F2 fix round 1)', () => {
     await user.click(frameClose)
 
     expect(onDone).not.toHaveBeenCalled()
+  })
+
+  it('a bit payment finishes the wizard even though no completion message ever arrives', async () => {
+    // The other half of the test above, and the defect the first live payment exposed
+    // (2026-09-11). `onComplete` fires only when uPay navigates the frame back to OUR
+    // origin -- which the bit route never does. It ends on `app.upay.co.il/API6/bit/
+    // return.php`, the frame goes white, and a family who HAD paid was left with the X as
+    // their only move, which `dismissFrame` reads as not having paid.
+    //
+    // No message is posted anywhere in this test. The frame watches the order row, which
+    // is the one authority true on every route uPay takes.
+    //
+    // **This is the seam, not the hook.** `useSettledOrder` has its own tests; what is
+    // proven here is the wiring nothing else covers -- that `submitJoin`'s `checkoutRef`
+    // reaches `PaymentFrame`, and that a settled order runs `completeFrame` rather than
+    // `dismissFrame`. A field carried in a type and dropped on the way would pass every
+    // test either side of this one.
+    const user = userEvent.setup()
+    const student = emptyStudent('c1', { firstName: 'איתי', lastName: 'לוי', planId: PLAN.id })
+    const result: SubmitJoinResult = {
+      personId: 'person-1',
+      outcomes: [
+        {
+          draftId: 'c1',
+          name: 'איתי לוי',
+          method: 'credit',
+          amountAgorot: 30_000,
+          state: 'card_pending',
+        },
+      ],
+      checkout: { action: 'https://upay.example/checkout', fields: {} },
+      checkoutRef: 'order-1',
+      checkoutUnavailable: false,
+      mandates: [],
+    }
+    const onDone = vi.fn()
+    // `expected_amount_agorot` is not optional on the wire, and the moment prints it —
+    // `formatAgorot` refuses `undefined` by design (G2), so a mock without it is a broken
+    // mock rather than a defect worth softening the guard for.
+    const orderStatus = vi.fn(
+      async () => ({ status: 'paid', expected_amount_agorot: 30_000 }) as never,
+    )
+
+    render(
+      <Step3Payment
+        locale="he"
+        students={[student]}
+        plans={[PLAN]}
+        methods={{ c1: 'credit' }}
+        onMethodChange={() => {}}
+        onBack={() => {}}
+        onSubmit={async () => result}
+        onDone={onDone}
+        orderStatus={orderStatus}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: STEP3_COPY.continueToPay }))
+    await user.click(
+      screen.getByRole('button', { name: new RegExp(STEP3_COPY.submitWithCredit) }),
+    )
+
+    // The frame asks once on mount, so this needs no timer at all. What appears is the
+    // OUTCOME, in place of uPay's page -- the family is told they paid before the frame
+    // goes anywhere.
+    const settled = await screen.findByTestId('payment-settled')
+    expect(settled).toHaveAttribute('data-status', 'paid')
+    expect(orderStatus).toHaveBeenCalledWith('order-1')
+
+    // And then, and only then, the wizard moves on.
+    await waitFor(() => expect(onDone).toHaveBeenCalled(), { timeout: SETTLED_CLOSE_MS * 3 })
   })
 
   it('an unsigned mandate row shows its open-the-form text visibly, not only as an accessible name', async () => {
@@ -909,6 +983,7 @@ describe('Step3Payment -- the mandates checklist (F2 fix round 1)', () => {
         },
       ],
       checkout: null,
+      checkoutRef: null,
       checkoutUnavailable: false,
       mandates: [
         { draftId: 'c1', studentId: 's1', name: 'איתי לוי', amountAgorot: 30_000, url: 'https://upay.example/link' },
@@ -925,6 +1000,7 @@ describe('Step3Payment -- the mandates checklist (F2 fix round 1)', () => {
         onBack={() => {}}
         onSubmit={async () => result}
         onDone={() => {}}
+        orderStatus={async () => ({ status: 'pending' }) as never}
       />,
     )
 

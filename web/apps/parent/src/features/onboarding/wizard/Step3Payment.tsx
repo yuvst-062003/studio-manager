@@ -33,6 +33,7 @@ import type { Locale } from '@studio/i18n'
 import { step3Copy } from './copy'
 import { PaymentFrame } from './PaymentFrame'
 import type { PaymentFrameRequest } from './PaymentFrame'
+import type { PaymentOrderOut } from '../../billing/billingClient'
 import type { SubmitJoinResult } from './submitJoin'
 import { formatShekels, needsManagerReview } from './types'
 import type { PaymentMethod, StudentDraft, WizardPlan } from './types'
@@ -73,6 +74,9 @@ export type Step3PaymentProps = {
   onSubmit: () => Promise<SubmitJoinResult>
   /** Every child accounted for -- advance to step 4 with what landed. */
   onDone: (result: SubmitJoinResult) => void
+  /** Reads one order's status, for `PaymentFrame`'s poll. The wizard holds the billing
+   *  client; this step only ever had `onSubmit`, so the reader is passed in beside it. */
+  orderStatus: (publicRef: string) => Promise<PaymentOrderOut>
 }
 
 export function Step3Payment({
@@ -85,6 +89,7 @@ export function Step3Payment({
   onBack,
   onSubmit,
   onDone,
+  orderStatus,
 }: Step3PaymentProps) {
   const copy = step3Copy(locale)
   const [subView, setSubView] = useState<SubView>('decision')
@@ -168,7 +173,7 @@ export function Step3Payment({
       setResult(landed)
       if (landed.checkout) {
         setOpenMandateDraftId(null)
-        setFrame({ kind: 'checkout', form: landed.checkout })
+        setFrame({ kind: 'checkout', form: landed.checkout, publicRef: landed.checkoutRef })
         return
       }
       if (landed.mandates.length > 0) {
@@ -245,7 +250,9 @@ export function Step3Payment({
 
   //: Reopens the SAME checkout rather than submitting again, for the reason above.
   const reopenCheckout = () => {
-    if (result?.checkout) setFrame({ kind: 'checkout', form: result.checkout })
+    if (result?.checkout) {
+      setFrame({ kind: 'checkout', form: result.checkout, publicRef: result.checkoutRef })
+    }
   }
 
   return (
@@ -711,7 +718,13 @@ export function Step3Payment({
       </footer>
 
       {frame ? (
-        <PaymentFrame locale={locale} request={frame} onComplete={completeFrame} onClose={dismissFrame} />
+        <PaymentFrame
+          locale={locale}
+          request={frame}
+          onComplete={completeFrame}
+          onClose={dismissFrame}
+          orderStatus={orderStatus}
+        />
       ) : null}
     </div>
   )

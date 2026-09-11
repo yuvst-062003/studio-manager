@@ -466,3 +466,29 @@ def test_months_bought_forward_settle_the_debt_and_leave_the_rest_as_credit(
         BillingService(tenant_session).payer_credit(a_priced_student.payer_person_id)
         == MONTHLY_AGOROT * 2
     )
+
+
+def test_a_reference_arriving_inside_a_described_field_still_settles(
+    client, an_order, tenant_session
+):
+    """End to end over the seam, not just the parser.
+
+    `paymentdetails` now carries the club's name before the reference (2026-09-11, after
+    bit showed a real parent a bare UUID), so `productdescription` comes back decorated.
+    The parser finding the UUID is necessary but not sufficient: `IpnIntake.record` writes
+    `order_public_ref` from the same field, and `settle` looks the order up through it. A
+    test that only parsed would pass while every real payment landed `unmatched`.
+    """
+    described = f"מועדון גלדיאטור · {an_order.order.public_ref}"
+    response = _deliver(
+        client, an_order.order, IpnShape.SUCCESS, productdescription=described
+    )
+    assert response.status_code == 200
+
+    tenant_session.expire_all()
+    assert tenant_session.get(PaymentOrder, an_order.order.id).status == "paid"
+    record = tenant_session.execute(select(UpayIpnRecord)).scalars().one()
+    assert record.match_status == "auto"
+    assert record.order_public_ref == an_order.order.public_ref
+    for charge_id in an_order.charge_ids:
+        assert tenant_session.get(Charge, charge_id).status == "settled"

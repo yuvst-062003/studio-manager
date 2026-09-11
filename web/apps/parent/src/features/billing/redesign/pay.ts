@@ -210,6 +210,48 @@ export function receiptLines(
   return lines
 }
 
+/**
+ * What a payment settled, as data rather than a sentence.
+ *
+ * The confirmation moment has to say what was paid for — a parent who sees only "שולם" and
+ * a number has been told the least useful half of the event (owner, 2026-09-11). The
+ * sentence itself is built in `PaymentSettled`, because the charge KIND needs `t(locale,
+ * …)` and this module is deliberately free of i18n, for the same reason `money` is a prop
+ * on the screen rather than an import inside it.
+ *
+ * `proration_note` is where both shop routes write the item's name and where the billing
+ * run writes its explanation, so it is the label whenever it is there — and the kind is
+ * the floor for a charge nothing ever named.
+ */
+export type SettledFor = {
+  /** The first charge's own note, when it has one. */
+  note: string | null
+  /** Its kind, for the i18n key when there is no note. */
+  kind: string
+  /** Distinct children this payment covered, in the order the charges were selected. */
+  students: readonly string[]
+  /** How many charges beyond the first, so the line can say so without listing them. */
+  extra: number
+}
+
+export function settledFor(
+  chargeIds: readonly string[],
+  debts: readonly DebtRow[],
+): SettledFor | null {
+  const byId = new Map(debts.map((row) => [row.charge.id, row]))
+  const rows = chargeIds.map((id) => byId.get(id)).filter((row) => row !== undefined)
+  const first = rows[0]
+  if (first === undefined) return null
+  return {
+    note: first.charge.proration_note ?? null,
+    kind: first.charge.kind,
+    // A two-child family paying one month is two charges and two names; the same name
+    // twice is one child with a shop item beside their tuition.
+    students: [...new Set(rows.map((row) => row.studentName).filter(Boolean))],
+    extra: Math.max(0, rows.length - 1),
+  }
+}
+
 /** Every open charge, whoever is holding it. The number that never moves. */
 export function debtAgorot(debts: readonly DebtRow[]): number {
   return selectionTotal(debts.map((row) => row.charge))

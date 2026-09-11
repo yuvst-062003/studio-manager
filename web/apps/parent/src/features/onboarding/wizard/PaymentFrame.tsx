@@ -21,14 +21,16 @@ import {
   PAYMENT_OVERLAY_MESSAGE_TYPE,
 } from '../../billing/PaymentOverlay'
 import { submitUpayForm } from '../../billing/billingClient'
-import type { UpayForm } from '../../billing/billingClient'
+import type { PaymentOrderOut, UpayForm } from '../../billing/billingClient'
+import { PaymentSettled } from '../../billing/PaymentSettled'
+import { useSettledOrder } from '../../billing/useSettledOrder'
 import { useDialog } from './useDialog'
 import { paymentFrameCopy } from './copy'
 
 export type PaymentFrameRequest =
   /** uPay's card page: a POST of hidden fields into the named frame. */
-  | { kind: 'checkout'; form: UpayForm }
-  /** A standing-order mandate, which is a plain URL uPay hosts. */
+  | { kind: 'checkout'; form: UpayForm; publicRef: string | null }
+  /** A standing-order mandate, which is a plain URL uPay hosts and has no order row. */
   | { kind: 'link'; url: string }
 
 export type PaymentFrameProps = {
@@ -36,12 +38,42 @@ export type PaymentFrameProps = {
   request: PaymentFrameRequest
   onComplete: (publicRef: string) => void
   onClose: () => void
+  /** Reads one order's status. Required, for the reason `PaymentOverlay`'s copy of this
+   *  prop is required: the postMessage is not the only way a payment ends. */
+  orderStatus: (publicRef: string) => Promise<PaymentOrderOut>
 }
 
-export function PaymentFrame({ locale, request, onComplete, onClose }: PaymentFrameProps) {
+export function PaymentFrame({
+  locale,
+  request,
+  onComplete,
+  onClose,
+  orderStatus,
+}: PaymentFrameProps) {
   const copy = paymentFrameCopy(locale)
   const dialogRef = useDialog(true, onClose)
   const [loaded, setLoaded] = useState(false)
+  const [settled, setSettled] = useState<PaymentOrderOut | null>(null)
+
+  //: The wizard's half of the bit fix. Without it a family joining the club and paying
+  //: with bit sat on a white frame, pressed the X, and `dismissFrame` put them in
+  //: `awaitingPayment` -- told to pay again for something they had already paid for.
+  useSettledOrder({
+    publicRef: request.kind === 'checkout' ? request.publicRef : null,
+    orderStatus,
+    onSettled: (_ref, resolved) => setSettled(resolved),
+  })
+
+  //: `onComplete` advances the wizard to step 4, so only `paid` may call it. A mismatch or
+  //: a decline leaves the family still owing the month, and `onClose` is the path that
+  //: already says so -- `dismissFrame` holds the checkout open for another attempt.
+  const dismissSettled = () => {
+    if (settled?.status === 'paid' && request.kind === 'checkout' && request.publicRef !== null) {
+      onComplete(request.publicRef)
+    } else {
+      onClose()
+    }
+  }
 
   useEffect(() => {
     if (request.kind === 'checkout') submitUpayForm(request.form, PAYMENT_OVERLAY_FRAME_NAME)
@@ -92,19 +124,25 @@ export function PaymentFrame({ locale, request, onComplete, onClose }: PaymentFr
         </div>
 
         <div className="flex-1 mx-2 mb-2 sm:mx-3 sm:mb-3 bg-white rounded-xl sm:rounded-2xl overflow-hidden relative">
-          {!loaded ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-[#444650]">
-              <Loader2 className="w-6 h-6 animate-spin text-[#0056c5]" />
-              <span className="text-[13px]">{copy.loading}</span>
-            </div>
-          ) : null}
-          <iframe
-            name={PAYMENT_OVERLAY_FRAME_NAME}
-            src={request.kind === 'link' ? request.url : undefined}
-            title={copy.title}
-            onLoad={() => setLoaded(true)}
-            className="w-full h-full border-0"
-          />
+          {settled !== null ? (
+            <PaymentSettled locale={locale} onDismiss={dismissSettled} order={settled} />
+          ) : (
+            <>
+              {!loaded ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-[#444650]">
+                  <Loader2 className="w-6 h-6 animate-spin text-[#0056c5]" />
+                  <span className="text-[13px]">{copy.loading}</span>
+                </div>
+              ) : null}
+              <iframe
+                name={PAYMENT_OVERLAY_FRAME_NAME}
+                src={request.kind === 'link' ? request.url : undefined}
+                title={copy.title}
+                onLoad={() => setLoaded(true)}
+                className="w-full h-full border-0"
+              />
+            </>
+          )}
         </div>
       </div>
     </div>
