@@ -1,0 +1,296 @@
+<title>Dashboard Checkpoint Proofs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+:root {
+  --paper: #eceae5;
+  --panel: #fbfaf8;
+  --ink: #1c1a17;
+  --ink-2: #4d4941;
+  --ink-3: #7a746a;
+  --rule: #d6d2ca;
+  --was: #7a746a;
+  --was-bg: #e6e3dd;
+  --design: #6b4ea8;
+  --design-bg: #eee9f6;
+  --built: #1f6b3f;
+  --built-bg: #e8f1ea;
+  --note: #8a5a00;
+  --sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  --display: 'Archivo', var(--sans);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #16161a; --panel: #1e1e23; --ink: #eceaf0; --ink-2: #b3afb8;
+    --ink-3: #85818b; --rule: #33323a;
+    --was: #85818b; --was-bg: #26252b;
+    --design: #b79ae6; --design-bg: #241c33;
+    --built: #5fb37c; --built-bg: #16251b;
+    --note: #d9a44e;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #16161a; --panel: #1e1e23; --ink: #eceaf0; --ink-2: #b3afb8;
+  --ink-3: #85818b; --rule: #33323a;
+  --was: #85818b; --was-bg: #26252b;
+  --design: #b79ae6; --design-bg: #241c33;
+  --built: #5fb37c; --built-bg: #16251b;
+  --note: #d9a44e;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--sans); font-size: 15px; line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 1320px; margin-inline: auto; padding-inline: 24px; }
+
+header.top { padding-block: 48px 24px; }
+
+h1 {
+  font-family: var(--display); font-weight: 700;
+  font-size: clamp(1.9rem, 4.4vw, 2.7rem); line-height: 1.05;
+  letter-spacing: -0.025em; margin: 0 0 12px; max-width: 22ch;
+}
+
+.sub { font-size: 1.03rem; color: var(--ink-2); max-width: 64ch; margin: 0 0 22px; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 10px; margin-block-end: 24px; }
+.legend span {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 4px 10px; border-radius: 3px;
+}
+.legend .l-was { background: var(--was-bg); color: var(--was); }
+.legend .l-design { background: var(--design-bg); color: var(--design); }
+.legend .l-built { background: var(--built-bg); color: var(--built); }
+
+.live {
+  background: var(--built-bg);
+  border: 1px solid var(--rule);
+  border-inline-start: 3px solid var(--built);
+  border-radius: 5px;
+  padding: 12px 16px;
+  margin-block: 0 22px;
+  font-size: 14px;
+  color: var(--ink-2);
+  max-width: 72ch;
+}
+
+.live a {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--built);
+  font-weight: 600;
+}
+
+.bar { display: flex; block-size: 8px; border-radius: 999px; overflow: hidden; background: var(--was-bg); border: 1px solid var(--rule); margin-block-end: 10px; }
+.bar i { display: block; background: var(--built); }
+.count { font-family: var(--mono); font-size: 12px; color: var(--ink-3); letter-spacing: 0.04em; margin: 0; }
+
+.steps { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 4px; margin-block: 24px 0; }
+.step { background: var(--panel); padding: 9px 16px; display: grid; grid-template-columns: 62px 1fr auto; gap: 14px; align-items: baseline; }
+.step .n { font-family: var(--mono); font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.step b { font-weight: 500; font-size: 14px; }
+.step .tag { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 8px; border-radius: 2px; }
+.step[data-s="done"] .tag { background: var(--built-bg); color: var(--built); }
+.step[data-s="next"] .tag { background: var(--was-bg); color: var(--note); }
+.step[data-s="wait"] .tag { background: var(--was-bg); color: var(--was); }
+.step[data-s="wait"] b { color: var(--ink-3); font-weight: 400; }
+
+section.cp { padding-block: 40px; border-block-start: 1px solid var(--rule); }
+.cp-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 14px; margin-block-end: 8px; }
+.cp-head h2 { font-family: var(--display); font-size: 1.3rem; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+.cp-head .n { font-family: var(--mono); font-size: 12px; color: var(--built); }
+
+.cp > p { color: var(--ink-2); max-width: 70ch; margin: 0 0 8px; }
+.cp > p b { color: var(--ink); font-weight: 600; }
+
+.fixes { margin: 14px 0 22px; padding: 0; list-style: none; display: grid; gap: 8px; max-width: 70ch; }
+.fixes li { font-size: 14px; color: var(--ink-2); padding-inline-start: 14px; border-inline-start: 2px solid var(--note); }
+.fixes li b { color: var(--ink); font-weight: 600; }
+
+.shots { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 860px) { .shots[data-n="2"] { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1040px) { .shots[data-n="3"] { grid-template-columns: repeat(3, 1fr); } }
+
+figure { margin: 0; }
+figcaption {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  font-weight: 500; margin-block-end: 7px; display: inline-block; padding: 3px 9px; border-radius: 2px;
+}
+figure[data-kind="was"] figcaption { background: var(--was-bg); color: var(--was); }
+figure[data-kind="design"] figcaption { background: var(--design-bg); color: var(--design); }
+figure[data-kind="built"] figcaption { background: var(--built-bg); color: var(--built); }
+figure img { display: block; inline-size: 100%; block-size: auto; border: 1px solid var(--rule); border-radius: 5px; }
+
+footer { padding-block: 30px 60px; border-block-start: 1px solid var(--rule); color: var(--ink-3); font-size: 13px; }
+footer p { max-width: 68ch; }
+code { font-family: var(--mono); font-size: 0.86em; }
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+<header class="top">
+  <h1>Checkpoint proofs: design against build</h1>
+  <p class="sub">
+    Each checkpoint shown three ways — what the dashboard was, what the prototype draws, and
+    what is now running. Republished as each one lands; refresh rather than looking for a new link.
+  </p>
+  <div class="legend">
+    <span class="l-was">Was — the old dashboard</span>
+    <span class="l-design">Design — your prototype</span>
+    <span class="l-built">Built — running now</span>
+  </div>
+  <p class="live">
+    <a href="https://admin.staging.gladiatorclub.co.il">admin.staging.gladiatorclub.co.il</a>
+    — these four checkpoints are deployed to staging, so you can click the real thing rather
+    than read about it. Verified against the served bundle, not just a green deploy line.
+  </p>
+  <div class="bar"><i id="fill"></i></div>
+  <p class="count" id="count"></p>
+  <div class="steps" id="steps"></div>
+</header>
+
+<div id="proofs"></div>
+
+<footer>
+  <p>
+    Built column captured from the running dashboard against the seeded demo club; design column
+    from the prototype at <code>~/Downloads/גלדיאטור-studio-os</code>. All at 1440×900.
+    Spec: <code>docs/superpowers/specs/2026-09-10-dashboard-redesign.md</code> ·
+    branch <code>feat/dashboard-redesign</code>.
+  </p>
+</footer>
+
+</div>
+
+<script>
+/*__IMAGES__*/
+
+const STEPS = [
+  'The palette and the shell',
+  'Home, and the alert centre moved onto it',
+  'Students list and the class chips',
+  'Student card — four tabs, and its missing error state',
+  'Weekly schedule — the grid and the session popover',
+  'Groups and cycles — the card grid',
+  'One group, and closures',
+  'Attendance — three buttons per student',
+  'Billing collections, promises, plan changes',
+  'Prices and reconciliation',
+  'Items — the product grid and the order wizard',
+  'Announcements — the four-step wizard',
+  'Reports — chart styling and the KPI strip',
+  'Belts, exams, events',
+  'Documents, staff, settings, setup, rollover',
+  'Platform',
+  'The uPay receipt link — proven, or dropped',
+];
+
+const DONE = 4;
+
+const PROOFS = [
+  {
+    n: 1,
+    title: 'The palette and the shell',
+    what: 'The dashboard gets a palette of its own, and the menu goes from <b>nineteen destinations to nine</b>.',
+    detail: 'Your prototype defines no light palette at all — its theme file is dark throughout — so the light half was derived rather than copied. Money colours are deliberately untouched by it: a debt figure stays the same red on this mint app as on the blue staff app.',
+    fixes: [
+      '<b>The selected menu item was invisible</b> — mint text on a mint background. A general link-colour rule was overriding it, and had been for as long as that rule existed; it only showed now because the old dark palette’s highlight is white, so green-on-white read fine by accident.',
+      '<b>The settings menu entry printed its own translation key</b> on screen. It had never been a menu item before, so nobody had written its description.',
+    ],
+    shots: [
+      { k: 'before-home', c: 'Was', kind: 'was' },
+      { k: 'after-home', c: 'Design', kind: 'design' },
+      { k: '01-shell--after-light', c: 'Built', kind: 'built' },
+    ],
+  },
+  {
+    n: 2,
+    title: 'The alert centre moves onto the home screen',
+    what: 'Five parts of the app produce alerts — money owed, attendance slipping, a coach unavailable, a health form waiting, trials needing a decision. <b>All were live and correct, and all sat on a screen nobody opened.</b> They now meet you where you land.',
+    detail: 'Directly under the money figures, which is where your prototype puts its urgent tray. The full list stays at מרכז התראות.',
+    fixes: [
+      '<b>An empty alert now disappears completely.</b> Three of the six drew a panel saying nothing was wrong, pushing today’s classes off screen. Hiding just the panel left a heading standing over nothing, which reads worse — a heading promises something underneath it.',
+      '<b>The new region borrowed a name already in use</b>, so its styling would have leaked onto the list beside it. A lint rule caught it before it reached the screen.',
+    ],
+    shots: [
+      { k: 'before-home', c: 'Was', kind: 'was' },
+      { k: 'after-home', c: 'Design', kind: 'design' },
+      { k: '02-home--after-light', c: 'Built', kind: 'built' },
+    ],
+  },
+  {
+    n: 3,
+    title: 'Class chips on the students list',
+    what: 'The class filter becomes buttons across the top instead of a dropdown, so you can see your classes without opening anything. Built to take more classes as you add them.',
+    detail: 'Checked against your demo club rather than assumed: ג׳ודו shows 30 of 31, קראטה shows 0 of 31, and one student belongs to no class at all — the filter working in both directions.',
+    fixes: [
+      '<b>No number on the chips, on purpose.</b> The prototype puts a count on each. The list arrives a page at a time and the server sends no total, so a per-class count would be one extra request per class, or a number nobody can stand behind.',
+      '<b>The WhatsApp button per row had to wait.</b> The students list receives guardian names and no phone numbers, so the link cannot be built from it. Moved to checkpoint 15, and the spec corrected where it claimed otherwise.',
+    ],
+    shots: [
+      { k: 'before-students', c: 'Was', kind: 'was' },
+      { k: 'after-students', c: 'Design', kind: 'design' },
+      { k: '03-students--after-light', c: 'Built', kind: 'built' },
+    ],
+  },
+  {
+    n: 4,
+    title: 'The student card: four tabs, and it stops hiding its own failures',
+    what: 'One long scroll becomes four tabs. Freeze, convert and mark-as-lost stay visible at the bottom, because they act on the student rather than on a tab.',
+    detail: 'The bigger change is invisible until something breaks. If the card failed to load it showed a loading placeholder — forever, with no message and nothing to press. It now says so and offers a retry that genuinely re-fetches. Note one deliberate difference from the design: <b>the national ID stays off the card</b>, per your decision.',
+    fixes: [
+      '<b>Two labels were running into each other</b> — "ג׳וניוריםכל הימים" and "לביא אזולאיהורה ראשי". Only findable by looking at the screen.',
+      '<b>Six tests had to learn to click.</b> They checked that cards from different tabs were visible at once — true of the old scroll, deliberately false now. What they check is unchanged.',
+    ],
+    shots: [
+      { k: 'proto-student-drawer', c: 'Design', kind: 'design' },
+      { k: '04-student-card--after-light', c: 'Built · general', kind: 'built' },
+      { k: '04-student-card--after-training-tab', c: 'Built · training', kind: 'built' },
+    ],
+  },
+];
+
+document.getElementById('fill').style.inlineSize = `${(DONE / STEPS.length) * 100}%`;
+document.getElementById('count').textContent = `${DONE} of ${STEPS.length} checkpoints done`;
+
+document.getElementById('steps').innerHTML = STEPS.map((title, i) => {
+  const n = i + 1;
+  const state = n <= DONE ? 'done' : n === DONE + 1 ? 'next' : 'wait';
+  const tag = state === 'done' ? 'done' : state === 'next' ? 'paused' : 'to come';
+  return `<div class="step" data-s="${state}">
+      <span class="n">${String(n).padStart(2, '0')} / 17</span>
+      <b>${title}</b>
+      <span class="tag">${tag}</span>
+    </div>`;
+}).join('');
+
+document.getElementById('proofs').innerHTML = PROOFS.map((c) => {
+  const shots = c.shots.filter((s) => IMG[s.k]);
+  return `<section class="cp">
+      <div class="cp-head">
+        <span class="n">${String(c.n).padStart(2, '0')} / 17</span>
+        <h2>${c.title}</h2>
+      </div>
+      <p>${c.what}</p>
+      <p>${c.detail}</p>
+      ${c.fixes?.length ? `<ul class="fixes">${c.fixes.map((f) => `<li>${f}</li>`).join('')}</ul>` : ''}
+      <div class="shots" data-n="${shots.length}">
+        ${shots.map((s) => `<figure data-kind="${s.kind}">
+            <figcaption>${s.c}</figcaption>
+            <img src="${IMG[s.k]}" alt="${c.title} — ${s.c}">
+          </figure>`).join('')}
+      </div>
+    </section>`;
+}).join('');
+</script>
