@@ -68,9 +68,7 @@ def _window() -> tuple[str, str]:
     return (today - timedelta(days=1)).isoformat(), (today + timedelta(days=1)).isoformat()
 
 
-def test_the_calendar_can_be_asked_for_one_class(
-    client, two_classes_with_lessons, as_manager
-):
+def test_the_calendar_can_be_asked_for_one_class(client, two_classes_with_lessons, as_manager):
     ids = two_classes_with_lessons
     start, end = _window()
 

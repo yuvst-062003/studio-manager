@@ -188,7 +188,10 @@ def test_the_manager_moves_an_item_to_another_class(
 
     # The seam that matters: the shop is what the manager was actually changing.
     parent = as_guardian_of(a_priced_student.student_id)
-    names = [row["name"] for row in client.get("/api/v1/me/products", headers=parent.headers).json()["items"]]
+    names = [
+        row["name"]
+        for row in client.get("/api/v1/me/products", headers=parent.headers).json()["items"]
+    ]
     assert "חגורה" in names
 
 
@@ -222,7 +225,10 @@ def test_the_manager_unfiles_an_item_and_it_leaves_every_shop(
     assert unfiled.json()["class_id"] is None
 
     parent = as_guardian_of(a_priced_student.student_id)
-    names = [row["name"] for row in client.get("/api/v1/me/products", headers=parent.headers).json()["items"]]
+    names = [
+        row["name"]
+        for row in client.get("/api/v1/me/products", headers=parent.headers).json()["items"]
+    ]
     assert "ביטוח שנתי" not in names
 
 
@@ -295,7 +301,13 @@ def test_a_coach_is_offered_only_this_lessons_items(
 
 
 def test_the_handout_picker_still_carries_no_money_when_scoped(
-    client, app_session, studio, a_group, a_priced_student, judo_and_karate, a_judo_lesson,
+    client,
+    app_session,
+    studio,
+    a_group,
+    a_priced_student,
+    judo_and_karate,
+    a_judo_lesson,
     as_lead_coach,
 ):
     """Invariant 3 is a property of the SHAPE, and narrowing the list must not widen it."""
