@@ -14,7 +14,16 @@
 // and it is why the control below says חוג and can never be allowed to say קבוצה.
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Button, Card, EmptyState, MoneyDisplay, SelectField, StatusChip, TextField } from '@studio/ui'
+import {
+  Button,
+  Card,
+  EmptyState,
+  MoneyDisplay,
+  PageHeader,
+  SelectField,
+  StatusChip,
+  TextField,
+} from '@studio/ui'
 import { PlanFrequencyPicker, PlanPreview, frequencyLabel } from './PlanFrequency'
 import { StandingOrderLinksPanel } from './StandingOrderLinksPanel'
 import { t } from '@studio/i18n'
@@ -28,25 +37,6 @@ const columnStyle: CSSProperties = {
   flexDirection: 'column',
   gap: 'var(--space-4)',
   padding: 'var(--space-5)',
-}
-
-// One plan, two lines: the facts a manager scans for (name, volume, price, since when)
-// on the first, the long strong-LTR payment URL alone on the second — inline in one flex
-// row it dragged the amount off screen and interleaved with the Hebrew around it
-// (2026-08-30).
-const planStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--space-1)',
-  paddingBlock: 'var(--space-3)',
-  borderBlockEnd: 'var(--border-width-hairline) solid var(--border)',
-}
-
-const rowStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 'var(--space-3)',
-  flexWrap: 'wrap',
 }
 
 const mutedStyle: CSSProperties = {
@@ -66,13 +56,6 @@ const urlStyle: CSSProperties = {
 }
 
 /** A class heading over its own plans. Quiet: it separates, it does not shout. */
-const classHeadingStyle: CSSProperties = {
-  fontSize: 'var(--text-caption)',
-  fontWeight: 700,
-  color: 'var(--text-muted)',
-  marginBlock: 'var(--space-4) var(--space-2)',
-}
-
 /** The unfiled heading DOES shout — those plans can be given to nobody. */
 const warnHeadingStyle: CSSProperties = {
   fontSize: 'var(--text-caption)',
@@ -135,39 +118,54 @@ export function PricePlansScreen({
     }
   }
 
-  /** One plan row. Extracted so the grouped and ungrouped layouts render the same row
-   *  rather than two copies that drift apart. */
-  const planRow = (plan: PricePlanOut) => (
-    <div
+  /** One plan, as a card. Extracted so the grouped and ungrouped layouts render the same
+   *  card rather than two copies that drift apart.
+   *
+   *  **A `<button>`, not a `<div onClick>` (checkpoint 10).** It opens the close-card, which
+   *  is the only way a price is ever changed — and as a div it was unreachable by keyboard,
+   *  invisible to a screen reader as a control, and had no focus ring. `inert-buttons.test.ts`
+   *  could not have caught it either: that guard checks `<Button>`s, and this was not one.
+   *
+   *  Its accessible name says what pressing it DOES. "500 ₪" read out alone tells a screen
+   *  reader user nothing about the fact that this opens a price change. */
+  const planCard = (plan: PricePlanOut) => (
+    <button
       key={plan.id}
-      style={planStyle}
+      type="button"
+      className="plan-card"
+      data-closed={plan.active_to ? 'true' : undefined}
       data-testid="plan-row"
+      aria-label={`${t(locale, 'billing.plan.closeCurrent')} — ${plan.name}`}
       onClick={() => setOpenPlanId(plan.id)}
     >
-      <div style={rowStyle}>
-        <strong style={{ flex: 1, minInlineSize: 0 }}>
+      <span className="plan-card__row">
+        <span className="plan-card__name">
           <bdi>{plan.name}</bdi>
-        </strong>
-        {/* C11 — the volume the club prices by, as a sentence rather than a bare
-            number. Not a group. */}
-        <span data-testid="plan-volume">
-          {frequencyLabel(locale, plan.sessions_per_week)}
         </span>
-        <MoneyDisplay agorot={plan.monthly_amount_agorot} label={plan.name} />
+        <span className="plan-card__amount">
+          <MoneyDisplay agorot={plan.monthly_amount_agorot} label={plan.name} />
+        </span>
+      </span>
+
+      <span className="plan-card__meta">
+        {/* C11 — the volume the club prices by, as a sentence rather than a bare number.
+            Not a group. */}
+        <span data-testid="plan-volume">{frequencyLabel(locale, plan.sessions_per_week)}</span>
         {plan.active_to ? (
-          <span data-testid="plan-closed" style={mutedStyle}>
+          <span data-testid="plan-closed">
             {t(locale, 'billing.plan.activeTo')} {plan.active_to}
           </span>
         ) : (
-          <span data-testid="plan-current" style={mutedStyle}>
+          <span data-testid="plan-current">
             {t(locale, 'billing.plan.activeFrom')} {plan.active_from}
           </span>
         )}
-      </div>
-      {/* §4 -- the FULL url, never a "link set" tick: a typo in a payment page has
-          to be visible without clicking it. And the missing case is badged only on
-          an ACTIVE plan; a closed plan's link is dead by definition, so badging it
-          would put a permanent unfixable warning on every retired plan. */}
+      </span>
+
+      {/* §4 -- the FULL url, never a "link set" tick: a typo in a payment page has to be
+          visible without clicking it. And the missing case is badged only on an ACTIVE plan;
+          a closed plan's link is dead by definition, so badging it would put a permanent
+          unfixable warning on every retired plan. */}
       {plan.standing_order_link_url ? (
         <span data-testid="plan-link" style={urlStyle}>
           <bdi>{plan.standing_order_link_url}</bdi>
@@ -177,7 +175,7 @@ export function PricePlansScreen({
           <StatusChip status="pending" label={t(locale, 'billing.plan.linkMissing')} />
         </span>
       ) : null}
-    </div>
+    </button>
   )
 
   async function create() {
@@ -214,7 +212,14 @@ export function PricePlansScreen({
 
   return (
     <div style={columnStyle} data-testid="price-plans">
-      <h1>{t(locale, 'billing.plan.title')}</h1>
+      {/* The versioning rule as the page's own subtitle. It was already on the close-card,
+          where a manager reads it only after deciding to change a price; saying it here too
+          costs nothing and is the one fact that explains why the list keeps closed plans. */}
+      <PageHeader
+        subtitle={t(locale, 'billing.plan.versionedHint')}
+        title={t(locale, 'billing.plan.title')}
+        titleId="price-plans-title"
+      />
 
       {writeFailed ? (
         <p className="plans-error" data-testid="plan-write-failed" role="alert">
@@ -242,8 +247,13 @@ export function PricePlansScreen({
               </h2>
               <p style={mutedStyle}>{t(locale, 'billing.byClass.unfiledPlans')}</p>
               {unfiled.map((plan) => (
-                <div key={plan.id}>
-                  {planRow(plan)}
+                // The card and ITS filing select in one box. Laid out as a plain list they
+                // alternated — card, select, card, select — and the select read as belonging
+                // to the plan below it as easily as the one above. The select cannot go
+                // inside the card: the card is a `<button>`, and a `<select>` inside one is
+                // invalid and unoperable.
+                <div className="plan-unfiled" key={plan.id}>
+                  {planCard(plan)}
                   <SelectField
                     data-testid={`plan-file-${plan.id}`}
                     disabled={filing === plan.id}
@@ -274,20 +284,22 @@ export function PricePlansScreen({
 
           {/* A club with no classes yet gets one plain list: a heading over every row, or a
               warning nobody can act on, would both be noise before any class exists. */}
-          {classes.length === 0
-            ? plans.map((plan) => planRow(plan))
-            : grouped.map((group) => (
-                <section
-                  key={group.classId}
-                  aria-labelledby={`plans-class-${group.classId}`}
-                  data-testid={`plans-class-${group.classId}`}
-                >
-                  <h2 id={`plans-class-${group.classId}`} style={classHeadingStyle}>
-                    <bdi>{group.className}</bdi>
-                  </h2>
-                  {group.rows.map((plan) => planRow(plan))}
-                </section>
-              ))}
+          {classes.length === 0 ? (
+            <div className="plan-list">{plans.map((plan) => planCard(plan))}</div>
+          ) : (
+            grouped.map((group) => (
+              <section
+                key={group.classId}
+                aria-labelledby={`plans-class-${group.classId}`}
+                data-testid={`plans-class-${group.classId}`}
+              >
+                <h2 id={`plans-class-${group.classId}`} className="plan-class-heading">
+                  <bdi>{group.className}</bdi>
+                </h2>
+                <div className="plan-list">{group.rows.map((plan) => planCard(plan))}</div>
+              </section>
+            ))
+          )}
         </Card>
       )}
 

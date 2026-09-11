@@ -621,4 +621,9 @@ export const billing: Bundle = {
   'pay.ceilingReached': 'שילמתם מראש עד הסוף — אפשר לשלם חודשים נוספים כשהמנוי יתקדם.',
   'pay.noMonthlyPrice': 'למנוי עדיין לא נקבע מחיר חודשי, ולכן אפשר לשלם כאן רק את החוב הקיים. פנו למועדון כדי לשלם חודשים מראש.',
   'pay.secureNote': 'עסקה מאובטחת ע״פ תקן PCI-DSS',
+  // Checkpoint 10 — the two amounts on an unmatched payment, each saying which it is.
+  // Unlabelled they read as one number printed twice rather than as a comparison.
+  'reconciliation.rawAmount': 'uPay שלחו',
+  'reconciliation.parsedAmount': 'קראנו',
+  'reconciliation.noOwnerName': 'ללא שם בעל כרטיס',
 }

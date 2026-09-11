@@ -1404,7 +1404,7 @@ screenshots the result beside the prototype into
 | 7 | One group, and closures | §3.3, §3.4. Includes the closures error state |
 | 8 | Attendance — three buttons per student, the stat header | §3.16 |
 | 9 | Billing collections, promises, plan changes | §3.20 |
-| 10 | Prices and reconciliation | §3.20. Includes the two missing `.catch` paths |
+| 10 | Prices and reconciliation | §3.20. **Done 2026-09-11**, out of order: it was the one checkpoint the branch skipped, and was found missing only after the redesign had already been deployed. The two missing `.catch` paths were not part of it in the end — commit `9c6a36ec` had already closed all three (both in `PricePlansScreen`, plus `RecordPaymentDialog`'s submit) while building checkpoint 9. What this checkpoint actually carried was the restyle, one accessibility defect (a plan was a `<div onClick>`, so the only control that changes a price was unreachable by keyboard) and one legibility defect (an unmatched payment's raw and parsed amounts rendered unlabelled as `320.00  ₪320`, reading as one number printed twice) |
 | 11 | Items — the product grid, the sizing guide, the order wizard on `charges/from-product` | §3.20 |
 | 12 | Announcements — the four-step wizard and the notification preview | §3.12. The strongest single idea in the prototype |
 | 13 | Reports — chart styling, tooltips, KPI strip | §3.13 |

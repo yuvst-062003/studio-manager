@@ -389,13 +389,30 @@ describe('the reconciliation queue', () => {
     expect(screen.getByTestId('four-digits')).toHaveTextContent('4242')
   })
 
-  it('shows the raw amount beside our parse', () => {
+  it('shows the raw amount beside our parse, each saying which it is', () => {
     // `UpayIpnRecordOut.amount` is a STRING kept exactly as uPay sent it, beside
     // `amount_agorot`, which is our parse. A manager seeing both is the only way an amount
     // mismatch is legible.
+    //
+    // The LABELS are checkpoint 10's addition and are the point of this test now. Without
+    // them the two rendered as `250  ₪250` — which reads as one number printed twice by
+    // mistake rather than as the comparison it is, and the owner read it exactly that way.
     renderQueue()
     expect(screen.getByTestId('raw-amount')).toHaveTextContent('250')
     expect(screen.getByTestId('unmatched-row').querySelector('.studio-money')).not.toBeNull()
+    const row = screen.getByTestId('unmatched-row')
+    expect(row).toHaveTextContent(t('he', 'billing.reconciliation.rawAmount'))
+    expect(row).toHaveTextContent(t('he', 'billing.reconciliation.parsedAmount'))
+  })
+
+  it('says so when uPay sent no cardholder name', () => {
+    // uPay does not always send one, and blank it left a card opening with a bare number
+    // that identified nobody — on the one screen whose entire job is working out who paid.
+    // `renderQueue` spreads onto the COMPONENT, so the blank name goes on the record.
+    renderQueue({ unmatched: [{ ...IPN, card_owner_name: '' }] })
+    expect(screen.getByTestId('card-owner')).toHaveTextContent(
+      t('he', 'billing.reconciliation.noOwnerName'),
+    )
   })
 
   it('shows a dash rather than inventing a number we could not read', () => {
@@ -468,6 +485,27 @@ describe('5a — prices and plans', () => {
       />,
     )
     expect(screen.queryByTestId('plan-link-missing')).not.toBeInTheDocument()
+  })
+
+  // Checkpoint 10. The plan was a `<div onClick>`: it opened the close-card — the only way a
+  // price is ever changed in this product — and was unreachable by keyboard, announced as
+  // nothing by a screen reader, and had no focus ring. `inert-buttons.test.ts` could not
+  // have caught it, because that guard checks `<Button>`s and this was not one.
+  it('opens the close-card from the keyboard, not only from a mouse', async () => {
+    render(
+      <PricePlansScreen locale={LOCALE} client={stub()} plans={[PLAN]} onChanged={vi.fn()} />,
+    )
+    const card = screen.getByTestId('plan-row')
+    expect(card.tagName).toBe('BUTTON')
+    // The accessible name says what pressing it DOES. The amount read out alone tells a
+    // screen-reader user nothing about opening a price change.
+    expect(card).toHaveAccessibleName(
+      new RegExp(t('he', 'billing.plan.closeCurrent')),
+    )
+    card.focus()
+    expect(card).toHaveFocus()
+    await userEvent.keyboard('{Enter}')
+    expect(await screen.findByTestId('versioned-hint')).toBeInTheDocument()
   })
 
   it('offers to close and replace a plan, never to edit its amount', async () => {
