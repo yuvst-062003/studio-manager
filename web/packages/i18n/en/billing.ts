@@ -485,4 +485,7 @@ export const billing: Bundle = {
   'pay.ceilingReached': 'You are paid ahead as far as we take — more months open up as the year goes on.',
   'pay.noMonthlyPrice': 'This membership has no monthly price yet, so only the existing balance can be paid here. Contact the club to pay months in advance.',
   'pay.secureNote': 'Secured to the PCI-DSS standard',
+  'reconciliation.rawAmount': 'uPay sent',
+  'reconciliation.parsedAmount': 'We read',
+  'reconciliation.noOwnerName': 'No cardholder name',
 }

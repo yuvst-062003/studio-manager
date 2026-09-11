@@ -155,7 +155,7 @@ def test_a_manager_invites_a_manager_for_one_class(
 ):
     """How a class manager actually arrives. The grant is written NOW, against the Person
     the invitation creates, so it is real before anybody signs in (§5.3)."""
-    from app.models.person import RoleAssignment as RA
+    from app.models.person import RoleAssignment
     from sqlalchemy import select as sa_select
 
     # A unique address per run. The test database is NOT reset between pytest invocations,
@@ -177,9 +177,9 @@ def test_a_manager_invites_a_manager_for_one_class(
     assert response.status_code == 201, response.text
 
     rows = app_session.execute(
-        sa_select(RA.role, RA.scope_type, RA.scope_id)
-        .join(Person, Person.id == RA.person_id)
-        .where(Person.email == email, RA.revoked_at.is_(None))
+        sa_select(RoleAssignment.role, RoleAssignment.scope_type, RoleAssignment.scope_id)
+        .join(Person, Person.id == RoleAssignment.person_id)
+        .where(Person.email == email, RoleAssignment.revoked_at.is_(None))
     ).all()
     # Class-scoped and NOTHING studio-scoped: a studio row beside it would hand back the
     # club-wide authority the scoping exists to withhold.
@@ -207,7 +207,7 @@ def test_an_invitation_with_no_classes_is_still_a_studio_manager(
 ):
     """The existing shape must be untouched: every manager invited before today, and every
     one invited without naming a class, stays studio-wide."""
-    from app.models.person import RoleAssignment as RA
+    from app.models.person import RoleAssignment
     from sqlalchemy import select as sa_select
 
     email = f"studio-manager-{uuid.uuid4().hex[:8]}@example.invalid"
@@ -219,9 +219,9 @@ def test_an_invitation_with_no_classes_is_still_a_studio_manager(
     assert response.status_code == 201, response.text
     rows = (
         app_session.execute(
-            sa_select(RA.scope_type)
-            .join(Person, Person.id == RA.person_id)
-            .where(Person.email == email, RA.revoked_at.is_(None))
+            sa_select(RoleAssignment.scope_type)
+            .join(Person, Person.id == RoleAssignment.person_id)
+            .where(Person.email == email, RoleAssignment.revoked_at.is_(None))
         )
         .scalars()
         .all()

@@ -41,7 +41,9 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-KODOKAN = "https://kdkjd.org/%E6%8A%80/%E6%9F%94%E9%81%93-%E6%8A%80%E5%90%8D%E7%A7%B0%E4%B8%80%E8%A6%A7/"
+KODOKAN = (
+    "https://kdkjd.org/%E6%8A%80/%E6%9F%94%E9%81%93-%E6%8A%80%E5%90%8D%E7%A7%B0%E4%B8%80%E8%A6%A7/"
+)
 WIKIPEDIA = "https://en.wikipedia.org/wiki/List_of_judo_techniques"
 IJF = "https://judo.ijf.org/techniques/{slug}"
 UA = "studio-manager-judo-seed/1.0 (one-off dataset build; contact the studio admin)"
@@ -216,7 +218,7 @@ def verify_ijf(name: str, *, pause: float) -> str | None:
     try:
         with urllib.request.urlopen(request, timeout=20, context=CONTEXT) as response:
             ok = response.status == 200
-    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError):
+    except urllib.error.HTTPError, urllib.error.URLError, TimeoutError:
         ok = False
     time.sleep(pause)
     return slug if ok else None
@@ -224,7 +226,11 @@ def verify_ijf(name: str, *, pause: float) -> str | None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--skip-ijf", action="store_true", help="do not verify IJF pages (100 requests)")
+    parser.add_argument(
+        "--skip-ijf",
+        action="store_true",
+        help="do not verify IJF pages (100 requests)",
+    )
     parser.add_argument("--pause", type=float, default=0.3, help="seconds between IJF requests")
     args = parser.parse_args()
 
@@ -270,9 +276,14 @@ def main() -> int:
         if got != expected:
             problems += 1
         print(f"  {flag}{subcategory:<12} {got:>3} / {expected}", file=sys.stderr)
-    for field, label in (("nameKanji", "kanji"), ("nameHebrew", "Hebrew name"), ("descriptionHe", "Hebrew text")):
+    for field, label in (
+        ("nameKanji", "kanji"),
+        ("nameHebrew", "Hebrew name"),
+        ("descriptionHe", "Hebrew text"),
+    ):
         missing = [t["slug"] for t in techniques if not t.get(field)]
-        print(f"  missing {label:<12} {len(missing):>3}" + (f"  e.g. {', '.join(missing[:4])}" if missing else ""), file=sys.stderr)
+        example = f"  e.g. {', '.join(missing[:4])}" if missing else ""
+        print(f"  missing {label:<12} {len(missing):>3}" + example, file=sys.stderr)
     verified = sum(1 for t in techniques if t["ijfSlug"])
     source = "verified" if not args.skip_ijf else "carried over"
     print(f"  IJF {source:<13} {verified:>3} / {len(techniques)}", file=sys.stderr)
@@ -285,7 +296,11 @@ def main() -> int:
     # The English source material, for writing the Hebrew from. Not committed, not shipped.
     source = DATA / ".source-definitions.json"
     source.write_text(
-        json.dumps({t["slug"]: {"en": t["_definitionEn"], "meaning": t["_meaningEn"]} for t in techniques}, ensure_ascii=False, indent=2),
+        json.dumps(
+            {t["slug"]: {"en": t["_definitionEn"], "meaning": t["_meaningEn"]} for t in techniques},
+            ensure_ascii=False,
+            indent=2,
+        ),
         encoding="utf-8",
     )
     return 1 if problems else 0

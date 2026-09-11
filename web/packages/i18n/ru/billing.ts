@@ -488,4 +488,7 @@ export const billing: Bundle = {
   'pay.ceilingReached': 'Вы оплатили максимально вперёд — новые месяцы откроются позже.',
   'pay.noMonthlyPrice': 'Для абонемента ещё не задана месячная цена, поэтому здесь можно оплатить только текущий долг. Обратитесь в клуб, чтобы оплатить месяцы вперёд.',
   'pay.secureNote': 'Защищённая транзакция по стандарту PCI-DSS',
+  'reconciliation.rawAmount': 'uPay прислал',
+  'reconciliation.parsedAmount': 'Мы прочитали',
+  'reconciliation.noOwnerName': 'Без имени владельца карты',
 }

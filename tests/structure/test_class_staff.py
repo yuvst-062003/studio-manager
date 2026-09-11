@@ -331,9 +331,7 @@ def test_a_coach_on_no_class_is_admitted_by_the_assignment_itself(
     roster = client.get(
         f"/api/v1/classes/{judo_and_karate['judo']}/staff", headers=as_manager.headers
     ).json()["items"]
-    assert [(row["person_id"], row["role"]) for row in roster] == [
-        (str(newcomer), "lead_coach")
-    ]
+    assert [(row["person_id"], row["role"]) for row in roster] == [(str(newcomer), "lead_coach")]
     # And they are NOT silently on the other class.
     karate = client.get(
         f"/api/v1/classes/{judo_and_karate['karate']}/staff", headers=as_manager.headers

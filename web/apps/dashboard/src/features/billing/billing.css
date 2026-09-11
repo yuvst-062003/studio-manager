@@ -355,3 +355,172 @@
   color: var(--danger);
   font-size: var(--text-caption);
 }
+
+/* ── checkpoint 10 · מחירים ומסלולים ─────────────────────────────────────────
+ *
+ * A plan used to be a hairline-separated row inside one big card: name, volume, amount and
+ * date on one line with nothing between them but flex gaps, three of them stacked, reading
+ * as one long form rather than as three plans. The card idiom is `.debt-card`'s, which
+ * checkpoint 9 established for the collections board — a plan and a household are the same
+ * kind of object on screen, and two different treatments for them would be two accidents.
+ */
+.plan-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+/* A BUTTON, not a div with onClick — see the component. Buttons bring their own UA styles,
+ * so the reset here is what lets one look like a card. */
+.plan-card {
+  display: block;
+  inline-size: 100%;
+  text-align: start;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+}
+
+.plan-card:hover {
+  border-color: var(--border-strong);
+}
+
+/* A closed plan is history: it is still listed, because a charge raised last year has to
+ * stay explicable, but it must never read as a price the club is currently selling. */
+.plan-card[data-closed='true'] {
+  background: var(--ground);
+  border-style: dashed;
+}
+
+.plan-card__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.plan-card__name {
+  font-weight: var(--weight-semibold);
+  flex: 1;
+  min-inline-size: 8rem;
+}
+
+.plan-card__amount {
+  font-size: var(--text-title);
+  font-weight: var(--weight-semibold);
+}
+
+.plan-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block-start: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+}
+
+/* Drawn, not typed: a literal "·" between two elements that are already separate is
+ * punctuation a screen reader reads aloud for nothing. Same rule as `.alert-queue__meta`. */
+.plan-card__meta > * + *::before {
+  content: '';
+  display: inline-block;
+  inline-size: var(--border-width-hairline);
+  block-size: 0.9em;
+  margin-inline-end: var(--space-2);
+  vertical-align: -0.1em;
+  background: var(--border-strong);
+}
+
+/* An unfiled plan and the select that files it, boxed together — see the component for why
+ * the select cannot live inside the card itself. */
+.plan-unfiled {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  margin-block-end: var(--space-3);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--ground);
+}
+
+.plan-class-heading {
+  margin-block: var(--space-4) var(--space-2);
+  font-size: var(--text-label);
+  color: var(--text-secondary);
+}
+
+/* ── checkpoint 10 · התאמת תשלומים ───────────────────────────────────────────
+ *
+ * Two columns that were a bare flex row of two Cards, each holding rows of loose spans.
+ * `auto-fit` rather than two fixed tracks so it stacks on a narrow screen without a query.
+ */
+.recon-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.recon-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.recon-card {
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.recon-card__who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.recon-card__owner {
+  font-weight: var(--weight-medium);
+}
+
+.recon-card__digits {
+  color: var(--text-secondary);
+  font-size: var(--text-caption);
+}
+
+/* THE TWO AMOUNTS, LABELLED.
+ *
+ * uPay's raw string and our parse of it sit side by side on purpose — that is the only way
+ * an amount mismatch is legible, and when we could not parse it at all the dash must not be
+ * papered over with an invented number. But unlabelled they rendered as `320.00  ₪320`,
+ * which reads as the same number printed twice by mistake rather than as a comparison. The
+ * labels are what make the intent visible. */
+.recon-amounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.recon-amount {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.recon-amount__label {
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+
+.recon-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
