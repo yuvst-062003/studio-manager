@@ -45,3 +45,8 @@ blob-report/
 # Stitch MCP working output. The design that mattered is committed under
 # docs/screenshots/upay-stub/ as provenance; this directory is tool cache.
 .stitch/
+
+# Codex MCP config — carries a live X-Goog-Api-Key for the Stitch server.
+# GitHub push protection caught this on 2026-09-11; the hooks, agents and skills
+# beside it are committed, this one file is not.
+.codex/config.toml

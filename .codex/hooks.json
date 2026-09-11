@@ -1,0 +1,47 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/yuvalstolin/Desktop/studio-manager/.codex/hooks/block-protected.sh'"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/yuvalstolin/Desktop/studio-manager/.codex/hooks/block-protected.sh'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/yuvalstolin/Desktop/studio-manager/.codex/hooks/format-python.sh'"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/yuvalstolin/Desktop/studio-manager/.codex/hooks/verify-types.sh'",
+            "timeout": 180,
+            "statusMessage": "Verifying types before finishing…"
+          }
+        ]
+      }
+    ]
+  }
+}
