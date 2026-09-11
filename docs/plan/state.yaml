@@ -1571,6 +1571,47 @@ holdbacks:
     status: closed
     opened: 2026-09-10
     closed: 2026-09-11
+  - id: HB-parent-gate-becomes-wizard
+    kind: carried
+    title: §6.1's blocking gate was rebuilt as the join wizard and never finished
+    why: >-
+      Work parked on 2026-09-06 as `wip/delete-old-wizard`, whose own commit subject read
+      "NOT FINISHED, do not merge". The branch was removed on 2026-09-11 while closing the
+      session; the commit is kept reachable as the tag `parked/delete-old-wizard-2026-09-06`
+      so nothing is lost and nothing sits in the branch list looking mergeable.
+
+      WHAT IT DID. §6.1's gate becomes `JoinWizard` mounted in front of the app with the tab
+      bar hidden; `ConsentGate`, `HealthGate` and `AgreementFlow` are deleted, and the gate's
+      write is the ordinary POST /me/students/register. The finding that makes the approach
+      possible is worth keeping whatever happens to the code: OnboardingService.register
+      ADOPTS a child who already exists rather than refusing them, and then writes that
+      student's registration, health declaration and club-terms acceptance exactly as for a
+      new one. So the gate needs no second write path.
+
+      TWO TRAPS IT FOUND, both of which would have shipped silently. First,
+      /me/onboarding-status's `next` must NOT be the gate condition: `payment` is
+      open_charge_count == 0, so `next` names it for every family that owes money, and
+      blocking on it locks a family out of their own app over an unpaid charge. Only
+      `agreements` blocks. Second, that endpoint's `health` flag is not the old gate's
+      question — it is health_signed alone, while HealthGate gated on
+      needsFullDeclaration, which also catches a child whose declaration is signed and
+      whose REGISTRATION is not. Swapping them NARROWS a health gate, the one direction
+      that must never happen by accident.
+
+      WHY IT IS NOT FINISHED. Five tests in AppHealthGate.test.tsx are red, and they are the
+      guard on a hard gate over a minor's health record. The branch is also 170 commits
+      behind: App.tsx moved 12 commits and JoinWizard 6 since it was cut, so the rewiring
+      would be redone rather than rebased. The author's own note says door A is still open —
+      BookingFlow uses JoinWelcomeStep — and that E2E-1 must run against it, because the
+      failure mode of mounting this gate wrongly is locking every guardian out rather than
+      letting one through.
+
+      WHAT CLOSES IT. A funded piece: rewire the gate against current main, get the five
+      tests green, close door A, and run E2E-1. Not cleanup, and not something to slip into
+      a session wrap-up.
+    blocks: §6.1
+    status: open
+    opened: 2026-09-06
   - id: HB-w6-health-gate-unmounted
     kind: carried
     title: §6.1's blocking health gate is built, tested, and never mounted
