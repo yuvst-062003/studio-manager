@@ -1,0 +1,334 @@
+<title>Dashboard Before and After</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+:root {
+  --paper: #eceae5;
+  --panel: #fbfaf8;
+  --ink: #1c1a17;
+  --ink-2: #4d4941;
+  --ink-3: #7a746a;
+  --rule: #d6d2ca;
+  --now: #8a5a00;
+  --now-bg: #f6efe1;
+  --end: #1f6b3f;
+  --end-bg: #e8f1ea;
+  --new: #7a3ea8;
+  --new-bg: #f1eaf7;
+  --sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --display: 'Archivo', var(--sans);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #16161a;
+    --panel: #1e1e23;
+    --ink: #eceaf0;
+    --ink-2: #b3afb8;
+    --ink-3: #85818b;
+    --rule: #33323a;
+    --now: #d9a44e;
+    --now-bg: #2a2216;
+    --end: #5fb37c;
+    --end-bg: #16251b;
+    --new: #c08fe6;
+    --new-bg: #241a2e;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #16161a;
+  --panel: #1e1e23;
+  --ink: #eceaf0;
+  --ink-2: #b3afb8;
+  --ink-3: #85818b;
+  --rule: #33323a;
+  --now: #d9a44e;
+  --now-bg: #2a2216;
+  --end: #5fb37c;
+  --end-bg: #16251b;
+  --new: #c08fe6;
+  --new-bg: #241a2e;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 1240px; margin-inline: auto; padding-inline: 24px; }
+
+header.top { padding-block: 52px 30px; }
+
+h1 {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(2rem, 4.6vw, 2.9rem);
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  margin: 0 0 14px;
+  max-width: 18ch;
+}
+
+.sub { font-size: 1.05rem; color: var(--ink-2); max-width: 60ch; margin: 0; }
+.sub b { color: var(--ink); font-weight: 600; }
+
+h2 {
+  font-family: var(--display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
+}
+
+.section { padding-block: 40px; border-block-start: 1px solid var(--rule); }
+.section > p { color: var(--ink-2); max-width: 62ch; margin: 0 0 26px; }
+
+/* ── menu ─────────────────────────────────────────── */
+
+.menu {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+@media (min-width: 800px) { .menu { grid-template-columns: 1fr 1fr; } }
+
+.menucol {
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.menucol h3 {
+  margin: 0;
+  padding: 13px 18px;
+  font-size: 12px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 600;
+  border-block-end: 1px solid var(--rule);
+}
+
+.menucol ol, .menucol ul { margin: 0; padding: 8px 0; list-style: none; }
+
+.menucol li {
+  padding: 7px 18px;
+  font-size: 14px;
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.menucol li span { color: var(--ink-3); font-size: 12.5px; }
+.menucol li.grp { color: var(--ink-3); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; padding-top: 14px; font-weight: 600; }
+.menucol li b { font-weight: 500; }
+
+/* ── screens ──────────────────────────────────────── */
+
+.screen { padding-block: 40px; border-block-start: 1px solid var(--rule); }
+
+.screen-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 14px; margin-block-end: 6px; }
+
+.screen-head h2 { margin: 0; font-size: 1.35rem; }
+
+.tag {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 3px;
+  background: var(--new-bg);
+  color: var(--new);
+}
+
+.change { color: var(--ink-2); max-width: 68ch; margin: 0 0 22px; }
+.change b { color: var(--ink); font-weight: 600; }
+
+.pair { display: grid; grid-template-columns: 1fr; gap: 18px; }
+
+@media (min-width: 900px) { .pair { grid-template-columns: 1fr 1fr; } }
+
+figure { margin: 0; }
+
+figcaption {
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-block-end: 8px;
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 3px;
+}
+
+.now figcaption { background: var(--now-bg); color: var(--now); }
+.end figcaption { background: var(--end-bg); color: var(--end); }
+
+figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  background: var(--panel);
+}
+
+footer { padding-block: 36px 64px; border-block-start: 1px solid var(--rule); color: var(--ink-3); font-size: 13.5px; }
+footer p { max-width: 66ch; }
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+<header class="top">
+  <h1>Dashboard: now and after</h1>
+  <p class="sub">
+    Every manager screen as it looks today, beside how it will look at the end.
+    Nine screens come from your prototype. <b>Four screens the prototype never drew were
+    designed for this</b> — attendance, health documents, events and the year rollover.
+  </p>
+</header>
+
+<section class="section">
+  <h2>The menu goes from 19 to 9</h2>
+  <p>
+    Today there are two menus that have drifted apart — a desktop sidebar and a separate
+    mobile drawer holding items the sidebar doesn't. Three destinations are already
+    unreachable from the desktop menu. Nothing is deleted below; the extra doors move inside
+    the screen that owns them.
+  </p>
+  <div class="menu">
+    <div class="menucol">
+      <h3>Now — 19 destinations</h3>
+      <ul>
+        <li class="grp">Daily</li>
+        <li><b>לוח המנהל</b></li>
+        <li><b>לוח שבועי</b></li>
+        <li><b>נוכחות</b></li>
+        <li><b>הודעות</b></li>
+        <li class="grp">Club</li>
+        <li><b>חניכים</b></li>
+        <li><b>קבוצות ומחזורים</b></li>
+        <li><b>אירועים ותחרויות</b></li>
+        <li><b>חגורות ומבחנים</b></li>
+        <li><b>צוות</b></li>
+        <li><b>גלגול שנה</b></li>
+        <li class="grp">Money and documents</li>
+        <li><b>תשלומים וגבייה</b></li>
+        <li><b>מחירים ומסלולים</b></li>
+        <li><b>פריטים למכירה</b></li>
+        <li><b>מסמכים והצהרות</b></li>
+        <li><b>דוחות</b></li>
+        <li class="grp">Elsewhere</li>
+        <li><b>הגדרות</b></li>
+        <li><b>סגירות</b> <span>drawer only</span></li>
+        <li><b>מבחנים</b> <span>no link at all</span></li>
+        <li><b>הקמה</b> <span>banner only</span></li>
+      </ul>
+    </div>
+    <div class="menucol">
+      <h3>After — 9 doors</h3>
+      <ul>
+        <li><b>לוח בקרה ראשי</b> <span>+ the alerts centre moves here</span></li>
+        <li><b>יומן שיעורים שבועי</b> <span>+ closures, groups</span></li>
+        <li><b>חניכים ומתאמנים</b> <span>+ add student, alerts list</span></li>
+        <li><b>חוגים וקבוצות</b> <span>+ belts, exams</span></li>
+        <li><b>חנות המועדון</b></li>
+        <li><b>הודעות ועדכונים</b></li>
+        <li><b>תשלומים וגבייה</b> <span>+ prices, reconciliation</span></li>
+        <li><b>סטטיסטיקות ודוחות</b> <span>+ attendance report</span></li>
+        <li><b>הגדרות מערכת</b> <span>+ staff, setup, documents, platform</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<div id="screens"></div>
+
+<footer>
+  <p>
+    Left column captured from the running dashboard against the seeded demo club, 10 September 2026.
+    Right column: nine screens from the prototype at <code>~/Downloads/גלדיאטור-studio-os</code>,
+    four generated for the screens it never drew. All at 1440×900.
+  </p>
+</footer>
+
+</div>
+
+<script>
+/*__IMAGES__*/
+
+const SCREENS = [
+  { key: 'home', title: 'Main dashboard', now: 'before-home', end: 'after-home',
+    change: 'The numbers are already real and already correct — debt, collected, today’s classes, attendance per group. What changes is that they stop looking like a spreadsheet. <b>The alerts centre moves onto this screen</b>, so the six real alerts five parts of the app already produce finally have somewhere a manager will see them.' },
+
+  { key: 'schedule', title: 'Weekly schedule', now: 'before-schedule', end: 'after-schedule',
+    change: 'A real week grid instead of a list: day columns, time rows, colour per class, and live / finished / upcoming states on each card. The session popover keeps everything it does today — attendance, move, room, coach, cancel — but splits into two tabs instead of one long column.' },
+
+  { key: 'students', title: 'Students', now: 'before-students', end: 'after-students',
+    change: 'Class tabs with live counts across the top, and a WhatsApp button on every row. The student card becomes a four-tab drawer — details, training, money, health — instead of one long scroll. <b>The prototype’s pagination is not copied</b>: its page buttons do nothing at all.' },
+
+  { key: 'groups', title: 'Classes and groups', now: 'before-groups', end: 'after-groups',
+    change: 'Cards with a capacity bar replace the table, so a group that is nearly full reads at a glance. Three tabs — groups, curriculum, staff — where the curriculum tab becomes the home for the belt ladder.' },
+
+  { key: 'billing', title: 'Payments and collection', now: 'before-billing', end: 'after-billing',
+    change: 'Filter chips with live counts, and a payments list the dashboard does not have today — it currently shows only debts. <b>Every headline figure in the prototype is invented</b>, so those get computed for real, and its "mark as paid" is not copied: it changes a row without touching what the family actually owes.' },
+
+  { key: 'comms', title: 'Announcements', now: 'before-comms', end: 'after-comms',
+    change: 'The strongest idea in the whole prototype: a four-step send — type, message, audience, channels — ending in <b>a live preview of the notification as the parent will receive it</b>. Its audience numbers are hardcoded; ours will use the real recipient count, which already exists.' },
+
+  { key: 'reports', title: 'Reports', now: 'before-reports', end: 'after-reports',
+    change: 'Better charts over data we already have. Retention and belt promotions stay — the prototype has neither. <b>Its profitability table is not built</b>: it needs coach wages, which the system does not store.' },
+
+  { key: 'items', title: 'Club shop', now: 'before-items', end: 'after-items',
+    change: 'A product grid with photos, categories and a required-item badge, plus the sizing guide. <b>Stock levels are not built</b> — the system deliberately does not track inventory, so a stock number would be invented on screen.' },
+
+  { key: 'settings', title: 'Settings', now: 'before-settings', end: 'after-settings',
+    change: 'Five tabs instead of a menu where two-thirds of the entries navigate somewhere else. The light/dark control moves here, where people look for it. The prototype’s payment-provider panel is fake and is not copied.' },
+
+  { key: 'attendance', title: 'Attendance report', now: 'before-attendance', end: 'stitch-attendance', isNew: true,
+    change: 'Sessions still waiting to be marked, with a reminder to the coach and per-group percentages. Two rules the current screen already gets right are kept and made visible: <b>unmarked is not the same as absent</b>, and a group with no data shows the words "no data" rather than a zero bar that would read as nobody turning up.' },
+
+  { key: 'documents', title: 'Health declarations', now: 'before-documents', end: 'stitch-documents', isNew: true,
+    change: 'Who has signed, who has not, and when each expires. <b>No medical information appears anywhere</b> — only whether a form exists — and the note that every viewing is written to the audit log stays visible beside the button, not hidden behind it.' },
+
+  { key: 'events', title: 'Events and competitions', now: 'before-events', end: 'stitch-events', isNew: true,
+    change: 'Cards with a date badge, the event type, and a bar showing how many families have replied out of those invited. A draft event carries a visible warning that parents cannot see it yet.' },
+
+  { key: 'rollover', title: 'Year rollover', now: 'before-rollover', end: 'stitch-rollover', isNew: true,
+    change: 'The seven-step end-of-year wizard, with a status word under every step rather than colour alone. The rule that matters is on screen: <b>no student is promoted automatically</b> — every move is chosen by hand.' },
+];
+
+document.getElementById('screens').innerHTML = SCREENS.map((s) => `
+  <section class="screen">
+    <div class="screen-head">
+      <h2>${s.title}</h2>
+      ${s.isNew ? '<span class="tag">newly designed</span>' : ''}
+    </div>
+    <p class="change">${s.change}</p>
+    <div class="pair">
+      <figure class="now">
+        <figcaption>Now</figcaption>
+        <img src="${IMG[s.now]}" alt="${s.title} as it looks today">
+      </figure>
+      <figure class="end">
+        <figcaption>After</figcaption>
+        <img src="${IMG[s.end]}" alt="${s.title} as it will look">
+      </figure>
+    </div>
+  </section>`).join('');
+</script>
