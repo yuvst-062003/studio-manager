@@ -1553,9 +1553,24 @@ holdbacks:
       Note that this is the CARD path only. For cash, cheque and הוראת קבע there is no
       document at all, only a free-text `external_receipt_number` a manager types by hand,
       so no button could ever be offered on those rows whichever way the card question goes.
+
+      CLOSED 2026-09-11, and the answer is no button. It took two pieces of evidence rather
+      than the one look this entry expected. First, the owner supplied a real receipt email:
+      a per-transaction URL DOES exist and is shareable without a login —
+      app.upay.co.il/API6/s.php?m=<token> — but the token decodes to double-base64 around
+      exactly 16 bytes of binary, one AES block, so it is ciphertext only uPay can produce
+      and external_payment_ref cannot construct it. That left one way the button could still
+      have existed: uPay sending us the link in the callback. Second, the ₪1 live money test
+      on production settled that. The first real IPN this system has ever received carries 31
+      query parameters, exactly the 31 app/integrations/upay/callback.py already parses, and
+      not one of them contains invoice, receipt, doc, link, url or pdf. So the link exists,
+      cannot be derived, and is never handed to us. D6's stated alternative is now the
+      permanent answer: the paid row keeps the typed receipt number as plain text and no
+      control beside it.
     blocks: D6 · W10.19
-    status: open
+    status: closed
     opened: 2026-09-10
+    closed: 2026-09-11
   - id: HB-w6-health-gate-unmounted
     kind: carried
     title: §6.1's blocking health gate is built, tested, and never mounted

@@ -1011,7 +1011,9 @@ Per `upay-integration.md`, using the server-rendered form POST integration.
    `returnurl`, `ipnurl = /webhooks/upay/{public_ref}`, `maxpayments`,
    `createinvoiceandreceipt=1`, `lang=HE`, `currency=NIS`, and auto-submits it.
 3. The parent pays on uPay's hosted page. Card data never reaches our servers.
-4. uPay sends an unsigned IPN `GET` roughly 5 minutes later.
+4. uPay sends an unsigned IPN `GET` **1–5 minutes later** — observed at **77 seconds** on
+   the first live payment (2026-09-11). The lag is real but shorter than the integration
+   notes assumed; nothing may depend on either number.
 5. `returnurl` renders a "התקבל, מאמת תשלום…" page. **The redirect is never the source
    of truth** — a closed tab still produces an IPN.
 
@@ -1028,6 +1030,15 @@ Per `upay-integration.md`, using the server-rendered form POST integration.
 | Slow processing causes uPay retries | The endpoint persists the raw `upay_ipn_record` and returns 200 immediately; all processing happens in a worker. |
 
 Every IPN is persisted verbatim in `upay_ipn_record` whether matched or not.
+
+**The payload is 31 query parameters, and that is the whole of it** — confirmed against a
+real callback on 2026-09-11, the first this system has ever received. The 31 are exactly
+the set `app/integrations/upay/callback.py` parses: nothing arrived that we ignore, and
+nothing we parse failed to arrive. Three of them (`identitynumber`, `cellphonenotify`,
+`emailnotify`) came through empty. **`comment` did not** — it carried the payer's first
+name, so it is a name field for §11.7 purposes and not the blank the simulator assumes.
+**`depositcashierid` is a different number from `transactionid`** (`189128993` beside
+`189129005`); anything deduplicating on the wrong one would be deduplicating on nothing.
 
 #### הוראת קבע reconciliation
 
@@ -1957,13 +1968,14 @@ Recorded so they are never rediscovered the hard way. Details in `upay-integrati
 | One shared recurring link, one fixed amount, for all parents | Per-payer recurring amounts are impossible |
 | Recurring IPNs carry **no customer identifier** | Automatic matching is impossible; reconciliation is human-confirmed |
 | No custom free-text field on the uPay payment page | Cannot ask the payer to type a student name |
-| IPN arrives ~5 minutes after payment | The return redirect must never be the source of truth |
+| IPN arrives 1–5 minutes after payment (**77 seconds** observed live, 2026-09-11) | The return redirect must never be the source of truth. The lag is not a number anything may depend on — only its existence |
 | **The IPN's `amount` is not the form's `amount`** — a ₪1 charge returns `1`, not `1.00` | Reconciliation compares **integers** (`agorot_from_ipn_amount`), never strings. A string compare fails every correct whole-shekel payment into `amount_mismatch`, i.e. a fraud alert on good money |
 | **The merchant account has no sandbox** — `livesystem=0` is untestable and may be a no-op | §19.6 cannot rest on it. A demo studio is refused a form in our own code instead |
 | The form field `paymentdetails` returns as `productdescription` | Confirmed live, 3/3. The outbound and inbound names for the order reference genuinely differ |
 | Installments cap at **12** on the merchant account | `max_payments` is clamped; above it is an untested path |
 | `application=BIT` is uPay's channel label, **not** the payment method | Never parse it as the instrument used — it reads "bit" for Visa-paid transactions |
-| uPay issues a **קבלה**, not a **חשבונית מס** | Do not generate or infer tax documents; store `transactionid` and link to uPay's own receipt view |
+| uPay issues a **קבלה**, not a **חשבונית מס** | Do not generate or infer tax documents. Store `transactionid` and show it as text — **there is nothing to link to**, see the row below |
+| **uPay never sends the receipt it issues.** The live IPN's 31 keys contain no `invoice`, `receipt`, `doc`, `link`, `url` or `pdf` field, and the mailed receipt's URL (`s.php?m=<token>`) is AES ciphertext no stored value can construct | A receipt button is impossible, not merely unbuilt. Closed permanently as checkpoint 19 of the dashboard redesign, 2026-09-11 |
 | **Apple has no third-party calendar write API** | ICS subscription is the only cross-platform calendar option |
 | Google Calendar write is a restricted scope | Would require an annual third-party security assessment |
 | **iOS Web Push exists only for a home-screen web app** | An iPhone parent using a Safari tab can receive no push whatsoever. The API is absent, not denied — there is nothing to request |
