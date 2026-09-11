@@ -31,12 +31,12 @@ export function PartGroup({
     <fieldset className="flex flex-col gap-3.5 border-0 p-0 m-0">
       <legend className="contents">
         <div className="flex items-center gap-2 pb-1 pt-0.5">
-          <div className="w-8 h-8 rounded-lg bg-[#dae1ff] flex items-center justify-center text-[#001849] shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-[var(--wz-tint-2)] flex items-center justify-center text-[var(--wz-heading)] shrink-0">
             <Swords className="w-4 h-4" />
           </div>
           <div className="text-right">
-            <h4 className="text-[17px] text-[#001849] font-bold leading-tight">{copy.groupTitle}</h4>
-            <p className="text-[12px] text-[#444650]">{copy.groupLead}</p>
+            <h4 className="text-[17px] text-[var(--wz-heading)] font-bold leading-tight">{copy.groupTitle}</h4>
+            <p className="text-[12px] text-[var(--wz-secondary)]">{copy.groupLead}</p>
           </div>
         </div>
       </legend>
@@ -47,10 +47,10 @@ export function PartGroup({
           return (
             <label
               key={group.id}
-              className={`group relative flex items-start gap-3 p-3.5 rounded-xl cursor-pointer transition-all duration-200 shadow-2xs has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#0056c5] ${
+              className={`group relative flex items-start gap-3 p-3.5 rounded-xl cursor-pointer transition-all duration-200 shadow-2xs has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--wz-accent)] ${
                 isSelected
-                  ? 'bg-white border-2 border-[#0056c5] shadow-md'
-                  : 'bg-white border border-[#c5c6d2]/50 hover:border-[#0056c5]'
+                  ? 'bg-[var(--wz-surface)] border-2 border-[var(--wz-accent)] shadow-md'
+                  : 'bg-[var(--wz-surface)] border border-[var(--wz-line-strong)]/50 hover:border-[var(--wz-accent)]'
               }`}
             >
               <input
@@ -65,8 +65,8 @@ export function PartGroup({
                 aria-hidden
                 className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
                   isSelected
-                    ? 'border-[#0056c5] bg-[#0056c5] text-white'
-                    : 'border-[#757681] text-transparent bg-transparent'
+                    ? 'border-[var(--wz-accent)] bg-[var(--wz-accent)] text-white'
+                    : 'border-[var(--wz-tertiary)] text-transparent bg-transparent'
                 }`}
               >
                 <Check className="w-3.5 h-3.5 stroke-[3]" />
@@ -75,20 +75,20 @@ export function PartGroup({
               <span className="flex flex-col min-w-0 flex-1">
                 <span className="flex items-center justify-between flex-wrap gap-1">
                   <span className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[15px] font-bold text-[#161b28]">{group.name}</span>
-                    <span className="px-2 py-0.5 rounded-md bg-[#e9edff] text-[#0056c5] text-[11px] font-semibold">
+                    <span className="text-[15px] font-bold text-[var(--wz-ink)]">{group.name}</span>
+                    <span className="px-2 py-0.5 rounded-md bg-[var(--wz-tint)] text-[var(--wz-accent)] text-[11px] font-semibold">
                       {group.trackLabel}
                     </span>
-                    <span className="px-2 py-0.5 rounded-md bg-[#dae1ff] text-[#001849] text-[11px] font-semibold">
+                    <span className="px-2 py-0.5 rounded-md bg-[var(--wz-tint-2)] text-[var(--wz-heading)] text-[11px] font-semibold">
                       {group.durationMin} {copy.minutesPerSession}
                     </span>
                   </span>
-                  <span className="px-2 py-0.5 rounded-md bg-[#d9e2ff] text-[#001945] text-[11px] font-bold flex items-center gap-1">
+                  <span className="px-2 py-0.5 rounded-md bg-[var(--wz-tint-3)] text-[var(--wz-chip-fg)] text-[11px] font-bold flex items-center gap-1">
                     <Calendar className="w-3 h-3" />
                     {group.scheduleLabel}
                   </span>
                 </span>
-                <span className="flex items-center gap-2 mt-2 text-[#444650] text-[12px] flex-wrap">
+                <span className="flex items-center gap-2 mt-2 text-[var(--wz-secondary)] text-[12px] flex-wrap">
                   <span>
                     {copy.coaches}: {group.coachesLabel}
                   </span>
@@ -108,10 +108,10 @@ export function PartGroup({
       ) : null}
 
       {selected ? (
-        <div className="p-3 rounded-xl bg-[#e9edff] border border-[#dee2f4] flex items-center gap-2 text-[#001849] text-[13px] shadow-2xs">
-          <CheckCircle2 className="w-5 h-5 text-[#0056c5] shrink-0" />
+        <div className="p-3 rounded-xl bg-[var(--wz-tint)] border border-[var(--wz-line)] flex items-center gap-2 text-[var(--wz-heading)] text-[13px] shadow-2xs">
+          <CheckCircle2 className="w-5 h-5 text-[var(--wz-accent)] shrink-0" />
           <span className="font-semibold">{copy.groupSelected}</span>
-          <span className="px-2.5 py-0.5 rounded-lg bg-white text-[#001849] text-[13px] font-bold shadow-2xs">
+          <span className="px-2.5 py-0.5 rounded-lg bg-[var(--wz-surface)] text-[var(--wz-heading)] text-[13px] font-bold shadow-2xs">
             {selected.name}
           </span>
         </div>

@@ -442,6 +442,58 @@ class TrialService:
         return BookedTrial(booked=booked, guardian_person_id=parent.id, studio_id=studio_id)
 
     @staticmethod
+    def declaration_for_student(
+        session: Session, *, student_id: uuid.UUID
+    ) -> dict[str, Any] | None:
+        """What this child's family answered on the booking form, or None.
+
+        **Read back for the conversion screen, not for a manager.** §5.4a ④'s "איך היה?"
+        lands on a three-step join -- declaration, groups and plan, payment -- and its first
+        step SHOWS these answers instead of asking the thirteen questions a second time
+        (owner, 2026-09-12: "he already signed health... in the health he will see what he
+        wrote and place to signature"). There is nothing to map on the way: `TrialBookingPage`
+        renders the current `kind=full` template minus its clause, so these answers are
+        already in the member form's own id-space.
+
+        **Scanned in Python, and it has to be.** `payload_encrypted` is `EncryptedJSON`, so
+        no WHERE clause can reach inside it. The rows are narrowed by the child's own
+        guardians first, which is both the cheap filter and the safe one -- an unnarrowed
+        scan would decrypt other families' payloads to answer a question about this child.
+
+        **Matched on `student_id`, never on the parent.** One booking writes ONE row holding
+        every child in it, so matching on the parent alone would hand back a sibling's
+        medical answers under this child's name.
+        """
+        guardian_ids = (
+            session.execute(select(Guardian.person_id).where(Guardian.student_id == student_id))
+            .scalars()
+            .all()
+        )
+        if not guardian_ids:
+            return None
+        rows = (
+            session.execute(
+                select(RegistrationRequest)
+                .where(RegistrationRequest.matched_person_id.in_(guardian_ids))
+                .order_by(RegistrationRequest.submitted_at.desc())
+            )
+            .scalars()
+            .all()
+        )
+        wanted = str(student_id)
+        for row in rows:
+            payload = row.payload_encrypted
+            if not isinstance(payload, dict):  # pragma: no cover - defensive
+                continue
+            for child in payload.get("children") or ():
+                if not isinstance(child, dict) or child.get("student_id") != wanted:
+                    continue
+                declaration = child.get("trial_declaration")
+                if isinstance(declaration, dict):
+                    return declaration
+        return None
+
+    @staticmethod
     def _resolve_choice(
         session: Session,
         *,

@@ -981,6 +981,7 @@ function AuthedApp() {
             // the moment the join lands they stop passing — which is the point.
             <JoinClubSection
               client={peopleClient}
+              healthClient={healthClient}
               locale={locale}
               onJoined={() => setFamilyJoined((n) => n + 1)}
             />

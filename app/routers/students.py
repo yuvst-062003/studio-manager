@@ -50,6 +50,7 @@ from app.schemas.people import (
     GuardianListResponse,
     GuardianOut,
     MyStudentStatusHistoryListResponse,
+    MyTrialDeclarationOut,
     SiblingRequestIn,
     StudentConvertIn,
     StudentCreate,
@@ -85,6 +86,7 @@ from app.services.people.naming import format_person_name
 from app.services.people.onboarding import OnboardingService
 from app.services.people.profile import ProfileService
 from app.services.people.students import StudentRow, StudentService
+from app.services.people.trials import TrialService
 from app.services.schedule import ScheduleService
 
 router = APIRouter(tags=["people"])
@@ -1035,6 +1037,54 @@ def update_my_profile(
     return _my_profile_out(person)
 
 
+@router.get(
+    "/me/students/{student_id}/trial-declaration",
+    response_model=MyTrialDeclarationOut,
+)
+def my_trial_declaration(
+    student_id: uuid.UUID,
+    request: Request,
+    session: TenantSessionDep,
+) -> MyTrialDeclarationOut:
+    """What this family answered on the booking form, for the conversion screen to show back.
+
+    **Why it exists.** Entrance A's first step used to send a converting family through the
+    full thirteen-question declaration from scratch. They had already answered it — the
+    public booking form renders the current `kind=full` template minus its clause — so the
+    app was asking a parent to type their child's medical history twice and calling the
+    second copy the real one (owner, 2026-09-12). Now the step shows what they wrote and
+    asks only for the signature that door deliberately does not take.
+
+    **404, never 403**, the rule every `/me/` route here follows: under `/me/` the collection
+    is "my children", so an id outside it does not exist — and a 403 would confirm the child
+    is in this studio.
+
+    **An empty declaration is 200, not 404.** A child a manager put on a trial by hand has no
+    booking form behind them; the screen then asks the questions properly, and a 404 would be
+    indistinguishable from the route being broken.
+
+    No audit row and no logging of the body: G7 and §11.2 — these are a minor's health
+    answers, and `audit_log` is append-only, so anything written there is beyond
+    anonymization's reach.
+    """
+    person_id = _person_id(request)
+    if student_id not in StudentService.guardian_student_ids(session, person_id=person_id):
+        raise _not_found()
+    stored = TrialService.declaration_for_student(session, student_id=student_id) or {}
+    raw_template = stored.get("template_id")
+    try:
+        template_id = uuid.UUID(str(raw_template)) if raw_template else None
+    except ValueError:  # pragma: no cover - a parked payload is unvalidated by design
+        template_id = None
+    answers = stored.get("answers")
+    return MyTrialDeclarationOut(
+        template_id=template_id,
+        answers=answers if isinstance(answers, dict) else {},
+        declared_by=stored.get("declared_by"),
+        declared_at=stored.get("declared_at"),
+    )
+
+
 @router.post("/me/students/{student_id}/join", response_model=StudentSummaryOut)
 def join_the_club(
     student_id: uuid.UUID,
@@ -1068,6 +1118,7 @@ def join_the_club(
             session,
             student_id=student_id,
             group_ids=list(body.group_ids),
+            price_plan_id=body.price_plan_id,
             at=now(),
             actor_person_id=person_id,
             schedule=schedule_reader(session),

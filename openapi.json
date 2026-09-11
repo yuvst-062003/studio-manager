@@ -2403,6 +2403,72 @@
         "title": "ClassStaffListResponse",
         "type": "object"
       },
+      "ClassUpdate": {
+        "properties": {
+          "color": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "discipline": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discipline"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "ClassUpdate",
+        "type": "object"
+      },
       "ClosureCreate": {
         "properties": {
           "date_from": {
@@ -7950,6 +8016,52 @@
         "title": "MyTrialBookingOut",
         "type": "object"
       },
+      "MyTrialDeclarationOut": {
+        "description": "What this family already answered on the booking form, for the conversion screen's\nfirst step to SHOW them (owner, 2026-09-12).\n\n**The answers, and deliberately so** — which is the opposite of `HealthDeclarationOut`,\nthe coach-safe shape that returns flags and never contents (§5.5). The difference is the\nreader: this route is under `/me/`, so the caller is a guardian of this child reading\nwhat they themselves wrote an hour ago. A screen that asked them to sign a declaration\nwithout showing what is in it would be asking for a signature on an unread document.\n\n`template_id` travels so the client signs against the SAME template the answers were\ngiven on, rather than re-fetching the newest and silently pairing old answers with new\nquestions. `null` when the stored entry carried none.\n\nG7: never logged, never in an audit `diff`. These are a minor's medical answers.",
+        "properties": {
+          "answers": {
+            "additionalProperties": true,
+            "title": "Answers",
+            "type": "object"
+          },
+          "declared_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Declared At"
+          },
+          "declared_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Declared By"
+          },
+          "template_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id"
+          }
+        },
+        "title": "MyTrialDeclarationOut",
+        "type": "object"
+      },
       "NotificationActionOut": {
         "description": "What a notice asks for, and whether the club is still waiting for it.\n\n`null` on every notice that asks for nothing — an announcement, an injury report, the\nno-show follow-up. See `app/services/comms/actions.py` for why this is resolved on\nread rather than stored, and why the enum carries no Hebrew: the client owns the\nlabel and the route, the server owns the fact.",
         "properties": {
@@ -10846,6 +10958,11 @@
             "title": "Id",
             "type": "string"
           },
+          "kind": {
+            "default": "base",
+            "title": "Kind",
+            "type": "string"
+          },
           "locations": {
             "items": {
               "type": "string"
@@ -13677,7 +13794,45 @@
         "type": "object"
       },
       "StaffRolesIn": {
+        "description": "The staff-row editor. Roles, and — since 2026-09-10 — the person's own details.\n\nThe owner's report was \"אי אפשר לערוך איש צוות\", and it was accurate: this took `roles`\nand nothing else, so a coach invited with a typo in their name carried it for ever. The\ninvite form is the only place a name is ever written and nothing could rewrite it.\n\n`None` means NOT MENTIONED and never \"set to empty\". The role editor sends `{roles}`\nalone and must keep doing so without blanking a name, which is the distinction every\npartial update has to get right and the one a test here pins.",
         "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 320,
+                "minLength": 3,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
           "roles": {
             "items": {
               "type": "string"
@@ -14458,7 +14613,7 @@
         "type": "object"
       },
       "StudentJoinIn": {
-        "description": "Entrance A — `POST /me/students/{student_id}/join`.\n\n**`group_ids` and no price.** How much a family pays is derived from the weekly volume\nacross the groups they tick (§5.10); how they PAY is chosen on §6.1's payment step. A\n`price_plan_id` here would be a price a client can post.\n\nPlural for the same reason `SiblingRequestIn.group_ids` is: one group id cannot price a\nchild who trains twice a week.",
+        "description": "Entrance A — `POST /me/students/{student_id}/join`.\n\n**`price_plan_id` is optional, and checked rather than trusted** (owner, 2026-09-12).\nThis field did not exist, on the reasoning that a price a client posts is not a price —\nwhile the join wizard's own `toRegisterPayload` had always sent one, so the product's\nmain registration door already worked the way this one refused to. The conversion screen\nnow shows the club's plans like every other door, and `join_from_trial` refuses an id\nthat is not a live plan of this studio. Omitted, the weekly volume across `group_ids`\nstill derives it (§5.10) — a club with no published plans shows nothing to pick.\n\nPlural for the same reason `SiblingRequestIn.group_ids` is: one group id cannot price a\nchild who trains twice a week.",
         "properties": {
           "group_ids": {
             "items": {
@@ -14469,6 +14624,18 @@
             "minItems": 1,
             "title": "Group Ids",
             "type": "array"
+          },
+          "price_plan_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Plan Id"
           }
         },
         "required": [
@@ -19516,6 +19683,60 @@
         ]
       }
     },
+    "/api/v1/classes/{class_id}": {
+      "patch": {
+        "description": "Rename / re-describe / retire one class.\n\n`ClassUpdate` was written when the model landed and no route ever used it, so a club\nthat mistyped a class name during setup had no way to correct it. `model_fields_set`\ndecides what to write, like `SessionPatch` and `GroupPatch`: an absent field leaves\nits column alone rather than nulling it.",
+        "operationId": "update_class_api_v1_classes__class_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Class Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClassUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Class",
+        "tags": [
+          "structure"
+        ]
+      }
+    },
     "/api/v1/classes/{class_id}/staff": {
       "get": {
         "description": "Who coaches this class, main coach first.\n\nReadable by any staff member: §3.2 makes MANAGING staff a manager's act, but knowing who\nelse teaches your class is neither a financial nor a personal-data read, and a coach app\nthat could not show it would be worse than useless on the mat.",
@@ -21945,6 +22166,53 @@
         ]
       }
     },
+    "/api/v1/groups/{group_id}/staff/{person_id}": {
+      "delete": {
+        "description": "The counterpart `POST /groups/{id}/staff` shipped without in M1.4.\n\nClasses have had a removal since the class-manager work; groups had none, so a coach\nput on the wrong group stayed on it, and the staff screen's ללא קבוצה could only ever\nbe fixed in one direction (owner report, 2026-09-10).\n\nCloses the row and revokes the group-scoped grant together -- see\n`StructureService.unassign_staff` for why that is one call.",
+        "operationId": "remove_group_staff_api_v1_groups__group_id__staff__person_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "group_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Group Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Group Staff",
+        "tags": [
+          "structure"
+        ]
+      }
+    },
     "/api/v1/groups/{group_id}/training-kind": {
       "patch": {
         "description": "`kind` and `is_invite_only`, the two switches every rule in this feature reads.\n\nIts own route rather than a field on the structure lane's `PATCH /groups/{id}`: that\nshape belongs to another lane, and these two columns are read by this one. The path\nsays `training-kind` for the same reason.",
@@ -23747,6 +24015,50 @@
           }
         },
         "summary": "My Student Status History",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/me/students/{student_id}/trial-declaration": {
+      "get": {
+        "description": "What this family answered on the booking form, for the conversion screen to show back.\n\n**Why it exists.** Entrance A's first step used to send a converting family through the\nfull thirteen-question declaration from scratch. They had already answered it — the\npublic booking form renders the current `kind=full` template minus its clause — so the\napp was asking a parent to type their child's medical history twice and calling the\nsecond copy the real one (owner, 2026-09-12). Now the step shows what they wrote and\nasks only for the signature that door deliberately does not take.\n\n**404, never 403**, the rule every `/me/` route here follows: under `/me/` the collection\nis \"my children\", so an id outside it does not exist — and a 403 would confirm the child\nis in this studio.\n\n**An empty declaration is 200, not 404.** A child a manager put on a trial by hand has no\nbooking form behind them; the screen then asks the questions properly, and a 404 would be\nindistinguishable from the route being broken.\n\nNo audit row and no logging of the body: G7 and §11.2 — these are a minor's health\nanswers, and `audit_log` is append-only, so anything written there is beyond\nanonymization's reach.",
+        "operationId": "my_trial_declaration_api_v1_me_students__student_id__trial_declaration_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyTrialDeclarationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Trial Declaration",
         "tags": [
           "people"
         ]

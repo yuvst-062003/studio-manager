@@ -184,6 +184,53 @@ describe('toRegisterPayload — שנת עליה and הורה 2', () => {
   })
 })
 
+// The seam that would have caught the defect below, and did not exist while it was
+// written. `toRegisterPayload` maps over the family; a trial child mapped with them is
+// REGISTERED as a member — and `OnboardingService.register` promotes a child already on
+// the roster to `active`, which is exactly what a trial is not. The submitJoin tests
+// asserted on charges, orders and `bookTrial`'s arguments and never on what `register`
+// was handed, so the child became two rows and the funnel counted a conversion that had
+// not happened (found 2026-09-12, before it shipped).
+describe('toRegisterPayload — a trial child is not registered as a member', () => {
+  const OPTIONS = { templateId: 'tmpl-1', clubTermsAccepted: true }
+
+  const child = (id: string, extra: Record<string, unknown> = {}) => ({
+    ...emptyStudent(id),
+    firstName: 'ילד',
+    lastName: id,
+    birthDate: '2015-05-05',
+    guardianFirstName: 'הורה',
+    guardianLastName: 'לוי',
+    guardianPhone: '0500000000',
+    ...extra,
+  })
+
+  it('leaves a trial sibling out of the children it registers', () => {
+    const payload = toRegisterPayload(
+      [child('a'), child('b', { intent: 'trial' }), child('c')],
+      OPTIONS,
+    )
+
+    expect(payload.children).toHaveLength(2)
+    expect(payload.children.map((row) => row.last_name)).toEqual(['a', 'c'])
+  })
+
+  it('throws when every child is a trial, rather than registering nobody', () => {
+    // The caller must not reach `register` at all in that shape — `submitJoin` skips it.
+    // Throwing here is what makes a silent empty registration impossible.
+    expect(() => toRegisterPayload([child('a', { intent: 'trial' })], OPTIONS)).toThrow()
+  })
+
+  it('still carries the health declaration for the children it does register', () => {
+    const payload = toRegisterPayload([child('a', { signatureDataUrl: 'data:image/png;base64,AAA' })], OPTIONS)
+
+    expect(payload.children[0]?.health).toMatchObject({
+      template_id: 'tmpl-1',
+      signature_image_base64: 'AAA',
+    })
+  })
+})
+
 describe('the belt a family declares', () => {
   // Bug #10 gave the wizard the CLUB's own ladder so a family would not register against
   // belts the club does not award. The picker shipped, the review card showed the answer

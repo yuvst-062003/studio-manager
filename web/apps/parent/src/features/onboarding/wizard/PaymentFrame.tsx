@@ -101,7 +101,7 @@ export function PaymentFrame({
         aria-modal="true"
         aria-label={copy.title}
         tabIndex={-1}
-        className="w-full max-w-[960px] h-[100dvh] sm:h-[94vh] bg-[#0d2c6c] sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden focus:outline-none"
+        className="w-full max-w-[960px] h-[100dvh] sm:h-[94vh] bg-[var(--wz-accent-deep)] sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden focus:outline-none"
       >
         <div className="flex items-center justify-between gap-3 px-4 py-3 shrink-0">
           <div className="flex items-center gap-2 min-w-0">
@@ -110,7 +110,7 @@ export function PaymentFrame({
             </span>
             <div className="flex flex-col min-w-0">
               <span className="text-[15px] font-bold text-white truncate">{copy.title}</span>
-              <span className="text-[11px] text-[#b3c5ff] truncate">{copy.secure}</span>
+              <span className="text-[11px] text-[var(--wz-on-navy)] truncate">{copy.secure}</span>
             </div>
           </div>
           <button
@@ -123,14 +123,14 @@ export function PaymentFrame({
           </button>
         </div>
 
-        <div className="flex-1 mx-2 mb-2 sm:mx-3 sm:mb-3 bg-white rounded-xl sm:rounded-2xl overflow-hidden relative">
+        <div className="flex-1 mx-2 mb-2 sm:mx-3 sm:mb-3 bg-[var(--wz-surface)] rounded-xl sm:rounded-2xl overflow-hidden relative">
           {settled !== null ? (
             <PaymentSettled locale={locale} onDismiss={dismissSettled} order={settled} />
           ) : (
             <>
               {!loaded ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-[#444650]">
-                  <Loader2 className="w-6 h-6 animate-spin text-[#0056c5]" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-[var(--wz-secondary)]">
+                  <Loader2 className="w-6 h-6 animate-spin text-[var(--wz-accent)]" />
                   <span className="text-[13px]">{copy.loading}</span>
                 </div>
               ) : null}

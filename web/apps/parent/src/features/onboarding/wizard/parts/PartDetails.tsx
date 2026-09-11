@@ -84,7 +84,7 @@ export function PartDetails({
             onBlur={() => onBlurField('birthDate')}
           />
           {Number.isFinite(age) ? (
-            <span className="self-start px-2 py-0.5 rounded-md bg-[#d9e2ff] text-[#001945] text-[11px] font-semibold">
+            <span className="self-start px-2 py-0.5 rounded-md bg-[var(--wz-tint-3)] text-[var(--wz-chip-fg)] text-[11px] font-semibold">
               {copy.ageBadge}: {age} ({minor ? copy.ageMinor : copy.ageAdult})
             </span>
           ) : null}
@@ -191,9 +191,9 @@ export function PartDetails({
       </div>
 
       {student.birthDate && !minor ? (
-        <div className="p-3 rounded-xl bg-[#f2f3ff] border border-[#e9edff] text-[#001849] text-[12px] flex items-center justify-between">
+        <div className="p-3 rounded-xl bg-[var(--wz-raised)] border border-[var(--wz-tint)] text-[var(--wz-heading)] text-[12px] flex items-center justify-between">
           <span className="font-semibold">{copy.adultNotice}</span>
-          <span className="text-[#0056c5] font-bold">18+</span>
+          <span className="text-[var(--wz-accent)] font-bold">18+</span>
         </div>
       ) : null}
 
@@ -274,11 +274,11 @@ export function PartDetails({
             student={student}
           />
 
-          <div className="p-3.5 rounded-xl bg-[#f2f3ff] border border-[#e9edff] flex flex-col gap-3">
+          <div className="p-3.5 rounded-xl bg-[var(--wz-raised)] border border-[var(--wz-tint)] flex flex-col gap-3">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 min-w-0">
-                <School className="w-5 h-5 text-[#0056c5] shrink-0" />
-                <span className="text-[13px] font-bold text-[#001849]">{copy.pickupTitle}</span>
+                <School className="w-5 h-5 text-[var(--wz-accent)] shrink-0" />
+                <span className="text-[13px] font-bold text-[var(--wz-heading)]">{copy.pickupTitle}</span>
               </div>
               <label className="flex items-center gap-2 cursor-pointer shrink-0">
                 <input
@@ -287,9 +287,9 @@ export function PartDetails({
                   onChange={(event) =>
                     onChange({ pickup: { ...student.pickup, parentOnly: event.target.checked } })
                   }
-                  className="w-5 h-5 accent-[#0056c5]"
+                  className="w-5 h-5 accent-[var(--wz-accent)]"
                 />
-                <span className="text-[12px] font-medium text-[#161b28]">{copy.pickupParentOnly}</span>
+                <span className="text-[12px] font-medium text-[var(--wz-ink)]">{copy.pickupParentOnly}</span>
               </label>
             </div>
 

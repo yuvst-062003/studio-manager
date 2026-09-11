@@ -31,6 +31,7 @@ from sqlalchemy import Select, func, or_, select
 from sqlalchemy.orm import Session, aliased
 
 from app.models.attendance import Attendance
+from app.models.billing import PricePlan
 from app.models.people import (
     Enrollment,
     Student,
@@ -980,6 +981,7 @@ class StudentService:
         at: datetime,
         actor_person_id: uuid.UUID | None,
         schedule: ScheduleReader,
+        price_plan_id: uuid.UUID | None = None,
     ) -> Student:
         """Entrance A -- a trial family joining the club from their own app.
 
@@ -994,16 +996,26 @@ class StudentService:
         which is the duplicate defect the self-enrolment change created and this spec
         closes.
 
-        **The parent chooses groups; the server derives the price.** How much is never a
-        parent's choice: `plan_for_volume` reads the weekly volume across the groups they
-        ticked. How to PAY is always theirs, and that is §6.1's payment step, untouched
-        here. There is deliberately no `price_plan_id` in this method's signature -- the
-        manager's `convert` has one and this must not, or the price becomes a field a
-        client can post.
+        **The parent chooses groups AND the plan; the server still refuses a plan that is
+        not the club's.** REVISED 2026-09-12 (owner). This read "how much is never a
+        parent's choice" and took no `price_plan_id` at all, on the reasoning that a price
+        a client can post is not a price. Two facts overruled it: the join wizard's own
+        `toRegisterPayload` has always sent `price_plan_id`, so the product's main
+        registration door already worked the way this one refused to -- and the conversion
+        screen a family actually sees showed no price at all, only a sentence promising one
+        would appear on the payments screen later.
 
-        **`health_status` is not promoted.** §5.4a: "the trial declaration is not sufficient
-        for enrollment -- converting requires the full form." §5.5's gate collects it, which
-        is the first step of the finishing line.
+        So the choice is offered and then checked: an id that is not a live plan of THIS
+        studio is refused rather than priced, and `plan_for_volume` still derives one when
+        no choice is made -- a club with no published plans has nothing to show and its
+        families must still be able to join.
+
+        **`health_status` is not promoted, and that is no longer a gate.** §5.4a: "the trial
+        declaration is not sufficient for enrollment." Still true, and the conversion screen
+        now satisfies it BEFORE calling this, in its own first step: the family's booking-form
+        answers are shown back to them and signed (§5.5's own `POST
+        /students/{id}/health-declaration`), so this method finds a student who is already
+        `signed` and has nothing to promote. A child converted some other way keeps the gate.
 
         The transition runs FIRST, so an illegal move refuses before an enrolment is
         written: a refused join must not leave the student in a group they were never put
@@ -1046,10 +1058,19 @@ class StudentService:
             )
             volume_pairs.append((None, weekdays))
 
-        plan = plan_for_volume(
-            session, studio_id=student.studio_id, volume=weekly_volume(volume_pairs)
-        )
-        student.price_plan_id = plan.id if plan is not None else None
+        if price_plan_id is not None:
+            # Live plans only, and only this studio's. `active_to is None` is the same
+            # "still sold" test `public_price_plans` filters the picker by, so the ids a
+            # family can see are exactly the ids this accepts.
+            chosen = session.get(PricePlan, price_plan_id)
+            if chosen is None or chosen.studio_id != student.studio_id or chosen.active_to:
+                raise RefusedError("that plan is not one this club sells")
+            student.price_plan_id = chosen.id
+        else:
+            plan = plan_for_volume(
+                session, studio_id=student.studio_id, volume=weekly_volume(volume_pairs)
+            )
+            student.price_plan_id = plan.id if plan is not None else None
         StudentService._close_open_trials(session, student_id=student.id, outcome="converted")
         session.flush()
         StudentService._raise_first_charge(session, student=student, on=started_on)

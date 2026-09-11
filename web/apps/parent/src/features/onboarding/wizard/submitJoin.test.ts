@@ -63,6 +63,7 @@ function makeDeps(options: {
   orderForm?: ReturnType<typeof vi.fn>
   standingOrderLinks?: readonly MandateLink[]
   savePaymentMethods?: ReturnType<typeof vi.fn>
+  bookTrial?: ReturnType<typeof vi.fn>
 } = {}): SubmitJoinDeps {
   return {
     register: options.registerFails
@@ -82,6 +83,8 @@ function makeDeps(options: {
     standingOrderLinks: vi.fn().mockResolvedValue(options.standingOrderLinks ?? []),
     savePaymentMethods: (options.savePaymentMethods ??
       vi.fn().mockResolvedValue(undefined)) as SubmitJoinDeps['savePaymentMethods'],
+    bookTrial: (options.bookTrial ??
+      vi.fn().mockResolvedValue(undefined)) as SubmitJoinDeps['bookTrial'],
   }
 }
 
@@ -113,6 +116,58 @@ describe('submitJoin', () => {
     expect(deps.billing.orderForm).toHaveBeenCalledWith('order-1')
     expect(result.checkout).toBe(FORM)
     expect(result.outcomes.map((o) => o.state)).toEqual(['card_pending', 'card_pending'])
+  })
+
+  // The owner's case, 2026-09-11: "a parent would want to register one kid with payment
+  // and second with trial". Before this the only trial on offer was a link out of the
+  // wizard, so the two children could not travel together at all.
+  it('one child paying and one on a trial: the trial raises no charge and opens no order', async () => {
+    const bookTrial = vi.fn().mockResolvedValue(undefined)
+    const savePaymentMethods = vi.fn().mockResolvedValue(undefined)
+    const deps = makeDeps({
+      charges: [charge('ch1', 's1'), charge('ch2', 's2')],
+      bookTrial,
+      savePaymentMethods,
+    })
+    const result = await submitJoin(
+      input({
+        students: [student('c1'), student('c2', { groupId: 'grp-7', intent: 'trial' })],
+        methods: { c1: 'credit' },
+        deps,
+      }),
+    )
+
+    // The paying child is billed for THEIR charge alone. `ch2` belongs to the trial child
+    // and must not ride into the order — that is the failure that would charge a family
+    // for a lesson they were only trying.
+    expect(deps.billing.createOrder).toHaveBeenCalledTimes(1)
+    expect(deps.billing.createOrder).toHaveBeenCalledWith(['ch1'], 1, 0)
+
+    // The trial child is booked, with the group step 2 collected.
+    expect(bookTrial).toHaveBeenCalledTimes(1)
+    expect(bookTrial).toHaveBeenCalledWith([
+      expect.objectContaining({ groupId: 'grp-7' }),
+    ])
+
+    // And no payment method is declared for them: `student.payment_method` has a CHECK
+    // with no room for a trial, and the column is nullable for exactly this case.
+    const declared = savePaymentMethods.mock.calls[0]?.[0] ?? []
+    expect(declared).toHaveLength(1)
+    expect(declared[0].method).toBe('upay_card')
+
+    expect(result.outcomes.map((o) => o.state)).toEqual(['card_pending', 'trial_booked'])
+  })
+
+  it('a trial child alone opens no order at all', async () => {
+    const deps = makeDeps({ charges: [charge('ch1', 's1')] })
+    const result = await submitJoin(
+      input({ students: [student('c1', { groupId: 'grp-7', intent: 'trial' })], methods: {}, deps }),
+    )
+
+    expect(deps.billing.createOrder).not.toHaveBeenCalled()
+    expect(deps.billing.createPromise).not.toHaveBeenCalled()
+    expect(result.checkout).toBeNull()
+    expect(result.outcomes.map((o) => o.state)).toEqual(['trial_booked'])
   })
 
   it('cash and cheque each get exactly one createPromise call, over only their own charges', async () => {

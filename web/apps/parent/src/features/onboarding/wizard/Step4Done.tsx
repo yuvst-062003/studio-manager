@@ -28,6 +28,7 @@ const STATE_COPY: Record<PaymentOutcome['state'], Step4CopyKey> = {
   recorded: 'paymentRecorded',
   mandate_pending: 'paymentMandatePending',
   card_pending: 'paymentCardPending',
+  trial_booked: 'paymentTrialBooked',
   not_recorded: 'paymentNotRecorded',
 }
 
@@ -57,7 +58,7 @@ function PaymentChip({
   const AMBER =
     'px-2.5 py-1 rounded-full bg-amber-500/25 text-amber-300 text-[11px] font-bold flex items-center gap-1 border border-amber-400/40 shrink-0'
   const BLUE =
-    'px-2.5 py-1 rounded-full bg-[#0056c5]/20 text-[#8ea8f7] text-[11px] font-bold flex items-center gap-1 border border-[#0056c5]/30 shrink-0'
+    'px-2.5 py-1 rounded-full bg-[var(--wz-accent)]/20 text-[var(--wz-accent-soft)] text-[11px] font-bold flex items-center gap-1 border border-[var(--wz-accent)]/30 shrink-0'
 
   switch (outcome.state) {
     case 'awaiting_review':
@@ -191,17 +192,17 @@ export function Step4Done({
   }
 
   return (
-    <div className="tw-scope relative w-full min-h-[100dvh] bg-[#02102f] text-white px-4 pt-6 pb-20">
+    <div className="tw-scope relative w-full min-h-[100dvh] bg-[var(--wz-accent-darkest)] text-white px-4 pt-6 pb-20">
       <style>{'@keyframes wizard-fall{to{transform:translateY(16rem) rotate(320deg);opacity:0}}'}</style>
       <Confetti />
 
       <div className="relative max-w-[480px] mx-auto flex flex-col items-center">
         <div className="w-full flex items-center justify-between gap-2 mb-6">
-          <span className="px-3 py-1 rounded-full bg-white/10 text-[#dae1ff] text-[12px] font-semibold border border-white/15 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[#10b981]" />
+          <span className="px-3 py-1 rounded-full bg-white/10 text-[var(--wz-tint-2)] text-[12px] font-semibold border border-white/15 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-[var(--wz-success)]" />
             <span>{copy.stageBadge}</span>
           </span>
-          <span className="px-3 py-1 rounded-full bg-[#0056c5] text-white text-[12px] font-bold shadow-sm whitespace-nowrap">
+          <span className="px-3 py-1 rounded-full bg-[var(--wz-accent)] text-white text-[12px] font-bold shadow-sm whitespace-nowrap">
             {copy.percentBadge}
           </span>
         </div>
@@ -214,7 +215,7 @@ export function Step4Done({
               className="w-36 h-36 sm:w-40 sm:h-40 object-contain drop-shadow-[0_4px_24px_rgba(255,255,255,0.12)]"
             />
           ) : null}
-          <span className="mt-3 px-4 py-1.5 rounded-full bg-[#001849] border border-[#0056c5] text-[#dae1ff] text-[13px] font-bold flex items-center gap-2 shadow-md">
+          <span className="mt-3 px-4 py-1.5 rounded-full bg-[var(--wz-btn-bg)] border border-[var(--wz-accent)] text-[var(--wz-tint-2)] text-[13px] font-bold flex items-center gap-2 shadow-md">
             <span aria-hidden>🥋</span>
             <span>{copy.ippon}</span>
           </span>
@@ -226,7 +227,7 @@ export function Step4Done({
             <br />
             {copy.titleSecond}
           </h2>
-          <p className="text-[13px] text-[#b3c5ff] leading-relaxed max-w-sm mx-auto">
+          <p className="text-[13px] text-[var(--wz-on-navy)] leading-relaxed max-w-sm mx-auto">
             {anyAwaiting ? copy.leadWithReview : copy.leadPlain}
           </p>
         </div>
@@ -242,10 +243,10 @@ export function Step4Done({
         ) : null}
 
         {registrationRef ? (
-          <div className="w-full bg-[#0d2157]/80 backdrop-blur-md rounded-2xl p-4 border border-[#2a4484] shadow-lg flex flex-col items-center gap-1.5 mb-5">
-            <span className="text-[11px] text-[#b3c5ff] font-medium">{copy.refLabel}</span>
+          <div className="w-full bg-[var(--wz-accent-darkest)]/80 backdrop-blur-md rounded-2xl p-4 border border-[var(--wz-accent-mid)] shadow-lg flex flex-col items-center gap-1.5 mb-5">
+            <span className="text-[11px] text-[var(--wz-on-navy)] font-medium">{copy.refLabel}</span>
             <div className="flex items-center gap-3">
-              <span className="text-[22px] font-black tracking-wider text-[#ffd700] font-mono">
+              <span className="text-[22px] font-black tracking-wider text-[var(--wz-gold)] font-mono">
                 {registrationRef}
               </span>
               <button
@@ -257,7 +258,7 @@ export function Step4Done({
                 {copied ? (
                   <Check className="w-4 h-4 text-green-400" />
                 ) : (
-                  <Copy className="w-4 h-4 text-[#dae1ff]" />
+                  <Copy className="w-4 h-4 text-[var(--wz-tint-2)]" />
                 )}
               </button>
             </div>
@@ -265,7 +266,7 @@ export function Step4Done({
         ) : null}
 
         {outcomes.length > 0 ? (
-          <div className="w-full bg-[#091b48]/90 rounded-2xl p-4 border border-[#1b3a8a] shadow-md mb-5 flex flex-col gap-3">
+          <div className="w-full bg-[var(--wz-accent-darkest)]/90 rounded-2xl p-4 border border-[var(--wz-accent-mid)] shadow-md mb-5 flex flex-col gap-3">
             <div className="flex items-center justify-between text-xs pb-1 border-b border-white/10">
               <span className="text-[14px] font-bold text-white flex items-center gap-1.5">
                 <span aria-hidden>💳</span>
@@ -278,7 +279,7 @@ export function Step4Done({
                 return (
                   <li
                     key={outcome.draftId}
-                    className={`p-3 rounded-xl bg-[#0e2766] border border-white/10 ${
+                    className={`p-3 rounded-xl bg-[var(--wz-accent-deeper)] border border-white/10 ${
                       notRecorded ? 'border-s-4 border-s-amber-400' : ''
                     }`}
                   >
@@ -287,7 +288,7 @@ export function Step4Done({
                     </span>
                     <span
                       className={`text-[12px] flex items-center gap-1.5 mt-0.5 ${
-                        notRecorded ? 'text-amber-300 font-semibold' : 'text-[#b3c5ff]'
+                        notRecorded ? 'text-amber-300 font-semibold' : 'text-[var(--wz-on-navy)]'
                       }`}
                     >
                       {notRecorded ? <AlertCircle className="w-3.5 h-3.5 shrink-0" /> : null}
@@ -305,7 +306,7 @@ export function Step4Done({
           </div>
         ) : null}
 
-        <div className="w-full bg-[#091b48]/90 rounded-2xl p-4 border border-[#1b3a8a] shadow-md mb-5 flex flex-col gap-3">
+        <div className="w-full bg-[var(--wz-accent-darkest)]/90 rounded-2xl p-4 border border-[var(--wz-accent-mid)] shadow-md mb-5 flex flex-col gap-3">
           <div className="flex items-center justify-between text-xs pb-1 border-b border-white/10">
             <span className="text-[14px] font-bold text-white flex items-center gap-1.5">
               <span aria-hidden>👥</span>
@@ -313,7 +314,7 @@ export function Step4Done({
                 {copy.traineesTitle} ({students.length})
               </span>
             </span>
-            <span className="text-[11px] text-[#b3c5ff] font-medium">{copy.season}</span>
+            <span className="text-[11px] text-[var(--wz-on-navy)] font-medium">{copy.season}</span>
           </div>
 
           <ul className="flex flex-col gap-2.5 list-none p-0 m-0">
@@ -333,15 +334,15 @@ export function Step4Done({
                     type="button"
                     onClick={() => setCard(student)}
                     aria-label={`${copy.openCard}: ${name}`}
-                    className="w-full flex items-center justify-between gap-2 p-3 rounded-xl bg-[#0e2766] border border-white/10 hover:border-[#0056c5] transition-all cursor-pointer text-right"
+                    className="w-full flex items-center justify-between gap-2 p-3 rounded-xl bg-[var(--wz-accent-deeper)] border border-white/10 hover:border-[var(--wz-accent)] transition-all cursor-pointer text-right"
                   >
                     <span className="flex items-center gap-3 min-w-0">
-                      <span className="w-10 h-10 rounded-lg bg-[#001849] text-[#ffd700] font-bold flex items-center justify-center text-xs shrink-0 border border-white/15">
+                      <span className="w-10 h-10 rounded-lg bg-[var(--wz-btn-bg)] text-[var(--wz-gold)] font-bold flex items-center justify-center text-xs shrink-0 border border-white/15">
                         {initials || '🥋'}
                       </span>
                       <span className="flex flex-col min-w-0">
                         <span className="text-[14px] font-bold text-white truncate">{name}</span>
-                        <span className="text-[11px] text-[#8ea8f7] truncate">
+                        <span className="text-[11px] text-[var(--wz-accent-soft)] truncate">
                           {group?.name ?? ''}
                         </span>
                       </span>
@@ -355,7 +356,7 @@ export function Step4Done({
         </div>
 
         {events && events.length > 0 ? (
-          <div className="w-full bg-[#091b48]/90 rounded-2xl p-4 border border-[#1b3a8a] shadow-md mb-5 flex flex-col gap-3">
+          <div className="w-full bg-[var(--wz-accent-darkest)]/90 rounded-2xl p-4 border border-[var(--wz-accent-mid)] shadow-md mb-5 flex flex-col gap-3">
             <div className="flex items-center justify-between text-xs pb-1 border-b border-white/10">
               <span className="text-[14px] font-bold text-white flex items-center gap-1.5">
                 <span aria-hidden>📅</span>
@@ -366,16 +367,16 @@ export function Step4Done({
               {events.map((event) => (
                 <li
                   key={event.id}
-                  className="flex items-center justify-between gap-2 p-3 rounded-xl bg-[#0e2766] border border-white/10"
+                  className="flex items-center justify-between gap-2 p-3 rounded-xl bg-[var(--wz-accent-deeper)] border border-white/10"
                 >
                   <span className="flex items-center gap-3 min-w-0">
-                    <span className="w-11 h-11 rounded-xl bg-[#0056c5] flex flex-col items-center justify-center text-white shrink-0">
+                    <span className="w-11 h-11 rounded-xl bg-[var(--wz-accent)] flex flex-col items-center justify-center text-white shrink-0">
                       <span className="text-[15px] font-bold leading-none">{event.day}</span>
                       <span className="text-[10px] opacity-80 leading-none mt-0.5">{event.month}</span>
                     </span>
                     <span className="flex flex-col min-w-0">
                       <span className="text-[13px] font-bold text-white truncate">{event.title}</span>
-                      <span className="text-[11px] text-[#b3c5ff] truncate">{event.detail}</span>
+                      <span className="text-[11px] text-[var(--wz-on-navy)] truncate">{event.detail}</span>
                     </span>
                   </span>
                   <span className="px-2 py-0.5 rounded-md bg-white/10 text-white text-[11px] font-medium shrink-0">
@@ -392,18 +393,18 @@ export function Step4Done({
             href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full bg-[#032338] hover:bg-[#04334f] border border-[#059669]/50 rounded-2xl p-3.5 shadow-md flex items-center justify-between gap-3 mb-6 transition-all group"
+            className="w-full bg-[var(--wz-accent-darkest)] hover:bg-[var(--wz-accent-navy)] border border-[var(--wz-success)]/50 rounded-2xl p-3.5 shadow-md flex items-center justify-between gap-3 mb-6 transition-all group"
           >
             <span className="flex items-center gap-3 min-w-0">
-              <span className="w-10 h-10 rounded-full bg-[#10b981] text-white flex items-center justify-center shrink-0 shadow-sm">
+              <span className="w-10 h-10 rounded-full bg-[var(--wz-success)] text-white flex items-center justify-center shrink-0 shadow-sm">
                 <MessageCircle className="w-5 h-5" />
               </span>
               <span className="flex flex-col min-w-0">
                 <span className="text-[14px] font-bold text-white">{copy.whatsappTitle}</span>
-                <span className="text-[11px] text-[#6ee7b7] truncate">{copy.whatsappLead}</span>
+                <span className="text-[11px] text-[var(--wz-success)] truncate">{copy.whatsappLead}</span>
               </span>
             </span>
-            <span className="px-3 py-1.5 rounded-xl bg-[#10b981] text-white text-[12px] font-bold shrink-0 group-hover:scale-105 transition-transform">
+            <span className="px-3 py-1.5 rounded-xl bg-[var(--wz-success)] text-white text-[12px] font-bold shrink-0 group-hover:scale-105 transition-transform">
               {copy.whatsappJoin}
             </span>
           </a>
@@ -412,7 +413,7 @@ export function Step4Done({
         <button
           type="button"
           onClick={onEnterApp}
-          className="w-full h-13 py-3.5 rounded-2xl bg-[#0056c5] hover:bg-[#00429b] active:scale-[0.99] text-white font-bold text-[16px] shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
+          className="w-full h-13 py-3.5 rounded-2xl bg-[var(--wz-accent)] hover:bg-[var(--wz-accent)] active:scale-[0.99] text-white font-bold text-[16px] shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
         >
           {copy.enterApp}
         </button>

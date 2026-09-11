@@ -64,7 +64,71 @@
  *
  * `--font-sans` is deliberately NOT in this list: the prototype asks for Rubik and the
  * design system already provides it, so both systems agree and the studio's wins. */
+
+/* THE WIZARD'S PALETTE, AND WHY IT IS VARIABLES RATHER THAN `dark:` UTILITIES.
+ *
+ * The comment above says the wizard "has no dark styling at all". That was true and it
+ * was a bug: a parent whose phone is in dark mode, or who chose dark in the app, opened
+ * the join wizard and got the light prototype unchanged — `data-theme="dark"` reached the
+ * element and nothing under it cared (reported 2026-09-11, reproduced with two identical
+ * screenshots).
+ *
+ * The wizard is a Tailwind prototype port with ~630 colour utilities across 17 files, and
+ * the values are the prototype's own blues rather than the design system's. Two ways to
+ * fix that. A `dark:` variant beside every one of them is 630 edits, 630 chances to pick
+ * a slightly different navy, and no single place that says what the palette IS. Naming
+ * the palette once and flipping it here is one edit per COLOUR instead of one per USE —
+ * and it makes the second theme reviewable as a block rather than as a diff.
+ *
+ * The light values are exactly what the files already contained; nothing shifted in light
+ * mode, which is what makes the before/after screenshots comparable. */
 .tw-scope {
+  /* Ground and surfaces */
+  --wz-ground: #faf8ff;
+  --wz-surface: #fff;
+  --wz-raised: #f2f3ff;
+  --wz-tint: #e9edff;
+  --wz-tint-2: #dae1ff;
+  --wz-tint-3: #d9e2ff;
+  --wz-tint-4: #e3e7fa;
+
+  /* Ink */
+  --wz-ink: #161b28;
+  --wz-heading: #001849;
+  --wz-secondary: #444650;
+  --wz-tertiary: #757681;
+
+  /* Lines */
+  --wz-line: #dee2f4;
+  --wz-line-strong: #c5c6d2;
+
+  /* Brand */
+  --wz-accent: #0056c5;
+  --wz-accent-deep: #0d2c6c;
+  --wz-accent-deeper: #0e2766;
+  --wz-accent-darkest: #091b48;
+  --wz-accent-navy: #001945;
+  --wz-accent-mid: #1b3a8a;
+  --wz-on-navy: #b3c5ff;
+  --wz-accent-soft: #8ea8f7;
+
+  /* Semantic — these are Band 2 and keep their meaning in both themes */
+  --wz-danger: #ba1a1a;
+  --wz-danger-tint: #ffdad6;
+  --wz-success: #10b981;
+  --wz-gold: #ffd700;
+
+  /* TWO ROLES THAT LOOK LIKE ONE, SPLIT.
+   *
+   * In light mode a navy is a navy: `--wz-heading` is the headline colour AND the primary
+   * button's fill, and both read correctly because the page behind them is near-white. At
+   * night they diverge — a heading must go light to sit on a dark ground, while a button
+   * fill must stay dark so the white label on it survives. Sharing one token gave a
+   * lavender button with white text, which is what looking at the first dark screenshot
+   * showed. Same story for a chip's label: navy on a pale tint in light, pale on a dark
+   * tint at night. */
+  --wz-btn-bg: #001849;
+  --wz-chip-fg: #0d2c6c;
   --leading-tight: 1.25;
   --leading-snug: 1.375;
   --leading-normal: 1.5;
@@ -74,6 +138,52 @@
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
   --radius-xl: 0.75rem;
+}
+
+/* The same palette at night.
+ *
+ * Derived rather than inverted: the surfaces step UP in lightness the way elevation does
+ * in dark mode (ground -> surface -> raised), the accent lightens so it can carry text on
+ * a dark ground, and the two Band 2 colours keep their meaning while gaining enough
+ * lightness to pass 4.5:1 — `#ba1a1a` on a dark card is unreadable, so danger becomes a
+ * light red rather than staying "the red".
+ *
+ * `[data-theme="dark"]` and not `prefers-color-scheme`: `ThemeProvider` writes that
+ * attribute, and auto mode resolves to it. Keying off the OS here would give a parent who
+ * chose light on a dark phone a light design system and a dark wizard on one screen —
+ * the exact split the `dark:` variant above was pointed at this attribute to avoid. */
+.tw-scope:where([data-theme="dark"]),
+[data-theme="dark"] .tw-scope {
+  --wz-ground: #12141c;
+  --wz-surface: #1a1d27;
+  --wz-raised: #222634;
+  --wz-tint: #232839;
+  --wz-tint-2: #252b3d;
+  --wz-tint-3: #26304a;
+  --wz-tint-4: #222739;
+  --wz-ink: #e9eaf0;
+  --wz-heading: #dbe4ff;
+  --wz-secondary: #a9adbb;
+  --wz-tertiary: #8b8f9d;
+  --wz-line: #333848;
+  --wz-line-strong: #3d4254;
+  --wz-accent: #8ea8f7;
+  --wz-accent-deep: #16213f;
+  --wz-accent-deeper: #1a2547;
+  --wz-accent-darkest: #111a36;
+  --wz-accent-navy: #101a38;
+  --wz-accent-mid: #2a4aa0;
+  --wz-on-navy: #b3c5ff;
+  --wz-accent-soft: #6f8de8;
+  --wz-danger: #ff9b96;
+  --wz-danger-tint: #4a1f1d;
+  --wz-success: #3ddc97;
+  --wz-gold: #ffd700;
+
+  /* The button stays a dark fill so its white label keeps working; the chip label goes
+     light because the tint behind it went dark. */
+  --wz-btn-bg: #26365f;
+  --wz-chip-fg: #c9d6ff;
 }
 
 /* Preflight, scoped to `.tw-scope`.

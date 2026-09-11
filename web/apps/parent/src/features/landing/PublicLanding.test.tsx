@@ -41,6 +41,7 @@ const LANDING: Landing = {
       age_max: 8,
       training_weekdays: [0, 3],
       training_times: ['16:00'],
+      kind: 'base',
     },
   ],
 }
@@ -488,6 +489,7 @@ describe('booking — every call to action is a link to the form', () => {
         age_min: 9,
         age_max: 12,
         training_weekdays: [1, 3],
+        kind: 'base',
         training_times: ['17:30'],
       },
     ],

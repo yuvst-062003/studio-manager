@@ -57,7 +57,13 @@ export function TraineesSheet({
         {childList.map((child) => (
           <a
             key={child.id}
-            href={`#/student/${child.id}`}
+            //: A trial child's row goes to `#/join`, not to their student card. That
+            //: route already exists and already does the whole job — it names the child,
+            //: reads the group they trialled in, refuses a no-show, and converts the
+            //: student who is already there. What was missing was any way to REACH it
+            //: from the app: only `TrialHome` linked to it, and a family with an enrolled
+            //: sibling never sees `TrialHome`. That is the entire gap (2026-09-12).
+            href={child.status === 'trial' ? '#/join' : `#/student/${child.id}`}
             data-testid={`sheet-trainee-${child.id}`}
             className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/70 border border-slate-100 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-[0.99] transition-all cursor-pointer"
           >
@@ -90,6 +96,23 @@ export function TraineesSheet({
               {child.needsDeclaration ? (
                 <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold text-[#ba1a1a] dark:text-red-300 bg-[#ffdad6] dark:bg-red-500/15 px-2 py-0.5 rounded-full">
                   {t(locale, 'people.profile.needsDeclaration')}
+                </span>
+              ) : null}
+              {/* A child who came for one lesson, and the one next step the PARENT can
+                  take. `trial` has been on `StudentSummaryOut` since M3 and nothing in
+                  this app ever read it, so a family whose child tried a lesson had no way
+                  to say "we would like to join" short of finding the wizard again. */}
+              {child.status === 'trial' ? (
+                <span className="flex items-center gap-1.5 mt-1 flex-wrap">
+                  <span
+                    className="inline-flex items-center gap-1 text-[10px] font-bold text-[#8a5a00] dark:text-amber-200 bg-amber-100 dark:bg-amber-400/15 px-2 py-0.5 rounded-full"
+                    data-testid={`sheet-trial-badge-${child.id}`}
+                  >
+                    {t(locale, 'people.profile.trialBadge')}
+                  </span>
+                  <span className="text-[10px] font-bold text-[#0056c5] dark:text-blue-300">
+                    {t(locale, 'people.profile.trialPickPlan')}
+                  </span>
                 </span>
               ) : null}
             </span>

@@ -525,7 +525,7 @@ export const people: Bundle = {
   'joinClub.cta': 'הצטרפות למועדון',
   'joinClub.title': 'הצטרפות למועדון',
   'joinClub.subtitle': 'בוחרים קבוצות, חותמים על הצהרת בריאות ומסדירים תשלום.',
-  'joinClub.chooseGroups': 'באילו קבוצות להתאמן',
+  'joinClub.chooseGroups': 'באיזו קבוצה להתאמן',
   'joinClub.trialledHere': 'התאמנתם כאן',
   'joinClub.priceHint': 'המחיר נקבע לפי מספר האימונים בשבוע, ומופיע במסך התשלומים.',
   'joinClub.steps.title': 'מה קורה עכשיו',
@@ -538,6 +538,40 @@ export const people: Bundle = {
   'joinClub.retryGroups': 'טעינה מחדש',
   'joinClub.error': 'לא הצלחנו להשלים את ההצטרפות. נסו שוב.',
   'joinClub.forWhom': 'מצטרפים בשביל',
+  // The three-step conversion (owner, 2026-09-12). §5.4a ④'s "איך היה?" used to land on a
+  // one-screen form that asked the family to sign a FULL declaration from scratch — the
+  // thirteen questions they had already answered on the booking form, which renders the same
+  // `kind=full` template. So the first step now SHOWS what they wrote and asks only for the
+  // signature that door deliberately does not take, and the price stopped being a sentence
+  // promising a number on a later screen.
+  'joinClub.step.declaration': 'הצהרת בריאות',
+  'joinClub.step.groups': 'קבוצות ומסלול',
+  'joinClub.step.payment': 'תשלום',
+  'joinClub.stage': 'שלב {n} מתוך 3',
+  'joinClub.declaration.title': 'מה שמילאתם, ועוד חתימה אחת',
+  'joinClub.declaration.lead': 'אלה התשובות שמסרתם כשקבעתם את שיעור הניסיון. עברו עליהן, ואם הכול נכון — חתמו.',
+  'joinClub.declaration.declaredBy': 'נמסר על ידי',
+  'joinClub.declaration.declaredOn': 'בתאריך',
+  'joinClub.declaration.answers': 'התשובות שמסרתם',
+  'joinClub.declaration.changed': 'משהו השתנה מאז?',
+  'joinClub.declaration.changedHint': 'אפשר לעדכן את ההצהרה בכל רגע מתוך כרטיס המתאמן.',
+  'joinClub.declaration.empty': 'לא נמצאה הצהרה קודמת. נמלא אותה יחד לפני ההצטרפות.',
+  'joinClub.declaration.sign': 'חתימת ההורה/האפוטרופוס',
+  'joinClub.declaration.signHere': 'חתמו כאן באצבע',
+  'joinClub.declaration.clearSignature': 'ניקוי',
+  'joinClub.declaration.signatureRequired': 'יש לחתום כדי להמשיך',
+  'joinClub.declaration.clauseRequired': 'יש לאשר את ההצהרה',
+  'joinClub.declaration.failed': 'לא הצלחנו לשמור את ההצהרה. נסו שוב.',
+  'joinClub.groups.title': 'איפה מתאמנים, ובאיזה מסלול',
+  'joinClub.groups.lead': 'בוחרים קבוצת אימון אחת, ואת המסלול שמתאים לכם. אימונים נוספים נפתחים לפי המסלול.',
+  'joinClub.plans.title': 'מסלול חודשי',
+  'joinClub.plans.lead': 'המחיר החודשי לפי המסלול שתבחרו.',
+  'joinClub.plans.none': 'המועדון יקבע את המחיר לפי מספר האימונים בשבוע.',
+  'joinClub.perMonth': 'לחודש',
+  'joinClub.groupsRequired': 'בחרו קבוצת אימון',
+  'joinClub.continue': 'המשך',
+  'joinClub.joining': 'מצטרפים…',
+  'joinClub.toPayment': 'להצטרפות ולתשלום',
   // `SelfServeJoinFlow`'s duplicate-child refusal, kept name-agnostic per §11.1: naming a
   // child this caller is not a guardian of would disclose that they train here.
   'sibling.duplicate': 'נראה שהילד/ה כבר רשומים במועדון. פנו למועדון כדי לוודא.',
@@ -633,6 +667,8 @@ export const people: Bundle = {
   'profile.attendanceLabel': 'נוכחות',
   'profile.beltUnset': 'טרם נקבעה חגורה',
   'profile.needsDeclaration': 'חסרה הצהרת בריאות',
+  'profile.trialBadge': 'שיעור ניסיון',
+  'profile.trialPickPlan': 'בחירת מנוי והצטרפות ←',
   'profile.addChild': 'הוספת מתאמן',
   // -- הגדרות --
   'profile.preferencesTitle': 'שפה ותצוגה',
@@ -720,7 +756,11 @@ export const people: Bundle = {
   'joinWizard.step2.draftResume': 'המשך מילוי',
   'joinWizard.step2.draftDiscard': 'מחק טיוטה',
   'joinWizard.step2.addStudent': '+ רישום תלמיד / ילד נוסף במשפחה',
-  'joinWizard.step2.tryFirst': 'רוצים שהילד/ה ינסה קודם? קביעת שיעור ניסיון',
+  //: No longer a link out to the public booking page (2026-09-11) — it points at the
+  //: per-child choice one step later, so a family enrolling one child and trying
+  //: another keeps everything they have typed.
+  'joinWizard.step2.tryFirst': '+ הוספת ילד/ה לשיעור ניסיון, בלי הרשמה',
+  'joinWizard.step2.trialChip': 'שיעור ניסיון',
   'joinWizard.step2.continueDraft': 'המשך עריכת טופס החניך',
   'joinWizard.step2.back': 'חזרה',
   'joinWizard.step2.continueToStep3': 'המשך לשלב 3: תשלום וסיכום',
@@ -728,6 +768,8 @@ export const people: Bundle = {
 
   // STUDENT_FORM_COPY -> joinWizard.form.*
   'joinWizard.form.addTitle': 'רישום פרטי חניך חדש',
+  'joinWizard.form.addTrialTitle': 'רישום לשיעור ניסיון',
+  'joinWizard.form.stepOf': 'שלב {{step}} מתוך {{total}}',
   'joinWizard.form.editTitle': 'עריכת פרטי התלמיד',
   'joinWizard.form.cancel': 'ביטול',
   // The discard confirmation (2026-09-07). This was `window.confirm()` — a grey iOS
@@ -879,6 +921,12 @@ export const people: Bundle = {
   'joinWizard.step3.methodCashLong': 'במזומן מול המאמן',
   'joinWizard.step3.methodChequeLong': 'בצ\'קים מול המאמן',
   'joinWizard.step3.methodStandingOrderLong': 'הוראת קבע',
+  //: The fifth per-child choice (2026-09-11). Not a payment method — it is the family
+  //: saying this child is not joining yet. A parent with two children often wants one
+  //: enrolled and one trying a lesson first, and the wizard could not express that.
+  'joinWizard.step3.methodTrial': 'שיעור ניסיון',
+  'joinWizard.step3.methodTrialLong': 'שיעור ניסיון, בלי תשלום',
+  'joinWizard.step3.trialNote': 'נקבע שיעור ניסיון. לא ייווצר חיוב עבור {{name}}.',
   'joinWizard.step3.reviewCardTitle': 'חניך זה אינו מחויב בתשלום כעת:',
   'joinWizard.step3.reviewCardBody': 'עקב מענה "כן" בהצהרת הבריאות, הרישום יועבר למנהל המועדון לבדיקה. פרטי התשלום יוסדרו בנפרד רק לאחר קבלת אישור.',
   'joinWizard.step3.notChargedNow': 'לא יחויב כעת',
@@ -952,6 +1000,9 @@ export const people: Bundle = {
   'joinWizard.step4.paymentRecorded': 'אופן התשלום נרשם ודווח למועדון',
   'joinWizard.step4.paymentMandatePending': 'נרשם — נותר לחתום על הוראת הקבע',
   'joinWizard.step4.paymentCardPending': 'נפתחה הזמנת תשלום באשראי',
+  //: The trial child's line on the done screen. Not a payment state — it is why
+  //: this child has no payment state at all.
+  'joinWizard.step4.paymentTrialBooked': 'נקבע שיעור ניסיון',
   'joinWizard.step4.paymentNotRecorded': 'לא הצלחנו לרשום את אופן התשלום',
   'joinWizard.step4.paymentReasonNoChargeForCard': 'אין חיוב פתוח לתשלום באשראי — המועדון ייצור קשר',
   'joinWizard.step4.paymentReasonWriteFailed': 'ההרשמה נקלטה, אך הדיווח על אופן התשלום לא נשלח. המועדון ייצור קשר',

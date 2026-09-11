@@ -57,11 +57,11 @@ export function AthleteCardModal({
         aria-modal="true"
         aria-label={`${copy.title}: ${name}`}
         tabIndex={-1}
-        className="w-full max-w-[420px] bg-gradient-to-b from-[#0e2766] to-[#02102f] rounded-t-3xl sm:rounded-2xl shadow-2xl border border-white/10 overflow-hidden focus:outline-none"
+        className="w-full max-w-[420px] bg-gradient-to-b from-[var(--wz-accent-deeper)] to-[var(--wz-accent-darkest)] rounded-t-3xl sm:rounded-2xl shadow-2xl border border-white/10 overflow-hidden focus:outline-none"
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
           <div className="flex items-center gap-2 text-white">
-            <IdCard className="w-5 h-5 text-[#ffd700]" />
+            <IdCard className="w-5 h-5 text-[var(--wz-gold)]" />
             <span className="text-[14px] font-bold">{copy.title}</span>
           </div>
           <button
@@ -76,12 +76,12 @@ export function AthleteCardModal({
 
         <div className="p-5 flex flex-col gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-16 h-16 rounded-2xl bg-[#001849] text-[#ffd700] font-bold flex items-center justify-center text-[20px] border border-white/15 shrink-0">
+            <div className="w-16 h-16 rounded-2xl bg-[var(--wz-btn-bg)] text-[var(--wz-gold)] font-bold flex items-center justify-center text-[20px] border border-white/15 shrink-0">
               {initials || '🥋'}
             </div>
             <div className="flex flex-col min-w-0">
               <span className="text-[19px] font-bold text-white truncate">{name}</span>
-              <span className="text-[12px] text-[#b3c5ff] truncate">{group?.name ?? ''}</span>
+              <span className="text-[12px] text-[var(--wz-on-navy)] truncate">{group?.name ?? ''}</span>
             </div>
           </div>
 
@@ -95,7 +95,7 @@ export function AthleteCardModal({
                   key={label}
                   className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 flex flex-col gap-0.5"
                 >
-                  <dt className="text-[#8ea8f7] flex items-center gap-1">
+                  <dt className="text-[var(--wz-accent-soft)] flex items-center gap-1">
                     <Icon className="w-3.5 h-3.5" />
                     {label}
                   </dt>
@@ -109,7 +109,7 @@ export function AthleteCardModal({
             className={`rounded-xl px-3 py-2 text-[12px] font-bold flex items-center justify-between ${
               awaiting
                 ? 'bg-amber-500/20 text-amber-200 border border-amber-400/40'
-                : 'bg-[#10b981]/20 text-[#34d399] border border-[#10b981]/30'
+                : 'bg-[var(--wz-success)]/20 text-[var(--wz-success)] border border-[var(--wz-success)]/30'
             }`}
           >
             <span>{copy.status}</span>
@@ -119,7 +119,7 @@ export function AthleteCardModal({
           {/* A reference, not an identity document. */}
           {registrationRef ? (
             <div className="border-t border-white/10 pt-3 text-center">
-              <span className="text-[10px] font-mono tracking-widest text-[#8ea8f7]">
+              <span className="text-[10px] font-mono tracking-widest text-[var(--wz-accent-soft)]">
                 {registrationRef}
               </span>
             </div>

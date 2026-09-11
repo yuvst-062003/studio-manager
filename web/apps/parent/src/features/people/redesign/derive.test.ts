@@ -16,6 +16,7 @@ const child = (id: string, firstName: string): ProfileChild => ({
   groupNames: [],
   attendancePercent: null,
   needsDeclaration: false,
+  status: 'active',
 })
 
 const row = (studentId: string, status: string, id = Math.random().toString()): AttendanceRow => ({

@@ -70,6 +70,15 @@ class PublicGroup:
     coaches: list[str]
     #: Distinct location names this group actually trains at, sorted.
     locations: list[str]
+    #: `base` / `extra` / `private` (`GROUP_KINDS`). Published for entrance A's conversion,
+    #: which offers the family their ONE base team: base training is included in every
+    #: plan and the PLAN buys the extra sessions, so a converting member picks a base group
+    #: and nothing else. An extra is something a student adds themselves afterwards --
+    #: `GROUP_KINDS`' own note says the competition squad is exactly that.
+    #:
+    #: It carries no member data and no contact details, so it sits inside
+    #: `PublicGroupOut`'s narrowness rule rather than against it.
+    kind: str
 
 
 class LandingService:
@@ -221,6 +230,7 @@ class LandingService:
                 training_durations_min=sorted(
                     training_durations_min(group.id, since=since, schedule=schedule)
                 ),
+                kind=group.kind,
                 coaches=coaches_by_group.get(group.id, []),
                 locations=sorted(
                     {

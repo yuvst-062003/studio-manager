@@ -2,9 +2,9 @@ export { TraineeCard } from './redesign/TraineeCard'
 export type { StudentCardSectionProps } from './redesign/TraineeCard'
 export { registerPeopleSections } from './register'
 export { TrialHome, daysUntil } from './TrialHome'
-export { JoinTheClub } from './JoinTheClub'
+export { JoinFromTrial } from './joinFromTrial/JoinFromTrial'
 export { JoinClubSection } from './JoinClubSection'
-export type { JoinGroupOption } from './JoinTheClub'
+export type { JoinGroupOption } from './joinFromTrial/joinFromTrialClient'
 export { StatusHistorySection } from './sections/StatusHistorySection'
 export {
   makePeopleClient,

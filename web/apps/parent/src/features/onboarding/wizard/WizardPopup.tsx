@@ -38,19 +38,19 @@ function PopupShell({ locale, title, subtitle, icon, onClose, children, footer }
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="w-full max-w-[480px] bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden border border-[#c5c6d2]/30 focus:outline-none"
+        className="w-full max-w-[480px] bg-[var(--wz-surface)] rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden border border-[var(--wz-line-strong)]/30 focus:outline-none"
       >
-        <div className="flex items-center justify-between px-5 py-4 bg-[#f2f3ff] border-b border-[#c5c6d2]/30 shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 bg-[var(--wz-raised)] border-b border-[var(--wz-line-strong)]/30 shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-full bg-[#e9edff] flex items-center justify-center text-[#0056c5] shrink-0">
+            <div className="w-9 h-9 rounded-full bg-[var(--wz-tint)] flex items-center justify-center text-[var(--wz-accent)] shrink-0">
               {icon}
             </div>
             <div className="flex flex-col min-w-0">
-              <h3 id={titleId} className="text-[17px] font-bold text-[#161b28] truncate">
+              <h3 id={titleId} className="text-[17px] font-bold text-[var(--wz-ink)] truncate">
                 {title}
               </h3>
               {subtitle ? (
-                <span className="text-[12px] text-[#444650] truncate">{subtitle}</span>
+                <span className="text-[12px] text-[var(--wz-secondary)] truncate">{subtitle}</span>
               ) : null}
             </div>
           </div>
@@ -58,18 +58,18 @@ function PopupShell({ locale, title, subtitle, icon, onClose, children, footer }
             type="button"
             aria-label={copy.close}
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-white hover:bg-[#e3e7fa] text-[#444650] flex items-center justify-center transition-colors cursor-pointer shrink-0"
+            className="w-9 h-9 rounded-full bg-[var(--wz-surface)] hover:bg-[var(--wz-tint-4)] text-[var(--wz-secondary)] flex items-center justify-center transition-colors cursor-pointer shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-5 overflow-y-auto text-[14px] leading-relaxed text-[#161b28]">
+        <div className="p-5 overflow-y-auto text-[14px] leading-relaxed text-[var(--wz-ink)]">
           {children}
         </div>
 
         {footer ? (
-          <div className="p-4 bg-[#f2f3ff] border-t border-[#c5c6d2]/30 shrink-0">{footer}</div>
+          <div className="p-4 bg-[var(--wz-raised)] border-t border-[var(--wz-line-strong)]/30 shrink-0">{footer}</div>
         ) : null}
       </div>
     </div>
@@ -98,7 +98,7 @@ export function DocumentPopup({
         <button
           type="button"
           onClick={onClose}
-          className="w-full py-3 px-5 rounded-xl bg-[#0056c5] hover:bg-[#001849] text-white font-semibold text-[15px] shadow-sm transition-all duration-200 flex items-center justify-center gap-2 active:scale-[0.99] cursor-pointer"
+          className="w-full py-3 px-5 rounded-xl bg-[var(--wz-accent)] hover:bg-[var(--wz-btn-bg)] text-white font-semibold text-[15px] shadow-sm transition-all duration-200 flex items-center justify-center gap-2 active:scale-[0.99] cursor-pointer"
         >
           {copy.closeDocument}
         </button>
@@ -108,8 +108,8 @@ export function DocumentPopup({
         <div className="space-y-4">
           {doc.sections.map((section) => (
             <div key={section.heading} className="space-y-1">
-              <h4 className="text-[15px] font-bold text-[#001849]">{section.heading}</h4>
-              <p className="text-[14px] text-[#444650] leading-relaxed">{section.body}</p>
+              <h4 className="text-[15px] font-bold text-[var(--wz-heading)]">{section.heading}</h4>
+              <p className="text-[14px] text-[var(--wz-secondary)] leading-relaxed">{section.body}</p>
             </div>
           ))}
         </div>
@@ -118,10 +118,10 @@ export function DocumentPopup({
           {doc.paragraphs.map((paragraph) => (
             <div
               key={paragraph}
-              className="flex items-start gap-2.5 p-3.5 rounded-xl bg-[#f2f3ff] border border-[#c5c6d2]/30"
+              className="flex items-start gap-2.5 p-3.5 rounded-xl bg-[var(--wz-raised)] border border-[var(--wz-line-strong)]/30"
             >
-              <CheckCircle2 className="w-5 h-5 text-[#0056c5] shrink-0 mt-0.5" />
-              <p className="text-[14px] text-[#161b28] leading-relaxed">{paragraph}</p>
+              <CheckCircle2 className="w-5 h-5 text-[var(--wz-accent)] shrink-0 mt-0.5" />
+              <p className="text-[14px] text-[var(--wz-ink)] leading-relaxed">{paragraph}</p>
             </div>
           ))}
         </div>
@@ -165,8 +165,8 @@ export function FaqPopup({
               key={item.id}
               className={`rounded-xl border transition-all duration-200 overflow-hidden ${
                 isOpen
-                  ? 'bg-white border-[#0056c5]/30 shadow-xs ring-1 ring-[#0056c5]/10'
-                  : 'bg-white/80 border-[#dee2f4] hover:bg-white hover:border-[#c5c6d2]'
+                  ? 'bg-[var(--wz-surface)] border-[var(--wz-accent)]/30 shadow-xs ring-1 ring-[var(--wz-accent)]/10'
+                  : 'bg-white/80 border-[var(--wz-line)] hover:bg-[var(--wz-surface)] hover:border-[var(--wz-line-strong)]'
               }`}
             >
               <button
@@ -179,17 +179,17 @@ export function FaqPopup({
               >
                 <div className="flex items-start sm:items-center gap-2.5 min-w-0">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 min-w-0">
-                    <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded bg-[#e9edff] text-[#001849] shrink-0 self-start sm:self-auto">
+                    <span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded bg-[var(--wz-tint)] text-[var(--wz-heading)] shrink-0 self-start sm:self-auto">
                       {item.category}
                     </span>
-                    <span className="text-[13.5px] font-bold text-[#161b28] leading-snug">
+                    <span className="text-[13.5px] font-bold text-[var(--wz-ink)] leading-snug">
                       {item.question}
                     </span>
                   </div>
                 </div>
                 <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[#444650] transition-transform duration-200 ${
-                    isOpen ? 'rotate-180 text-[#0056c5] bg-[#e9edff]' : 'bg-[#f2f3ff]'
+                  className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[var(--wz-secondary)] transition-transform duration-200 ${
+                    isOpen ? 'rotate-180 text-[var(--wz-accent)] bg-[var(--wz-tint)]' : 'bg-[var(--wz-raised)]'
                   }`}
                 >
                   <ChevronDown className="w-3.5 h-3.5" />
@@ -201,9 +201,9 @@ export function FaqPopup({
                   id={panelIdFor(item.id)}
                   role="region"
                   aria-labelledby={buttonIdFor(item.id)}
-                  className="px-4 pb-3.5 pt-1 text-[13px] text-[#444650] leading-relaxed border-t border-[#f2f3ff]"
+                  className="px-4 pb-3.5 pt-1 text-[13px] text-[var(--wz-secondary)] leading-relaxed border-t border-[var(--wz-raised)]"
                 >
-                  <p className="bg-[#faf8ff] p-3 rounded-lg border border-[#e9edff]/60">
+                  <p className="bg-[var(--wz-ground)] p-3 rounded-lg border border-[var(--wz-tint)]/60">
                     {item.answer}
                   </p>
                 </div>

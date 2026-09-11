@@ -480,9 +480,7 @@ def test_a_reference_arriving_inside_a_described_field_still_settles(
     test that only parsed would pass while every real payment landed `unmatched`.
     """
     described = f"מועדון גלדיאטור · {an_order.order.public_ref}"
-    response = _deliver(
-        client, an_order.order, IpnShape.SUCCESS, productdescription=described
-    )
+    response = _deliver(client, an_order.order, IpnShape.SUCCESS, productdescription=described)
     assert response.status_code == 200
 
     tenant_session.expire_all()

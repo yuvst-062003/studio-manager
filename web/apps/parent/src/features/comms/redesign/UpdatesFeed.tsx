@@ -133,8 +133,15 @@ function MarkReadButton({
       type="button"
       onClick={onClick}
       data-testid={testId}
-      className="text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 underline underline-offset-2 transition-colors cursor-pointer"
+      /* A chip, matching the two it sits beside and the mark-all pill it is the row-level
+         half of. It was an 11px underlined word, which beside `נועה` and `חדש` read as a
+         stray link rather than as the control that clears them — and 11px with no padding
+         is a target a thumb misses. `bg-transparent` is stated rather than inherited from
+         preflight: that reset is scoped to `.tw-scope`, and a `<button>` rendered outside
+         it keeps the browser's grey button face. */
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-transparent text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
     >
+      <Check className="w-3 h-3 shrink-0" aria-hidden="true" />
       {t(locale, 'comms.updates.markRead')}
     </button>
   )
@@ -334,14 +341,24 @@ export function UpdatesFeed({
         {/* Under the filter strip, not in the header: adding a third control to that row
             wrapped the title onto two lines. Shown only when there is something to clear. */}
         {unreadCount > 0 ? (
-          <div className="flex justify-start pt-1">
+          <div className="flex justify-start pt-1.5">
+            {/* A pill, not an 11px underlined word. It was `text-[11px] … underline` with
+                no padding, which gave it a hit area far under the 44px this design system
+                requires of every interactive element — and made the one control that
+                CHANGES STATE for the whole list look like a footnote. Now it reads as a
+                button, carries the tick it performs, and says how many it will clear so
+                nobody has to count the list first. */}
             <button
               type="button"
               onClick={onMarkAllRead}
               data-testid="updates-mark-all-read"
-              className="text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 underline underline-offset-2 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 min-h-11 px-3.5 py-2 rounded-full text-[13px] font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100 active:scale-[0.98] shadow-xs transition-all cursor-pointer"
             >
-              {t(locale, 'comms.updates.markAllRead')}
+              <Check className="w-4 h-4 shrink-0" aria-hidden="true" />
+              <span>{t(locale, 'comms.updates.markAllRead')}</span>
+              <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 tabular-nums">
+                {unreadCount}
+              </span>
             </button>
           </div>
         ) : null}
@@ -399,8 +416,14 @@ export function UpdatesFeed({
                     <article
                       key={row.id}
                       data-testid={`updates-row-${row.id}`}
-                      className={`bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-xs border border-slate-100 dark:border-slate-800 border-s-4 flex items-center justify-between gap-3 transition-all hover:shadow-md ${
-                        settled ? 'border-s-emerald-500 bg-emerald-50/20' : style.border
+/* A COLUMN, not a row. `items-center justify-between` put the message and its
+                         button side by side, so on a 390px phone the body got what was left
+                         after a full-width action — "נועה הגיעה לשיעור ניסיון אצלנו…" wrapped
+                         into a four-word-wide ribbon. The action is the whole point of an
+                         urgent card, so it gets its own line and full width rather than
+                         squeezing the sentence that explains it. */
+                      className={`bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-xs border border-slate-100 dark:border-slate-800 border-s-4 flex flex-col gap-3 transition-all hover:shadow-md ${
+                        settled ? 'border-s-emerald-500 bg-emerald-50/20 dark:bg-emerald-500/5' : style.border
                       }`}
                     >
                       <div className="flex items-start gap-3 flex-1">
@@ -411,10 +434,13 @@ export function UpdatesFeed({
                         >
                           {settled ? <Check className="w-6 h-6" /> : <Icon className="w-6 h-6" />}
                         </div>
-                        <div className="space-y-1 flex-1 text-start">
+                        <div className="space-y-1.5 flex-1 min-w-0 text-start">
+                          {/* Chips first, on their own line: the title used to share a
+                              `flex-wrap` row with them and was pushed to a second line at
+                              an arbitrary word. */}
                           <div className="flex items-center gap-2 flex-wrap">
                             {row.subjectName !== null && (
-                              <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs font-medium">
+                              <span className="bg-blue-50 dark:bg-blue-400/15 text-blue-700 dark:text-blue-200 px-2 py-0.5 rounded text-xs font-medium">
                                 {row.subjectName}
                               </span>
                             )}
@@ -426,17 +452,26 @@ export function UpdatesFeed({
                                 testId={`updates-mark-read-${row.id}`}
                               />
                             ) : null}
-                            <h3 className="text-base font-bold text-slate-900 dark:text-slate-50 leading-snug">{row.title}</h3>
                           </div>
-                          <p className={`text-xs font-semibold ${settled ? 'text-emerald-700' : style.status}`}>
+                          <h3 className="text-[17px] font-bold text-slate-900 dark:text-slate-50 leading-snug">
+                            {row.title}
+                          </h3>
+                          {/* Prose, not a status label. It was `text-xs font-semibold` in the
+                              kind's status colour, which reads as a second badge rather than
+                              as the sentence telling the family what happened. */}
+                          <p
+                            className={`text-sm leading-relaxed ${
+                              settled ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-600 dark:text-slate-300'
+                            }`}
+                          >
                             {row.body}
                           </p>
                         </div>
                       </div>
 
                       {settled ? (
-                        <span className="text-sm font-medium px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-xs shrink-0 bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default">
-                          <Check className="w-4 h-4 text-emerald-600" />
+                        <span className="text-sm font-medium px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-xs bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 cursor-default">
+                          <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                           <span>{t(locale, 'comms.updates.settled')}</span>
                         </span>
                       ) : row.action !== null && row.action.href !== null ? (
@@ -444,7 +479,15 @@ export function UpdatesFeed({
                           onClick={() => onOpen(row.id)}
                           href={row.action.href}
                           data-testid={`updates-action-${row.id}`}
-                          className="text-sm font-medium px-4 py-2 rounded-xl flex items-center gap-1.5 shadow-xs transition-transform shrink-0 cursor-pointer bg-[#0f1f3d] hover:bg-slate-800 active:scale-95 text-white"
+                          /* `no-underline` is not decoration: this is an `<a>` drawn as a
+                             primary button, and the app's link styling is an unlayered rule
+                             that outranks every Tailwind layer. It is written
+                             `a:not(.tw-scope a)`, so inside the shell `text-white` wins and
+                             the colour needs no help — measured, after an inline
+                             `color: #fff` here was found to change nothing. Outside the
+                             scope it would, which is what a bare preview of this screen
+                             showed and why that exclusion is worth knowing about. */
+                          className="text-[15px] font-bold px-4 py-3 rounded-xl flex items-center justify-center gap-2 shadow-sm transition-transform cursor-pointer no-underline bg-[#0f1f3d] dark:bg-blue-500 hover:bg-slate-800 dark:hover:bg-blue-400 active:scale-[0.99] text-white"
                         >
                           <Icon className="w-4 h-4" />
                           <span>{row.action.label}</span>

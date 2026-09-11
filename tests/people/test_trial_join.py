@@ -17,12 +17,13 @@ from datetime import timedelta
 
 import pytest
 from app.models.billing import Charge, PricePlan
-from app.models.people import Enrollment, Student, TrialBooking
+from app.models.people import Enrollment, RegistrationRequest, Student, TrialBooking
 from app.models.person import Guardian, Person
 from app.models.structure import Group
 from app.services.people.errors import NotFoundError, RefusedError
 from app.services.people.status import StudentStatusService
 from app.services.people.students import StudentService
+from app.services.people.trials import TrialService
 from sqlalchemy import select
 from tests.people.conftest import T0, make_session
 
@@ -354,3 +355,211 @@ def _sign_in_as(client, app_session, fake_provider, person: Person) -> dict[str,
     app_session.commit()
     signed = sign_in(client, code=code, app_name="parent")
     return {"Authorization": f"Bearer {signed.json()['access_token']}"}
+
+
+# -- what the family already answered, and the plan they chose ------------------
+#
+# Both exist for one screen: §5.4a ④'s "איך היה?" now lands on a three-step conversion --
+# declaration, groups and plan, payment -- and its first step SHOWS the family the answers
+# they already gave rather than asking the thirteen questions a second time (owner,
+# 2026-09-12). The answers are in the full member template's own id-space already, because
+# `TrialBookingPage` renders `kind=full` minus the clause, so there is nothing to map.
+def _trial_declaration_for(session, student: Student, *, answers: dict) -> RegistrationRequest:
+    parent = _guardian_of(session, student)
+    row = RegistrationRequest(
+        source="public_link",
+        payload_encrypted={
+            "guardian": {"person_id": str(parent.id)},
+            "children": [
+                {
+                    "student_id": str(student.id),
+                    "first_name": "נועה",
+                    "last_name": "לוי",
+                    "trial_declaration": {
+                        "template_id": str(uuid.uuid4()),
+                        "answers": answers,
+                        "signature_image_base64": "",
+                        "declared_by": "הורה לוי",
+                        "declared_at": T0.isoformat(),
+                    },
+                }
+            ],
+        },
+        matched_person_id=parent.id,
+        status="approved",
+        submitted_at=T0,
+        reviewed_at=T0,
+        reviewed_by_person_id=None,
+        created_at=T0,
+    )
+    session.add(row)
+    session.flush()
+    return row
+
+
+def test_the_trial_answers_come_back_for_the_child_who_gave_them(tenant_session, a_group):
+    """Step 1 of the conversion shows what the family wrote. Without this read it would ask
+    the thirteen questions again, which is what the owner refused: they answered them on the
+    booking form and the answers are already the member form's own."""
+    student = _trial_student(tenant_session, group_id=a_group)
+    _trial_declaration_for(tenant_session, student, answers={"q_asthma": False, "q_meds": True})
+
+    found = TrialService.declaration_for_student(tenant_session, student_id=student.id)
+
+    assert found is not None
+    assert found["answers"] == {"q_asthma": False, "q_meds": True}
+    assert found["declared_by"] == "הורה לוי"
+
+
+def test_each_sibling_gets_their_own_answers_out_of_the_one_payload(tenant_session, a_group):
+    """One booking writes ONE row holding every child. Matching on the parent alone would
+    show a sibling's answers under this child's name — and these are medical answers about a
+    named minor, so the wrong one is not a cosmetic mix-up."""
+    first = _trial_student(tenant_session, group_id=a_group)
+    second = _trial_student(tenant_session, group_id=a_group)
+    parent = _guardian_of(tenant_session, first)
+    # Siblings share a parent. `_trial_student` gives each child its own, so without this
+    # the second child's guardian is a different person and the narrowing below correctly
+    # finds nothing — which would make this test pass for the wrong reason.
+    tenant_session.add(
+        Guardian(student_id=second.id, person_id=parent.id, is_primary=False, relation="parent")
+    )
+    tenant_session.add(
+        RegistrationRequest(
+            source="public_link",
+            payload_encrypted={
+                "guardian": {"person_id": str(parent.id)},
+                "children": [
+                    {
+                        "student_id": str(first.id),
+                        "trial_declaration": {"answers": {"q_asthma": True}},
+                    },
+                    {
+                        "student_id": str(second.id),
+                        "trial_declaration": {"answers": {"q_asthma": False}},
+                    },
+                ],
+            },
+            matched_person_id=parent.id,
+            status="approved",
+            submitted_at=T0,
+            reviewed_at=T0,
+            created_at=T0,
+        )
+    )
+    tenant_session.flush()
+
+    mine = TrialService.declaration_for_student(tenant_session, student_id=first.id)
+    theirs = TrialService.declaration_for_student(tenant_session, student_id=second.id)
+
+    assert mine is not None and mine["answers"] == {"q_asthma": True}
+    assert theirs is not None and theirs["answers"] == {"q_asthma": False}
+
+
+def test_a_child_with_no_trial_declaration_reads_as_none_rather_than_raising(
+    tenant_session, a_group
+):
+    """A child a manager put on a trial by hand has no booking form behind them. The screen
+    then asks the questions properly; it must not fail to open."""
+    student = _trial_student(tenant_session, group_id=a_group)
+    assert TrialService.declaration_for_student(tenant_session, student_id=student.id) is None
+
+
+def test_joining_takes_the_plan_the_family_picked(
+    tenant_session, a_group, a_second_group, two_groups_once_a_week, plans
+):
+    """The owner's call (2026-09-12): the conversion screen shows plans and the family
+    chooses, exactly as the join wizard's own step does — `toRegisterPayload` has always
+    sent a `price_plan_id`, so the two doors disagreed until now.
+
+    Two groups is a weekly volume of two, so `plan_for_volume` would derive `two`. Picking
+    `open` proves the choice is what was used and not the derivation."""
+    student = _trial_student(tenant_session, group_id=a_group)
+
+    joined = StudentService.join_from_trial(
+        tenant_session,
+        student_id=student.id,
+        group_ids=[a_group, a_second_group],
+        price_plan_id=plans["open"].id,
+        at=T0,
+        actor_person_id=None,
+        schedule=two_groups_once_a_week,
+    )
+
+    assert joined.price_plan_id == plans["open"].id
+
+
+def test_a_plan_from_another_studio_is_refused_rather_than_priced(
+    tenant_session, a_group, two_groups_once_a_week, plans
+):
+    """The price becomes a field a client posts the moment this is accepted, which is the
+    exact objection `join_from_trial`'s own docstring raised against having one at all. It
+    is answered by refusing, not by trusting."""
+    student = _trial_student(tenant_session, group_id=a_group)
+
+    with pytest.raises(RefusedError):
+        StudentService.join_from_trial(
+            tenant_session,
+            student_id=student.id,
+            group_ids=[a_group],
+            price_plan_id=uuid.uuid4(),
+            at=T0,
+            actor_person_id=None,
+            schedule=two_groups_once_a_week,
+        )
+
+
+def test_no_plan_chosen_still_derives_one_from_the_volume(
+    tenant_session, a_group, a_second_group, two_groups_once_a_week, plans
+):
+    """The picker is a courtesy, not a requirement: a club with no published plans shows
+    nothing to pick and the volume rule still prices the child."""
+    student = _trial_student(tenant_session, group_id=a_group)
+
+    joined = StudentService.join_from_trial(
+        tenant_session,
+        student_id=student.id,
+        group_ids=[a_group, a_second_group],
+        at=T0,
+        actor_person_id=None,
+        schedule=two_groups_once_a_week,
+    )
+
+    assert joined.price_plan_id == plans["two"].id
+
+
+def test_the_route_shows_a_guardian_their_own_childs_trial_answers(
+    client, as_guardian, app_session, tenant_session, a_group
+):
+    """The read the conversion screen's first step opens on. A guardian of this child, and
+    the answers themselves — see `MyTrialDeclarationOut` on why this shape returns contents
+    where `HealthDeclarationOut` returns flags."""
+    student = _trial_student(tenant_session, group_id=a_group)
+    tenant_session.add(
+        Guardian(student_id=student.id, person_id=as_guardian.person_id, relation="parent")
+    )
+    _trial_declaration_for(tenant_session, student, answers={"q_asthma": False})
+    tenant_session.commit()
+
+    response = client.get(
+        f"/api/v1/me/students/{student.id}/trial-declaration", headers=as_guardian.headers
+    )
+
+    assert response.status_code == 200
+    assert response.json()["answers"] == {"q_asthma": False}
+
+
+def test_the_route_refuses_a_child_who_is_not_the_callers_with_404(
+    client, as_guardian, tenant_session, a_group
+):
+    """404 and never 403 — a 403 confirms the child is in this studio, and this body is a
+    minor's medical answers."""
+    student = _trial_student(tenant_session, group_id=a_group)
+    _trial_declaration_for(tenant_session, student, answers={"q_asthma": True})
+    tenant_session.commit()
+
+    response = client.get(
+        f"/api/v1/me/students/{student.id}/trial-declaration", headers=as_guardian.headers
+    )
+
+    assert response.status_code == 404

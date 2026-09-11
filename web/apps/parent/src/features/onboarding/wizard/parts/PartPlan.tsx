@@ -20,12 +20,20 @@ export function PartPlan({
   selectedId,
   onSelect,
   error,
+  title,
+  lead,
 }: {
   locale: Locale
   plans: readonly WizardPlan[]
   selectedId: string
   onSelect: (id: string) => void
   error: string | null
+  /** Overrides for the legend, because the wizard's is not true everywhere this renders.
+   *  `planLead` ends "• ללא תשלום כעת" — right in the wizard, where step 3 is a promise to
+   *  pay later, and wrong on entrance A's conversion, where the NEXT step is the payment.
+   *  Defaulted rather than required: every existing caller keeps its own copy untouched. */
+  title?: string
+  lead?: string
 }) {
   const copy = studentFormCopy(locale)
 
@@ -33,12 +41,14 @@ export function PartPlan({
     <fieldset className="flex flex-col gap-3.5 border-0 p-0 m-0">
       <legend className="contents">
         <div className="flex items-center gap-2 pb-1 pt-0.5">
-          <div className="w-8 h-8 rounded-lg bg-[#0056c5]/15 flex items-center justify-center text-[#0056c5] shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-[var(--wz-accent)]/15 flex items-center justify-center text-[var(--wz-accent)] shrink-0">
             <CreditCard className="w-5 h-5" />
           </div>
           <div className="text-right">
-            <h4 className="text-[17px] text-[#001849] font-bold leading-tight">{copy.planTitle}</h4>
-            <p className="text-[12px] text-[#444650]">{copy.planLead}</p>
+            <h4 className="text-[17px] text-[var(--wz-heading)] font-bold leading-tight">
+              {title ?? copy.planTitle}
+            </h4>
+            <p className="text-[12px] text-[var(--wz-secondary)]">{lead ?? copy.planLead}</p>
           </div>
         </div>
       </legend>
@@ -50,14 +60,14 @@ export function PartPlan({
           return (
             <label
               key={plan.id}
-              className={`group relative flex flex-col p-4 rounded-2xl cursor-pointer transition-all duration-200 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#0056c5] ${
+              className={`group relative flex flex-col p-4 rounded-2xl cursor-pointer transition-all duration-200 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--wz-accent)] ${
                 plan.isRecommended ? 'shadow-lg pt-5' : 'shadow-2xs'
               } ${
                 inverted
-                  ? 'bg-[#001849] text-white border-2 border-[#0056c5] ring-2 ring-[#0056c5]/20'
+                  ? 'bg-[var(--wz-btn-bg)] text-white border-2 border-[var(--wz-accent)] ring-2 ring-[var(--wz-accent)]/20'
                   : isSelected
-                    ? 'bg-white border-2 border-[#0056c5] shadow-md'
-                    : 'bg-white border-2 border-[#c5c6d2]/40 hover:border-[#0056c5]'
+                    ? 'bg-[var(--wz-surface)] border-2 border-[var(--wz-accent)] shadow-md'
+                    : 'bg-[var(--wz-surface)] border-2 border-[var(--wz-line-strong)]/40 hover:border-[var(--wz-accent)]'
               }`}
             >
               <input
@@ -70,7 +80,7 @@ export function PartPlan({
               />
 
               {plan.badge ? (
-                <span className="absolute -top-3 start-4 px-3 py-1 rounded-full bg-[#ba1a1a] text-white text-[11px] font-bold flex items-center gap-1 shadow-md">
+                <span className="absolute -top-3 start-4 px-3 py-1 rounded-full bg-[var(--wz-danger)] text-white text-[11px] font-bold flex items-center gap-1 shadow-md">
                   {plan.badge}
                 </span>
               ) : null}
@@ -79,13 +89,13 @@ export function PartPlan({
                 <span className="flex flex-col">
                   <span className="flex items-center gap-2">
                     <span
-                      className={`text-[16px] font-bold ${inverted ? 'text-white' : 'text-[#161b28]'}`}
+                      className={`text-[16px] font-bold ${inverted ? 'text-white' : 'text-[var(--wz-ink)]'}`}
                     >
                       {plan.title}
                     </span>
                     <span
                       className={`px-2.5 py-0.5 rounded-md text-[11px] font-semibold ${
-                        inverted ? 'bg-white/15 text-[#dae1ff]' : 'bg-[#e9edff] text-[#0056c5]'
+                        inverted ? 'bg-white/15 text-[var(--wz-tint-2)]' : 'bg-[var(--wz-tint)] text-[var(--wz-accent)]'
                       }`}
                     >
                       {plan.subtitle}
@@ -93,11 +103,11 @@ export function PartPlan({
                   </span>
                   <span className="flex items-baseline gap-1 mt-2">
                     <span
-                      className={`text-[28px] font-bold ${inverted ? 'text-white' : 'text-[#001849]'}`}
+                      className={`text-[28px] font-bold ${inverted ? 'text-white' : 'text-[var(--wz-heading)]'}`}
                     >
                       ₪{shekels(plan.pricePerMonthAgorot)}
                     </span>
-                    <span className={`text-[12px] ${inverted ? 'text-[#b3c5ff]' : 'text-[#444650]'}`}>
+                    <span className={`text-[12px] ${inverted ? 'text-[var(--wz-on-navy)]' : 'text-[var(--wz-secondary)]'}`}>
                       {copy.perMonth}
                     </span>
                   </span>
@@ -106,8 +116,8 @@ export function PartPlan({
                   aria-hidden
                   className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${
                     isSelected
-                      ? 'border-[#0056c5] bg-[#0056c5] text-white'
-                      : 'border-[#757681] text-transparent'
+                      ? 'border-[var(--wz-accent)] bg-[var(--wz-accent)] text-white'
+                      : 'border-[var(--wz-tertiary)] text-transparent'
                   }`}
                 >
                   <Check className="w-3.5 h-3.5 stroke-[3]" />
@@ -116,13 +126,13 @@ export function PartPlan({
 
               <span
                 className={`flex flex-col gap-2 mt-3 pt-3 border-t text-[13px] ${
-                  inverted ? 'border-white/15 text-[#dae1ff]' : 'border-[#e9edff] text-[#444650]'
+                  inverted ? 'border-white/15 text-[var(--wz-tint-2)]' : 'border-[var(--wz-tint)] text-[var(--wz-secondary)]'
                 }`}
               >
                 {plan.features.map((feature) => (
                   <span key={feature} className="flex items-center gap-2">
                     <CheckCircle2
-                      className={`w-4 h-4 shrink-0 ${inverted ? 'text-[#b3c5ff]' : 'text-[#0056c5]'}`}
+                      className={`w-4 h-4 shrink-0 ${inverted ? 'text-[var(--wz-on-navy)]' : 'text-[var(--wz-accent)]'}`}
                     />
                     <span>{feature}</span>
                   </span>
@@ -133,8 +143,8 @@ export function PartPlan({
                 <span
                   className={`w-full py-2.5 rounded-xl text-[13px] font-semibold flex items-center justify-center transition-colors ${
                     isSelected
-                      ? 'bg-[#0056c5] text-white shadow-xs'
-                      : 'bg-[#e9edff] text-[#001849] group-hover:bg-[#dee2f4]'
+                      ? 'bg-[var(--wz-accent)] text-white shadow-xs'
+                      : 'bg-[var(--wz-tint)] text-[var(--wz-heading)] group-hover:bg-[var(--wz-line)]'
                   }`}
                 >
                   {isSelected ? copy.planChosen : copy.planChoose}

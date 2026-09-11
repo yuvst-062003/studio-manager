@@ -96,12 +96,12 @@ export function PartHealth({
 
   return (
     <div className="flex flex-col gap-3.5">
-      <div className="p-3.5 rounded-xl bg-[#0d2c6c] text-white flex flex-col gap-2.5 shadow-sm">
+      <div className="p-3.5 rounded-xl bg-[var(--wz-accent-deep)] text-white flex flex-col gap-2.5 shadow-sm">
         <div className="flex items-center gap-2">
-          <HeartPulse className="w-5 h-5 text-[#dae1ff]" />
+          <HeartPulse className="w-5 h-5 text-[var(--wz-tint-2)]" />
           <span className="text-[16px] font-bold">{copy.healthTitle}</span>
         </div>
-        <p className="text-[12px] text-[#dee2f4] leading-relaxed">{copy.healthQuestion}</p>
+        <p className="text-[12px] text-[var(--wz-line)] leading-relaxed">{copy.healthQuestion}</p>
 
         <div className="grid grid-cols-2 gap-2 mt-1">
           <button
@@ -110,7 +110,7 @@ export function PartHealth({
             onClick={() => applyPreset(true)}
             className={`py-2 px-3 rounded-lg text-[13px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
               student.healthyPreset === true
-                ? 'bg-[#0056c5] text-white shadow-xs ring-2 ring-white/50'
+                ? 'bg-[var(--wz-accent)] text-white shadow-xs ring-2 ring-white/50'
                 : 'bg-white/10 text-white hover:bg-white/20'
             }`}
           >
@@ -123,7 +123,7 @@ export function PartHealth({
             onClick={() => applyPreset(false)}
             className={`py-2 px-3 rounded-lg text-[13px] font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
               student.healthyPreset === false
-                ? 'bg-[#ba1a1a] text-white font-bold ring-2 ring-white/50'
+                ? 'bg-[var(--wz-danger)] text-white font-bold ring-2 ring-white/50'
                 : 'bg-white/10 text-white hover:bg-white/20'
             }`}
           >
@@ -133,14 +133,14 @@ export function PartHealth({
         </div>
 
         {presetError ? (
-          <p className="text-[11.5px] bg-[#ba1a1a]/50 text-white px-2.5 py-1 rounded-md" role="alert">
+          <p className="text-[11.5px] bg-[var(--wz-danger)]/50 text-white px-2.5 py-1 rounded-md" role="alert">
             {presetError}
           </p>
         ) : null}
 
         {student.healthyPreset === true && !flagged ? (
-          <div className="text-[11.5px] bg-[#0056c5]/40 text-white px-2.5 py-1 rounded-md flex items-center gap-1.5 border border-white/10">
-            <Check className="w-3.5 h-3.5 text-[#dae1ff] shrink-0" />
+          <div className="text-[11.5px] bg-[var(--wz-accent)]/40 text-white px-2.5 py-1 rounded-md flex items-center gap-1.5 border border-white/10">
+            <Check className="w-3.5 h-3.5 text-[var(--wz-tint-2)] shrink-0" />
             <span>{copy.healthAllClear}</span>
           </div>
         ) : null}
@@ -152,7 +152,7 @@ export function PartHealth({
             <Clock className="w-5 h-5 text-amber-300 shrink-0 mt-0.5" />
             <div className="flex flex-col gap-0.5 text-[12px]">
               <span className="font-bold text-amber-200">{copy.reviewTitle}</span>
-              <span className="text-[#dee2f4] leading-relaxed">{copy.reviewBody}</span>
+              <span className="text-[var(--wz-line)] leading-relaxed">{copy.reviewBody}</span>
             </div>
           </div>
         ) : null}
@@ -167,9 +167,9 @@ export function PartHealth({
         return (
           <fieldset
             key={section.id}
-            className="p-3.5 rounded-xl bg-[#f2f3ff] border border-[#e9edff] flex flex-col gap-3 border-0"
+            className="p-3.5 rounded-xl bg-[var(--wz-raised)] border border-[var(--wz-tint)] flex flex-col gap-3 border-0"
           >
-            <legend className="text-[14px] font-bold text-[#001849] px-0">
+            <legend className="text-[14px] font-bold text-[var(--wz-heading)] px-0">
               {index + 1}. {section.title}
             </legend>
             <div className="flex flex-col gap-2 text-[13px]">
@@ -210,7 +210,7 @@ export function PartHealth({
                         <div className="flex flex-col gap-1">
                           <label
                             htmlFor={`clause-${student.id}`}
-                            className="text-[#161b28] leading-relaxed cursor-pointer"
+                            className="text-[var(--wz-ink)] leading-relaxed cursor-pointer"
                           >
                             {t(locale, clauseTextKey(clause))}
                           </label>
@@ -226,19 +226,19 @@ export function PartHealth({
                 ) : question.type === 'boolean' ? (
                   <div
                     key={question.id}
-                    className="flex items-center justify-between py-1 border-b border-[#dee2f4]/60 gap-2"
+                    className="flex items-center justify-between py-1 border-b border-[var(--wz-line)]/60 gap-2"
                   >
-                    <span className="text-[#161b28]">{question.label}</span>
+                    <span className="text-[var(--wz-ink)]">{question.label}</span>
                     <div className="flex items-center gap-2 shrink-0">
                       {[
-                        { value: false, label: copy.answerNo, on: 'bg-[#0056c5] text-white font-bold', off: 'text-[#444650] hover:bg-[#dee2f4]' },
-                        { value: true, label: copy.answerYes, on: 'bg-[#ba1a1a] text-white font-bold', off: 'text-[#ba1a1a] hover:bg-[#ffdad6]' },
+                        { value: false, label: copy.answerNo, on: 'bg-[var(--wz-accent)] text-white font-bold', off: 'text-[var(--wz-secondary)] hover:bg-[var(--wz-line)]' },
+                        { value: true, label: copy.answerYes, on: 'bg-[var(--wz-danger)] text-white font-bold', off: 'text-[var(--wz-danger)] hover:bg-[var(--wz-danger-tint)]' },
                       ].map((option) => {
                         const checked = student.healthAnswers[question.id] === option.value
                         return (
                           <label
                             key={String(option.value)}
-                            className={`cursor-pointer text-[12px] font-medium flex items-center gap-1 px-2 py-0.5 rounded transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#0056c5] ${
+                            className={`cursor-pointer text-[12px] font-medium flex items-center gap-1 px-2 py-0.5 rounded transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--wz-accent)] ${
                               checked ? option.on : option.off
                             }`}
                           >
@@ -257,12 +257,12 @@ export function PartHealth({
                   </div>
                 ) : (
                   <label key={question.id} className="flex flex-col gap-1 py-1">
-                    <span className="text-[#161b28]">{question.label}</span>
+                    <span className="text-[var(--wz-ink)]">{question.label}</span>
                     <input
                       type={question.type === 'phone' ? 'tel' : 'text'}
                       value={String(student.healthAnswers[question.id] ?? '')}
                       onChange={(event) => setAnswer(question.id, event.target.value)}
-                      className="h-10 px-3 rounded-lg bg-white text-[#161b28] text-[13px] border border-[#c5c6d2] focus:border-[#0056c5] focus:outline-none"
+                      className="h-10 px-3 rounded-lg bg-[var(--wz-surface)] text-[var(--wz-ink)] text-[13px] border border-[var(--wz-line-strong)] focus:border-[var(--wz-accent)] focus:outline-none"
                     />
                   </label>
                 ),
@@ -278,8 +278,8 @@ export function PartHealth({
         </p>
       ) : null}
 
-      <div className="p-3.5 rounded-xl bg-[#f2f3ff] border border-[#e9edff] flex flex-col gap-2">
-        <label htmlFor="medical-notes" className="text-[12px] font-semibold text-[#444650]">
+      <div className="p-3.5 rounded-xl bg-[var(--wz-raised)] border border-[var(--wz-tint)] flex flex-col gap-2">
+        <label htmlFor="medical-notes" className="text-[12px] font-semibold text-[var(--wz-secondary)]">
           {copy.notesLabel}
         </label>
         <textarea
@@ -288,11 +288,11 @@ export function PartHealth({
           value={student.medicalNotes}
           onChange={(event) => onChange({ medicalNotes: event.target.value })}
           placeholder={copy.notesPlaceholder}
-          className="w-full p-2.5 rounded-lg bg-white text-[#161b28] text-[13px] border border-[#c5c6d2] focus:border-[#0056c5] focus:outline-none resize-y"
+          className="w-full p-2.5 rounded-lg bg-[var(--wz-surface)] text-[var(--wz-ink)] text-[13px] border border-[var(--wz-line-strong)] focus:border-[var(--wz-accent)] focus:outline-none resize-y"
         />
         {/* A note is NOT a review trigger. The prototype flags any non-empty note, so
             "wears glasses during fitness training" suspends a registration (§8.1). */}
-        <p className="text-[11px] text-[#757681]">{copy.notesHint}</p>
+        <p className="text-[11px] text-[var(--wz-tertiary)]">{copy.notesHint}</p>
       </div>
     </div>
   )

@@ -90,11 +90,11 @@ function WizardLoadFailed({
 }) {
   return (
     <div className="flex flex-col items-center gap-4" data-testid="wizard-load-failed">
-      <p className="text-[14px] text-[#ba1a1a] font-medium text-center" role="alert">
+      <p className="text-[14px] text-[var(--wz-danger)] font-medium text-center" role="alert">
         {message}
       </p>
       <button
-        className="rounded-full border border-[#001849] px-5 py-2 text-[14px] font-bold text-[#001849] dark:border-blue-400 dark:text-blue-400"
+        className="rounded-full border border-[var(--wz-heading)] px-5 py-2 text-[14px] font-bold text-[var(--wz-heading)] dark:border-blue-400 dark:text-blue-400"
         data-testid="wizard-load-retry"
         onClick={onRetry}
         type="button"
@@ -241,6 +241,7 @@ export function JoinWizard({
       plans,
       methods,
       alreadyArranged,
+      templateId,
       deps: {
         register: () =>
           source.register(toRegisterPayload(students, { templateId, clubTermsAccepted: agreed })),
@@ -264,6 +265,34 @@ export function JoinWizard({
           //: failure reach that decision rather than passing silently as a resolved write.
           if (!response.ok) throw new Error(String(response.status))
         },
+        //: The children trying a lesson instead of joining. One request for all of them.
+        //: `group_id` per child and no `session_id`: the endpoint requires a group, which
+        //: step 2 already collected, and treats the lesson as optional — the club picks it
+        //: and calls. A signed-in caller needs no `guardian` block; the server prefers the
+        //: provider-verified identity over anything a client could type.
+        bookTrial: async (children) => {
+          const response = await apiFetch('/api/v1/trial-bookings/self', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              children: children.map((child) => ({
+                first_name: child.firstName,
+                last_name: child.lastName,
+                //: `birthdate`, one word — `StudentCreate`'s own spelling. `birth_date`
+                //: would be dropped by Pydantic and the child booked with no age.
+                birthdate: child.birthDate,
+                group_id: child.groupId,
+              })),
+              //: One per child, same order — the endpoint's own rule
+              //: (`_one_declaration_per_child`). Sent only when every child has one, since
+              //: a partial list is rejected outright rather than filled in.
+              ...(children.every((child) => child.health !== null)
+                ? { trial_health_declarations: children.map((child) => child.health) }
+                : {}),
+            }),
+          })
+          if (!response.ok) throw new Error(String(response.status))
+        },
       },
     })
 
@@ -275,15 +304,15 @@ export function JoinWizard({
 
   if (studio.status === 'loading') {
     return (
-      <div className="tw-scope min-h-[100dvh] bg-[#faf8ff] flex items-center justify-center p-6">
-        <p className="text-[14px] text-[#444650]">{copy.loading}</p>
+      <div className="tw-scope min-h-[100dvh] bg-[var(--wz-ground)] flex items-center justify-center p-6">
+        <p className="text-[14px] text-[var(--wz-secondary)]">{copy.loading}</p>
       </div>
     )
   }
 
   if (studio.status === 'failed') {
     return (
-      <div className="tw-scope min-h-[100dvh] bg-[#faf8ff] flex items-center justify-center p-6">
+      <div className="tw-scope min-h-[100dvh] bg-[var(--wz-ground)] flex items-center justify-center p-6">
         <WizardLoadFailed message={copy.loadFailed} onRetry={retry} retryLabel={copy.retry} />
       </div>
     )
@@ -305,7 +334,7 @@ export function JoinWizard({
   }
 
   return (
-    <div className="tw-scope min-h-[100dvh] bg-[#faf8ff] text-[#161b28] flex flex-col">
+    <div className="tw-scope min-h-[100dvh] bg-[var(--wz-ground)] text-[var(--wz-ink)] flex flex-col">
       <WizardHeader
         locale={locale}
         currentStep={step}
@@ -326,7 +355,7 @@ export function JoinWizard({
         ) : null}
 
         {step === 2 && catalogue.status === 'loading' ? (
-          <p className="text-[14px] text-[#444650] py-8 text-center">{copy.loadingCatalogue}</p>
+          <p className="text-[14px] text-[var(--wz-secondary)] py-8 text-center">{copy.loadingCatalogue}</p>
         ) : null}
         {step === 2 && catalogue.status === 'failed' ? (
           //: Retrying re-reads the studio too. Both are cheap, the family is stuck on this
@@ -350,7 +379,6 @@ export function JoinWizard({
             plans={catalogue.plans}
             healthSchema={catalogue.schema}
             firstStudentDefaults={firstStudentDefaults}
-            slug={studio.slug}
             checkDuplicate={source.checkDuplicate}
             onBack={() => setStep(1)}
             onContinue={() => setStep(3)}

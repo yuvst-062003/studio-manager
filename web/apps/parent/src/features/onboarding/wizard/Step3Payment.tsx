@@ -125,12 +125,18 @@ export function Step3Payment({
   const priceOf = (student: StudentDraft) =>
     plans.find((plan) => plan.id === student.planId)?.pricePerMonthAgorot ?? 0
 
+  //: A trial child is not on this step at all — they are not paying, so there is nothing
+  //: to ask them. `students` still carries them because step 4 lists the whole family.
+  const isTrial = (student: StudentDraft) => student.intent === 'trial'
+  const joining = students.filter((student) => !isTrial(student))
+
   const { chargeable, awaiting, total, creditSum, coachSum } = useMemo(() => {
-    const awaitingList = students.filter(needsManagerReview)
-    const chargeableList = students.filter((student) => !needsManagerReview(student))
+    const awaitingList = joining.filter(needsManagerReview)
+    const chargeableList = joining.filter((student) => !needsManagerReview(student))
     let credit = 0
     let coach = 0
     for (const student of chargeableList) {
+      if (isTrial(student)) continue
       const price = priceOf(student)
       //: Default to credit when nothing is chosen yet, matching the picker's own default.
       if ((methods[student.id] ?? 'credit') === 'credit') credit += price
@@ -139,12 +145,14 @@ export function Step3Payment({
     return {
       chargeable: chargeableList,
       awaiting: awaitingList,
-      total: chargeableList.reduce((sum, student) => sum + priceOf(student), 0),
+      total: chargeableList
+        .filter((student) => !isTrial(student))
+        .reduce((sum, student) => sum + priceOf(student), 0),
       creditSum: credit,
       coachSum: coach,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [students, plans, methods])
+  }, [joining, plans, methods])
 
   // F5 (fix round 1) — no אשראי button at all on the "already arranged" path, not a
   // disabled one. A disabled control still invites "why can't I?"; this route simply has
@@ -267,23 +275,23 @@ export function Step3Payment({
       ) : null}
 
       {result?.checkoutUnavailable ? (
-        <div className="bg-[#0056c5]/10 border border-[#0056c5]/20 rounded-xl p-3 mb-3 flex items-start gap-2 text-[#001849]">
-          <Info className="w-4 h-4 text-[#0056c5] shrink-0 mt-0.5" />
+        <div className="bg-[var(--wz-accent)]/10 border border-[var(--wz-accent)]/20 rounded-xl p-3 mb-3 flex items-start gap-2 text-[var(--wz-heading)]">
+          <Info className="w-4 h-4 text-[var(--wz-accent)] shrink-0 mt-0.5" />
           <p className="text-[12px] leading-relaxed">{copy.demoNoForm}</p>
         </div>
       ) : null}
 
       {/* §6.1 — the family summary strip */}
-      <div className="bg-[#f2f3ff] border border-[#dee2f4] rounded-xl p-3 shadow-2xs mb-3 flex items-center justify-between gap-2">
+      <div className="bg-[var(--wz-raised)] border border-[var(--wz-line)] rounded-xl p-3 shadow-2xs mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-full bg-[#0056c5]/10 flex items-center justify-center text-[#0056c5] shrink-0">
+          <div className="w-8 h-8 rounded-full bg-[var(--wz-accent)]/10 flex items-center justify-center text-[var(--wz-accent)] shrink-0">
             <Users className="w-4 h-4" />
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="text-[13px] font-bold text-[#001849]">
-              {students.length} {copy.familyCount}
+            <span className="text-[13px] font-bold text-[var(--wz-heading)]">
+              {joining.length} {copy.familyCount}
             </span>
-            <span className="text-[11px] text-[#444650] truncate">
+            <span className="text-[11px] text-[var(--wz-secondary)] truncate">
               {students
                 .map((student) => {
                   const name = `${student.firstName} ${student.lastName}`.trim()
@@ -296,7 +304,7 @@ export function Step3Payment({
           </div>
         </div>
         <div className="flex flex-col items-end shrink-0">
-          <span className="bg-[#001849] text-white text-[12px] font-bold px-2.5 py-1 rounded-full shadow-xs whitespace-nowrap">
+          <span className="bg-[var(--wz-btn-bg)] text-white text-[12px] font-bold px-2.5 py-1 rounded-full shadow-xs whitespace-nowrap">
             ₪{formatShekels(total)} {copy.perMonth}
           </span>
           {awaiting.length > 0 ? (
@@ -339,10 +347,10 @@ export function Step3Payment({
 
       {phase === 'mandates' && result ? (
         <section className="flex flex-col gap-4">
-          <div className="bg-white rounded-2xl p-4 shadow-xs border border-[#dee2f4] flex flex-col gap-1">
-            <div className="flex items-center justify-between border-b border-[#dee2f4] pb-2 mb-1">
-              <span className="text-[15px] font-bold text-[#001849]">{copy.mandatesTitle}</span>
-              <span className="text-[11px] text-[#444650]">
+          <div className="bg-[var(--wz-surface)] rounded-2xl p-4 shadow-xs border border-[var(--wz-line)] flex flex-col gap-1">
+            <div className="flex items-center justify-between border-b border-[var(--wz-line)] pb-2 mb-1">
+              <span className="text-[15px] font-bold text-[var(--wz-heading)]">{copy.mandatesTitle}</span>
+              <span className="text-[11px] text-[var(--wz-secondary)]">
                 {result.mandates.length} {copy.mandatesCount}
               </span>
             </div>
@@ -356,14 +364,14 @@ export function Step3Payment({
                   ) : (
                     <span
                       aria-hidden
-                      className="w-4 h-4 rounded-full border-2 border-[#757681] shrink-0"
+                      className="w-4 h-4 rounded-full border-2 border-[var(--wz-tertiary)] shrink-0"
                     />
                   )}
                   <span className="flex flex-col min-w-0 text-right">
-                    <span className="text-[13px] font-bold text-[#161b28] truncate">
+                    <span className="text-[13px] font-bold text-[var(--wz-ink)] truncate">
                       {mandate.name}
                     </span>
-                    <span className="text-[11px] text-[#444650]">
+                    <span className="text-[11px] text-[var(--wz-secondary)]">
                       ₪{formatShekels(mandate.amountAgorot)}
                     </span>
                   </span>
@@ -372,7 +380,7 @@ export function Step3Payment({
               return isSigned ? (
                 <div
                   key={mandate.draftId}
-                  className="flex items-center justify-between gap-2 py-2.5 border-b border-[#f2f3ff] last:border-0"
+                  className="flex items-center justify-between gap-2 py-2.5 border-b border-[var(--wz-raised)] last:border-0"
                 >
                   {marker}
                   <span className="text-[12px] font-semibold text-emerald-700 shrink-0">
@@ -394,10 +402,10 @@ export function Step3Payment({
                     setOpenMandateDraftId(mandate.draftId)
                     setFrame({ kind: 'link', url: mandate.url })
                   }}
-                  className="group flex items-center justify-between gap-2 py-2.5 -mx-1 px-1 border-b border-[#f2f3ff] last:border-0 w-full text-right cursor-pointer hover:bg-[#f2f3ff] rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-[#0056c5]"
+                  className="group flex items-center justify-between gap-2 py-2.5 -mx-1 px-1 border-b border-[var(--wz-raised)] last:border-0 w-full text-right cursor-pointer hover:bg-[var(--wz-raised)] rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-[var(--wz-accent)]"
                 >
                   {marker}
-                  <span className="text-[13px] font-bold text-[#0056c5] shrink-0 group-hover:underline group-active:text-[#00429b]">
+                  <span className="text-[13px] font-bold text-[var(--wz-accent)] shrink-0 group-hover:underline group-active:text-[var(--wz-accent)]">
                     {copy.mandateOpen}
                   </span>
                 </button>
@@ -407,16 +415,16 @@ export function Step3Payment({
         </section>
       ) : subView === 'decision' ? (
         <fieldset className="flex flex-col gap-4 border-0 p-0 m-0">
-          <div className="bg-white rounded-2xl p-4 shadow-xs flex flex-col gap-2 text-center items-center border border-[#dee2f4]/60">
-            <div className="w-12 h-12 rounded-full bg-[#e9edff] flex items-center justify-center text-[#001849] mb-1">
+          <div className="bg-[var(--wz-surface)] rounded-2xl p-4 shadow-xs flex flex-col gap-2 text-center items-center border border-[var(--wz-line)]/60">
+            <div className="w-12 h-12 rounded-full bg-[var(--wz-tint)] flex items-center justify-center text-[var(--wz-heading)] mb-1">
               <HelpCircle className="w-7 h-7" />
             </div>
             <legend className="contents">
-              <h2 className="text-[18px] sm:text-[20px] font-bold text-[#161b28]">
+              <h2 className="text-[18px] sm:text-[20px] font-bold text-[var(--wz-ink)]">
                 {copy.decisionTitle}
               </h2>
             </legend>
-            <p className="text-[13px] text-[#444650] leading-relaxed max-w-sm">{copy.decisionLead}</p>
+            <p className="text-[13px] text-[var(--wz-secondary)] leading-relaxed max-w-sm">{copy.decisionLead}</p>
           </div>
 
           <div className="flex flex-col gap-3">
@@ -430,10 +438,10 @@ export function Step3Payment({
               return (
                 <label
                   key={key}
-                  className={`cursor-pointer p-4 rounded-2xl transition-all flex items-start gap-3 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#0056c5] ${
+                  className={`cursor-pointer p-4 rounded-2xl transition-all flex items-start gap-3 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--wz-accent)] ${
                     selected
-                      ? 'bg-[#e9edff] shadow-md border-2 border-[#001849]'
-                      : 'bg-white shadow-xs border-2 border-transparent hover:border-[#dee2f4]'
+                      ? 'bg-[var(--wz-tint)] shadow-md border-2 border-[var(--wz-heading)]'
+                      : 'bg-[var(--wz-surface)] shadow-xs border-2 border-transparent hover:border-[var(--wz-line)]'
                   }`}
                 >
                   <input
@@ -445,24 +453,24 @@ export function Step3Payment({
                   />
                   <span
                     className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-xs ${
-                      selected ? 'bg-[#001849] text-white' : 'bg-[#e9edff] text-[#001849]'
+                      selected ? 'bg-[var(--wz-btn-bg)] text-white' : 'bg-[var(--wz-tint)] text-[var(--wz-heading)]'
                     }`}
                   >
                     <Icon className="w-6 h-6" />
                   </span>
                   <span className="flex flex-col flex-1">
                     <span className="flex items-center justify-between gap-2">
-                      <span className="text-[16px] font-bold text-[#161b28]">{title}</span>
+                      <span className="text-[16px] font-bold text-[var(--wz-ink)]">{title}</span>
                       <span
                         aria-hidden
                         className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
-                          selected ? 'bg-[#001849]' : 'bg-[#e3e7fa]'
+                          selected ? 'bg-[var(--wz-btn-bg)]' : 'bg-[var(--wz-tint-4)]'
                         }`}
                       >
-                        <span className="w-2 h-2 rounded-full bg-white" />
+                        <span className="w-2 h-2 rounded-full bg-[var(--wz-surface)]" />
                       </span>
                     </span>
-                    <span className="text-[13px] text-[#444650] mt-1 leading-snug">{lead}</span>
+                    <span className="text-[13px] text-[var(--wz-secondary)] mt-1 leading-snug">{lead}</span>
                   </span>
                 </label>
               )
@@ -472,24 +480,24 @@ export function Step3Payment({
       ) : (
         <section className="flex flex-col gap-4">
           <div className="flex items-center justify-between px-1">
-            <h3 className="text-[16px] font-bold text-[#001849]">{copy.methodsTitle}</h3>
+            <h3 className="text-[16px] font-bold text-[var(--wz-heading)]">{copy.methodsTitle}</h3>
             <button
               type="button"
               onClick={() => setSubView('decision')}
-              className="text-[12px] text-[#0056c5] hover:underline font-semibold cursor-pointer"
+              className="text-[12px] text-[var(--wz-accent)] hover:underline font-semibold cursor-pointer"
             >
               {copy.backToChoice}
             </button>
           </div>
 
           {intent === 'arranged' ? (
-            <div className="bg-[#0056c5]/10 border border-[#0056c5]/20 rounded-xl p-3 flex items-start gap-2 text-[#001849]">
-              <Handshake className="w-4 h-4 text-[#0056c5] shrink-0 mt-0.5" />
+            <div className="bg-[var(--wz-accent)]/10 border border-[var(--wz-accent)]/20 rounded-xl p-3 flex items-start gap-2 text-[var(--wz-heading)]">
+              <Handshake className="w-4 h-4 text-[var(--wz-accent)] shrink-0 mt-0.5" />
               <p className="text-[12px] leading-relaxed">{copy.arrangedNotice}</p>
             </div>
           ) : null}
 
-          {students.map((student, index) => {
+          {joining.map((student, index) => {
             const name = `${student.firstName} ${student.lastName}`.trim()
             const price = priceOf(student)
             const plan = plans.find((entry) => entry.id === student.planId)
@@ -507,13 +515,13 @@ export function Step3Payment({
                       </span>
                       <div className="flex flex-col min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-[16px] font-bold text-[#161b28]">{name}</span>
+                          <span className="text-[16px] font-bold text-[var(--wz-ink)]">{name}</span>
                           <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[11px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
                             <Clock className="w-3 h-3 text-amber-700" />
                             {copy.awaitingBadge}
                           </span>
                         </div>
-                        <span className="text-[12px] text-[#444650] truncate">{plan?.title}</span>
+                        <span className="text-[12px] text-[var(--wz-secondary)] truncate">{plan?.title}</span>
                       </div>
                     </div>
                     <div className="flex flex-col items-end shrink-0">
@@ -541,28 +549,28 @@ export function Step3Payment({
             return (
               <div
                 key={student.id}
-                className="bg-white rounded-2xl p-4 shadow-xs border border-[#dee2f4] flex flex-col gap-3"
+                className="bg-[var(--wz-surface)] rounded-2xl p-4 shadow-xs border border-[var(--wz-line)] flex flex-col gap-3"
               >
-                <div className="flex items-center justify-between border-b border-[#f2f3ff] pb-2.5 gap-2">
+                <div className="flex items-center justify-between border-b border-[var(--wz-raised)] pb-2.5 gap-2">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="w-8 h-8 rounded-full bg-[#001849]/10 text-[#001849] font-bold text-[13px] flex items-center justify-center shrink-0">
+                    <span className="w-8 h-8 rounded-full bg-[var(--wz-btn-bg)]/10 text-[var(--wz-heading)] font-bold text-[13px] flex items-center justify-center shrink-0">
                       {index + 1}
                     </span>
                     <div className="flex flex-col min-w-0">
-                      <span className="text-[16px] font-bold text-[#161b28]">{name}</span>
-                      <span className="text-[12px] text-[#444650] truncate">{plan?.title}</span>
+                      <span className="text-[16px] font-bold text-[var(--wz-ink)]">{name}</span>
+                      <span className="text-[12px] text-[var(--wz-secondary)] truncate">{plan?.title}</span>
                     </div>
                   </div>
                   <div className="flex flex-col items-end shrink-0">
-                    <span className="text-[16px] font-bold text-[#001849]">
+                    <span className="text-[16px] font-bold text-[var(--wz-heading)]">
                       ₪{formatShekels(price)}
                     </span>
-                    <span className="text-[11px] text-[#444650]">{copy[LONG_LABEL[method]]}</span>
+                    <span className="text-[11px] text-[var(--wz-secondary)]">{copy[LONG_LABEL[method]]}</span>
                   </div>
                 </div>
 
                 <fieldset className="flex flex-col gap-1.5 border-0 p-0 m-0">
-                  <legend className="text-[11px] text-[#444650] font-medium mb-1">
+                  <legend className="text-[11px] text-[var(--wz-secondary)] font-medium mb-1">
                     {copy.methodFor} {name}
                   </legend>
                   {/* F5 (fix round 1) — arranged with the coach already means one of the
@@ -580,8 +588,8 @@ export function Step3Payment({
                       return (
                         <label
                           key={key}
-                          className={`py-2 px-1 rounded-xl text-[12px] font-bold text-center flex flex-col items-center justify-center gap-1 transition-all cursor-pointer shadow-xs has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#0056c5] ${
-                            active ? 'bg-[#001849] text-white' : 'bg-[#e9edff] text-[#161b28] hover:bg-[#dee2f4]'
+                          className={`py-2 px-1 rounded-xl text-[12px] font-bold text-center flex flex-col items-center justify-center gap-1 transition-all cursor-pointer shadow-xs has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--wz-accent)] ${
+                            active ? 'bg-[var(--wz-btn-bg)] text-white' : 'bg-[var(--wz-tint)] text-[var(--wz-ink)] hover:bg-[var(--wz-line)]'
                           }`}
                         >
                           <input
@@ -607,17 +615,17 @@ export function Step3Payment({
               and "one form either way" is not a multi-child note. */}
           {chargeable.length >= 2 &&
           chargeable.some((student) => (methods[student.id] ?? 'credit') === 'standing_order') ? (
-            <div className="bg-[#0056c5]/10 border border-[#0056c5]/20 rounded-xl p-3 flex items-start gap-2 text-[#001849]">
-              <Repeat className="w-4 h-4 text-[#0056c5] shrink-0 mt-0.5" />
+            <div className="bg-[var(--wz-accent)]/10 border border-[var(--wz-accent)]/20 rounded-xl p-3 flex items-start gap-2 text-[var(--wz-heading)]">
+              <Repeat className="w-4 h-4 text-[var(--wz-accent)] shrink-0 mt-0.5" />
               <p className="text-[12px] leading-relaxed">{copy.standingOrderMultiNote}</p>
             </div>
           ) : null}
 
           {/* §6.5 — the breakdown */}
-          <div className="bg-white rounded-2xl p-4 shadow-xs border border-[#dee2f4] flex flex-col gap-2.5">
-            <div className="flex items-center justify-between border-b border-[#dee2f4] pb-2">
-              <span className="text-[15px] font-bold text-[#001849]">{copy.breakdownTitle}</span>
-              <span className="text-[11px] text-[#0056c5] font-semibold">{copy.insuranceIncluded}</span>
+          <div className="bg-[var(--wz-surface)] rounded-2xl p-4 shadow-xs border border-[var(--wz-line)] flex flex-col gap-2.5">
+            <div className="flex items-center justify-between border-b border-[var(--wz-line)] pb-2">
+              <span className="text-[15px] font-bold text-[var(--wz-heading)]">{copy.breakdownTitle}</span>
+              <span className="text-[11px] text-[var(--wz-accent)] font-semibold">{copy.insuranceIncluded}</span>
             </div>
 
             {awaiting.length > 0 ? (
@@ -640,30 +648,30 @@ export function Step3Payment({
             ) : null}
 
             {creditSum > 0 ? (
-              <div className="flex items-center justify-between py-1 border-b border-[#f2f3ff] gap-2">
+              <div className="flex items-center justify-between py-1 border-b border-[var(--wz-raised)] gap-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <CreditCard className="w-5 h-5 text-[#0056c5] shrink-0" />
+                  <CreditCard className="w-5 h-5 text-[var(--wz-accent)] shrink-0" />
                   <div className="flex flex-col min-w-0">
-                    <span className="text-[13px] font-bold text-[#161b28]">{copy.creditRow}</span>
-                    <span className="text-[11px] text-[#444650]">{copy.creditRowSub}</span>
+                    <span className="text-[13px] font-bold text-[var(--wz-ink)]">{copy.creditRow}</span>
+                    <span className="text-[11px] text-[var(--wz-secondary)]">{copy.creditRowSub}</span>
                   </div>
                 </div>
-                <span className="text-[16px] font-bold text-[#0056c5] shrink-0">
+                <span className="text-[16px] font-bold text-[var(--wz-accent)] shrink-0">
                   ₪{formatShekels(creditSum)}
                 </span>
               </div>
             ) : null}
 
             {coachSum > 0 ? (
-              <div className="flex items-center justify-between py-1 border-b border-[#f2f3ff] gap-2">
+              <div className="flex items-center justify-between py-1 border-b border-[var(--wz-raised)] gap-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <Handshake className="w-5 h-5 text-[#001849] shrink-0" />
+                  <Handshake className="w-5 h-5 text-[var(--wz-heading)] shrink-0" />
                   <div className="flex flex-col min-w-0">
-                    <span className="text-[13px] font-bold text-[#001849]">{copy.coachRow}</span>
-                    <span className="text-[11px] text-[#444650]">{copy.coachRowSub}</span>
+                    <span className="text-[13px] font-bold text-[var(--wz-heading)]">{copy.coachRow}</span>
+                    <span className="text-[11px] text-[var(--wz-secondary)]">{copy.coachRowSub}</span>
                   </div>
                 </div>
-                <span className="text-[16px] font-bold text-[#001849] shrink-0">
+                <span className="text-[16px] font-bold text-[var(--wz-heading)] shrink-0">
                   ₪{formatShekels(coachSum)}
                 </span>
               </div>
@@ -676,8 +684,8 @@ export function Step3Payment({
             ) : null}
 
             {coachSum > 0 ? (
-              <div className="bg-[#0056c5]/10 border border-[#0056c5]/20 rounded-xl p-2.5 flex items-start gap-2 text-[#001849]">
-                <Handshake className="w-4 h-4 text-[#0056c5] shrink-0 mt-0.5" />
+              <div className="bg-[var(--wz-accent)]/10 border border-[var(--wz-accent)]/20 rounded-xl p-2.5 flex items-start gap-2 text-[var(--wz-heading)]">
+                <Handshake className="w-4 h-4 text-[var(--wz-accent)] shrink-0 mt-0.5" />
                 <p className="text-[12px] leading-relaxed">{copy.coachNote}</p>
               </div>
             ) : null}
@@ -685,14 +693,14 @@ export function Step3Payment({
         </section>
       )}
 
-      <footer className="fixed bottom-0 inset-x-0 z-30 bg-[#faf8ff]/95 backdrop-blur-md shadow-[0_-4px_20px_rgba(15,23,42,0.08)] pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] px-4 border-t border-[#dee2f4]">
+      <footer className="fixed bottom-0 inset-x-0 z-30 bg-[var(--wz-ground)]/95 backdrop-blur-md shadow-[0_-4px_20px_rgba(15,23,42,0.08)] pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] px-4 border-t border-[var(--wz-line)]">
         <div className="max-w-[480px] mx-auto flex flex-col gap-2">
           <div className="flex items-center gap-2">
             {phase === 'form' ? (
               <button
                 type="button"
                 onClick={subView === 'methods' ? () => setSubView('decision') : onBack}
-                className="h-12 px-4 rounded-xl bg-[#e9edff] hover:bg-[#dee2f4] text-[#001849] text-[14px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer shrink-0"
+                className="h-12 px-4 rounded-xl bg-[var(--wz-tint)] hover:bg-[var(--wz-line)] text-[var(--wz-heading)] text-[14px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer shrink-0"
               >
                 {copy.back}
               </button>
@@ -703,15 +711,15 @@ export function Step3Payment({
               onClick={onFooter}
               className={`flex-1 h-12 rounded-xl text-white text-[15px] font-bold shadow-md transition-all flex items-center justify-center gap-2 ${
                 phase === 'working'
-                  ? 'bg-[#757681] cursor-not-allowed'
-                  : 'bg-[#001849] hover:bg-[#0056c5] active:scale-[0.99] cursor-pointer'
+                  ? 'bg-[var(--wz-tertiary)] cursor-not-allowed'
+                  : 'bg-[var(--wz-btn-bg)] hover:bg-[var(--wz-accent)] active:scale-[0.99] cursor-pointer'
               }`}
             >
               <span className="truncate">{footerLabel()}</span>
             </button>
           </div>
-          <div className="flex items-center justify-center gap-1.5 text-[#444650] text-[11px]">
-            <Lock className="w-3.5 h-3.5 text-[#0056c5]" />
+          <div className="flex items-center justify-center gap-1.5 text-[var(--wz-secondary)] text-[11px]">
+            <Lock className="w-3.5 h-3.5 text-[var(--wz-accent)]" />
             <span>{copy.secureNote}</span>
           </div>
         </div>

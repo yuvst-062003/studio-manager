@@ -71,15 +71,15 @@ export function Step1Agreements({
           />
         ) : null}
 
-        <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[#001849]/5 text-[#001849] mb-2.5 shadow-2xs">
-          <Swords className="w-4 h-4 text-[#0056c5]" />
+        <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[var(--wz-btn-bg)]/5 text-[var(--wz-heading)] mb-2.5 shadow-2xs">
+          <Swords className="w-4 h-4 text-[var(--wz-accent)]" />
           <span className="text-[12px] font-semibold">{STEP1_COPY.seasonBadge}</span>
         </div>
 
-        <h2 className="text-[24px] sm:text-[26px] font-bold text-[#161b28] tracking-tight mb-2">
+        <h2 className="text-[24px] sm:text-[26px] font-bold text-[var(--wz-ink)] tracking-tight mb-2">
           {STEP1_COPY.heading}
         </h2>
-        <p className="text-[14px] text-[#444650] max-w-[340px] mx-auto leading-relaxed">
+        <p className="text-[14px] text-[var(--wz-secondary)] max-w-[340px] mx-auto leading-relaxed">
           {STEP1_COPY.lead}
         </p>
       </div>
@@ -91,17 +91,17 @@ export function Step1Agreements({
             key={key}
             type="button"
             onClick={() => setOpenDocument(key)}
-            className="group w-full flex items-center justify-between p-3.5 rounded-xl bg-white shadow-xs hover:shadow-md border border-[#c5c6d2]/30 transition-all active:scale-[0.99] cursor-pointer text-right"
+            className="group w-full flex items-center justify-between p-3.5 rounded-xl bg-[var(--wz-surface)] shadow-xs hover:shadow-md border border-[var(--wz-line-strong)]/30 transition-all active:scale-[0.99] cursor-pointer text-right"
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-[#e9edff] flex items-center justify-center text-[#0056c5] group-hover:bg-[#0056c5] group-hover:text-white transition-colors">
+              <div className="w-10 h-10 rounded-lg bg-[var(--wz-tint)] flex items-center justify-center text-[var(--wz-accent)] group-hover:bg-[var(--wz-accent)] group-hover:text-white transition-colors">
                 <Icon className="w-5 h-5" />
               </div>
-              <span className="text-[15px] font-bold text-[#0056c5] group-hover:text-[#001849] transition-colors">
+              <span className="text-[15px] font-bold text-[var(--wz-accent)] group-hover:text-[var(--wz-heading)] transition-colors">
                 {LEGAL_DOCS[key].title}
               </span>
             </div>
-            <div className="flex items-center gap-1 text-[#0056c5]">
+            <div className="flex items-center gap-1 text-[var(--wz-accent)]">
               <span className="text-[11px] font-semibold opacity-75 group-hover:opacity-100">
                 {STEP1_COPY.viewDocument}
               </span>
@@ -116,20 +116,20 @@ export function Step1Agreements({
         <button
           type="button"
           onClick={() => setFaqOpen(true)}
-          className="group w-full flex items-center justify-between p-3.5 rounded-xl bg-white shadow-xs hover:shadow-md border border-[#c5c6d2]/30 transition-all active:scale-[0.99] cursor-pointer text-right"
+          className="group w-full flex items-center justify-between p-3.5 rounded-xl bg-[var(--wz-surface)] shadow-xs hover:shadow-md border border-[var(--wz-line-strong)]/30 transition-all active:scale-[0.99] cursor-pointer text-right"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[#e9edff] flex items-center justify-center text-[#0056c5] group-hover:bg-[#0056c5] group-hover:text-white transition-colors">
+            <div className="w-10 h-10 rounded-lg bg-[var(--wz-tint)] flex items-center justify-center text-[var(--wz-accent)] group-hover:bg-[var(--wz-accent)] group-hover:text-white transition-colors">
               <HelpCircle className="w-5 h-5" />
             </div>
             <div className="flex flex-col text-right">
-              <span className="text-[15px] font-bold text-[#0056c5] group-hover:text-[#001849] transition-colors">
+              <span className="text-[15px] font-bold text-[var(--wz-accent)] group-hover:text-[var(--wz-heading)] transition-colors">
                 {STEP1_COPY.faqTitle}
               </span>
-              <span className="text-[11px] text-[#444650]">{STEP1_COPY.faqLead}</span>
+              <span className="text-[11px] text-[var(--wz-secondary)]">{STEP1_COPY.faqLead}</span>
             </div>
           </div>
-          <div className="flex items-center gap-1 text-[#0056c5] shrink-0">
+          <div className="flex items-center gap-1 text-[var(--wz-accent)] shrink-0">
             <span className="text-[11px] font-semibold opacity-75 group-hover:opacity-100">
               {STEP1_COPY.faqCount}
             </span>
@@ -139,7 +139,7 @@ export function Step1Agreements({
       </div>
 
       {/* §3.4 — the confirmation card */}
-      <div className="mt-4 p-4 rounded-xl bg-white shadow-md border border-[#e9edff] flex flex-col gap-4">
+      <div className="mt-4 p-4 rounded-xl bg-[var(--wz-surface)] shadow-md border border-[var(--wz-tint)] flex flex-col gap-4">
         <label
           htmlFor="wizard-master-agreement"
           className="flex items-start gap-3 cursor-pointer group"
@@ -153,16 +153,16 @@ export function Step1Agreements({
               className="sr-only peer"
             />
             <div
-              className={`w-6 h-6 rounded-lg flex items-center justify-center shadow-inner transition-all group-hover:scale-105 peer-focus-visible:ring-2 peer-focus-visible:ring-[#0056c5] peer-focus-visible:ring-offset-2 ${
+              className={`w-6 h-6 rounded-lg flex items-center justify-center shadow-inner transition-all group-hover:scale-105 peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--wz-accent)] peer-focus-visible:ring-offset-2 ${
                 agreed
-                  ? 'bg-[#0056c5] text-white'
-                  : 'bg-[#e3e7fa] text-transparent border border-[#c5c6d2]'
+                  ? 'bg-[var(--wz-accent)] text-white'
+                  : 'bg-[var(--wz-tint-4)] text-transparent border border-[var(--wz-line-strong)]'
               }`}
             >
               <Check className="w-4 h-4 stroke-[3]" />
             </div>
           </div>
-          <span className="text-[13px] font-medium text-[#161b28] leading-snug group-hover:text-[#0056c5] transition-colors">
+          <span className="text-[13px] font-medium text-[var(--wz-ink)] leading-snug group-hover:text-[var(--wz-accent)] transition-colors">
             {STEP1_COPY.agree}
           </span>
         </label>
@@ -173,8 +173,8 @@ export function Step1Agreements({
           onClick={onContinue}
           className={`w-full h-12 rounded-xl text-[15px] font-bold flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98] ${
             agreed
-              ? 'bg-[#001849] hover:bg-[#0056c5] text-white shadow-md cursor-pointer'
-              : 'bg-[#dee2f4] text-[#757681] cursor-not-allowed shadow-none'
+              ? 'bg-[var(--wz-btn-bg)] hover:bg-[var(--wz-accent)] text-white shadow-md cursor-pointer'
+              : 'bg-[var(--wz-line)] text-[var(--wz-tertiary)] cursor-not-allowed shadow-none'
           }`}
         >
           <span>{STEP1_COPY.continue}</span>
@@ -189,7 +189,7 @@ export function Step1Agreements({
             <DocumentPopup
               locale={locale}
               document={LEGAL_DOCS[openDocument]}
-              icon={<Icon className="w-5 h-5 text-[#0056c5]" />}
+              icon={<Icon className="w-5 h-5 text-[var(--wz-accent)]" />}
               onClose={() => setOpenDocument(null)}
             />
           )
@@ -199,7 +199,7 @@ export function Step1Agreements({
       {faqOpen ? (
         <FaqPopup
           locale={locale}
-          icon={<HelpCircle className="w-5 h-5 text-[#0056c5]" />}
+          icon={<HelpCircle className="w-5 h-5 text-[var(--wz-accent)]" />}
           onClose={() => setFaqOpen(false)}
         />
       ) : null}

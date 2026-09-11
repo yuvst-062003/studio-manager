@@ -11,6 +11,7 @@ import {
   Plus,
   School,
   ShieldCheck,
+  Sparkles,
   Swords,
   Trash2,
   Users,
@@ -45,10 +46,6 @@ export type Step2TraineesProps = {
    *  only while the list is empty and no saved draft is being resumed: it is a starting
    *  point for the first row, never a value that reappears on the second child. */
   firstStudentDefaults?: Partial<StudentDraft>
-  /** Task 10 item 3 -- the club's own slug, for the "try a trial lesson first" line
-   *  under the add-student button. `null` when the door has none to offer (rendered:
-   *  nothing) -- see `WizardStudio.slug`'s own doc for which doors have it. */
-  slug: string | null
   /** Task 10 item 4 -- threaded straight through to the student form's save.
    *  `undefined` on door B, which has no session for the `/me/*` read it needs. */
   checkDuplicate?: (firstName: string, lastName: string, birthDate: string) => Promise<boolean>
@@ -65,7 +62,6 @@ export function Step2Trainees({
   belts,
   healthSchema,
   firstStudentDefaults,
-  slug,
   checkDuplicate,
   onBack,
   onContinue,
@@ -73,7 +69,15 @@ export function Step2Trainees({
   const copy = step2Copy(locale)
   const BELT_OPTIONS = beltOptions(belts)
   const GRADE_OPTIONS = gradeOptions(locale)
-  const [sheet, setSheet] = useState<{ initial: StudentDraft | null; part: FormPart } | null>(null)
+  //: `intent` rides on the sheet because it is chosen by WHICH button opened it — a
+  //: child added through "שיעור ניסיון" is a trial from the first keystroke, rather
+  //: than a member who is asked at the payment step how they would like to pay for
+  //: something that costs nothing (owner's correction, 2026-09-11).
+  const [sheet, setSheet] = useState<{
+    initial: StudentDraft | null
+    part: FormPart
+    intent?: 'join' | 'trial'
+  } | null>(null)
   const [draft, setDraft] = useState(() => loadStudentDraft())
   const [removeError, setRemoveError] = useState<string | null>(null)
 
@@ -103,27 +107,27 @@ export function Step2Trainees({
     <div className="tw-scope flex flex-col w-full pb-[calc(7rem+env(safe-area-inset-bottom,0px))]" data-testid="join-family-step">
       <div className="flex flex-col gap-1.5 mt-2 mb-4">
         <div className="flex items-center justify-between flex-wrap gap-1">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#e3e7fa] text-[#0d2c6c] text-[12px] font-semibold">
-            <span className="w-2 h-2 rounded-full bg-[#0056c5]" />
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--wz-tint-4)] text-[var(--wz-chip-fg)] text-[12px] font-semibold">
+            <span className="w-2 h-2 rounded-full bg-[var(--wz-accent)]" />
             <span>{copy.seasonPill}</span>
           </div>
         </div>
-        <h2 className="text-[22px] sm:text-[24px] font-bold text-[#161b28] tracking-tight mt-1">
+        <h2 className="text-[22px] sm:text-[24px] font-bold text-[var(--wz-ink)] tracking-tight mt-1">
           {copy.heading}
         </h2>
-        <p className="text-[14px] text-[#444650] leading-relaxed">{copy.lead}</p>
+        <p className="text-[14px] text-[var(--wz-secondary)] leading-relaxed">{copy.lead}</p>
       </div>
 
       <div className="flex flex-col gap-3 mb-4">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-2">
-            <span className="text-[16px] font-bold text-[#161b28]">{copy.registered}</span>
-            <span className="px-2.5 py-0.5 rounded-full bg-[#dae1ff] text-[#001849] text-[12px] font-bold">
+            <span className="text-[16px] font-bold text-[var(--wz-ink)]">{copy.registered}</span>
+            <span className="px-2.5 py-0.5 rounded-full bg-[var(--wz-tint-2)] text-[var(--wz-heading)] text-[12px] font-bold">
               {students.length}
             </span>
           </div>
           {students.length > 0 ? (
-            <span className="text-[12px] text-[#0056c5] font-semibold flex items-center gap-1">
+            <span className="text-[12px] text-[var(--wz-accent)] font-semibold flex items-center gap-1">
               <CheckCircle2 className="w-4 h-4" />
               {copy.readyForNext}
             </span>
@@ -137,22 +141,34 @@ export function Step2Trainees({
           return (
             <div
               key={student.id}
-              className="relative overflow-hidden rounded-xl bg-white p-4 shadow-xs border border-[#dee2f4] hover:shadow-md transition-all duration-300"
+              className="relative overflow-hidden rounded-xl bg-[var(--wz-surface)] p-4 shadow-xs border border-[var(--wz-line)] hover:shadow-md transition-all duration-300"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3 min-w-0">
-                  <div className="relative w-12 h-12 rounded-xl bg-[#e3e7fa] flex items-center justify-center shrink-0 text-[#0d2c6c]">
+                  <div className="relative w-12 h-12 rounded-xl bg-[var(--wz-tint-4)] flex items-center justify-center shrink-0 text-[var(--wz-chip-fg)]">
                     <Swords className="w-6 h-6" />
                   </div>
 
                   <div className="flex flex-col min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-[17px] font-bold text-[#161b28] truncate">
+                      <h3 className="text-[17px] font-bold text-[var(--wz-ink)] truncate">
                         {student.firstName} {student.lastName}
                       </h3>
                       {student.beltId ? (
-                        <span className="px-2 py-0.5 rounded-md bg-[#e9edff] text-[#0056c5] text-[11px] font-semibold">
+                        <span className="px-2 py-0.5 rounded-md bg-[var(--wz-tint)] text-[var(--wz-accent)] text-[11px] font-semibold">
                           {labelFrom(BELT_OPTIONS, student.beltId)}
+                        </span>
+                      ) : null}
+                      {/* Said on the child's own row, because it is the one fact that
+                          changes what happens to them: no plan is charged and step 3
+                          never asks about them. */}
+                      {student.intent === 'trial' ? (
+                        <span
+                          className="px-2 py-0.5 rounded-md bg-[var(--wz-tint-3)] text-[var(--wz-chip-fg)] text-[11px] font-bold flex items-center gap-1"
+                          data-testid="step2-trial-chip"
+                        >
+                          <Sparkles className="w-3 h-3" />
+                          <span>{copy.trialChip}</span>
                         </span>
                       ) : null}
                       {flagged ? (
@@ -163,30 +179,30 @@ export function Step2Trainees({
                       ) : (
                         // The number, formatted once. The prototype's helper returns
                         // " (בן 11)" and the caller wraps it again — `קטין (גיל  (בן 11))`.
-                        <span className="px-2 py-0.5 rounded-md bg-[#d9e2ff] text-[#001945] text-[11px] font-semibold">
+                        <span className="px-2 py-0.5 rounded-md bg-[var(--wz-tint-3)] text-[var(--wz-chip-fg)] text-[11px] font-semibold">
                           {minor ? copy.minor : copy.adult}
                           {Number.isFinite(age) ? ` (${copy.age} ${age})` : ''}
                         </span>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2 mt-1.5 text-[#444650] text-[12px] flex-wrap">
+                    <div className="flex items-center gap-2 mt-1.5 text-[var(--wz-secondary)] text-[12px] flex-wrap">
                       {student.grade ? (
                         <>
                           <span className="flex items-center gap-1">
-                            <School className="w-3.5 h-3.5 text-[#0056c5]" />
+                            <School className="w-3.5 h-3.5 text-[var(--wz-accent)]" />
                             <span>{labelFrom(GRADE_OPTIONS, student.grade)}</span>
                           </span>
                           <span aria-hidden>•</span>
                         </>
                       ) : null}
                       <span className="flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5 text-[#0056c5]" />
+                        <Calendar className="w-3.5 h-3.5 text-[var(--wz-accent)]" />
                         <span>{formatBirthDate(student.birthDate)}</span>
                       </span>
                       <span aria-hidden>•</span>
                       <span className="flex items-center gap-1">
-                        <CreditCard className="w-3.5 h-3.5 text-[#0056c5]" />
+                        <CreditCard className="w-3.5 h-3.5 text-[var(--wz-accent)]" />
                         <span>
                           {copy.nationalIdShort} {student.nationalId}
                         </span>
@@ -194,7 +210,7 @@ export function Step2Trainees({
                       {student.email ? (
                         <>
                           <span aria-hidden>•</span>
-                          <span className="flex items-center gap-1 text-[#0056c5]" dir="ltr">
+                          <span className="flex items-center gap-1 text-[var(--wz-accent)]" dir="ltr">
                             <Mail className="w-3.5 h-3.5" />
                             <span>{student.email}</span>
                           </span>
@@ -216,7 +232,7 @@ export function Step2Trainees({
                     type="button"
                     aria-label={`${copy.edit}: ${student.firstName}`}
                     onClick={() => setSheet({ initial: student, part: 1 })}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[#444650] hover:bg-[#e9edff] hover:text-[#001849] transition-colors cursor-pointer"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--wz-secondary)] hover:bg-[var(--wz-tint)] hover:text-[var(--wz-heading)] transition-colors cursor-pointer"
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
@@ -224,7 +240,7 @@ export function Step2Trainees({
                     type="button"
                     aria-label={`${copy.remove}: ${student.firstName}`}
                     onClick={() => remove(student.id)}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[#444650] hover:bg-[#ffdad6] hover:text-[#ba1a1a] transition-colors cursor-pointer"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--wz-secondary)] hover:bg-[var(--wz-danger-tint)] hover:text-[var(--wz-danger)] transition-colors cursor-pointer"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -232,30 +248,30 @@ export function Step2Trainees({
               </div>
 
               {minor ? (
-                <div className="mt-3 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 bg-[#f2f3ff] p-2.5 rounded-lg text-[#161b28] text-[12px]">
+                <div className="mt-3 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 bg-[var(--wz-raised)] p-2.5 rounded-lg text-[var(--wz-ink)] text-[12px]">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <Users className="w-4 h-4 text-[#0056c5] shrink-0" />
-                    <span className="text-[#444650]">{copy.guardian}:</span>
+                    <Users className="w-4 h-4 text-[var(--wz-accent)] shrink-0" />
+                    <span className="text-[var(--wz-secondary)]">{copy.guardian}:</span>
                     <span className="font-semibold truncate">
                       {student.guardianFirstName} {student.guardianLastName}
                       {student.guardianPhone ? ` (${student.guardianPhone})` : ''}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <ShieldCheck className="w-4 h-4 text-[#0056c5] shrink-0" />
-                    <span className="text-[#444650]">{copy.pickup}:</span>
+                    <ShieldCheck className="w-4 h-4 text-[var(--wz-accent)] shrink-0" />
+                    <span className="text-[var(--wz-secondary)]">{copy.pickup}:</span>
                     <span className="font-semibold truncate">
                       {student.pickup.parentOnly ? copy.pickupParentsOnly : student.pickup.extraName}
                     </span>
                   </div>
                 </div>
               ) : (
-                <div className="mt-3 bg-[#f2f3ff] p-2.5 rounded-lg text-[#001849] text-[12px] flex items-center justify-between">
+                <div className="mt-3 bg-[var(--wz-raised)] p-2.5 rounded-lg text-[var(--wz-heading)] text-[12px] flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-[#0056c5] shrink-0" />
+                    <ShieldCheck className="w-4 h-4 text-[var(--wz-accent)] shrink-0" />
                     <span className="font-semibold">{copy.adultRow}</span>
                   </div>
-                  <span className="text-[#0056c5] font-bold">18+</span>
+                  <span className="text-[var(--wz-accent)] font-bold">18+</span>
                 </div>
               )}
             </div>
@@ -263,20 +279,20 @@ export function Step2Trainees({
         })}
 
         {removeError ? (
-          <p className="text-[12px] text-[#ba1a1a] font-medium px-1" role="alert">
+          <p className="text-[12px] text-[var(--wz-danger)] font-medium px-1" role="alert">
             {removeError}
           </p>
         ) : null}
 
         {showDraftCard && draft ? (
-          <div className="p-3.5 bg-gradient-to-r from-emerald-50 to-[#e9edff] border border-emerald-300/80 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[13px] shadow-xs mt-1">
+          <div className="p-3.5 bg-gradient-to-r from-emerald-50 to-[var(--wz-tint)] border border-emerald-300/80 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[13px] shadow-xs mt-1">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
                 <Clock className="w-4 h-4" />
               </div>
               <div className="flex flex-col">
-                <span className="text-[#161b28] font-bold">{copy.draftTitle}</span>
-                <span className="text-[12px] text-[#444650]">
+                <span className="text-[var(--wz-ink)] font-bold">{copy.draftTitle}</span>
+                <span className="text-[12px] text-[var(--wz-secondary)]">
                   {draft.student.firstName || '—'} • {draft.part}/5
                 </span>
               </div>
@@ -285,7 +301,7 @@ export function Step2Trainees({
               <button
                 type="button"
                 onClick={() => setSheet({ initial: draft.student, part: draft.part })}
-                className="px-3.5 py-1.5 bg-[#0056c5] hover:bg-[#0d2c6c] text-white rounded-lg text-[12px] font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+                className="px-3.5 py-1.5 bg-[var(--wz-accent)] hover:bg-[var(--wz-accent-deep)] text-white rounded-lg text-[12px] font-bold transition-all shadow-xs cursor-pointer active:scale-95"
               >
                 {copy.draftResume}
               </button>
@@ -295,7 +311,7 @@ export function Step2Trainees({
                   clearStudentDraft()
                   setDraft(null)
                 }}
-                className="px-2.5 py-1.5 text-[#ba1a1a] hover:bg-red-100/50 rounded-lg text-[12px] font-medium transition-colors cursor-pointer"
+                className="px-2.5 py-1.5 text-[var(--wz-danger)] hover:bg-red-100/50 rounded-lg text-[12px] font-medium transition-colors cursor-pointer"
               >
                 {copy.draftDiscard}
               </button>
@@ -305,35 +321,47 @@ export function Step2Trainees({
 
         <button
           type="button"
-          onClick={() => setSheet({ initial: null, part: 1 })}
-          className="group w-full py-3.5 px-4 rounded-xl text-[#0056c5] border-2 border-dashed bg-white hover:bg-[#f2f3ff] border-[#0056c5]/30 hover:border-[#0056c5] flex items-center justify-center gap-2.5 transition-all duration-200 mt-1 shadow-2xs active:scale-[0.99] cursor-pointer"
+          data-testid="step2-add-student"
+          onClick={() => setSheet({ initial: null, part: 1, intent: 'join' })}
+          className="group w-full py-3.5 px-4 rounded-xl text-[var(--wz-accent)] border-2 border-dashed bg-[var(--wz-surface)] hover:bg-[var(--wz-raised)] border-[var(--wz-accent)]/30 hover:border-[var(--wz-accent)] flex items-center justify-center gap-2.5 transition-all duration-200 mt-1 shadow-2xs active:scale-[0.99] cursor-pointer"
         >
-          <span className="w-7 h-7 rounded-full bg-[#d9e2ff] flex items-center justify-center text-[#0056c5] group-hover:scale-110 transition-transform">
+          <span className="w-7 h-7 rounded-full bg-[var(--wz-tint-3)] flex items-center justify-center text-[var(--wz-accent)] group-hover:scale-110 transition-transform">
             <Plus className="w-4 h-4 stroke-[3]" />
           </span>
           <span className="text-[15px] font-bold">{copy.addStudent}</span>
         </button>
 
-        {/* Task 10 item 3 -- the alternative for a family that is not ready to commit to
-            a membership: a quiet text link, never a second primary button, to the same
-            public booking page a new family uses. Rendered only when a slug is known. */}
-        {slug ? (
-          <a
-            className="self-center text-[13px] font-medium text-[#0056c5] hover:underline -mt-1"
-            data-testid="step2-try-first-link"
-            href={`/t/${slug}`}
-          >
-            {copy.tryFirst}
-          </a>
-        ) : null}
+        {/* The alternative for a family not ready to commit — as a SENTENCE, not a door.
+            It used to be `<a href="/t/{slug}">`, a hard navigation to the public booking
+            page: a parent who wanted one child enrolled and one trying a lesson pressed it
+            and lost the wizard, every answer they had typed, and their place in the flow
+            (reported 2026-09-11). The choice now lives per child at step 3, where every
+            other per-child decision is made, so the two children travel together. */}
+        {/* The second door, and the reason this is a BUTTON rather than the link it used
+            to be. `href="/t/{slug}"` navigated the parent to the public booking page and
+            took the wizard with it, so a family enrolling one child and trying another
+            could not do both. Adding a child here marks them a trial from the start: they
+            never reach step 3, raise no charge, and are booked through
+            `POST /trial-bookings/self` when the family submits. */}
+        <button
+          type="button"
+          data-testid="step2-add-trial"
+          onClick={() => setSheet({ initial: null, part: 1, intent: 'trial' })}
+          className="group w-full py-3 px-4 rounded-xl text-[var(--wz-secondary)] border border-dashed bg-transparent hover:bg-[var(--wz-raised)] border-[var(--wz-line-strong)] hover:border-[var(--wz-accent)] flex items-center justify-center gap-2.5 transition-all duration-200 active:scale-[0.99] cursor-pointer"
+        >
+          <span className="w-6 h-6 rounded-full bg-[var(--wz-tint)] flex items-center justify-center text-[var(--wz-accent)] shrink-0">
+            <Sparkles className="w-3.5 h-3.5" />
+          </span>
+          <span className="text-[13.5px] font-semibold">{copy.tryFirst}</span>
+        </button>
       </div>
 
-      <div className="fixed bottom-0 inset-x-0 z-30 bg-[#faf8ff]/95 backdrop-blur-md border-t border-[#dee2f4] shadow-[0_-4px_16px_rgba(15,23,42,0.06)] pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] px-4">
+      <div className="fixed bottom-0 inset-x-0 z-30 bg-[var(--wz-ground)]/95 backdrop-blur-md border-t border-[var(--wz-line)] shadow-[0_-4px_16px_rgba(15,23,42,0.06)] pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] px-4">
         <div className="max-w-[480px] mx-auto flex items-center gap-3">
           <button
             type="button"
             onClick={onBack}
-            className="h-12 px-4 rounded-xl bg-[#e9edff] hover:bg-[#dee2f4] text-[#001849] text-[15px] font-semibold flex items-center justify-center gap-1 transition-colors shrink-0 cursor-pointer"
+            className="h-12 px-4 rounded-xl bg-[var(--wz-tint)] hover:bg-[var(--wz-line)] text-[var(--wz-heading)] text-[15px] font-semibold flex items-center justify-center gap-1 transition-colors shrink-0 cursor-pointer"
           >
             {copy.back}
           </button>
@@ -343,8 +371,8 @@ export function Step2Trainees({
             onClick={onContinue}
             className={`flex-1 h-12 rounded-xl text-[15px] font-bold flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.99] ${
               students.length === 0
-                ? 'bg-[#dee2f4] text-[#757681] cursor-not-allowed'
-                : 'bg-[#001849] hover:bg-[#0056c5] text-white shadow-md cursor-pointer'
+                ? 'bg-[var(--wz-line)] text-[var(--wz-tertiary)] cursor-not-allowed'
+                : 'bg-[var(--wz-btn-bg)] hover:bg-[var(--wz-accent)] text-white shadow-md cursor-pointer'
             }`}
           >
             <span>{copy.continueToStep3}</span>
@@ -383,6 +411,9 @@ export function Step2Trainees({
                 ? firstStudentDefaults
                 : undefined
           }
+          //: Which button opened the sheet. `undefined` while EDITING an existing child,
+          //: so re-opening a member's form never silently turns them into a trial.
+          intent={sheet.intent}
           onSave={save}
           onClose={() => {
             setSheet(null)

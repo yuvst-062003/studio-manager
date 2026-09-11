@@ -9,6 +9,7 @@
 //   * The dialog traps focus, closes on Escape and restores focus -- see useDialog.ts.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, CreditCard, HeartPulse, PenTool, Swords, User, X } from 'lucide-react'
+import { fill } from '@studio/core'
 import type { Locale } from '@studio/i18n'
 import type { TemplateSchema } from '../../health/healthClient'
 import { useDialog } from './useDialog'
@@ -38,6 +39,18 @@ function partMeta(
 
 const PARTS: readonly FormPart[] = [1, 2, 3, 4, 5]
 
+/** The shipped tab labels carry their own number — "1. פרטים" through "5. חתימה" — and a
+ *  trial's form skips part 3, so they would read 1, 2, 4, 5 with no 3 anywhere. Strips the
+ *  prefix so the caller can renumber by position. Leading digit and separator only; every
+ *  locale's label starts the same way. */
+const stripIndex = (label: string): string => label.replace(/^\s*\d+\s*[.)]\s*/, '')
+
+/** Part 3 is the PLAN — which membership this child is on and what it costs a month.
+ *  A child coming for one lesson is not on a membership, so asking them to choose one is
+ *  asking a question with no answer, and the price beside it is not a price they will be
+ *  charged. So a trial child's form is four steps, not five. */
+const TRIAL_PARTS: readonly FormPart[] = [1, 2, 4, 5]
+
 export type StudentFormSheetProps = {
   locale: Locale
   initial: StudentDraft | null
@@ -49,6 +62,11 @@ export type StudentFormSheetProps = {
   healthSchema: TemplateSchema
   /** Applied to a NEW child only, so the family types it once (§5.6). */
   familyDefaults?: Partial<StudentDraft>
+  /** Joining, or here for one lesson. Set by WHICH add button opened this sheet, so a
+   *  trial child is a trial from the first keystroke rather than being asked at the
+   *  payment step. `undefined` when editing an existing child — re-opening a member's
+   *  form must never silently change what they are. */
+  intent?: 'join' | 'trial'
   /** Task 10 item 4 -- `GET /me/students/duplicate-check`, called right before the
    *  final save. `undefined` on door B (no `/me/*` session); doors C/D get the real
    *  thing from `studioSource`. **Warns, never refuses** -- a parent may genuinely have
@@ -68,15 +86,22 @@ export function StudentFormSheet({
   belts,
   healthSchema,
   familyDefaults,
+  intent,
   checkDuplicate,
   onSave,
   onClose,
 }: StudentFormSheetProps) {
   const STUDENT_FORM_COPY = studentFormCopy(locale)
   const PART_META = partMeta(STUDENT_FORM_COPY)
+  //: A child being EDITED keeps whatever they already are; `intent` is only set by the
+  //: button that opens a NEW form, so re-opening a member never drops their plan step.
+  const isTrial = (initial?.intent ?? intent) === 'trial'
+  const parts = isTrial ? TRIAL_PARTS : PARTS
   const isEditing = initial !== null && initial.firstName !== ''
   const [student, setStudent] = useState<StudentDraft>(
-    () => initial ?? emptyStudent(`student-${Date.now()}`, familyDefaults),
+    () =>
+      initial ??
+      emptyStudent(`student-${Date.now()}`, { ...familyDefaults, ...(intent ? { intent } : {}) }),
   )
   const [part, setPart] = useState<FormPart>(initialPart)
   const [touched, setTouched] = useState<Partial<Record<FieldKey, boolean>>>({})
@@ -182,7 +207,7 @@ export function StudentFormSheet({
   }
 
   const submit = async () => {
-    for (const target of PARTS) {
+    for (const target of parts) {
       if (!validate(target)) {
         setPart(target)
         return
@@ -225,7 +250,7 @@ export function StudentFormSheet({
         aria-modal="true"
         aria-label={isEditing ? STUDENT_FORM_COPY.editTitle : STUDENT_FORM_COPY.addTitle}
         tabIndex={-1}
-        className="relative w-full max-w-[490px] bg-white rounded-t-3xl sm:rounded-2xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden focus:outline-none"
+        className="relative w-full max-w-[490px] bg-[var(--wz-surface)] rounded-t-3xl sm:rounded-2xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden focus:outline-none"
       >
         {confirmingDiscard ? (
           // Inside the sheet's own dialog, so `useDialog`'s focus trap and Escape handling
@@ -235,7 +260,7 @@ export function StudentFormSheet({
             data-testid="discard-confirm"
           >
             <div className="w-full max-w-xs text-center">
-              <h3 className="text-base font-black text-[#0d2c6c]">
+              <h3 className="text-base font-black text-[var(--wz-chip-fg)]">
                 {STUDENT_FORM_COPY.discardTitle}
               </h3>
               <p className="mt-2 text-sm leading-relaxed text-slate-500">
@@ -248,7 +273,7 @@ export function StudentFormSheet({
                 type="button"
                 data-testid="discard-keep"
                 onClick={() => setConfirmingDiscard(false)}
-                className="mt-5 w-full rounded-xl bg-[#0d2c6c] py-3 text-sm font-black text-white"
+                className="mt-5 w-full rounded-xl bg-[var(--wz-accent-deep)] py-3 text-sm font-black text-white"
               >
                 {STUDENT_FORM_COPY.discardKeep}
               </button>
@@ -267,34 +292,48 @@ export function StudentFormSheet({
           </div>
         ) : null}
 
-        <div className="w-12 h-1.5 bg-[#dee2f4] rounded-full mx-auto mt-2.5 sm:hidden" />
+        <div className="w-12 h-1.5 bg-[var(--wz-line)] rounded-full mx-auto mt-2.5 sm:hidden" />
 
-        <div className="flex items-center justify-between px-5 pt-3 pb-3 border-b border-[#e9edff]">
+        <div className="flex items-center justify-between px-5 pt-3 pb-3 border-b border-[var(--wz-tint)]">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-[#0d2c6c] text-white flex items-center justify-center shadow-xs shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-[var(--wz-accent-deep)] text-white flex items-center justify-center shadow-xs shrink-0">
               <User className="w-5 h-5" />
             </div>
             <div className="flex flex-col min-w-0">
-              <h3 className="text-[18px] font-bold text-[#161b28] truncate">
-                {isEditing ? STUDENT_FORM_COPY.editTitle : STUDENT_FORM_COPY.addTitle}
+              <h3 className="text-[18px] font-bold text-[var(--wz-ink)] truncate">
+                {isEditing
+                  ? STUDENT_FORM_COPY.editTitle
+                  : isTrial
+                    ? STUDENT_FORM_COPY.addTrialTitle
+                    : STUDENT_FORM_COPY.addTitle}
               </h3>
-              <span className="text-[12px] text-[#444650] font-medium truncate">{meta.title}</span>
+              <span className="text-[12px] text-[var(--wz-secondary)] font-medium truncate">
+                {isTrial
+                  ? `${fill(STUDENT_FORM_COPY.stepOf, {
+                      step: parts.indexOf(part) + 1,
+                      total: parts.length,
+                    })}: ${stripIndex(PART_META[part].tab)}`
+                  : meta.title}
+              </span>
             </div>
           </div>
           <button
             type="button"
             onClick={requestClose}
             aria-label={STUDENT_FORM_COPY.close}
-            className="w-9 h-9 rounded-full bg-[#e9edff] flex items-center justify-center text-[#444650] hover:text-[#161b28] hover:bg-[#dee2f4] transition-colors cursor-pointer shrink-0"
+            className="w-9 h-9 rounded-full bg-[var(--wz-tint)] flex items-center justify-center text-[var(--wz-secondary)] hover:text-[var(--wz-ink)] hover:bg-[var(--wz-line)] transition-colors cursor-pointer shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="bg-[#f2f3ff] px-3 py-2 border-b border-[#e9edff]">
+        <div className="bg-[var(--wz-raised)] px-3 py-2 border-b border-[var(--wz-tint)]">
           <div className="grid grid-cols-5 gap-1">
-            {PARTS.map((target) => {
+            {parts.map((target) => {
               const { Icon, tab } = PART_META[target]
+              //: Numbered by POSITION for a trial, whose form has no part 3 — the
+              //: shipped labels would otherwise read 1, 2, 4, 5.
+              const label = isTrial ? `${parts.indexOf(target) + 1}. ${stripIndex(tab)}` : tab
               const failed = attempted[target] && partHasErrors(target)
               return (
                 <button
@@ -304,17 +343,17 @@ export function StudentFormSheet({
                   onClick={() => goTo(target)}
                   className={`relative flex flex-col items-center gap-1 py-1.5 px-0.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
                     part === target
-                      ? 'bg-[#0d2c6c] text-white shadow-xs'
+                      ? 'bg-[var(--wz-accent-deep)] text-white shadow-xs'
                       : part > target
-                        ? 'bg-[#0056c5]/15 text-[#0056c5]'
-                        : 'bg-white text-[#444650]'
+                        ? 'bg-[var(--wz-accent)]/15 text-[var(--wz-accent)]'
+                        : 'bg-[var(--wz-surface)] text-[var(--wz-secondary)]'
                   }`}
                 >
                   {failed ? (
                     <span className="absolute top-1 end-1 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white" />
                   ) : null}
                   <Icon className="w-4 h-4" />
-                  <span className="truncate">{tab}</span>
+                  <span className="truncate">{label}</span>
                 </button>
               )
             })}
@@ -400,7 +439,7 @@ export function StudentFormSheet({
               </div>
               <div className="flex items-center gap-2 justify-end">
                 <button
-                  className="h-9 px-3 rounded-lg bg-white border border-amber-300 text-amber-900 text-[13px] font-semibold hover:bg-amber-100 transition-colors cursor-pointer"
+                  className="h-9 px-3 rounded-lg bg-[var(--wz-surface)] border border-amber-300 text-amber-900 text-[13px] font-semibold hover:bg-amber-100 transition-colors cursor-pointer"
                   data-testid="duplicate-go-back"
                   onClick={() => setDuplicateWarning(false)}
                   type="button"
@@ -420,23 +459,28 @@ export function StudentFormSheet({
           ) : null}
         </div>
 
-        <div className="flex items-center gap-2 px-4 sm:px-5 py-3 bg-white border-t border-[#e9edff]">
+        <div className="flex items-center gap-2 px-4 sm:px-5 py-3 bg-[var(--wz-surface)] border-t border-[var(--wz-tint)]">
           {part > 1 ? (
             <button
               type="button"
-              onClick={() => setPart((previous) => (previous > 1 ? ((previous - 1) as FormPart) : previous))}
-              className="h-12 px-4 rounded-xl bg-[#e9edff] text-[#444650] hover:bg-[#dee2f4] text-[14px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer shrink-0"
+              onClick={() =>
+                setPart((previous) => {
+                  const at = parts.indexOf(previous)
+                  return at > 0 ? parts[at - 1]! : previous
+                })
+              }
+              className="h-12 px-4 rounded-xl bg-[var(--wz-tint)] text-[var(--wz-secondary)] hover:bg-[var(--wz-line)] text-[14px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer shrink-0"
             >
               <ChevronRight className="w-4 h-4" />
               <span>{STUDENT_FORM_COPY.previous}</span>
             </button>
           ) : null}
 
-          {part < 5 ? (
+          {part !== parts[parts.length - 1] ? (
             <button
               type="button"
-              onClick={() => goTo((part + 1) as FormPart)}
-              className="flex-1 h-12 rounded-xl bg-[#001849] hover:bg-[#0056c5] text-white text-[15px] font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99] cursor-pointer"
+              onClick={() => goTo(parts[parts.indexOf(part) + 1] ?? part)}
+              className="flex-1 h-12 rounded-xl bg-[var(--wz-btn-bg)] hover:bg-[var(--wz-accent)] text-white text-[15px] font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99] cursor-pointer"
             >
               <span className="truncate">{meta.next}</span>
               <ChevronLeft className="w-5 h-5 shrink-0" />
@@ -446,7 +490,7 @@ export function StudentFormSheet({
               type="button"
               disabled={checkingDuplicate}
               onClick={() => void submit()}
-              className="flex-1 h-12 rounded-xl bg-[#0056c5] hover:bg-[#001849] disabled:opacity-60 disabled:cursor-not-allowed text-white text-[15px] font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99] cursor-pointer"
+              className="flex-1 h-12 rounded-xl bg-[var(--wz-accent)] hover:bg-[var(--wz-btn-bg)] disabled:opacity-60 disabled:cursor-not-allowed text-white text-[15px] font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99] cursor-pointer"
             >
               <CheckCircle2 className="w-5 h-5 shrink-0" />
               <span className="truncate">{STUDENT_FORM_COPY.save}</span>
@@ -456,7 +500,7 @@ export function StudentFormSheet({
           <button
             type="button"
             onClick={requestClose}
-            className="h-12 px-3 sm:px-4 rounded-xl bg-[#e9edff] text-[#444650] hover:bg-[#dee2f4] text-[13px] font-medium transition-colors cursor-pointer shrink-0"
+            className="h-12 px-3 sm:px-4 rounded-xl bg-[var(--wz-tint)] text-[var(--wz-secondary)] hover:bg-[var(--wz-line)] text-[13px] font-medium transition-colors cursor-pointer shrink-0"
           >
             {STUDENT_FORM_COPY.cancel}
           </button>

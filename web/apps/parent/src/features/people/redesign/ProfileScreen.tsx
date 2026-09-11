@@ -145,6 +145,7 @@ export function ProfileScreen({
             beltName: row.current_belt_name ?? null,
             beltColorHex: row.current_belt_color_hex ?? null,
             groupNames: row.group_names ?? [],
+            status: row.status,
             attendancePercent: row.attendance_percent ?? null,
             // The SAME predicate §6.1's gate uses. Two spellings of "does this child still
             // owe something" is how a card comes to disagree with the gate that blocks the

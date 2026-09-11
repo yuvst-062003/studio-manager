@@ -681,12 +681,18 @@ describe('JoinWizard -- wiring submitJoin into the screens', () => {
   }, 20000)
 })
 
-// Task 10 item 3 -- "add a child" offers a trial. The old add-a-child screen let a parent
-// book a trial instead of a membership; the redesigned wizard registers members only, so
-// this is the alternative for a family not ready to commit -- a quiet text link to the
-// club's own public booking page, never a second primary button.
-describe('Step2Trainees -- the "try a trial lesson first" link (task 10 item 3)', () => {
-  it('renders the link to /t/{slug} once the studio (and its slug) has loaded', async () => {
+// The trial, which used to be a way OUT of the wizard (2026-09-11).
+//
+// Task 10 item 3 gave step 2 a text link to `/t/{slug}`, the club's public booking page.
+// It was a hard navigation: a parent who wanted one child enrolled and a second trying a
+// lesson pressed it, lost the wizard, lost every answer typed into it, and landed on a
+// page that knows nothing about the family. The owner's report is the case that breaks —
+// "a parent would want to register one kid with payment and second with trial".
+//
+// So the trial is a per-child choice at step 3 now, beside the four payment methods,
+// and step 2 carries a sentence pointing at it rather than a door out.
+describe('Step2Trainees -- the trial is a choice, not a way out', () => {
+  it('offers no link away from the wizard', async () => {
     const user = userEvent.setup()
     renderWizard()
 
@@ -695,12 +701,17 @@ describe('Step2Trainees -- the "try a trial lesson first" link (task 10 item 3)'
     await user.click(screen.getByRole('button', { name: STEP1_COPY.continue }))
 
     await screen.findByTestId('join-family-step')
-    const link = screen.getByTestId('step2-try-first-link')
-    expect(link).toHaveTextContent(STEP2_COPY.tryFirst)
-    expect(link).toHaveAttribute('href', '/t/demo-club')
+    // The trial is a second ADD BUTTON now, beside the one that adds a member...
+    expect(screen.getByTestId('step2-add-trial')).toHaveTextContent(STEP2_COPY.tryFirst)
+    // ...and nothing on this step navigates to the public booking page.
+    expect(screen.queryByTestId('step2-try-first-link')).toBeNull()
+    const escapes = screen
+      .queryAllByRole('link')
+      .filter((a) => (a.getAttribute('href') ?? '').startsWith('/t/'))
+    expect(escapes, 'step 2 must not offer a door out of the wizard').toHaveLength(0)
   })
 
-  it('renders no trial link when the source has no slug to offer', async () => {
+  it('says so even when the source has no slug, because the choice no longer needs one', async () => {
     const user = userEvent.setup()
     const source = fakeSource({ loadStudio: vi.fn(async () => ({ ...STUDIO, slug: null })) })
     renderWizard({ source })
@@ -710,7 +721,9 @@ describe('Step2Trainees -- the "try a trial lesson first" link (task 10 item 3)'
     await user.click(screen.getByRole('button', { name: STEP1_COPY.continue }))
 
     await screen.findByTestId('join-family-step')
-    expect(screen.queryByTestId('step2-try-first-link')).toBeNull()
+    // The old link was rendered only when a slug was known, because it WAS a URL. Adding
+    // a trial child is internal now, so a door with no slug offers exactly the same thing.
+    expect(screen.getByTestId('step2-add-trial')).toBeInTheDocument()
   })
 })
 

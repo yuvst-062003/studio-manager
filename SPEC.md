@@ -626,6 +626,29 @@ by rebooking.
 **The trial declaration is not sufficient for enrollment.** `health_status` moves
 `missing → trial_signed → signed`; converting requires the full form.
 
+**Entrance A — the family converts themselves, in three steps** (owner, 2026-09-12).
+④'s "איך היה?" now leads to `#/join`, which is **declaration → groups and plan → payment**
+and not the one screen it was. Three things changed, each because the old shape asked a
+family for something it already had or withheld something it owed them:
+
+- **The declaration is SHOWN, not asked again.** The public booking form renders the current
+  `kind=full` template minus its clause, so a trial family's thirteen answers are already in
+  the member form's own id-space. Step 1 displays them, names who declared them and when,
+  and asks only for the two things that door deliberately does not take — the clause and a
+  drawn signature (`decode_signature` refuses an empty one: "a declaration is not signed
+  until it is signed"). Filed through §5.5's own submit, so the student is `signed` before
+  the join runs and the gate has nothing left to hold. A family whose circumstances changed
+  updates the full form from the trainee card; this step confirms, it does not edit.
+- **The price is on the screen.** `join_from_trial` took no `price_plan_id`, on the reasoning
+  that a price a client posts is not a price — while `OnboardingService.register` had always
+  accepted one from the join wizard, so the two doors disagreed and this one showed no number
+  at all. The plan is chosen here and the server refuses an id that is not a live plan of
+  this studio; with no choice, the weekly-volume rule still derives it.
+- **Payment is step 3**, which is the payments screen the join's first charge lands on.
+
+The club terms are NOT re-asked: `TrialService.book_for_self` records `ConsentService` grants
+and `AgreementService.accept_club_terms` at booking, against a tick the booking form requires.
+
 **An unconverted lead is still personal data about a minor.** The retention job (§11.5)
 anonymizes leads that never converted on the same schedule as students who left.
 

@@ -997,6 +997,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/classes/{class_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Class
+         * @description Rename / re-describe / retire one class.
+         *
+         *     `ClassUpdate` was written when the model landed and no route ever used it, so a club
+         *     that mistyped a class name during setup had no way to correct it. `model_fields_set`
+         *     decides what to write, like `SessionPatch` and `GroupPatch`: an absent field leaves
+         *     its column alone rather than nulling it.
+         */
+        patch: operations["update_class_api_v1_classes__class_id__patch"];
+        trace?: never;
+    };
     "/api/v1/classes/{class_id}/staff": {
         parameters: {
             query?: never;
@@ -1725,6 +1750,33 @@ export interface paths {
          */
         post: operations["assign_group_staff_api_v1_groups__group_id__staff_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/groups/{group_id}/staff/{person_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Group Staff
+         * @description The counterpart `POST /groups/{id}/staff` shipped without in M1.4.
+         *
+         *     Classes have had a removal since the class-manager work; groups had none, so a coach
+         *     put on the wrong group stayed on it, and the staff screen's ללא קבוצה could only ever
+         *     be fixed in one direction (owner report, 2026-09-10).
+         *
+         *     Closes the row and revokes the group-scoped grant together -- see
+         *     `StructureService.unassign_staff` for why that is one call.
+         */
+        delete: operations["remove_group_staff_api_v1_groups__group_id__staff__person_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2675,6 +2727,45 @@ export interface paths {
          *     gives for a cross-studio reference.
          */
         get: operations["my_student_status_history_api_v1_me_students__student_id__status_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/students/{student_id}/trial-declaration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Trial Declaration
+         * @description What this family answered on the booking form, for the conversion screen to show back.
+         *
+         *     **Why it exists.** Entrance A's first step used to send a converting family through the
+         *     full thirteen-question declaration from scratch. They had already answered it — the
+         *     public booking form renders the current `kind=full` template minus its clause — so the
+         *     app was asking a parent to type their child's medical history twice and calling the
+         *     second copy the real one (owner, 2026-09-12). Now the step shows what they wrote and
+         *     asks only for the signature that door deliberately does not take.
+         *
+         *     **404, never 403**, the rule every `/me/` route here follows: under `/me/` the collection
+         *     is "my children", so an id outside it does not exist — and a 403 would confirm the child
+         *     is in this studio.
+         *
+         *     **An empty declaration is 200, not 404.** A child a manager put on a trial by hand has no
+         *     booking form behind them; the screen then asks the questions properly, and a 404 would be
+         *     indistinguishable from the route being broken.
+         *
+         *     No audit row and no logging of the body: G7 and §11.2 — these are a minor's health
+         *     answers, and `audit_log` is append-only, so anything written there is beyond
+         *     anonymization's reach.
+         */
+        get: operations["my_trial_declaration_api_v1_me_students__student_id__trial_declaration_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7225,6 +7316,19 @@ export interface components {
             /** Items */
             items: components["schemas"]["ClassCoachOut"][];
         };
+        /** ClassUpdate */
+        ClassUpdate: {
+            /** Color */
+            color?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Discipline */
+            discipline?: string | null;
+            /** Is Active */
+            is_active?: boolean | null;
+            /** Name */
+            name?: string | null;
+        };
         /** ClosureCreate */
         ClosureCreate: {
             /**
@@ -9726,6 +9830,35 @@ export interface components {
             student_id: string;
         };
         /**
+         * MyTrialDeclarationOut
+         * @description What this family already answered on the booking form, for the conversion screen's
+         *     first step to SHOW them (owner, 2026-09-12).
+         *
+         *     **The answers, and deliberately so** — which is the opposite of `HealthDeclarationOut`,
+         *     the coach-safe shape that returns flags and never contents (§5.5). The difference is the
+         *     reader: this route is under `/me/`, so the caller is a guardian of this child reading
+         *     what they themselves wrote an hour ago. A screen that asked them to sign a declaration
+         *     without showing what is in it would be asking for a signature on an unread document.
+         *
+         *     `template_id` travels so the client signs against the SAME template the answers were
+         *     given on, rather than re-fetching the newest and silently pairing old answers with new
+         *     questions. `null` when the stored entry carried none.
+         *
+         *     G7: never logged, never in an audit `diff`. These are a minor's medical answers.
+         */
+        MyTrialDeclarationOut: {
+            /** Answers */
+            answers?: {
+                [key: string]: unknown;
+            };
+            /** Declared At */
+            declared_at?: string | null;
+            /** Declared By */
+            declared_by?: string | null;
+            /** Template Id */
+            template_id?: string | null;
+        };
+        /**
          * NotificationActionOut
          * @description What a notice asks for, and whether the club is still waiting for it.
          *
@@ -10993,6 +11126,11 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Kind
+             * @default base
+             */
+            kind: string;
             /** Locations */
             locations?: string[];
             /** Name */
@@ -12328,8 +12466,25 @@ export interface components {
              */
             weekly_hours?: number | null;
         };
-        /** StaffRolesIn */
+        /**
+         * StaffRolesIn
+         * @description The staff-row editor. Roles, and — since 2026-09-10 — the person's own details.
+         *
+         *     The owner's report was "אי אפשר לערוך איש צוות", and it was accurate: this took `roles`
+         *     and nothing else, so a coach invited with a typo in their name carried it for ever. The
+         *     invite form is the only place a name is ever written and nothing could rewrite it.
+         *
+         *     `None` means NOT MENTIONED and never "set to empty". The role editor sends `{roles}`
+         *     alone and must keep doing so without blanking a name, which is the distinction every
+         *     partial update has to get right and the one a test here pins.
+         */
         StaffRolesIn: {
+            /** Email */
+            email?: string | null;
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
             /** Roles */
             roles: string[];
         };
@@ -12637,9 +12792,13 @@ export interface components {
          * StudentJoinIn
          * @description Entrance A — `POST /me/students/{student_id}/join`.
          *
-         *     **`group_ids` and no price.** How much a family pays is derived from the weekly volume
-         *     across the groups they tick (§5.10); how they PAY is chosen on §6.1's payment step. A
-         *     `price_plan_id` here would be a price a client can post.
+         *     **`price_plan_id` is optional, and checked rather than trusted** (owner, 2026-09-12).
+         *     This field did not exist, on the reasoning that a price a client posts is not a price —
+         *     while the join wizard's own `toRegisterPayload` had always sent one, so the product's
+         *     main registration door already worked the way this one refused to. The conversion screen
+         *     now shows the club's plans like every other door, and `join_from_trial` refuses an id
+         *     that is not a live plan of this studio. Omitted, the weekly volume across `group_ids`
+         *     still derives it (§5.10) — a club with no published plans shows nothing to pick.
          *
          *     Plural for the same reason `SiblingRequestIn.group_ids` is: one group id cannot price a
          *     child who trains twice a week.
@@ -12647,6 +12806,8 @@ export interface components {
         StudentJoinIn: {
             /** Group Ids */
             group_ids: string[];
+            /** Price Plan Id */
+            price_plan_id?: string | null;
         };
         /**
          * StudentLeaveIn
@@ -15275,6 +15436,41 @@ export interface operations {
             };
         };
     };
+    update_class_api_v1_classes__class_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                class_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClassUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_class_staff_api_v1_classes__class_id__staff_get: {
         parameters: {
             query?: never;
@@ -16654,6 +16850,36 @@ export interface operations {
             };
         };
     };
+    remove_group_staff_api_v1_groups__group_id__staff__person_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     set_group_kind_api_v1_groups__group_id__training_kind_patch: {
         parameters: {
             query?: never;
@@ -17801,6 +18027,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MyStudentStatusHistoryListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_trial_declaration_api_v1_me_students__student_id__trial_declaration_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyTrialDeclarationOut"];
                 };
             };
             /** @description Validation Error */

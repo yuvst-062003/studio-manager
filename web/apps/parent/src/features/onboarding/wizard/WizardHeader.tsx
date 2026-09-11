@@ -44,7 +44,7 @@ export function WizardHeader({
   const current = STEP_DETAIL[currentStep]
 
   return (
-    <header className="tw-scope fixed top-0 w-full z-40 bg-[#faf8ff]/95 backdrop-blur-xl border-b border-[#e9edff] shadow-[0_2px_10px_rgba(0,0,0,0.04)]">
+    <header className="tw-scope fixed top-0 w-full z-40 bg-[var(--wz-ground)]/95 backdrop-blur-xl border-b border-[var(--wz-tint)] shadow-[0_2px_10px_rgba(0,0,0,0.04)]">
       <div className="max-w-[480px] mx-auto px-4 pt-2.5 pb-2 flex flex-col justify-center">
         <div className="flex items-center justify-between gap-3 mb-2">
           <div className="flex items-center gap-2.5 min-w-0">
@@ -53,7 +53,7 @@ export function WizardHeader({
                 type="button"
                 onClick={onBack}
                 aria-label="חזרה לשלב הקודם"
-                className="w-10 h-10 flex items-center justify-center rounded-full text-[#161b28] hover:bg-[#e9edff] active:scale-95 transition-all shrink-0 cursor-pointer"
+                className="w-10 h-10 flex items-center justify-center rounded-full text-[var(--wz-ink)] hover:bg-[var(--wz-tint)] active:scale-95 transition-all shrink-0 cursor-pointer"
               >
                 <ArrowRight className="w-5 h-5" />
               </button>
@@ -70,25 +70,25 @@ export function WizardHeader({
             ) : null}
 
             <div className="flex flex-col min-w-0">
-              <span className="text-[11px] font-semibold text-[#444650] leading-none">
+              <span className="text-[11px] font-semibold text-[var(--wz-secondary)] leading-none">
                 {studioName}
               </span>
-              <h1 className="text-[16px] font-bold text-[#161b28] leading-tight truncate mt-0.5">
+              <h1 className="text-[16px] font-bold text-[var(--wz-ink)] leading-tight truncate mt-0.5">
                 {current.title}
               </h1>
             </div>
           </div>
 
-          <div className="w-8 h-8 rounded-full bg-[#001849] flex items-center justify-center shrink-0 shadow-sm text-white">
+          <div className="w-8 h-8 rounded-full bg-[var(--wz-btn-bg)] flex items-center justify-center shrink-0 shadow-sm text-white">
             <User className="w-4 h-4" />
           </div>
         </div>
 
-        <div className="flex items-center justify-between text-[#444650] text-[13px] font-medium mb-1.5 px-0.5">
-          <span className="font-bold text-[#001849]">{current.stage}</span>
+        <div className="flex items-center justify-between text-[var(--wz-secondary)] text-[13px] font-medium mb-1.5 px-0.5">
+          <span className="font-bold text-[var(--wz-heading)]">{current.stage}</span>
           <div className="flex items-center gap-1.5">
-            <span className="text-[11px] text-[#444650] font-medium">{copy.completedLabel}</span>
-            <span className="text-[12.5px] font-extrabold text-[#0056c5] bg-[#e9edff] px-2 py-0.5 rounded-md">
+            <span className="text-[11px] text-[var(--wz-secondary)] font-medium">{copy.completedLabel}</span>
+            <span className="text-[12.5px] font-extrabold text-[var(--wz-accent)] bg-[var(--wz-tint)] px-2 py-0.5 rounded-md">
               {current.percent}%
             </span>
           </div>
@@ -106,10 +106,10 @@ export function WizardHeader({
                 onClick={() => onNavigate(item.step)}
                 className={`flex items-center justify-center gap-1.5 py-1 px-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                   isCurrent
-                    ? 'bg-[#001849] text-white shadow-xs ring-2 ring-[#001849]/20'
+                    ? 'bg-[var(--wz-btn-bg)] text-white shadow-xs ring-2 ring-[var(--wz-heading)]/20'
                     : isCompleted
                       ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                      : 'bg-[#f2f3ff] text-[#757681] hover:bg-[#e9edff]'
+                      : 'bg-[var(--wz-raised)] text-[var(--wz-tertiary)] hover:bg-[var(--wz-tint)]'
                 }`}
               >
                 {isCompleted ? (
@@ -117,7 +117,7 @@ export function WizardHeader({
                 ) : (
                   <span
                     className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9.5px] font-black ${
-                      isCurrent ? 'bg-white text-[#001849]' : 'bg-[#dee2f4] text-[#444650]'
+                      isCurrent ? 'bg-[var(--wz-surface)] text-[var(--wz-heading)]' : 'bg-[var(--wz-line)] text-[var(--wz-secondary)]'
                     }`}
                   >
                     {item.step}
@@ -131,7 +131,7 @@ export function WizardHeader({
       </div>
 
       <div
-        className="w-full h-2 bg-[#dee2f4] overflow-hidden relative shadow-inner"
+        className="w-full h-2 bg-[var(--wz-line)] overflow-hidden relative shadow-inner"
         role="progressbar"
         aria-valuenow={current.percent}
         aria-valuemin={0}
@@ -139,7 +139,7 @@ export function WizardHeader({
         aria-label="מד התקדמות תהליך הרישום"
       >
         <div
-          className="h-full bg-gradient-to-r from-[#0056c5] via-[#2563eb] to-[#0d2c6c] transition-all duration-500 ease-out"
+          className="h-full bg-gradient-to-r from-[var(--wz-accent)] via-[var(--wz-accent)] to-[var(--wz-accent-deep)] transition-all duration-500 ease-out"
           style={{ width: `${current.percent}%` }}
         />
       </div>

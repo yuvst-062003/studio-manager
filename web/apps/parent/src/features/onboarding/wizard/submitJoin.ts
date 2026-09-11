@@ -9,6 +9,7 @@
 import type { BillingClient, ChargeOut, UpayForm } from '../../billing/billingClient'
 import type { MandateLink } from '../../billing/billingClient'
 import { DEMO_SIMULATOR } from '../../billing/billingClient'
+import { toHealthDeclaration } from './adapters'
 import { needsManagerReview } from './types'
 import type { PaymentMethod, StudentDraft, WizardPlan } from './types'
 
@@ -33,6 +34,9 @@ export type OutcomeState =
   | 'mandate_pending'
   /** A uPay order was opened for this child; the card page settles it. */
   | 'card_pending'
+  /** A trial lesson was booked for this child; they are not joining yet, so no charge,
+   *  no promise and no order exist for them. */
+  | 'trial_booked'
   /** Nothing landed for this child. `reason` says why. */
   | 'not_recorded'
 
@@ -106,10 +110,27 @@ export type SubmitJoinDeps = {
   savePaymentMethods: (
     items: readonly { studentId: string; method: string }[],
   ) => Promise<void>
+  /** `POST /trial-bookings/self` for the children whose family chose a trial lesson
+   *  instead of joining. Optional because door B has no session for it and a door that
+   *  cannot offer a trial simply never sets the choice. Given the children's OWN group
+   *  ids — the endpoint requires one per child and the wizard collected it at step 2. */
+  bookTrial?: (
+    children: readonly {
+      firstName: string
+      lastName: string
+      birthDate: string
+      groupId: string
+      health: ReturnType<typeof toHealthDeclaration> 
+    }[],
+  ) => Promise<void>
 }
 
 export type SubmitJoinInput = {
   students: readonly StudentDraft[]
+  /** The health template this submission signs against — the same id
+   *  `toRegisterPayload` is given, so a trial child's declaration is the member's form
+   *  and not a lesser one. */
+  templateId?: string | null
   plans: readonly WizardPlan[]
   methods: Readonly<Record<string, PaymentMethod>>
   /** The family said the payment was already arranged with the coach. Recorded on every
@@ -134,9 +155,26 @@ type ActiveRow = {
 export async function submitJoin(input: SubmitJoinInput): Promise<SubmitJoinResult> {
   const { students, plans, methods, alreadyArranged, deps } = input
 
+  //: `register` is given JOINING children only (`toRegisterPayload` filters them), so a
+  //: submission of nothing but trial children has nobody to register — and calling it
+  //: would throw on an empty child list. A family in that shape already exists on doors C
+  //: and D; on door B the trial endpoint creates them as a lead.
+  const joiningDrafts = students.filter((draft) => draft.intent !== 'trial')
+
   // Let this reject: the caller keeps the family on step 3 and shows the error.
   // Everything below runs only once the family exists.
-  const registered = await deps.register()
+  const registered =
+    joiningDrafts.length > 0
+      ? await deps.register()
+      : //: Nobody was registered, so every id list is empty and no charge was raised.
+        //: Typed in full rather than cast, so a field added to `RegisterResult` later
+        //: fails here instead of arriving as `undefined` at a call site downstream.
+        ({
+          person_id: '',
+          student_ids: [] as string[],
+          child_student_ids: [] as string[],
+          charges_created: 0,
+        } satisfies RegisterResult)
 
   try {
     await deps.refreshSession()
@@ -169,11 +207,21 @@ export async function submitJoin(input: SubmitJoinInput): Promise<SubmitJoinResu
    */
   const declared: { studentId: string; method: string }[] = []
 
+  /** The children trying a lesson rather than joining. Collected in the loop and written
+   *  once after it, so a family with three trial children makes one request. */
+  const trials: {
+    firstName: string
+    lastName: string
+    birthDate: string
+    groupId: string
+    health: ReturnType<typeof toHealthDeclaration>
+  }[] = []
+
   /** `credit` is the wizard's word; `upay_card` is `payment.method`'s, which is what the
    *  column holds and what `methodKey` already translates for display. */
   const stored = (method: PaymentMethod) => (method === 'credit' ? 'upay_card' : method)
 
-  students.forEach((draft, index) => {
+  students.forEach((draft) => {
     const method = methods[draft.id] ?? 'credit'
     const amountAgorot = plans.find((plan) => plan.id === draft.planId)?.pricePerMonthAgorot ?? 0
     const name = `${draft.firstName} ${draft.lastName}`.trim()
@@ -185,9 +233,38 @@ export async function submitJoin(input: SubmitJoinInput): Promise<SubmitJoinResu
       return
     }
 
+    if (draft.intent === 'trial') {
+      // Not joining yet, so this child leaves the money path entirely: no payment method
+      // is declared (`student.payment_method`'s CHECK has no value for a trial, and the
+      // column is nullable for exactly this case), no charge is consulted, and no promise
+      // or order is opened. The booking itself is one write, made after the loop.
+      const groupId = draft.groupId
+      if (groupId) {
+        //: The declaration travels WITH the booking. Without it `trials.py` records
+        //: `health_status = "missing"` — a child whose parent completed the full health
+        //: step recorded as having given nothing, and §5.4a already says `trial_signed`
+        //: is not enough for enrollment, so starting below even that is worse.
+        trials.push({
+          firstName: draft.firstName,
+          lastName: draft.lastName,
+          birthDate: draft.birthDate,
+          groupId,
+          health: toHealthDeclaration(draft, input.templateId ?? null),
+        })
+      }
+      // `method: null` — the outcome type already allows it, and a trial child has no
+      // payment method by design rather than by omission.
+      outcomes.push({ draftId: draft.id, name, method: null, amountAgorot: 0, state: 'trial_booked' })
+      return
+    }
+
     // Resolved BEFORE the charges are consulted, because the method write below needs it
     // and does not care whether there is anything to bill.
-    const studentId = registered.child_student_ids[index]
+    //
+    //: Indexed by position among the JOINING children, which is what `register` was given.
+    //: Using the whole family's index shifted every child after a trial sibling onto the
+    //: wrong student id — the kind of mistake that reads fine and bills the wrong person.
+    const studentId = registered.child_student_ids[joiningDrafts.indexOf(draft)]
     if (studentId === undefined) {
       outcomes.push({
         draftId: draft.id,
@@ -199,6 +276,7 @@ export async function submitJoin(input: SubmitJoinInput): Promise<SubmitJoinResu
       })
       return
     }
+
 
     // The family answered the question and the registration landed. Record it whatever
     // happens to the money below.
@@ -250,6 +328,18 @@ export async function submitJoin(input: SubmitJoinInput): Promise<SubmitJoinResu
     outcomes.push(outcome)
     active.push({ outcome, studentId, method, charges, planId: draft.planId })
   })
+
+  // The trial children, in one write. Swallowed on failure for the same reason
+  // `savePaymentMethods` is: `register` has already landed, the family exists, and losing
+  // a booking they can make again is not worth failing the whole join over. The outcome
+  // rows already say `trial_booked`, which is what step 4 renders.
+  if (trials.length > 0 && deps.bookTrial) {
+    try {
+      await deps.bookTrial(trials)
+    } catch {
+      // Reported by nothing downstream; the child is registered either way.
+    }
+  }
 
   // How the family says they will pay. See `declared` above for why it is not `active`.
   // Children awaiting a manager's review are excluded there: a preference recorded for one

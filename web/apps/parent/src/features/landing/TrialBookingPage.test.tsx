@@ -17,10 +17,10 @@ import type { LandingClient, PublicGroup, TrialSlot } from './landingClient'
 const TODAY = new Date('2026-09-08T09:00:00Z')
 
 const GROUPS: PublicGroup[] = [
-  { id: 'g1', name: 'מתחילים', description: null, age_min: 5, age_max: 8, training_weekdays: [0, 3] },
-  { id: 'g2', name: 'נבחרת', description: null, age_min: 12, age_max: 16, training_weekdays: [1] },
+  { id: 'g1', name: 'מתחילים', description: null, age_min: 5, age_max: 8, training_weekdays: [0, 3], kind: 'base' },
+  { id: 'g2', name: 'נבחרת', description: null, age_min: 12, age_max: 16, training_weekdays: [1], kind: 'base' },
   // No range at all -- the group an adult can book, and the case `groupFitsAge` lets through.
-  { id: 'g3', name: 'בוגרים', description: null, age_min: null, age_max: null, training_weekdays: [2] },
+  { id: 'g3', name: 'בוגרים', description: null, age_min: null, age_max: null, training_weekdays: [2], kind: 'base' },
 ]
 
 const SLOTS: Record<string, TrialSlot[]> = {

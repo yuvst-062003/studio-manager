@@ -47,25 +47,25 @@ export function OtherParentTabs({
     onChange({ otherParent: { ...(second ?? EMPTY), ...values } })
 
   return (
-    <div className="rounded-xl border border-[#e9edff] bg-[#fbfcff] p-3 flex flex-col gap-3">
+    <div className="rounded-xl border border-[var(--wz-tint)] bg-[var(--wz-surface)] p-3 flex flex-col gap-3">
       {/* `role="tablist"` is deliberately NOT used: these are not tabs over one panel, they
           are one panel plus a control that creates a second. Announcing them as tabs would
           promise arrow-key navigation between two things when only one of them exists. */}
       <div className="flex items-center gap-2">
-        <Users className="w-4 h-4 text-[#0056c5] shrink-0" aria-hidden="true" />
-        <span className="text-[13px] font-bold text-[#001849]">{copy.parentTab1}</span>
+        <Users className="w-4 h-4 text-[var(--wz-accent)] shrink-0" aria-hidden="true" />
+        <span className="text-[13px] font-bold text-[var(--wz-heading)]">{copy.parentTab1}</span>
         {second ? (
           <>
-            <span aria-hidden="true" className="text-[#9aa3c7]">
+            <span aria-hidden="true" className="text-[var(--wz-tertiary)]">
               ·
             </span>
-            <span className="text-[13px] font-bold text-[#001849]">{copy.parentTab2}</span>
+            <span className="text-[13px] font-bold text-[var(--wz-heading)]">{copy.parentTab2}</span>
             <button
               type="button"
               data-testid="other-parent-remove"
               aria-label={copy.parentTabRemove}
               onClick={() => onChange({ otherParent: null })}
-              className="ms-auto flex items-center gap-1 text-[12px] font-bold text-[#0056c5] cursor-pointer"
+              className="ms-auto flex items-center gap-1 text-[12px] font-bold text-[var(--wz-accent)] cursor-pointer"
             >
               <X className="w-3.5 h-3.5" aria-hidden="true" />
               <span>{copy.parentTabRemove}</span>
@@ -76,7 +76,7 @@ export function OtherParentTabs({
             type="button"
             data-testid="other-parent-add"
             onClick={() => onChange({ otherParent: { ...EMPTY } })}
-            className="ms-auto text-[12px] font-bold text-[#0056c5] cursor-pointer"
+            className="ms-auto text-[12px] font-bold text-[var(--wz-accent)] cursor-pointer"
           >
             + {copy.parentTabAdd}
           </button>
@@ -85,7 +85,7 @@ export function OtherParentTabs({
 
       {second ? (
         <div data-testid="other-parent-fields" className="flex flex-col gap-3">
-          <p className="text-[11px] text-[#5b6288]">{copy.otherParentOptional}</p>
+          <p className="text-[11px] text-[var(--wz-tertiary)]">{copy.otherParentOptional}</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <TextField
               label={copy.otherParentFirstName}

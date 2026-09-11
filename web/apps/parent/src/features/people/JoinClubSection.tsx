@@ -16,9 +16,10 @@ import { useEffect, useState } from 'react'
 import { EmptyState } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
-import { JoinTheClub } from './JoinTheClub'
+import { JoinFromTrial } from './joinFromTrial/JoinFromTrial'
 import { nextTrialLesson } from './peopleClient'
 import type { PeopleClient, StudentSummary, TrialLesson } from './peopleClient'
+import type { HealthClient } from '../health/healthClient'
 
 type Loaded = {
   students: readonly StudentSummary[]
@@ -28,11 +29,15 @@ type Loaded = {
 export function JoinClubSection({
   locale,
   client,
+  healthClient,
   onJoined,
   now = new Date(),
 }: {
   locale: Locale
   client: PeopleClient
+  /** §5.5's own submit, for step 1. The conversion files the family's signature against
+   *  the full template BEFORE joining, so the gate has nothing left to hold afterwards. */
+  healthClient: HealthClient
   /** Bumped so the shell re-reads the family: the child is `active` now, still holding the
    *  short health form, so §5.5's gate must fire on the very next render. */
   onJoined?: () => void
@@ -67,8 +72,26 @@ export function JoinClubSection({
   // bounces is indistinguishable from a broken screen.
   if (!lesson || lesson.attended !== true || !student || student.status !== 'trial') {
     return (
-      <section aria-labelledby="join-club-unavailable" data-testid="join-club-unavailable">
-        <h1 id="join-club-unavailable">{t(locale, 'people.joinClub.title')}</h1>
+      <section
+        aria-labelledby="join-club-unavailable"
+        data-testid="join-club-unavailable"
+        style={{ padding: 'var(--space-4)' }}
+      >
+        {/* An explicit size and weight on a bare `<h1>`. `ParentShell` wraps every screen in
+            `.tw-scope`, whose preflight sets `h1-h6 { font-size: inherit; font-weight:
+            inherit }` — Tailwind's, written for a prototype where a utility sizes every
+            element. This screen is @studio/ui, so nothing put them back and the title
+            rendered at body size. Found by rendering it and looking (2026-09-12). */}
+        <h1
+          id="join-club-unavailable"
+          style={{
+            margin: '0 0 var(--space-3)',
+            fontSize: 'var(--text-display)',
+            fontWeight: 700,
+          }}
+        >
+          {t(locale, 'people.joinClub.title')}
+        </h1>
         <EmptyState title={t(locale, 'people.trialHome.waitingForClub')} />
         <a href="#/">{t(locale, 'people.joinClub.back')}</a>
       </section>
@@ -76,15 +99,13 @@ export function JoinClubSection({
   }
 
   return (
-    <JoinTheClub
+    <JoinFromTrial
       client={client}
+      healthClient={healthClient}
       locale={locale}
       student={student}
       trialledGroupId={lesson.groupId}
-      onJoined={() => {
-        onJoined?.()
-        globalThis.location.hash = '#/'
-      }}
+      onJoined={() => onJoined?.()}
     />
   )
 }

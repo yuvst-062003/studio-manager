@@ -111,11 +111,45 @@ export type RegisterPayload = {
 
 /** One transaction's worth of family, built from the wizard's state at step 3's final
  *  button and nowhere else (decision B2). */
+/** One child's health declaration, in the shape BOTH writes take.
+ *
+ * `OnboardingHealthDeclarationIn` and §5.4a's `trial_health_declarations` carry the same
+ * three fields — the trial endpoint's own schema note says so — so a trial child's answers
+ * are not a lesser form, they are the same form. Extracted because sending a trial booking
+ * WITHOUT them leaves `student.health_status` at `missing`
+ * (`trials.py`: `"trial_signed" if declarations else "missing"`), which is a child the
+ * wizard collected a full declaration from being recorded as having given none.
+ */
+export function toHealthDeclaration(
+  student: StudentDraft,
+  templateId: string | null,
+): { template_id: string; answers: Record<string, unknown>; signature_image_base64: string } | null {
+  if (!templateId) return null
+  return {
+    template_id: templateId,
+    answers: {
+      ...student.healthAnswers,
+      health_fund: student.healthFund,
+      emergency_contact: student.emergencyPhone,
+      special_notes: student.medicalNotes,
+    },
+    //: The pad stores a data URL; the API takes the base64 payload alone.
+    signature_image_base64: student.signatureDataUrl.replace(/^data:image\/\w+;base64,/, ''),
+  }
+}
+
 export function toRegisterPayload(
   students: readonly StudentDraft[],
   options: { templateId: string | null; clubTermsAccepted: boolean },
 ): RegisterPayload {
-  const first = students[0]
+  //: **Trial children are not registered as members.** `register` creates an enrolled
+  //: student and, for a child already on the roster, promotes them to `active` — which is
+  //: precisely what a trial is not. They are created by `POST /trial-bookings/self`
+  //: instead, as a `trial` in the funnel. Sending them here registered them as members
+  //: AND booked them a trial, so one child became two rows and the funnel counted a
+  //: conversion that never happened (found 2026-09-12, before it shipped).
+  const joining = students.filter((student) => student.intent !== 'trial')
+  const first = joining[0]
   if (!first) throw new Error('a registration needs at least one student')
 
   //: The GUARDIAN is the account holder, and the API carries one signer for the whole
@@ -123,7 +157,7 @@ export function toRegisterPayload(
   //: every later child from the first, so these are the same values the family typed
   //: once -- but the shape is one signer, and a family whose children genuinely live at
   //: two addresses cannot be expressed until `OnboardingSignerIn` grows a per-child one.
-  const signerSource = students.find((student) => isMinor(student.birthDate)) ?? first
+  const signerSource = joining.find((student) => isMinor(student.birthDate)) ?? first
 
   return {
     first_name: signerSource.guardianFirstName || signerSource.firstName,
@@ -149,7 +183,7 @@ export function toRegisterPayload(
       relation: 'mother',
     },
     club_terms_accepted: options.clubTermsAccepted,
-    children: students.map((student) => {
+    children: joining.map((student) => {
       const minor = isMinor(student.birthDate)
       return {
         first_name: student.firstName,
@@ -197,22 +231,7 @@ export function toRegisterPayload(
           minor && !student.pickup.parentOnly && student.pickup.extraName
             ? [{ name: student.pickup.extraName, phone: student.pickup.extraPhone }]
             : [],
-        health: options.templateId
-          ? {
-              template_id: options.templateId,
-              answers: {
-                ...student.healthAnswers,
-                health_fund: student.healthFund,
-                emergency_contact: student.emergencyPhone,
-                special_notes: student.medicalNotes,
-              },
-              //: The pad stores a data URL; the API takes the base64 payload alone.
-              signature_image_base64: student.signatureDataUrl.replace(
-                /^data:image\/\w+;base64,/,
-                '',
-              ),
-            }
-          : null,
+        health: toHealthDeclaration(student, options.templateId),
       }
     }),
   }

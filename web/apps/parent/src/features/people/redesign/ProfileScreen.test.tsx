@@ -128,6 +128,57 @@ describe('when a read fails', () => {
 
 // The המועדון sheet, after the owner's review of 2026-09-06: two labelled groups rather
 // than one run of buttons, email first, and a way to actually navigate there.
+// The gap this closes, and it was a WIRING gap rather than a missing feature. `#/join`
+// has existed since §5.4a ④: it names the trial child, reads the group they trialled in,
+// refuses a no-show and converts the student who is already on the roster. The inbox even
+// has an action for it (`trial_join` in `actionCatalogue`). The one place that never said
+// a word was the profile — and a family whose OTHER children are enrolled never sees
+// `TrialHome`, which was the only screen linking there.
+describe('a child on a trial, in the trainees sheet', () => {
+  function stubChildren(rows: Record<string, unknown>[]) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/me/students')) return new Response(JSON.stringify({ items: rows }), { status: 200 })
+        if (url.includes('/me/studio')) return new Response(JSON.stringify(CLUB), { status: 200 })
+        return new Response('{"items":[]}', { status: 200 })
+      }),
+    )
+  }
+
+  const row = (id: string, first: string, status: string) => ({
+    id,
+    person_id: `p-${id}`,
+    first_name: first,
+    last_name: 'לוי',
+    status,
+    health_status: 'signed',
+    group_names: [],
+  })
+
+  it('marks the trial child and sends their row to the conversion route', async () => {
+    stubChildren([row('s1', 'איתי', 'active'), row('s2', 'נועה', 'trial')])
+    renderScreen()
+    await userEvent.click(await screen.findByTestId('profile-row-trainees'))
+    await screen.findByTestId('sheet-trainees')
+
+    expect(screen.getByTestId('sheet-trial-badge-s2')).toBeInTheDocument()
+    // The enrolled sibling is untouched: their row still opens their card.
+    expect(screen.getByTestId('sheet-trainee-s1')).toHaveAttribute('href', '#/student/s1')
+    expect(screen.getByTestId('sheet-trainee-s2')).toHaveAttribute('href', '#/join')
+  })
+
+  it('says nothing about a trial for a family that has none', async () => {
+    stubChildren([row('s1', 'איתי', 'active')])
+    renderScreen()
+    await userEvent.click(await screen.findByTestId('profile-row-trainees'))
+    await screen.findByTestId('sheet-trainees')
+
+    expect(screen.queryByTestId('sheet-trial-badge-s1')).toBeNull()
+  })
+})
+
 describe('the המועדון sheet', () => {
   async function openClub() {
     renderScreen()

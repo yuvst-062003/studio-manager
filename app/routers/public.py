@@ -159,6 +159,7 @@ def _group_out(group: PublicGroup) -> PublicGroupOut:
         training_durations_min=group.training_durations_min,
         coaches=group.coaches,
         locations=group.locations,
+        kind=group.kind,
     )
 
 

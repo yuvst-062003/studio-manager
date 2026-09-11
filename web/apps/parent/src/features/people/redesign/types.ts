@@ -35,6 +35,11 @@ export type ProfileChild = {
   /** `current_belt_color_hex` — `null` before a first belt, drawn as absent. */
   beltColorHex: string | null
   groupNames: readonly string[]
+  /** `student.status` verbatim — the funnel's own word. Carried so the card can tell a
+   *  child who came for one lesson from one who joined: `trial` is the only value with a
+   *  next step the PARENT can take, and until 2026-09-12 nothing in this app said it.
+   *  `StudentSummaryOut` has always returned it; the card simply never read it. */
+  status: string
   /** The server's own `attendance_percent`, or `null` when it has not computed one. */
   attendancePercent: number | null
   /** Does this child still owe the club a declaration? Computed with the SAME predicate

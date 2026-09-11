@@ -101,7 +101,7 @@ def test_the_order_reference_is_the_public_ref_not_a_sequential_id():
     # renders it to the payer. What this restriction is about is unchanged -- the
     # reference in there is a UUIDv4 the server issued and never a sequential id.
     assert str(COMMON["order_public_ref"]) in fields["paymentdetails"]
-    assert "1" != fields["paymentdetails"]
+    assert fields["paymentdetails"] != "1"
 
 
 def test_money_crosses_the_boundary_as_integer_arithmetic():

@@ -111,6 +111,18 @@ export type StudentDraft = {
   pickup: PickupArrangement
   groupId: string
   planId: string
+  /** Joining the club, or coming for one lesson first.
+   *
+   * **Decided when the child is ADDED, not at the payment step.** A trial is not a way of
+   * paying — it is the family saying this child is not joining yet — so it is chosen on
+   * the button that adds them and it keeps them out of step 3 entirely. Putting it beside
+   * אשראי/מזומן/צ׳קים/הו״ק was the first attempt and it was wrong: it asked a parent how
+   * they would like to pay for something that costs nothing (owner, 2026-09-11).
+   *
+   * It also must never reach `student.payment_method`, whose database CHECK holds only
+   * ('upay_card','cash','cheque','standing_order') — a trial child simply has none, which
+   * is what that column is nullable for. */
+  intent: 'join' | 'trial'
   emergencyPhone: string
   healthFund: HealthFund | ''
   /** `null` until the family answers. NOT `true`: the prototype defaults this to "healthy"
@@ -188,6 +200,7 @@ export function emptyStudent(id: string, defaults?: Partial<StudentDraft>): Stud
     pickup: { parentOnly: true, extraName: '', extraPhone: '' },
     groupId: '',
     planId: '',
+    intent: 'join',
     emergencyPhone: '',
     healthFund: '',
     healthyPreset: null,

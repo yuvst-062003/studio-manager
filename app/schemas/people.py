@@ -598,6 +598,32 @@ class MyStudentStatusHistoryListResponse(BaseModel):
     items: list[MyStudentStatusHistoryOut]
 
 
+class MyTrialDeclarationOut(BaseModel):
+    """What this family already answered on the booking form, for the conversion screen's
+    first step to SHOW them (owner, 2026-09-12).
+
+    **The answers, and deliberately so** — which is the opposite of `HealthDeclarationOut`,
+    the coach-safe shape that returns flags and never contents (§5.5). The difference is the
+    reader: this route is under `/me/`, so the caller is a guardian of this child reading
+    what they themselves wrote an hour ago. A screen that asked them to sign a declaration
+    without showing what is in it would be asking for a signature on an unread document.
+
+    `template_id` travels so the client signs against the SAME template the answers were
+    given on, rather than re-fetching the newest and silently pairing old answers with new
+    questions. `null` when the stored entry carried none.
+
+    G7: never logged, never in an audit `diff`. These are a minor's medical answers.
+    """
+
+    template_id: uuid.UUID | None = None
+    answers: dict[str, Any] = Field(default_factory=dict)
+    #: Who pressed, and when, on the booking form. §2's door takes a typed name and a date
+    #: in place of a drawn signature, so this is the whole of what was "signed" — and the
+    #: conversion screen shows it rather than implying a pad was used.
+    declared_by: str | None = None
+    declared_at: str | None = None
+
+
 class MyTrialBookingOut(BaseModel):
     """The trial lesson, as the family it was booked for reads it.
 
@@ -677,6 +703,10 @@ class PublicGroupOut(BaseModel):
     coaches: list[str] = Field(default_factory=list)
     #: Distinct location names this group actually trains at, sorted.
     locations: list[str] = Field(default_factory=list)
+    #: `base` / `extra` / `private` — `GROUP_KINDS`. See `PublicGroup.kind`: entrance A's
+    #: conversion offers the family their one BASE team, because base training is included
+    #: in every plan and the plan is what buys extra sessions.
+    kind: str = "base"
 
 
 class PublicGroupListResponse(BaseModel):
@@ -871,15 +901,20 @@ class SiblingRequestIn(BaseModel):
 class StudentJoinIn(BaseModel):
     """Entrance A — `POST /me/students/{student_id}/join`.
 
-    **`group_ids` and no price.** How much a family pays is derived from the weekly volume
-    across the groups they tick (§5.10); how they PAY is chosen on §6.1's payment step. A
-    `price_plan_id` here would be a price a client can post.
+    **`price_plan_id` is optional, and checked rather than trusted** (owner, 2026-09-12).
+    This field did not exist, on the reasoning that a price a client posts is not a price —
+    while the join wizard's own `toRegisterPayload` had always sent one, so the product's
+    main registration door already worked the way this one refused to. The conversion screen
+    now shows the club's plans like every other door, and `join_from_trial` refuses an id
+    that is not a live plan of this studio. Omitted, the weekly volume across `group_ids`
+    still derives it (§5.10) — a club with no published plans shows nothing to pick.
 
     Plural for the same reason `SiblingRequestIn.group_ids` is: one group id cannot price a
     child who trains twice a week.
     """
 
     group_ids: list[uuid.UUID] = Field(min_length=1, max_length=8)
+    price_plan_id: uuid.UUID | None = None
 
 
 RegistrationRequestPageOut = CursorPage[RegistrationRequestOut]

@@ -41,7 +41,7 @@ function Label({
       <label
         htmlFor={htmlFor}
         className={`text-[13px] font-medium transition-colors ${
-          invalid ? 'text-red-700 font-bold' : 'text-[#161b28]'
+          invalid ? 'text-red-700 font-bold' : 'text-[var(--wz-ink)]'
         }`}
       >
         {children}
@@ -58,9 +58,9 @@ function Label({
 }
 
 const baseInput =
-  'h-11 px-3 rounded-xl text-[14px] w-full transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0056c5]/40'
+  'h-11 px-3 rounded-xl text-[14px] w-full transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--wz-accent)]/40'
 const okInput =
-  'bg-[#f2f3ff] text-[#161b28] border border-transparent focus:border-[#0056c5] focus:bg-white'
+  'bg-[var(--wz-raised)] text-[var(--wz-ink)] border border-transparent focus:border-[var(--wz-accent)] focus:bg-[var(--wz-surface)]'
 const badInput =
   'border-2 border-red-500 bg-red-50/40 text-red-950 placeholder-red-400 focus:border-red-600'
 
@@ -136,10 +136,10 @@ export function SelectField({
 
 export function SectionBand({ icon, title, trailing }: { icon: ReactNode; title: string; trailing?: ReactNode }) {
   return (
-    <div className="p-3 rounded-xl bg-[#f2f3ff] border border-[#e9edff] flex items-center justify-between">
+    <div className="p-3 rounded-xl bg-[var(--wz-raised)] border border-[var(--wz-tint)] flex items-center justify-between">
       <div className="flex items-center gap-2">
-        <span className="text-[#0056c5]">{icon}</span>
-        <span className="text-[16px] font-bold text-[#001849]">{title}</span>
+        <span className="text-[var(--wz-accent)]">{icon}</span>
+        <span className="text-[16px] font-bold text-[var(--wz-heading)]">{title}</span>
       </div>
       {trailing}
     </div>
