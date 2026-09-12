@@ -307,6 +307,12 @@ def test_the_manager_card_regenerates_and_the_public_read_validates(client, as_m
     info = client.get(f"/api/v1/public/onboarding/{token}")
     assert info.status_code == 200, info.text
     assert info.json()["studio_name"]
+    # The cash term rides on THIS read, not on `/me/prepay-terms`: a door B family belongs
+    # to no studio until `register` returns, so every `/me/*` call 403s at exactly the
+    # moment step 3 has to show them what three months of cash comes to. Asserted here
+    # because the field is only useful if it survives the wire -- a default on the model
+    # would make a dropped one look fine.
+    assert info.json()["cash_prepay_months"] == 2
 
     revoked = client.delete("/api/v1/onboarding-link", headers=as_manager.headers)
     assert revoked.status_code == 200
