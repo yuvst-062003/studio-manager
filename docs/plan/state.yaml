@@ -2637,16 +2637,23 @@ holdbacks:
       current subscription at launch. StaffPushSetting mounts on the account screen above
       the switches. Verified in a real Chrome against the real built worker.
 
-      STILL OPEN: the VAPID key pair is set in no environment, so both staging and
-      production continue to run RecordingPushSender. scripts/generate-vapid-keys.py
-      generates the pair and docs/deploy/railway-runbook.md carries the procedure; setting
-      a deployed environment variable was refused by this session's permission classifier
-      and is the one step left. app/services/ops/checks.py's comms.push_transport signal
-      turns red once a comms-notify run attempts a push through the recording fallback,
-      which is how to confirm the fix landed.
+      The keys followed the same day. A separate VAPID pair per environment — they are not
+      interchangeable, because the public half is baked into every PushSubscription a
+      browser makes against it — set on api in staging and in production, and both
+      redeployed with api, parent and staff. Verified over railway ssh in each: all three
+      settings present and push_transport_name(default_push_sender()) == 'webpush', which
+      is the fact RecordingPushSender was silently standing in for. Both environments serve
+      push-sw.js with its three listeners and an sw.js that importScripts it.
+
+      What is NOT yet proven, and only the owner can prove it: a real push travelling from
+      a real push service to a real phone. Everything up to the wire is verified; the last
+      hop needs a device. app/services/ops/checks.py's comms.push_transport signal is the
+      standing guard — it turns red if a comms-notify run ever attempts a push through the
+      recording fallback again.
     blocks: M8
-    status: open
+    status: closed
     opened: 2026-09-13
+    closed: 2026-09-13
     source: this session; supersedes the closure of HB-push-transport below
 
   - id: HB-push-transport
