@@ -595,6 +595,7 @@ export const people: Bundle = {
   // -- the join wizard (task 6) -- mirrors he/people.ts key-for-key.
 
   // STEP1_COPY -> joinWizard.step1.*
+  'joinWizard.header.back': 'Back to the previous step',
   'joinWizard.step1.seasonBadge': '2025–2026 training season',
   'joinWizard.step1.heading': 'Welcome to Gladiator Club',
   'joinWizard.step1.lead': 'Before we start the registration process, please review and agree to the club\'s documents',
@@ -796,6 +797,7 @@ export const people: Bundle = {
   'joinWizard.step3.creditRow': 'Charged immediately in the app (uPay)',
   'joinWizard.step3.creditRowSub': 'By secure credit card',
   'joinWizard.step3.coachRow': 'Paid directly to the coach',
+  'joinWizard.step3.prepayMonths': 'months paid in advance',
   'joinWizard.step3.coachRowSub': 'At the next session',
   'joinWizard.step3.allAwaiting': 'Every student in this registration is awaiting manager review — there is nothing to pay on this screen (₪0 charged).',
   'joinWizard.step3.coachNote': 'Hand the payment directly to the coach at the next session. Membership will be updated as soon as the report is complete.',

@@ -595,6 +595,7 @@ export const people: Bundle = {
   // -- the join wizard (task 6) -- mirrors he/people.ts key-for-key.
 
   // STEP1_COPY -> joinWizard.step1.*
+  'joinWizard.header.back': 'Назад к предыдущему шагу',
   'joinWizard.step1.seasonBadge': 'Сезон тренировок 2025–2026',
   'joinWizard.step1.heading': 'Добро пожаловать в клуб «Гладиатор»',
   'joinWizard.step1.lead': 'Прежде чем начать регистрацию, ознакомьтесь с документами клуба и подтвердите согласие',
@@ -796,6 +797,7 @@ export const people: Bundle = {
   'joinWizard.step3.creditRow': 'Оплата сразу в приложении (uPay)',
   'joinWizard.step3.creditRowSub': 'Защищённой кредитной картой',
   'joinWizard.step3.coachRow': 'Оплата напрямую тренеру',
+  'joinWizard.step3.prepayMonths': 'месяцев авансом',
   'joinWizard.step3.coachRowSub': 'На ближайшей тренировке',
   'joinWizard.step3.allAwaiting': 'Все ученики этой регистрации ожидают ответа и проверки менеджера — на этом экране нет суммы к оплате (₪0 к оплате).',
   'joinWizard.step3.coachNote': 'Передайте оплату напрямую тренеру на ближайшей тренировке. Действие абонемента обновится сразу после завершения сообщения.',

@@ -52,6 +52,7 @@ const STUDIO: WizardStudio = {
   logoUrl: null,
   groups: [toWizardGroup({ id: 'g1', name: 'קבוצת בוקר', weekdays: [0, 2] })],
   clubTermsVersion: null,
+  prepayMonths: { cash: 0, cheque: 0 },
   belts: [{ id: 'belt-white', name: 'חגורה לבנה' }],
   slug: 'demo-club',
 }
@@ -474,6 +475,50 @@ describe('JoinWizard -- wiring submitJoin into the screens', () => {
       expect(billingClient.createPromise).toHaveBeenCalledWith(['ch1'], 'cheque', 0, false),
     )
     expect(billingClient.createOrder).not.toHaveBeenCalled()
+  }, 30000)
+
+  it('cash at signup: the three months the screen shows are the three months the write records', async () => {
+    // The owner's rule — cash collects this month plus two — and the trap it has to avoid.
+    // `prepay_months` counts months bought FORWARD, so `2` is three months in total; and the
+    // whole point of showing it is that the screen and the promise must carry the SAME
+    // number. A total charged but never shown is the 2026-09-12 defect in a new place.
+    const user = userEvent.setup()
+    const source = fakeSource({
+      loadStudio: vi.fn(async () => ({ ...STUDIO, prepayMonths: { cash: 2, cheque: 11 } })),
+    })
+    const billingClient = billingClientStub({ openCharges: vi.fn(async () => [charge('ch1', 's1')]) })
+    renderWizard({ billingClient, source })
+
+    await addOneChildAndReachStep3(user)
+    await user.click(screen.getByRole('button', { name: STEP3_COPY.continueToPay }))
+    await user.click(screen.getByRole('radio', { name: STEP3_COPY.methodCash }))
+
+    // The child's plan is ₪300, so three months is ₪900 — on screen, before they commit.
+    expect(await screen.findByText('₪900')).toBeInTheDocument()
+    expect(screen.getByText(`3 ${STEP3_COPY.prepayMonths}`)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: STEP3_COPY.submitNoCredit }))
+    await waitFor(() =>
+      expect(billingClient.createPromise).toHaveBeenCalledWith(['ch1'], 'cash', 2, false),
+    )
+  }, 30000)
+
+  it('a standing order buys no months forward, however the club configures cash', async () => {
+    // Its mandate is what collects every month after this one; buying months on top would
+    // charge the family twice for the same period.
+    const user = userEvent.setup()
+    const source = fakeSource({
+      loadStudio: vi.fn(async () => ({ ...STUDIO, prepayMonths: { cash: 2, cheque: 11 } })),
+    })
+    const billingClient = billingClientStub({ openCharges: vi.fn(async () => [charge('ch1', 's1')]) })
+    renderWizard({ billingClient, source })
+
+    await addOneChildAndReachStep3(user)
+    await chooseMethodAndSubmit(user, STEP3_COPY.methodStandingOrder)
+
+    await waitFor(() =>
+      expect(billingClient.createPromise).toHaveBeenCalledWith(['ch1'], 'standing_order', 0, false),
+    )
   }, 30000)
 
   it('a failed registration keeps the family on step 3 with the error visible, and step 4 never renders', async () => {

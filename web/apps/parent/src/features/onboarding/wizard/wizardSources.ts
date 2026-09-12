@@ -19,6 +19,16 @@ export type WizardStudio = {
    *  (doors C/D) reads `/me/studio`, which carries no version at all, and inventing one
    *  would be worse than showing none. */
   clubTermsVersion: number | null
+  /** The club's cash and cheque arrangements, as MONTHS BOUGHT FORWARD beside the month
+   *  this registration already owes. Step 3 shows the family the resulting total before
+   *  they agree to it — a screen saying one number while the promise records another is
+   *  the 2026-09-12 defect, and prepayment is the easiest place to re-create it.
+   *
+   *  `0` for a door that cannot say (doors C/D read `/me/studio`, which carries neither),
+   *  and `0` is also the honest answer there for a second reason: forward months are
+   *  priced by the SERVER off the whole payer's monthly total, which for a family that
+   *  already has children is not the sum this run can see. */
+  prepayMonths: { cash: number; cheque: number }
   /** Bug #10 — the club's own belt ladder, for the picker in part 1 of the student form.
    *  Empty for a club that has not built one, and for any door whose slug could not be
    *  resolved; the picker hides itself rather than offering eight belts the club does not
@@ -134,6 +144,10 @@ export function tokenSource(token: string, healthClient: HealthClient): JoinWiza
         //: Optional for the same reason `logo_url` is: an older cached response (or a
         //: test fixture) predating this field must read as "no version", not crash.
         club_terms_version?: number
+        //: Optional for the same reason as the fields around it: an older cached response
+        //: predating them must read as "no arrangement", never crash.
+        cash_prepay_months?: number
+        cheque_prepay_months?: number
         //: `OnboardingInfoOut.slug` -- always present on the real endpoint; optional
         //: here so an older cached response or a test fixture predating this field
         //: reads as "no slug", not a crash.
@@ -149,6 +163,10 @@ export function tokenSource(token: string, healthClient: HealthClient): JoinWiza
         logoUrl: info.logo_url ? apiUrl(info.logo_url) : null,
         groups: (info.groups ?? []).map(toWizardGroup),
         clubTermsVersion: info.club_terms_version ?? null,
+        prepayMonths: {
+          cash: info.cash_prepay_months ?? 0,
+          cheque: info.cheque_prepay_months ?? 0,
+        },
         belts: await loadBelts(info.slug ?? null),
         slug: info.slug ?? null,
       }
@@ -271,6 +289,12 @@ export function studioSource(healthClient: HealthClient): JoinWizardSource {
         // is unaffected either way, since the server stamps its own constant regardless
         // of what this screen displays.
         clubTermsVersion: null,
+        //: Doors C and D read `/me/studio`, which carries no prepayment terms — and `0` is
+        //: the honest answer for them regardless: forward months are priced server-side off
+        //: the WHOLE payer's monthly total, which for a family that already has children is
+        //: not the sum this run can see. Those families prepay from the payments screen,
+        //: which reads `/me/prepay-terms` and knows the real total.
+        prepayMonths: { cash: 0, cheque: 0 },
         belts: await loadBelts(slug),
         // Item 3 -- the same `slug` this call already read to build the groups URL,
         // threaded through instead of discarded. Step 2 uses it for the "try a trial

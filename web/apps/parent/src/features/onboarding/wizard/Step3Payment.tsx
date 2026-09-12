@@ -65,6 +65,11 @@ export type Step3PaymentProps = {
   plans: readonly WizardPlan[]
   methods: Readonly<Record<string, PaymentMethod>>
   onMethodChange: (studentId: string, method: PaymentMethod) => void
+  /** The club's cash/cheque arrangements as months bought FORWARD beside this month.
+   *  Shown here BEFORE the family commits, because `submitJoin` records the same figure —
+   *  a screen saying one number while the write records another is the defect this whole
+   *  screen was rebuilt for. `{0,0}` on the doors that cannot price it. */
+  prepayMonths?: { cash: number; cheque: number }
   /** Step 3's own "כן, התשלום כבר הוסדר מראש" choice, lifted so `JoinWizard` can pass
    *  it into `submitJoin` as `alreadyArranged`. Fired only when the family changes it. */
   onIntentChange?: (arranged: boolean) => void
@@ -86,6 +91,7 @@ export function Step3Payment({
   plans,
   methods,
   onMethodChange,
+  prepayMonths,
   onIntentChange,
   onBack,
   onSubmit,
@@ -166,6 +172,27 @@ export function Step3Payment({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [joining, plans, methods])
+
+  //: **Months bought forward, and the rule that keeps the number honest.** The server
+  //: prices them payer-WIDE (`prepay_months x monthly_total`), so they attach to exactly one
+  //: method — a family splitting children between cash and cheque would otherwise be shown,
+  //: and promised, the whole household's months twice. `submitJoin` applies the identical
+  //: rule; the two must never disagree about what the family agreed to.
+  const forwardMonths = ((): number => {
+    if (!prepayMonths || chargeable.length === 0) return 0
+    const chosen = methods[chargeable[0]?.id ?? '']
+    if (chosen === undefined) return 0
+    if (!chargeable.every((student) => methods[student.id] === chosen)) return 0
+    if (chosen === 'cash') return prepayMonths.cash
+    if (chosen === 'cheque') return prepayMonths.cheque
+    return 0
+  })()
+
+  //: The month already owed plus what is bought forward — what the family actually hands
+  //: over. `total` is this run's monthly, which is the payer's monthly exactly when this
+  //: run's children are their only children; the doors where that does not hold pass
+  //: `{0,0}` and this stays zero.
+  const forwardAmount = forwardMonths * total
 
   // F5 (fix round 1) — no אשראי button at all on the "already arranged" path, not a
   // disabled one. A disabled control still invites "why can't I?"; this route simply has
@@ -694,11 +721,17 @@ export function Step3Payment({
                   <Handshake className="w-5 h-5 text-[var(--wz-heading)] shrink-0" />
                   <div className="flex flex-col min-w-0">
                     <span className="text-[13px] font-bold text-[var(--wz-heading)]">{copy.coachRow}</span>
-                    <span className="text-[11px] text-[var(--wz-secondary)]">{copy.coachRowSub}</span>
+                    <span className="text-[11px] text-[var(--wz-secondary)]">
+                      {forwardMonths > 0
+                        ? //: One line, the owner's own call: the total and how many months it
+                          //: covers, without spelling out the arithmetic.
+                          `${forwardMonths + 1} ${copy.prepayMonths}`
+                        : copy.coachRowSub}
+                    </span>
                   </div>
                 </div>
                 <span className="text-[16px] font-bold text-[var(--wz-heading)] shrink-0">
-                  ₪{formatShekels(coachSum)}
+                  ₪{formatShekels(coachSum + forwardAmount)}
                 </span>
               </div>
             ) : null}

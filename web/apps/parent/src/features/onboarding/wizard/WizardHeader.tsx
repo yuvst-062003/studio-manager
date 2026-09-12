@@ -4,6 +4,7 @@
 // design-review affordance and is NOT ported (spec §2, §16 item 5).
 import { ArrowRight, Check, User } from 'lucide-react'
 import type { Locale } from '@studio/i18n'
+import { t } from '@studio/i18n'
 import { step1Copy } from './copy'
 
 export type WizardStep = 1 | 2 | 3 | 4
@@ -52,7 +53,7 @@ export function WizardHeader({
               <button
                 type="button"
                 onClick={onBack}
-                aria-label="חזרה לשלב הקודם"
+                aria-label={t(locale, 'people.joinWizard.header.back')}
                 className="w-10 h-10 flex items-center justify-center rounded-full text-[var(--wz-ink)] hover:bg-[var(--wz-tint)] active:scale-95 transition-all shrink-0 cursor-pointer"
               >
                 <ArrowRight className="w-5 h-5" />

@@ -54,6 +54,9 @@ type StudioState =
       belts: WizardBelt[]
       /** Task 10 item 3 -- threaded down to step 2's "try a trial lesson first" link. */
       slug: string | null
+      /** The club's cash/cheque arrangements as months bought FORWARD. `{0,0}` on the
+       *  doors that cannot say — see `WizardStudio.prepayMonths`. */
+      prepayMonths: { cash: number; cheque: number }
     }
 
 type CatalogueState =
@@ -294,6 +297,9 @@ export function JoinWizard({
       plans,
       methods,
       alreadyArranged,
+      //: The SAME figure step 3 put in front of the family. Read off the studio rather than
+      //: recomputed, so the screen and the write cannot arrive at different totals.
+      prepayMonths: studio.status === 'ready' ? studio.prepayMonths : { cash: 0, cheque: 0 },
       templateId,
       deps: {
         register: () =>
@@ -448,6 +454,7 @@ export function JoinWizard({
             onMethodChange={(id, method) =>
               setMethods((previous) => ({ ...previous, [id]: method }))
             }
+            prepayMonths={studio.status === 'ready' ? studio.prepayMonths : undefined}
             onIntentChange={setAlreadyArranged}
             onBack={() => setStep(2)}
             onSubmit={submit}

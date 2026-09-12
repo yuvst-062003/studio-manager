@@ -35,7 +35,7 @@ from app.models.person import Person
 from app.models.studio import Studio
 from app.schemas._pagination import MAX_PAGE_SIZE
 from app.services.billing.catalogue import CatalogueService
-from app.services.billing.studio_settings import cash_prepay_months
+from app.services.billing.studio_settings import cash_prepay_months, cheque_months_remaining
 from app.services.health.agreement import (
     AgreementError,
     NationalIdInvalidError,
@@ -132,6 +132,11 @@ class OnboardingInfoOut(BaseModel):
     #: **The screen and the promise must read the same number.** A total shown as one month
     #: and recorded as three is the 2026-09-12 defect in a new place.
     cash_prepay_months: int
+    #: How many cheques a family joining TODAY writes — one per month left in the training
+    #: year, not a fixed twelve (owner, 2026-09-12). Inclusive of the joining month, so the
+    #: caller buying months forward wants one fewer. Published beside the cash term for the
+    #: same reason: step 3 has to show the family the arrangement before they agree to it.
+    cheque_prepay_months: int
 
 
 class OnboardingPickupIn(BaseModel):
@@ -378,6 +383,7 @@ def onboarding_info(token: str, request: Request, session: SessionDep) -> Onboar
         logo_url=(f"/api/v1/public/studios/{studio.slug}/logo" if studio.logo_object_key else None),
         club_terms_version=CLUB_TERMS_VERSION,
         cash_prepay_months=cash_prepay_months(studio),
+        cheque_prepay_months=cheque_months_remaining(session, link.studio_id, on=now().date()),
     )
 
 

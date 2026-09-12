@@ -313,6 +313,10 @@ def test_the_manager_card_regenerates_and_the_public_read_validates(client, as_m
     # because the field is only useful if it survives the wire -- a default on the model
     # would make a dropped one look fine.
     assert info.json()["cash_prepay_months"] == 2
+    # Cheques run to the end of the training year; with no year row configured in the
+    # fixtures that falls back to the full twelve. See tests/billing/test_cheque_term.py
+    # for the month arithmetic itself.
+    assert info.json()["cheque_prepay_months"] == 12
 
     revoked = client.delete("/api/v1/onboarding-link", headers=as_manager.headers)
     assert revoked.status_code == 200

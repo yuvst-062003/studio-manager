@@ -356,6 +356,7 @@ export function step3Copy(locale: Locale) {
     creditRowSub: t(locale, 'people.joinWizard.step3.creditRowSub'),
     coachRow: t(locale, 'people.joinWizard.step3.coachRow'),
     coachRowSub: t(locale, 'people.joinWizard.step3.coachRowSub'),
+    prepayMonths: t(locale, 'people.joinWizard.step3.prepayMonths'),
     allAwaiting: t(locale, 'people.joinWizard.step3.allAwaiting'),
     coachNote: t(locale, 'people.joinWizard.step3.coachNote'),
     back: t(locale, 'people.joinWizard.step3.back'),

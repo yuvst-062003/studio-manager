@@ -719,6 +719,7 @@ export const people: Bundle = {
   // WIZARD_FLOW_COPY, LEGAL_DOCS, FAQ_ITEMS.
 
   // STEP1_COPY -> joinWizard.step1.*
+  'joinWizard.header.back': 'חזרה לשלב הקודם',
   'joinWizard.step1.seasonBadge': 'עונת האימונים תשפ״ה',
   'joinWizard.step1.heading': 'ברוכים הבאים למועדון גלדיאטור',
   'joinWizard.step1.lead': 'לפני שנתחיל בתהליך ההצטרפות, יש לעיין ולאשר את מסמכי המועדון',
@@ -938,6 +939,7 @@ export const people: Bundle = {
   'joinWizard.step3.creditRow': 'לתשלום מיידי באפליקציה (uPay)',
   'joinWizard.step3.creditRowSub': 'בכרטיס אשראי מאובטח',
   'joinWizard.step3.coachRow': 'לתשלום ישירות למאמן',
+  'joinWizard.step3.prepayMonths': 'חודשים מראש',
   'joinWizard.step3.coachRowSub': 'באימון הקרוב',
   'joinWizard.step3.allAwaiting': 'כל החניכים בהרשמה זו ממתינים למענה ובדיקת מנהל – אין סכום לתשלום במסך זה (₪0 לחיוב).',
   'joinWizard.step3.coachNote': 'יש למסור את התשלום ישירות למאמן באימון הקרוב. תוקף המנוי יעודכן מיד עם השלמת הדיווח.',

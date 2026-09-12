@@ -156,6 +156,18 @@ export type SubmitJoinInput = {
    *  promise as `already_paid`, which is a TENSE and not a method: it tells the manager
    *  whether to go and look for this money now or wait for it. */
   alreadyArranged: boolean
+  /**
+   * The club's cash and cheque arrangements, as months bought FORWARD beside the month this
+   * registration already owes. `{cash: 2}` collects three months of cash in total.
+   *
+   * **Must match what step 3 showed.** Forward months are priced SERVER-side from the
+   * payer's monthly total; the screen computes the same figure from this run's plans, and
+   * the two agree only when this run's children are the payer's only children. Doors C and D
+   * therefore pass `{0, 0}` — a family that already has children prepays from the payments
+   * screen, which reads `/me/prepay-terms` and knows the real total. Charging a total the
+   * family was never shown is the 2026-09-12 defect in a new place.
+   */
+  prepayMonths?: { cash: number; cheque: number }
   deps: SubmitJoinDeps
 }
 
@@ -173,6 +185,7 @@ type ActiveRow = {
 
 export async function submitJoin(input: SubmitJoinInput): Promise<SubmitJoinResult> {
   const { students, plans, methods, alreadyArranged, deps } = input
+  const prepay = input.prepayMonths ?? { cash: 0, cheque: 0 }
 
   //: `register` is given JOINING children only (`toRegisterPayload` filters them), so a
   //: submission of nothing but trial children has nobody to register — and calling it
@@ -411,6 +424,31 @@ export async function submitJoin(input: SubmitJoinInput): Promise<SubmitJoinResu
   let checkoutRef: string | null = null
   const mandates: MandateRow[] = []
 
+  /**
+   * How many months forward THIS method buys, and the rule that keeps it honest.
+   *
+   * **Forward months are priced payer-WIDE** by the server: `prepay_months x
+   * monthly_total(payer)`, over every one of the family's active students. So they can be
+   * attached to exactly one method. A family putting one child on cash and another on
+   * cheque would otherwise buy the whole household's months twice — once at two months and
+   * once at twelve — and be promised a number nobody on either screen ever saw.
+   *
+   * The answer when the family splits methods is therefore zero, not a share: this month's
+   * charges are still recorded per method, and the forward arrangement is made with the
+   * manager afterwards. A standing order never buys months either — its mandate is what
+   * collects every month after this one.
+   */
+  const oneMethodForEveryone =
+    active.length > 0 && active.every((row) => row.method === active[0]?.method)
+      ? active[0]?.method
+      : null
+  const forwardFor = (method: PaymentMethod): number => {
+    if (method !== oneMethodForEveryone) return 0
+    if (method === 'cash') return prepay.cash
+    if (method === 'cheque') return prepay.cheque
+    return 0
+  }
+
   if (openCharges !== null) {
     // a. and b. -- cash, cheque and standing order. One call per method over every one of
     // that method's children's charges together (real charges); one call PER CHILD for a
@@ -425,7 +463,7 @@ export async function submitJoin(input: SubmitJoinInput): Promise<SubmitJoinResu
       if (withCharges.length > 0) {
         const chargeIds = withCharges.flatMap((row) => row.charges.map((charge) => charge.id))
         try {
-          await deps.billing.createPromise(chargeIds, method, 0, alreadyArranged)
+          await deps.billing.createPromise(chargeIds, method, forwardFor(method), alreadyArranged)
           for (const row of withCharges) {
             row.outcome.state = 'recorded'
             row.outcome.reason = undefined
