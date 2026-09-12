@@ -46,7 +46,7 @@ from app.services.people.attendance_pattern import weekly_volume
 from app.services.people.enrollments import EnrollmentService
 from app.services.people.errors import ConflictError, NotFoundError, RefusedError
 from app.services.people.group_days import ScheduleReader
-from app.services.people.matching import match_person
+from app.services.people.matching import match_person, pending_guardian
 from app.services.people.naming import format_person_name
 from app.services.people.status import StudentStatusService
 
@@ -177,11 +177,37 @@ class StudentService:
             if guardian_person_id is not None
             else match_person(session, email=guardian_email, phone=guardian_phone)
         )
+        #: **The sibling case.** `match_person` only ever finds a guardian who already has a
+        #: login with a verified address, so a parent this manager created minutes ago can
+        #: never match -- and their second child used to mint a SECOND Person and a SECOND
+        #: invitation against the same email. The parent signed in, bound one of the two, and
+        #: saw one of their children. Reusing the pending record is what makes one invitation
+        #: carry the whole family, and it is the same lookup `accept_invitation` performs at
+        #: the other end of the link.
+        pending = (
+            None
+            if guardian_person_id is not None or matched is not None
+            else pending_guardian(session, email=guardian_email, phone=guardian_phone)
+        )
         token: str | None = None
         if guardian_person_id is not None:
             pass  # already known by id; nothing to match and nobody to invite
         elif matched is not None:
             guardian_person_id = matched.person_id
+        elif pending is not None:
+            #: Reused, and invited again: the manager may well be sending one link per child,
+            #: and both tokens resolve to this same Person -- the second lands on
+            #: `accept_invitation`'s `already_owned` branch once the first is bound. What must
+            #: NOT happen is a second Person, which is what this branch exists to prevent.
+            guardian_person_id = pending.id
+            token = StudentService.issue_invitation(
+                session,
+                student_id=student.id,
+                email=guardian_email,
+                phone=guardian_phone,
+                at=at,
+                actor_person_id=actor_person_id,
+            )
         else:
             parent = Person(
                 #: `person.first_name`/`last_name` are NOT NULL — "" satisfies that without

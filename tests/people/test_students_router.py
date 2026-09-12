@@ -98,6 +98,86 @@ def _create(
 # -- §3.2's matrix -------------------------------------------------------------
 
 
+def test_two_children_with_one_parent_email_share_one_parent(client, as_manager):
+    """**The sibling case, and it was broken.**
+
+    `match_person` only matches a guardian who already HAS a login with a
+    provider-verified address — an unverified address is not a key, deliberately. A parent
+    the manager created minutes ago has no login at all, so that lookup could never find
+    them, and the second child minted a SECOND Person and a SECOND invitation against the
+    same email. The parent then signed in, bound one of the two, and saw ONE of their
+    children (2026-09-12).
+    """
+    tag = uuid.uuid4().hex[:8]
+    email = f"siblings-{tag}@example.invalid"
+
+    def add(name: str) -> dict:
+        return _create(
+            client,
+            as_manager,
+            {
+                "first_name": name,
+                "last_name": f"אחים{tag}",
+                "guardian": {"email": email, "relation": "parent"},
+            },
+        )
+
+    first = add(f"אלף{tag}")
+    second = add(f"בית{tag}")
+
+    assert (
+        first["student"]["guardians"][0]["person_id"]
+        == second["student"]["guardians"][0]["person_id"]
+    )
+
+
+def test_the_second_child_still_mints_a_usable_invitation(client, as_manager):
+    """Reusing the parent record must not mean the manager is left with nothing to send for
+    the second child. Both tokens resolve to the same Person; once the first is bound the
+    second lands on `accept_invitation`'s `already_owned` branch, which is a non-event
+    rather than a refusal."""
+    tag = uuid.uuid4().hex[:8]
+    email = f"siblings2-{tag}@example.invalid"
+    payload = {
+        "first_name": f"גימל{tag}",
+        "last_name": f"אחים{tag}",
+        "guardian": {"email": email, "relation": "parent"},
+    }
+    _create(client, as_manager, payload)
+    second = _create(
+        client, as_manager, {**payload, "first_name": f"דלת{tag}"}
+    )
+    assert second["invitation_token"]
+
+
+def test_a_guardian_with_no_email_and_no_phone_is_refused(client, as_manager):
+    """An invitation is the ONLY route onto a child a manager creates — there is no
+    self-service door — so a student saved without one is a child nobody can be contacted
+    about. The dashboard used to allow the submission and render the generic error."""
+    response = client.post(
+        "/api/v1/students",
+        json={"first_name": "א", "last_name": "ב", "guardian": {"relation": "parent"}},
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 422
+
+
+def test_a_phone_alone_is_enough_to_invite_on(client, as_manager):
+    """The dashboard offered email only until 2026-09-12; the API has always accepted a
+    phone, and a club that reaches its families by WhatsApp needs it."""
+    tag = uuid.uuid4().hex[:8]
+    body = _create(
+        client,
+        as_manager,
+        {
+            "first_name": f"טלפון{tag}",
+            "last_name": f"בלבד{tag}",
+            "guardian": {"phone": f"05012{tag[:5]}", "relation": "parent"},
+        },
+    )
+    assert body["invitation_token"]
+
+
 def test_a_manager_creates_a_student(client, as_manager):
     body = _create(client, as_manager)
     assert body["student"]["status"] == "lead"
@@ -423,7 +503,8 @@ def test_wizard_prefill_never_leaks_another_familys_child(client, as_manager, as
     """The same guardian scoping `/me/students` has. Knowing an id is not the check; being
     that child's guardian is."""
     _create(client, as_manager)
-    assert client.get("/api/v1/me/wizard-prefill", headers=as_guardian.headers).json()["items"] == []
+    got = client.get("/api/v1/me/wizard-prefill", headers=as_guardian.headers)
+    assert got.json()["items"] == []
 
 
 def test_a_guardian_never_sees_another_familys_child(client, as_manager, as_guardian):

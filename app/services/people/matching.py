@@ -70,6 +70,72 @@ def normalize_phone(raw: str | None) -> str | None:
     return digits
 
 
+def pending_guardian(
+    session: Session,
+    *,
+    email: str | None = None,
+    phone: str | None = None,
+) -> Person | None:
+    """A guardian a manager already pre-created here, who has not signed in yet.
+
+    **This is the sibling case, and without it a parent gets one record per child.**
+    `match_person` above deliberately only matches a Person that already HAS a login with
+    a provider-verified address -- an unverified address is not a key. A parent the manager
+    created five minutes ago has no login at all, so that check can never find them, and
+    adding their second child minted a SECOND Person and a SECOND invitation against the
+    same email. The parent then signed in, bound one of the two, and saw one of their
+    children (found 2026-09-12 by adding two children with one address).
+
+    Matching an UNBOUND record is a different question from matching a verified identity,
+    and it is safe for the reason the other is not: this record has no login to hijack. It
+    is exactly the lookup `accept_invitation` already does when the parent finally arrives
+    -- `Person.auth_identity_id IS NULL` and the same address -- so reusing it here makes
+    the two ends of the invitation agree about who the parent is.
+
+    Scoped by the caller's `TenantSession`, like everything else in this module: another
+    club's pending parent is not this club's.
+
+    Phone is normalized on BOTH sides, so `050-123-4567` typed today matches `0501234567`
+    typed last week.
+    """
+    if email:
+        row = (
+            session.execute(
+                select(Person)
+                .where(
+                    Person.anonymized_at.is_(None),
+                    Person.auth_identity_id.is_(None),
+                    Person.email == email,
+                )
+                .order_by(Person.created_at)
+            )
+            .scalars()
+            .first()
+        )
+        if row is not None:
+            return row
+
+    normalized = normalize_phone(phone)
+    if normalized:
+        candidates = (
+            session.execute(
+                select(Person)
+                .where(
+                    Person.anonymized_at.is_(None),
+                    Person.auth_identity_id.is_(None),
+                    Person.phone.is_not(None),
+                )
+                .order_by(Person.created_at)
+            )
+            .scalars()
+            .all()
+        )
+        for row in candidates:
+            if normalize_phone(row.phone) == normalized:
+                return row
+    return None
+
+
 def match_person(
     session: Session,
     *,
