@@ -17,7 +17,10 @@ export type StatusHistoryOut = components['schemas']['StudentStatusHistoryOut']
 export type AttendanceMarkRow = components['schemas']['AttendanceOut']
 /** Only what `3c`'s picker renders. M1 owns `GroupOut`; naming the two fields this screen
  *  reads keeps the form independent of fields another lane may add or move. */
-export type GroupOption = { id: string; name: string }
+/** `class_id` is here because the BELT LADDER hangs off the class, not off the group
+ *  (§5.9): the add-students screen can only offer a belt once a group has been chosen,
+ *  and it is this field that tells it which ladder to load. */
+export type GroupOption = { id: string; name: string; class_id?: string | null }
 
 export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
 
@@ -103,6 +106,24 @@ export function makeDashboardPeopleClient(fetcher: Fetcher) {
     /** M1's group list. `3c` needs it because §5.4(a)'s form asks for a group, and the
      *  enrolment it creates has to name one that exists. */
     groups: () => fetcher('/api/v1/groups').then(json<{ items: GroupOption[] }>),
+
+    /** §5.9's ladder for one class. The belt a manager can set on a child arriving from
+     *  another club comes from here — a rank id, never a colour name. */
+    beltRanks: (classId: string) =>
+      fetcher(`/api/v1/belt-ranks?class_id=${encodeURIComponent(classId)}`).then(
+        json<{ items: { id: string; name: string; color_hex?: string | null }[] }>,
+      ),
+
+    /** §5.9's award outside an exam. Used here for the belt a child ALREADY holds when
+     *  they arrive, which is a fact about them on the day the club learns it — so it is
+     *  dated today and carries a note saying where it came from, rather than pretending
+     *  the club examined them. */
+    awardBelt: (studentId: string, body: { belt_rank_id: string; awarded_on: string; note?: string }) =>
+      fetcher(`/api/v1/students/${studentId}/belts`, {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify(body),
+      }),
 
     weekdayOptions: (groupId: string) =>
       fetcher(`/api/v1/enrollments/weekday-options?group_id=${groupId}`).then(

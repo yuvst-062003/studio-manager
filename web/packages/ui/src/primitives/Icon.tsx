@@ -223,6 +223,30 @@ const PATHS = {
       <path d="M8 5V3" />
     </>
   ),
+  // The three the add-students screen needed and the set did not have (2026-09-13): an
+  // envelope for the account a trainee signs in through, and a pencil and a bin for the
+  // two actions on a trainee's row. Drawn in the same grammar as everything above -- 24
+  // viewBox, stroke, round caps -- rather than reaching for an icon font, which the
+  // dashboard redesign excludes as a new dependency and a CDN request on first paint.
+  mail: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+      <path d="m3.5 7 7.3 5.4a2 2 0 0 0 2.4 0L20.5 7" />
+    </>
+  ),
+  edit: (
+    <>
+      <path d="M12 20h9" />
+      <path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L7.5 18.5 3.5 19.5l1-4Z" />
+    </>
+  ),
+  trash: (
+    <>
+      <path d="M3.5 6.5h17" />
+      <path d="M9 6.5V4.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+      <path d="m5.5 6.5 1 13a1.5 1.5 0 0 0 1.5 1.4h8a1.5 1.5 0 0 0 1.5-1.4l1-13" />
+    </>
+  ),
 } as const
 
 export function Icon({
