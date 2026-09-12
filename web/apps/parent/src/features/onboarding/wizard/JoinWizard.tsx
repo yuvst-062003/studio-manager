@@ -309,6 +309,28 @@ export function JoinWizard({
         },
         billing: billingClient,
         standingOrderLinks,
+        //: §6.1 step 5, recorded by the screen that asked for it. Step 1 shows the family
+        //: the privacy policy and takes a tick for it; until 2026-09-12 only the CLUB's
+        //: terms were written, so `ConsentGate` had to stand in front of the app and ask
+        //: for the same two documents again, in a different design.
+        //:
+        //: The version is READ BACK first and never assumed: `ConsentGrantIn` refuses a
+        //: version the server has moved past, which is what stops a tab left open across a
+        //: policy change from recording an agreement to wording nobody saw.
+        grantPrivacyConsents: async () => {
+          const current = await apiFetch('/api/v1/privacy/consents')
+          if (!current.ok) throw new Error(String(current.status))
+          const state = (await current.json()) as { policy_version: number }
+          const response = await apiFetch('/api/v1/privacy/consents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              version: state.policy_version,
+              grants: { terms: true, privacy: true },
+            }),
+          })
+          if (!response.ok) throw new Error(String(response.status))
+        },
         //: How the family says they will pay. A `PUT` and not a promise, because
         //: `payment_promise.method` has no card and this must record all four routes --
         //: see `SubmitJoinDeps.savePaymentMethods` for the defect it closes.

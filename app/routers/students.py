@@ -584,6 +584,7 @@ def convert_student(
             at=now(),
             actor_person_id=getattr(request.state, "person_id", None),
             schedule=schedule_reader(session),
+            payment_settled=body.payment_settled,
         )
     except NotFoundError as exc:
         raise _not_found() from exc
@@ -809,6 +810,12 @@ class MyStudentPrefillOut(BaseModel):
     group_ids: list[uuid.UUID]
     price_plan_id: uuid.UUID | None
     health_status: str
+    #: **Whether the club already knows how this child pays**, which is what lets the join
+    #: wizard stop asking. Set when a manager converts with `payment_settled` (the family
+    #: handed the money over in person) and by the wizard's own step 3 for everyone else.
+    #: `None` means nobody has said yet — the ordinary case for a child a manager created
+    #: and has not converted.
+    payment_method: str | None
     #: Whether this child is the reason the gate is up. The wizard shows every child so the
     #: family can see the whole household, and acts on the ones still owing.
     agreement_complete: bool | None = None
@@ -855,6 +862,7 @@ def my_students_prefill(request: Request, session: TenantSessionDep) -> MyStuden
                 group_ids=group_ids,
                 price_plan_id=student.price_plan_id,
                 health_status=student.health_status,
+                payment_method=student.payment_method,
                 agreement_complete=agreement_status(
                     session, student, signer_person_id=person_id
                 ).complete,

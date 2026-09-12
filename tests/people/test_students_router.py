@@ -178,6 +178,70 @@ def test_a_phone_alone_is_enough_to_invite_on(client, as_manager):
     assert body["invitation_token"]
 
 
+def test_a_manager_can_convert_a_student_as_already_paid(
+    client, app_session, as_manager, a_group
+):
+    """**The family paid the manager in person, and the manager says so.**
+
+    Asserted on an UNPRICED student on purpose: the payment method must be recorded either
+    way, and the promise half must stay silent rather than fail when there is no charge to
+    name yet.
+
+    Until 2026-09-12 there was no way to record it: the parent then walked step 3 of the
+    join wizard and was asked how they intended to pay money they had already handed over.
+    `already_paid` is the promise's own word and is a TENSE, not a method — it tells the
+    manager whether to go looking for this money now or wait for it.
+    """
+    from app.models.payment_promise import PaymentPromise
+    from app.models.people import Student
+
+    created = _create(client, as_manager)
+    student_id = created["student"]["id"]
+    response = client.post(
+        f"/api/v1/students/{student_id}/convert",
+        json={
+            "group_id": str(a_group),
+            "started_on": "2026-09-01",
+            "payment_settled": True,
+        },
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 200, response.text
+
+    app_session.expire_all()
+    student = app_session.get(Student, uuid.UUID(student_id))
+    # **This is the half the parent app reads** to decide whether it still has to ask, and
+    # it is set whether or not there was anything to promise over.
+    assert student.payment_method == "cash"
+
+    # The promise is the MANAGER's half — a row saying this money is accounted for rather
+    # than owed. It needs an open charge to name, and this student is unpriced (the fixture
+    # sets no plan), so `charge_first_month` raised none and there is nothing to promise.
+    # Silent rather than failing is deliberate: a conversion the manager asked for must not
+    # fall over because the price has not been agreed yet.
+    assert app_session.query(PaymentPromise).filter_by(already_paid=True).all() == []
+
+
+def test_converting_without_the_flag_leaves_the_payment_open(
+    client, app_session, as_manager, a_group
+):
+    """The default, and it must stay the default: a conversion says nothing about money
+    unless the manager said something about money."""
+    from app.models.people import Student
+
+    created = _create(client, as_manager)
+    student_id = created["student"]["id"]
+    response = client.post(
+        f"/api/v1/students/{student_id}/convert",
+        json={"group_id": str(a_group), "started_on": "2026-09-01"},
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 200, response.text
+
+    app_session.expire_all()
+    assert app_session.get(Student, uuid.UUID(student_id)).payment_method is None
+
+
 def test_a_manager_creates_a_student(client, as_manager):
     body = _create(client, as_manager)
     assert body["student"]["status"] == "lead"

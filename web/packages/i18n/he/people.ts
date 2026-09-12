@@ -488,6 +488,8 @@ export const people: Bundle = {
   'convert.title': 'צירוף למועדון',
   'convert.group': 'קבוצה',
   'convert.plan': 'מסלול מחיר',
+  'convert.paymentSettled': 'התשלום כבר התקבל מההורה',
+  'convert.paymentSettledHint': 'סמנו אם קיבלתם את התשלום ביד. ההורה לא יישאל שוב באפליקציה',
   'convert.planNone': 'ללא מסלול — ייקבע מאוחר יותר',
   'convert.startedOn': 'מתאריך',
   'convert.pricePlan': 'מסלול מחיר',

@@ -421,6 +421,8 @@ export const people: Bundle = {
 
   'convert.title': 'Вступление в клуб',
   'convert.plan': 'Тарифный план',
+  'convert.paymentSettled': 'Родитель уже оплатил',
+  'convert.paymentSettledHint': 'Отметьте, если деньги получены лично. Приложение больше не спросит родителя',
   'convert.planNone': 'Без плана — решить позже',
   'convert.group': 'Группа',
   'convert.startedOn': 'С даты',

@@ -526,6 +526,11 @@ class StudentConvertIn(BaseModel):
     #: default. `None` means all of them.
     attends_weekdays: list[Weekday] | None = Field(default=None, min_length=1)
     reason: str | None = Field(default=None, max_length=200)
+    #: The family handed the money over in person, and the manager is saying so. Records an
+    #: `already_paid` cash promise over the first charge and sets the student's payment
+    #: method, which together are what let the parent's join wizard stop asking how they
+    #: intend to pay money they have already paid (owner, 2026-09-12).
+    payment_settled: bool = False
 
 
 class StudentMarkLostIn(BaseModel):

@@ -580,6 +580,35 @@ describe('converting a student — the price travels with it', () => {
     expect(vi.mocked(client.convert).mock.calls[0]![1]!.price_plan_id).toBeNull()
   })
 
+  it('sends payment_settled when the manager took the money in person', async () => {
+    // Until 2026-09-12 there was no way to say this, so the parent opened the app and was
+    // asked how they intended to pay money they had already handed over.
+    const user = userEvent.setup()
+    const client = makeClient()
+    render(<StudentDetailScreen locale="he" client={client} studentId="st1" />)
+
+    await user.click(await screen.findByTestId('detail-convert'))
+    await user.selectOptions(screen.getByTestId('detail-convert-group'), 'g1')
+    await user.click(screen.getByTestId('detail-convert-paid'))
+    await user.click(screen.getByTestId('detail-convert-submit'))
+
+    await waitFor(() => expect(client.convert).toHaveBeenCalled())
+    expect(vi.mocked(client.convert).mock.calls[0]![1]).toMatchObject({ payment_settled: true })
+  })
+
+  it('leaves payment_settled false unless the manager says so', async () => {
+    const user = userEvent.setup()
+    const client = makeClient()
+    render(<StudentDetailScreen locale="he" client={client} studentId="st1" />)
+
+    await user.click(await screen.findByTestId('detail-convert'))
+    await user.selectOptions(screen.getByTestId('detail-convert-group'), 'g1')
+    await user.click(screen.getByTestId('detail-convert-submit'))
+
+    await waitFor(() => expect(client.convert).toHaveBeenCalled())
+    expect(vi.mocked(client.convert).mock.calls[0]![1]!.payment_settled).toBe(false)
+  })
+
   it('never offers a closed plan — that is last year\'s price', async () => {
     const user = userEvent.setup()
     const client = makeClient()

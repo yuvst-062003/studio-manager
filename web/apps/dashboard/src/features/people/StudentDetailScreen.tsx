@@ -144,6 +144,7 @@ export function StudentDetailScreen({
   //: the group. Every child a manager converted came out UNPRICED: active, enrolled,
   //: training, billed nothing. The billing screen listed them and could not fix them.
   const [convertPlan, setConvertPlan] = useState('')
+  const [paymentSettled, setPaymentSettled] = useState(false)
   const [plans, setPlans] = useState<readonly { id: string; name: string; active_to: string | null }[]>([])
   // F2 — the two buttons on either side of convert, wired at last. Each expands into
   // its own small form: the second press is the confirmation step, and the fields ARE
@@ -218,10 +219,12 @@ export function StudentDetailScreen({
         group_id: convertGroup,
         started_on: new Date().toISOString().slice(0, 10),
         price_plan_id: convertPlan || null,
+        payment_settled: paymentSettled,
       })
       setConverting(false)
       setConvertGroup('')
       setConvertPlan('')
+      setPaymentSettled(false)
       setReloads((n) => n + 1)
     } finally {
       setBusy(false)
@@ -620,6 +623,18 @@ export function StudentDetailScreen({
                 ))}
               </select>
             </label>
+            <label>
+              <input
+                type="checkbox"
+                data-testid="detail-convert-paid"
+                checked={paymentSettled}
+                onChange={(event) => setPaymentSettled(event.target.checked)}
+              />
+              {t(locale, 'people.convert.paymentSettled')}
+            </label>
+            <p style={{ margin: 0 }} data-testid="detail-convert-paid-hint">
+              {t(locale, 'people.convert.paymentSettledHint')}
+            </p>
             <Button
               data-testid="detail-convert-submit"
               disabled={!convertGroup || busy}

@@ -146,6 +146,11 @@ export function makeDashboardPeopleClient(fetcher: Fetcher) {
         started_on: string
         price_plan_id?: string | null
         attends_weekdays?: number[] | null
+        //: The family handed the money over in person. Records an `already_paid` cash
+        //: promise over the first charge and sets the student's payment method — together,
+        //: what stops the parent's wizard asking how they intend to pay money they have
+        //: already paid.
+        payment_settled?: boolean
       },
     ) =>
       fetcher(`/api/v1/students/${studentId}/convert`, {

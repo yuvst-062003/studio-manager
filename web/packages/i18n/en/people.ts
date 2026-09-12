@@ -421,6 +421,8 @@ export const people: Bundle = {
 
   'convert.title': 'Enrol in the club',
   'convert.plan': 'Price plan',
+  'convert.paymentSettled': 'The parent has already paid',
+  'convert.paymentSettledHint': 'Tick if you took the money in person. The parent is not asked again in the app',
   'convert.planNone': 'No plan — decide later',
   'convert.group': 'Group',
   'convert.startedOn': 'From',

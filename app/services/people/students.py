@@ -929,6 +929,7 @@ class StudentService:
         at: datetime,
         actor_person_id: uuid.UUID | None,
         schedule: ScheduleReader,
+        payment_settled: bool = False,
     ) -> Student:
         """§5.4a step 5 -- 'Manager converts → picks group, sets price, status=active,
         enrollment created.'
@@ -973,7 +974,73 @@ class StudentService:
         StudentService._close_open_trials(session, student_id=student.id, outcome="converted")
         session.flush()
         StudentService._raise_first_charge(session, student=student, on=started_on)
+
+        #: **The family paid the manager in person, and the manager says so here.**
+        #: Without this the parent walked step 3 of the join wizard and was asked how they
+        #: intend to pay money they had already handed over — there was no way for a manager
+        #: to record it ahead of them (owner, 2026-09-12).
+        #:
+        #: `already_paid` is the promise's own word for this and is a TENSE, not a method:
+        #: it tells the manager whether to go and look for this money now or wait for it.
+        #: Recorded as `cash` because that is what being handed money in a dojo is; a
+        #: manager who took a cheque corrects the method on the payments screen, which is
+        #: the screen that owns it.
+        #:
+        #: Raised AFTER the first charge, deliberately — the promise names specific open
+        #: charges, and before that call there are none to name.
+        if payment_settled:
+            StudentService._settle_with_the_manager(
+                session, student=student, at=at, actor_person_id=actor_person_id
+            )
         return student
+
+    @staticmethod
+    def _settle_with_the_manager(
+        session: Session,
+        *,
+        student: Student,
+        at: datetime,
+        actor_person_id: uuid.UUID | None,
+    ) -> None:
+        """Record that this student's money already reached the club, in person.
+
+        Two writes, and both are needed. `student.payment_method` is what the parent app
+        reads to decide whether it still has to ask — a child whose method the club already
+        knows is not asked again. The promise is what the MANAGER reads on the payments
+        screen: a row saying this money is accounted for rather than owed.
+
+        Silent when there is nothing open to promise over. An unpriced student has no first
+        charge, and a promise over no charges is refused by `PaymentPromiseService` — which
+        is correct, and not a reason to fail a conversion the manager asked for.
+        """
+        from app.models.billing import Charge
+        from app.services.billing.payment_promise import PaymentPromiseService
+
+        student.payment_method = "cash"
+        #: **The payer comes off the CHARGE, not out of the guardian table.**
+        #: `charge.payer_person_id` is captured at creation from the primary guardian, so
+        #: reading it back addresses the promise to exactly whoever the charge was addressed
+        #: to — a second lookup could disagree with it if the primary changed in between.
+        #: It also keeps `is_primary` inside the guardian-management methods that own it
+        #: (§5.3, guarded by `tests/people/test_guardians.py`).
+        rows = session.execute(
+            select(Charge.id, Charge.payer_person_id).where(
+                Charge.student_id == student.id, Charge.status == "open"
+            )
+        ).all()
+        if not rows:
+            return
+        payer = rows[0][1]
+        charge_ids = [charge_id for charge_id, owed_by in rows if owed_by == payer]
+        PaymentPromiseService(session).create(
+            student.studio_id,
+            payer_person_id=payer,
+            charge_ids=charge_ids,
+            method="cash",
+            prepay_months=0,
+            already_paid=True,
+            at=at,
+        )
 
     @staticmethod
     def _raise_first_charge(session: Session, *, student: Student, on: date) -> int:

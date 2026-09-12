@@ -129,6 +129,25 @@ export type SubmitJoinDeps = {
   savePaymentMethods: (
     items: readonly { studentId: string; method: string }[],
   ) => Promise<void>
+  /**
+   * §6.1 step 5's privacy consent, recorded from the screen that actually asked for it.
+   *
+   * **Why the wizard does this at all.** Step 1 shows the family three documents and takes
+   * one tick covering all three — and until 2026-09-12 it recorded only the CLUB's terms.
+   * The privacy ledger was written by a separate `ConsentGate` screen, which therefore had
+   * to stand in front of the app and ask for the same two documents a second time, in a
+   * different design. A parent joining through the link ticked תנאי שימוש and מדיניות
+   * פרטיות twice, on two consecutive screens.
+   *
+   * Honest to record here because the two screens show the SAME WORDS: the wizard's
+   * `people.joinWizard.legal.*` and the gate's `reports.privacy.*` are the same corpus
+   * duplicated into two namespaces — twelve policy sections each, heading for heading.
+   *
+   * Optional, and swallowed on failure by the caller: `register` has already landed by the
+   * time this runs, and a family that exists but has not had a consent row written is asked
+   * again by the gate — which is the old behaviour, not a new failure.
+   */
+  grantPrivacyConsents?: () => Promise<void>
   /** `POST /trial-bookings/self` for the children whose family chose a trial lesson
    *  instead of joining. Optional because door B has no session for it and a door that
    *  cannot offer a trial simply never sets the choice. Given the children's OWN group
@@ -228,6 +247,17 @@ export async function submitJoin(input: SubmitJoinInput): Promise<SubmitJoinResu
   } catch {
     // Not worth losing the rest over -- the reads below fail into `not_recorded` on
     // their own if the token really is unusable.
+  }
+
+  // The privacy ledger, written by the screen that asked. Swallowed like
+  // `savePaymentMethods` below and for the same reason: `register` has landed, and losing a
+  // consent row the gate will ask for again is not worth failing a join over.
+  if (deps.grantPrivacyConsents) {
+    try {
+      await deps.grantPrivacyConsents()
+    } catch {
+      // The gate stays in front of the app, which is exactly the old behaviour.
+    }
   }
 
   let openCharges: ChargeOut[] | null = null
