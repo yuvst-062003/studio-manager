@@ -22,6 +22,7 @@ student in the studio" mean one studio; on a plain `Session` these queries are u
 from __future__ import annotations
 
 import hashlib
+import logging
 import secrets
 import uuid
 from dataclasses import dataclass
@@ -53,6 +54,9 @@ from app.services.people.status import StudentStatusService
 #: §5.3's invitation. Thirty days matches the refresh-token window and is long enough that
 #: a parent who is away for a fortnight is not locked out of their own children.
 INVITATION_TTL_DAYS = 30
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -1014,6 +1018,12 @@ class StudentService:
         is correct, and not a reason to fail a conversion the manager asked for.
         """
         from app.models.billing import Charge
+
+        #: Aliased: this module already imports `people.errors`' ConflictError and
+        #: RefusedError, and these are the BILLING ones the promise service raises. Same
+        #: names, different classes — catching the wrong pair would catch nothing.
+        from app.services.billing.errors import ConflictError as BillingConflict
+        from app.services.billing.errors import RefusedError as BillingRefused
         from app.services.billing.payment_promise import PaymentPromiseService
 
         student.payment_method = "cash"
@@ -1023,24 +1033,42 @@ class StudentService:
         #: to — a second lookup could disagree with it if the primary changed in between.
         #: It also keeps `is_primary` inside the guardian-management methods that own it
         #: (§5.3, guarded by `tests/people/test_guardians.py`).
+        #: `amount_agorot > 0` because §5.10's manual charge is SIGNED: a credit on the
+        #: family's balance is an ordinary open charge with a negative amount, and a promise
+        #: cannot name one -- `PaymentPromiseService` refuses anything with nothing
+        #: outstanding, which turned a manager's conversion into a 500 with nothing recorded.
         rows = session.execute(
             select(Charge.id, Charge.payer_person_id).where(
-                Charge.student_id == student.id, Charge.status == "open"
+                Charge.student_id == student.id,
+                Charge.status == "open",
+                Charge.amount_agorot > 0,
             )
         ).all()
         if not rows:
             return
         payer = rows[0][1]
         charge_ids = [charge_id for charge_id, owed_by in rows if owed_by == payer]
-        PaymentPromiseService(session).create(
-            student.studio_id,
-            payer_person_id=payer,
-            charge_ids=charge_ids,
-            method="cash",
-            prepay_months=0,
-            already_paid=True,
-            at=at,
-        )
+        try:
+            PaymentPromiseService(session).create(
+                student.studio_id,
+                payer_person_id=payer,
+                charge_ids=charge_ids,
+                method="cash",
+                prepay_months=0,
+                already_paid=True,
+                at=at,
+            )
+        except BillingConflict, BillingRefused:
+            #: **The conversion is what the manager asked for; this promise is a note beside
+            #: it.** A charge already inside a pending promise or covered by an open card
+            #: order is refused here, and correctly -- but losing the whole conversion over
+            #: it would leave the manager pressing a button that does nothing. The method is
+            #: already on the student above, which is the half the parent app reads; the
+            #: manager can record the money itself on the payments screen.
+            logger.warning(
+                "already-paid promise refused; conversion kept",
+                extra={"student_id": str(student.id), "charges": len(charge_ids)},
+            )
 
     @staticmethod
     def _raise_first_charge(session: Session, *, student: Student, on: date) -> int:

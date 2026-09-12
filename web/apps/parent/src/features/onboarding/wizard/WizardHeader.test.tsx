@@ -11,11 +11,16 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { WizardHeader } from './WizardHeader'
 
-function renderHeader(locale: 'he' | 'en' | 'ru', step: 1 | 2 | 3 = 1) {
+function renderHeader(
+  locale: 'he' | 'en' | 'ru',
+  step: 1 | 2 | 3 = 1,
+  totalSteps?: 2 | 3,
+) {
   return render(
     <WizardHeader
       locale={locale}
       currentStep={step}
+      totalSteps={totalSteps}
       studioName="מועדון גלדיאטור"
       onNavigate={vi.fn()}
       onBack={vi.fn()}
@@ -57,5 +62,21 @@ describe('WizardHeader', () => {
     // this can assert.
     const { container } = renderHeader('en', 2)
     expect(container.querySelector('.wz-dir-icon')).not.toBeNull()
+  })
+
+  it('a two-step run counts to two, and draws no payment tab', () => {
+    // The manager took the money in person and said so, so this family has no step 3.
+    // Telling them "שלב 2 מתוך 3" and drawing a third tab they will never reach is the
+    // thing the owner asked for in as many words: `2/3`, not `3/3`.
+    renderHeader('he', 2, 2)
+    expect(screen.getByText('שלב 2 מתוך 2: פרטי מתאמנים')).toBeInTheDocument()
+    expect(screen.queryByText('תשלום וסיכום')).toBeNull()
+    expect(screen.getAllByText('פרטי מתאמנים').length).toBeGreaterThan(0)
+  })
+
+  it('the three-step run is still the default when nobody says otherwise', () => {
+    renderHeader('he', 2)
+    expect(screen.getByText('שלב 2 מתוך 3: פרטי מתאמנים')).toBeInTheDocument()
+    expect(screen.getByText('תשלום וסיכום')).toBeInTheDocument()
   })
 })

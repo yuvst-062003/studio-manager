@@ -16,13 +16,23 @@ export type WizardStep = 1 | 2 | 3 | 4
 // an inlined user-facing string and this file held the app's most visible set of them.
 //
 // The PERCENTAGES stay here: they are the progress bar's geometry, not language.
-const STEP_PERCENT: Record<WizardStep, number> = { 1: 33, 2: 67, 3: 100, 4: 100 }
+/** How many steps this run actually has.
+ *
+ * **Three is not a constant.** A family whose payment the manager already took in person
+ * has nothing to answer on step 3, and walking them to a screen that asks how they intend
+ * to pay money they have already paid is the defect this exists to remove (owner,
+ * 2026-09-12). Two is then the honest total, and the header must say `מתוך 2` — a
+ * hardcoded 3 would count a step nobody walks. */
+export type WizardTotalSteps = 2 | 3
 
 const PILL_STEPS = [1, 2, 3] as const
 
 export type WizardHeaderProps = {
   locale: Locale
   currentStep: WizardStep
+  /** 3 normally; 2 when there is nothing left to pay. Drives the rail, the percentage and
+   *  the `שלב N מתוך M` line together, so they cannot disagree about how long this is. */
+  totalSteps?: WizardTotalSteps
   studioName: string
   logoUrl?: string | null
   /** Refused when the step being left has not been completed. §14.2 -- the prototype's
@@ -34,16 +44,27 @@ export type WizardHeaderProps = {
 export function WizardHeader({
   locale,
   currentStep,
+  totalSteps = 3,
   studioName,
   logoUrl,
   onNavigate,
   onBack,
 }: WizardHeaderProps) {
   const copy = step1Copy(locale)
+  //: Composed from words rather than one sentence per step, because the TOTAL is no longer
+  //: fixed: `שלב 1 מתוך 3` was a literal, and a literal cannot say 2. Assembled here and
+  //: never interpolated inside a locale file, which is this repo's own rule for counts.
+  const stepNames = PILL_STEPS.filter((step) => step <= totalSteps)
   const current = {
     title: t(locale, `people.joinWizard.header.title.${currentStep}`),
-    stage: t(locale, `people.joinWizard.header.stage.${currentStep}`),
-    percent: STEP_PERCENT[currentStep],
+    stage:
+      currentStep === 4
+        ? t(locale, 'people.joinWizard.header.stageName.4')
+        : `${t(locale, 'people.joinWizard.header.stepWord')} ${currentStep} ` +
+          `${t(locale, 'people.joinWizard.header.ofWord')} ${totalSteps}: ` +
+          t(locale, `people.joinWizard.header.stageName.${currentStep}`),
+    //: Out of the steps this run HAS. A two-step run is half done after step 1, not a third.
+    percent: Math.round((Math.min(currentStep, totalSteps) / totalSteps) * 100),
   }
 
   return (
@@ -97,8 +118,12 @@ export function WizardHeader({
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-1.5 w-full mb-1.5">
-          {PILL_STEPS.map((step) => {
+        <div
+          className={`grid gap-1.5 w-full mb-1.5 ${
+            totalSteps === 2 ? 'grid-cols-2' : 'grid-cols-3'
+          }`}
+        >
+          {stepNames.map((step) => {
             const isCompleted = currentStep > step
             const isCurrent = currentStep === step
             return (

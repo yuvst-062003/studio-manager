@@ -483,3 +483,60 @@ describe('recording how the family says they will pay', () => {
     expect(savePaymentMethods).toHaveBeenCalledWith([{ studentId: 's1', method: 'cash' }])
   })
 })
+
+// ── the child whose payment the manager already took (2026-09-12) ─────────────────────
+//
+// A manager can add a child and tick "already paid" — they took the money in person. That
+// child's parent never sees step 3, so no method is ever chosen for them, and `submitJoin`
+// is told so through `settledStudentIds`.
+
+describe('submitJoin — a child the club already settled', () => {
+  it('registers them and writes no promise, no order and no method', async () => {
+    const createPromise = vi.fn()
+    const createOrder = vi.fn()
+    const savePaymentMethods = vi.fn().mockResolvedValue(undefined)
+    const deps = makeDeps({
+      charges: [charge('ch1', 's1')],
+      createPromise,
+      createOrder,
+      savePaymentMethods,
+    })
+
+    const result = await submitJoin(
+      input({
+        students: [student('c1')],
+        // No method — nobody asked, which is the whole point of the two-step run.
+        methods: {},
+        settledStudentIds: ['c1'],
+        deps,
+      }),
+    )
+
+    expect(deps.register).toHaveBeenCalledTimes(1)
+    expect(createPromise).not.toHaveBeenCalled()
+    expect(createOrder).not.toHaveBeenCalled()
+    expect(savePaymentMethods).not.toHaveBeenCalled()
+    // `settled` and not `recorded`: `recorded` tells a family their chosen METHOD was
+    // filed, and this family chose nothing — the money is already with the club.
+    expect(result.outcomes[0]).toMatchObject({ state: 'settled', method: null })
+    expect(result.outcomes[0]?.reason).toBeUndefined()
+    expect(result.checkout).toBeNull()
+  })
+
+  it('still asks the sibling who is NOT settled', async () => {
+    // A two-child family where the manager took cash for one of them. The other is an
+    // ordinary chargeable child, so the missing-method guard must still refuse.
+    const deps = makeDeps()
+    await expect(
+      submitJoin(
+        input({
+          students: [student('c1'), student('c2')],
+          methods: {},
+          settledStudentIds: ['c1'],
+          deps,
+        }),
+      ),
+    ).rejects.toMatchObject({ name: 'MissingPaymentMethodError', draftIds: ['c2'] })
+    expect(deps.register).not.toHaveBeenCalled()
+  })
+})

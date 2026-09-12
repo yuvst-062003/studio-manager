@@ -26,6 +26,7 @@ type Step4CopyKey = keyof ReturnType<typeof step4Copy>
 const STATE_COPY: Record<PaymentOutcome['state'], Step4CopyKey> = {
   awaiting_review: 'paymentAwaitingReview',
   recorded: 'paymentRecorded',
+  settled: 'paymentSettled',
   mandate_pending: 'paymentMandatePending',
   card_pending: 'paymentCardPending',
   trial_booked: 'paymentTrialBooked',
@@ -60,6 +61,8 @@ function PaymentChip({
     'px-2.5 py-1 rounded-full bg-amber-500/25 text-amber-300 text-[11px] font-bold flex items-center gap-1 border border-amber-400/40 shrink-0'
   const BLUE =
     'px-2.5 py-1 rounded-full bg-[var(--wz-accent)]/20 text-[var(--wz-accent-soft)] text-[11px] font-bold flex items-center gap-1 border border-[var(--wz-accent)]/30 shrink-0'
+  const GREEN =
+    'px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-bold flex items-center gap-1 border border-emerald-400/40 shrink-0'
 
   switch (outcome.state) {
     case 'awaiting_review':
@@ -81,6 +84,16 @@ function PaymentChip({
         <span className={AMBER}>
           <AlertCircle className="w-3.5 h-3.5" />
           {copy.chipNotRecorded}
+        </span>
+      )
+    case 'settled':
+      // The one state on this screen where money has actually changed hands, so it is
+      // also the one that may wear the green tick the comment below refuses everything
+      // else.
+      return (
+        <span className={GREEN}>
+          <Check className="w-3.5 h-3.5" />
+          {copy.chipSettled}
         </span>
       )
     case 'recorded':

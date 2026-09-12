@@ -41,6 +41,8 @@ from app.core.config import settings
 from app.core.cors import app_origin
 from app.core.tenancy import TenantSession, TenantSessionDep, require_current_studio_id
 from app.models.belts import BeltRank
+from app.models.billing import Charge
+from app.models.payment_promise import PaymentPromise, PaymentPromiseCharge
 from app.models.people import Enrollment, Student
 from app.models.person import Person
 from app.models.studio import Studio
@@ -816,6 +818,15 @@ class MyStudentPrefillOut(BaseModel):
     #: `None` means nobody has said yet — the ordinary case for a child a manager created
     #: and has not converted.
     payment_method: str | None
+    #: **Whether the club has already been paid for this child**, which is what makes the
+    #: parent's run of the wizard two steps instead of three.
+    #:
+    #: Read off the `already_paid` promise a manager raises when the family hands the money
+    #: over in person — never off `payment_method`, which only says the club knows HOW this
+    #: child pays. Every family who has ever completed the wizard has a method; telling them
+    #: their payment was "already arranged with the club" on the strength of it would be
+    #: false, and would skip the step that collects what they still owe.
+    payment_settled: bool = False
     #: Whether this child is the reason the gate is up. The wizard shows every child so the
     #: family can see the whole household, and acts on the ones still owing.
     agreement_complete: bool | None = None
@@ -839,6 +850,23 @@ def my_students_prefill(request: Request, session: TenantSessionDep) -> MyStuden
     """
     person_id = _person_id(request)
     rows = StudentService.for_guardian(session, person_id=person_id)
+
+    #: One query for the whole family rather than one per child. A declined promise does not
+    #: count: the manager looked for that money and said it was not there, so the family is
+    #: owed the question again.
+    settled = set(
+        session.execute(
+            select(Charge.student_id)
+            .join(PaymentPromiseCharge, PaymentPromiseCharge.charge_id == Charge.id)
+            .join(PaymentPromise, PaymentPromise.id == PaymentPromiseCharge.payment_promise_id)
+            .where(
+                PaymentPromise.already_paid.is_(True),
+                PaymentPromise.status != "declined",
+                Charge.student_id.in_([row.id for row in rows]),
+            )
+        ).scalars()
+    )
+
     items: list[MyStudentPrefillOut] = []
     for row in rows:
         student = session.get(Student, row.id)
@@ -863,6 +891,7 @@ def my_students_prefill(request: Request, session: TenantSessionDep) -> MyStuden
                 price_plan_id=student.price_plan_id,
                 health_status=student.health_status,
                 payment_method=student.payment_method,
+                payment_settled=student.id in settled,
                 agreement_complete=agreement_status(
                     session, student, signer_person_id=person_id
                 ).complete,

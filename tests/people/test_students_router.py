@@ -12,7 +12,7 @@ for `GET /students/{id}` on day one.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 from app.main import app
@@ -178,6 +178,26 @@ def test_a_phone_alone_is_enough_to_invite_on(client, as_manager):
     assert body["invitation_token"]
 
 
+def _already_paid_promises_for(app_session, student_id: uuid.UUID) -> list[uuid.UUID]:
+    """The `already_paid` promises naming one student's charges.
+
+    Scoped, because the test database is migrated once per session and never truncated: a
+    query across every studio answers about every test that has ever run.
+    """
+    from app.models.billing import Charge
+    from app.models.payment_promise import PaymentPromise, PaymentPromiseCharge
+
+    return list(
+        app_session.execute(
+            select(PaymentPromise.id)
+            .join(PaymentPromiseCharge, PaymentPromiseCharge.payment_promise_id == PaymentPromise.id)
+            .join(Charge, Charge.id == PaymentPromiseCharge.charge_id)
+            .where(PaymentPromise.already_paid.is_(True), Charge.student_id == student_id)
+            .distinct()
+        ).scalars()
+    )
+
+
 def test_a_manager_can_convert_a_student_as_already_paid(
     client, app_session, as_manager, a_group
 ):
@@ -192,7 +212,6 @@ def test_a_manager_can_convert_a_student_as_already_paid(
     `already_paid` is the promise's own word and is a TENSE, not a method — it tells the
     manager whether to go looking for this money now or wait for it.
     """
-    from app.models.payment_promise import PaymentPromise
     from app.models.people import Student
 
     created = _create(client, as_manager)
@@ -219,7 +238,78 @@ def test_a_manager_can_convert_a_student_as_already_paid(
     # sets no plan), so `charge_first_month` raised none and there is nothing to promise.
     # Silent rather than failing is deliberate: a conversion the manager asked for must not
     # fall over because the price has not been agreed yet.
-    assert app_session.query(PaymentPromise).filter_by(already_paid=True).all() == []
+    #
+    #: Scoped to THIS student's charges. The test database is migrated once per session and
+    #: never truncated, so an unscoped `filter_by(already_paid=True).all() == []` asserts
+    #: something about every studio any other test has ever written — which is how it began
+    #: failing the moment a second test recorded a settled payment.
+    assert _already_paid_promises_for(app_session, uuid.UUID(student_id)) == []
+
+
+def test_an_unpromisable_charge_never_fails_the_managers_conversion(
+    client, app_session, as_manager, a_group, a_price_plan
+):
+    """A credit on the family's balance must not stop the manager recording a payment.
+
+    `_settle_with_the_manager` used to hand `PaymentPromiseService` **every** open charge on
+    the student, and that service refuses a charge with nothing outstanding -- correctly, it
+    is not money anyone can promise. §5.10's manual charge is signed, so a credit is an
+    ordinary open charge with a negative amount, and one on the account turned the manager's
+    conversion into a 500 with nothing recorded at all.
+
+    The conversion is the thing the manager asked for; the promise is a note beside it.
+    """
+    from app.models.billing import Charge
+    from app.models.payment_promise import PaymentPromiseCharge
+    from app.models.people import Student
+    from app.models.person import Guardian
+
+    created = _create(client, as_manager)
+    student_id = uuid.UUID(created["student"]["id"])
+    payer = app_session.execute(
+        select(Guardian.person_id).where(
+            Guardian.student_id == student_id, Guardian.is_primary.is_(True)
+        )
+    ).scalar_one()
+    student = app_session.get(Student, student_id)
+    credit = Charge(
+        studio_id=student.studio_id,
+        payer_person_id=payer,
+        student_id=student_id,
+        kind="manual",
+        amount_agorot=-5_000,
+        due_date=date(2026, 9, 28),
+        status="open",
+        created_by="manual",
+    )
+    app_session.add(credit)
+    app_session.commit()
+
+    response = client.post(
+        f"/api/v1/students/{student_id}/convert",
+        json={
+            "group_id": str(a_group),
+            "started_on": "2026-09-01",
+            "price_plan_id": str(a_price_plan),
+            "payment_settled": True,
+        },
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 200, response.text
+
+    app_session.expire_all()
+    assert app_session.get(Student, student_id).payment_method == "cash"
+    promises = _already_paid_promises_for(app_session, student_id)
+    assert len(promises) == 1
+    named = [
+        row.charge_id
+        for row in app_session.query(PaymentPromiseCharge).filter_by(
+            payment_promise_id=promises[0]
+        )
+    ]
+    # The tuition charge the conversion itself raised, and not the credit.
+    assert credit.id not in named
+    assert named
 
 
 def test_converting_without_the_flag_leaves_the_payment_open(
@@ -542,6 +632,77 @@ def test_wizard_prefill_returns_the_callers_own_children_with_what_the_wizard_ne
         "price_plan_id",
         "health_status",
     }
+
+
+def test_wizard_prefill_says_which_children_the_club_has_already_been_paid_for(
+    client, app_session, as_manager, as_guardian, a_group, a_price_plan
+):
+    """The field that decides whether the parent walks three steps or two.
+
+    **Keyed on the promise, not on `payment_method`.** A non-null method only says the club
+    knows HOW this child pays — every family who has ever completed the wizard has one — and
+    reading it as "already paid" would tell a returning family that money they still owe was
+    already arranged, while quietly skipping the step that collects it. The `already_paid`
+    promise is the manager's own statement that this money reached them in person, and it is
+    the only thing here that means what the parent is told it means.
+    """
+    from app.models.person import Person
+
+    parent = app_session.get(Person, as_guardian.person_id)
+    payload = _payload()
+    payload["guardian"]["email"] = parent.email
+    created = _create(client, as_manager, payload)
+    student_id = created["student"]["id"]
+
+    before = client.get("/api/v1/me/wizard-prefill", headers=as_guardian.headers).json()
+    assert [row["payment_settled"] for row in before["items"]] == [False]
+
+    # Priced, so the conversion raises a first charge for the promise to name.
+    response = client.post(
+        f"/api/v1/students/{student_id}/convert",
+        json={
+            "group_id": str(a_group),
+            "started_on": "2026-09-01",
+            "price_plan_id": str(a_price_plan),
+            "payment_settled": True,
+        },
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 200, response.text
+
+    after = client.get("/api/v1/me/wizard-prefill", headers=as_guardian.headers).json()
+    assert [row["payment_settled"] for row in after["items"]] == [True]
+
+
+def test_wizard_prefill_does_not_call_a_known_method_a_settled_payment(
+    client, app_session, as_manager, as_guardian, a_group, a_price_plan
+):
+    """The case the promise-based rule exists for: converted the ORDINARY way, with a
+    payment method later recorded. The club knows how they pay; nobody has been paid."""
+    from app.models.people import Student
+    from app.models.person import Person
+
+    parent = app_session.get(Person, as_guardian.person_id)
+    payload = _payload()
+    payload["guardian"]["email"] = parent.email
+    created = _create(client, as_manager, payload)
+    student_id = created["student"]["id"]
+    client.post(
+        f"/api/v1/students/{student_id}/convert",
+        json={
+            "group_id": str(a_group),
+            "started_on": "2026-09-01",
+            "price_plan_id": str(a_price_plan),
+        },
+        headers=as_manager.headers,
+    )
+    student = app_session.get(Student, uuid.UUID(student_id))
+    student.payment_method = "upay_card"
+    app_session.commit()
+
+    body = client.get("/api/v1/me/wizard-prefill", headers=as_guardian.headers).json()
+    assert body["items"][0]["payment_method"] == "upay_card"
+    assert body["items"][0]["payment_settled"] is False
 
 
 def test_wizard_prefill_never_returns_a_minors_national_id(

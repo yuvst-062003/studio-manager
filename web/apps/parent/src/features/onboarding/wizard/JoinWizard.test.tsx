@@ -23,7 +23,7 @@ import { Step3Payment } from './Step3Payment'
 import type { RegisterResult, SubmitJoinResult } from './submitJoin'
 import { SETTLED_CLOSE_MS } from '../../billing/PaymentSettled'
 import { emptyStudent } from './types'
-import type { WizardPlan } from './types'
+import type { StudentDraft, WizardPlan } from './types'
 import type { WizardStep } from './WizardHeader'
 import { JoinWizard } from './JoinWizard'
 import { RegisterCodeError } from './wizardSources'
@@ -153,6 +153,8 @@ function renderWizard(
     source?: JoinWizardSource
     startAtStep?: WizardStep
     prefillFirstRowName?: string
+    seedStudents?: readonly StudentDraft[]
+    settledStudentIds?: readonly string[]
   } = {},
 ) {
   const billingClient = options.billingClient ?? billingClientStub()
@@ -167,6 +169,8 @@ function renderWizard(
       standingOrderLinks={standingOrderLinks}
       startAtStep={options.startAtStep}
       prefillFirstRowName={options.prefillFirstRowName}
+      seedStudents={options.seedStudents}
+      settledStudentIds={options.settledStudentIds}
     />,
   )
   return { billingClient, standingOrderLinks, source, unmount: view.unmount }
@@ -1429,4 +1433,113 @@ describe('the health declaration clause', () => {
     // server derives independently and refuses any other.
     expect(body.children[0]!.health!.answers.clause_confirmed).toBe('none')
   }, 20000)
+})
+
+// ── the two-step run: the manager already took the money (2026-09-12) ─────────────────
+//
+// The owner's sentence, in full: "A manager add a user / He need to go through the full
+// wizards step / Only if he pairs already and the manager write it / He does 2/3 and not
+// 3/3." So this is the whole shape of that run, driven through the real step-2 form: the
+// header counts to two, step 2's button is the LAST button, and nothing about payment is
+// ever asked or opened.
+
+/** The row a manager's pre-created child arrives as — what `/me/wizard-prefill` knows and
+ *  nothing more. Everything else is still the parent's to fill in, which is the point. */
+const SEEDED: StudentDraft = emptyStudent('seed-1', {
+  firstName: 'נועה',
+  lastName: 'לוי',
+  planId: PLAN.id,
+})
+
+/** Completes a row that is ALREADY on step 2's list, through the real form sheet. Distinct
+ *  from `fillOneChildAndContinue` in one way that matters: it opens the row's own edit
+ *  button rather than "add student", so what it drives is the manager's draft. */
+async function completeSeededRowAndContinue(user: ReturnType<typeof userEvent.setup>) {
+  await screen.findByTestId('join-family-step')
+  await user.click(screen.getByRole('button', { name: `${STEP2_COPY.edit}: ${SEEDED.firstName}` }))
+
+  const dialog = screen.getByRole('dialog')
+  const field = (text: string) =>
+    within(dialog).getByLabelText(
+      new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\*?$`),
+    )
+  const fill = (text: string, value: string) => user.type(field(text), value)
+
+  // Part 1 — the two names the manager already gave are left alone; the rest is the
+  // parent's.
+  await fill(STUDENT_FORM_COPY.nationalId, '100000017')
+  await fill(STUDENT_FORM_COPY.birthDate, '2016-04-01')
+  await fill(STUDENT_FORM_COPY.address, 'הרצל 1')
+  await fill(STUDENT_FORM_COPY.city, 'תל אביב')
+  await user.selectOptions(field(STUDENT_FORM_COPY.grade), 'grade_3')
+  await fill(STUDENT_FORM_COPY.guardianFirstName, 'דנה')
+  await fill(STUDENT_FORM_COPY.guardianLastName, 'לוי')
+  await fill(STUDENT_FORM_COPY.guardianNationalId, '100000017')
+  await fill(STUDENT_FORM_COPY.guardianPhone, '0501234567')
+  await fill(STUDENT_FORM_COPY.guardianEmail, 'dana@example.com')
+  await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next1 }))
+
+  await user.click(within(dialog).getByRole('radio'))
+  await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next2 }))
+
+  await user.click(within(dialog).getByRole('radio'))
+  await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next3 }))
+
+  await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.healthYes }))
+  await tickClause(user, dialog)
+  await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.next4 }))
+
+  await fill(STUDENT_FORM_COPY.emergencyPhone, '0507654321')
+  await user.selectOptions(field(STUDENT_FORM_COPY.healthFund), 'clalit')
+  await user.click(
+    within(dialog).getByRole('checkbox', { name: new RegExp(STUDENT_FORM_COPY.attestCheckbox) }),
+  )
+  const canvas = dialog.querySelector('canvas')
+  if (!canvas) throw new Error('signature canvas not found')
+  fireEvent.pointerDown(canvas, { clientX: 100, clientY: 100, pointerId: 1 })
+  fireEvent.pointerMove(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
+  fireEvent.pointerUp(canvas, { clientX: 200, clientY: 100, pointerId: 1 })
+  await user.click(within(dialog).getByRole('button', { name: STUDENT_FORM_COPY.save }))
+
+  await user.click(screen.getByRole('button', { name: STEP2_COPY.continueToStep3 }))
+}
+
+describe('JoinWizard — a child the manager already took payment for', () => {
+  it('counts two steps, submits from step 2, and never opens a payment of any kind', async () => {
+    const user = userEvent.setup()
+    const billingClient = billingClientStub({
+      openCharges: vi.fn(async () => [charge('ch1', 's1')]),
+    })
+    const { source } = renderWizard({
+      billingClient,
+      startAtStep: 2,
+      seedStudents: [SEEDED],
+      settledStudentIds: [SEEDED.id],
+    })
+
+    await screen.findByTestId('join-family-step')
+    expect(screen.getByText(/שלב 2 מתוך 2/)).toBeInTheDocument()
+    expect(screen.queryByText('תשלום וסיכום')).toBeNull()
+
+    await completeSeededRowAndContinue(user)
+
+    // Step 2's button was the last one: no decision sub-view, no method radios, no uPay.
+    await screen.findByText(STEP4_COPY.paymentSettled)
+    expect(source.register).toHaveBeenCalledTimes(1)
+    expect(billingClient.createPromise).not.toHaveBeenCalled()
+    expect(billingClient.createOrder).not.toHaveBeenCalled()
+  })
+
+  it('a sibling the manager did NOT settle keeps all three steps', async () => {
+    // One settled child does not make the family settled. The moment a second, unsettled
+    // child is on the list, step 3 is owed again — and the header says so.
+    renderWizard({
+      startAtStep: 2,
+      seedStudents: [SEEDED, emptyStudent('seed-2', { firstName: 'איתי', lastName: 'לוי' })],
+      settledStudentIds: [SEEDED.id],
+    })
+
+    await screen.findByTestId('join-family-step')
+    expect(screen.getByText(/שלב 2 מתוך 3/)).toBeInTheDocument()
+  })
 })

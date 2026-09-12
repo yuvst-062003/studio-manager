@@ -208,6 +208,30 @@ def a_group(app_session: Session, studio: Studio, a_class: uuid.UUID) -> uuid.UU
 
 
 @pytest.fixture
+def a_price_plan(app_session: Session, studio: Studio) -> uuid.UUID:
+    """C11's unit of pricing, in this lane's own conftest.
+
+    Here because a conversion has to be able to raise a first charge: the settled-payment
+    promise names open charges, and an unpriced student has none. `active_to=None` marks it
+    the current plan.
+    """
+    from app.models.billing import PricePlan
+
+    row = PricePlan(
+        studio_id=studio.id,
+        name="פעמיים בשבוע",
+        sessions_per_week=2,
+        monthly_amount_agorot=30_000,
+        registration_fee_agorot=0,
+        active_from=date(2026, 9, 1),
+        active_to=None,
+    )
+    app_session.add(row)
+    app_session.commit()
+    return row.id
+
+
+@pytest.fixture
 def a_second_group(app_session: Session, studio: Studio, a_class: uuid.UUID) -> uuid.UUID:
     """C11's case: a child in two groups. One student, two enrollments, one price."""
     row = Group(studio_id=studio.id, class_id=a_class, name="נבחרת", age_min=9, age_max=14)

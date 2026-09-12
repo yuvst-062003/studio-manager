@@ -689,6 +689,70 @@ def a_joiner_on_a_free_plan(
 
 
 @pytest.fixture
+def a_zero_fee_plan(app_session: Session, studio: Studio) -> uuid.UUID:
+    """A plan whose registration fee is **0 rather than NULL**.
+
+    This is not a hypothetical shape: the dashboard's class wizard initialises its
+    registration box to `'0'` and posts a number, so every plan a club creates through the
+    product arrives here as zero. `None` is the only value the run used to check for.
+    """
+    row = PricePlan(
+        studio_id=studio.id,
+        name="ללא דמי הרשמה",
+        sessions_per_week=1,
+        monthly_amount_agorot=15_000,
+        registration_fee_agorot=0,
+        active_from=YEAR_STARTS,
+        active_to=None,
+    )
+    app_session.add(row)
+    app_session.commit()
+    return row.id
+
+
+@pytest.fixture
+def a_joiner_on_a_zero_fee_plan(
+    app_session: Session, studio: Studio, a_zero_fee_plan: uuid.UUID, a_scheduled_group: uuid.UUID
+) -> PricedStudent:
+    """The same child as `a_joiner_on_a_free_plan`, on the zero-rather-than-null plan."""
+    from app.models.people import Enrollment
+
+    child = Person(studio_id=studio.id, first_name="אפס", last_name="הרשמה")
+    payer = Person(studio_id=studio.id, first_name="הורה", last_name="אפס הרשמה")
+    app_session.add_all([child, payer])
+    app_session.flush()
+    student = Student(
+        studio_id=studio.id,
+        person_id=child.id,
+        status="active",
+        joined_on=YEAR_STARTS,
+        price_plan_id=a_zero_fee_plan,
+    )
+    app_session.add(student)
+    app_session.flush()
+    app_session.add_all(
+        [
+            Guardian(
+                studio_id=studio.id,
+                student_id=student.id,
+                person_id=payer.id,
+                is_primary=True,
+                relation="parent",
+            ),
+            Enrollment(
+                studio_id=studio.id,
+                student_id=student.id,
+                group_id=a_scheduled_group,
+                status="active",
+                started_on=YEAR_STARTS,
+            ),
+        ]
+    )
+    app_session.commit()
+    return PricedStudent(student_id=student.id, person_id=child.id, payer_person_id=payer.id)
+
+
+@pytest.fixture
 def a_frozen_student(
     app_session: Session, studio: Studio, a_price_plan: uuid.UUID, a_group: uuid.UUID
 ) -> PricedStudent:

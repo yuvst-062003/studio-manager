@@ -24,12 +24,13 @@ import { Step2Trainees } from './Step2Trainees'
 import { Step3Payment } from './Step3Payment'
 import { Step4Done } from './Step4Done'
 import { WizardHeader } from './WizardHeader'
-import type { WizardStep } from './WizardHeader'
+import type { WizardStep, WizardTotalSteps } from './WizardHeader'
 import { toRegisterPayload } from './adapters'
 import { clearStudentDraft, clearWizardDraft, loadWizardDraft, saveWizardDraft } from './draft'
 import { wizardFlowCopy } from './copy'
 import { submitJoin } from './submitJoin'
 import type { SubmitJoinResult } from './submitJoin'
+import { needsManagerReview } from './types'
 import type { PaymentMethod, StudentDraft, WizardBelt, WizardGroup, WizardPlan } from './types'
 import type { JoinWizardSource } from './wizardSources'
 
@@ -139,6 +140,10 @@ export type JoinWizardProps = {
    *  them, and submits their declaration either way, so re-submitting these is safe and is
    *  what clears the gate. */
   seedStudents?: readonly StudentDraft[]
+  /** Of those seeded children, the ones whose payment the club has already arranged — a
+   *  manager took the money in person and said so. They are not asked again, and a run in
+   *  which every child is settled is TWO steps, not three. */
+  settledStudentIds?: readonly string[]
   /** Which door's resumable draft this run owns -- door B's token, or `'me'` for the
    *  signed-in doors. A shared family phone can open one join link, abandon it and open
    *  another; restoring the first family's children into the second's wizard would be
@@ -156,6 +161,7 @@ export function JoinWizard({
   onEnterApp,
   draftScope = 'me',
   seedStudents,
+  settledStudentIds,
 }: JoinWizardProps) {
   const copy = wizardFlowCopy(locale)
   const [studio, setStudio] = useState<StudioState>({ status: 'loading' })
@@ -224,6 +230,19 @@ export function JoinWizard({
     setCatalogue({ status: 'loading' })
     setReloads((n) => n + 1)
   }, [])
+
+  //: **How long this run actually is.** Three steps is not a constant: a family whose
+  //: payment the manager already took has nothing to answer on step 3, and walking them to
+  //: a screen asking how they intend to pay money they have already paid is the whole
+  //: defect. Computed from the children who are actually still to be asked — a child
+  //: awaiting a manager's health review is not one of them either, because no charge is
+  //: raised for them at all.
+  const settled = useMemo(() => new Set(settledStudentIds ?? []), [settledStudentIds])
+  const paymentNeeded = students.some(
+    (student) =>
+      student.intent !== 'trial' && !needsManagerReview(student) && !settled.has(student.id),
+  )
+  const totalSteps: WizardTotalSteps = paymentNeeded ? 3 : 2
 
   //: Door C's "one row pre-filled" (§3): the manager's stub name, split into the two
   //: fields `StudentDraft` actually stores. `undefined` on every door but C, so
@@ -300,6 +319,7 @@ export function JoinWizard({
       //: The SAME figure step 3 put in front of the family. Read off the studio rather than
       //: recomputed, so the screen and the write cannot arrive at different totals.
       prepayMonths: studio.status === 'ready' ? studio.prepayMonths : { cash: 0, cheque: 0 },
+      settledStudentIds,
       templateId,
       deps: {
         register: () =>
@@ -419,6 +439,7 @@ export function JoinWizard({
     <div className="tw-scope min-h-[100dvh] bg-[var(--wz-ground)] text-[var(--wz-ink)] flex flex-col">
       <WizardHeader
         locale={locale}
+        totalSteps={totalSteps}
         currentStep={step}
         studioName={studio.studioName}
         logoUrl={studio.logoUrl}
@@ -463,7 +484,27 @@ export function JoinWizard({
             firstStudentDefaults={firstStudentDefaults}
             checkDuplicate={source.checkDuplicate}
             onBack={() => setStep(1)}
-            onContinue={() => setStep(3)}
+            //: **Two-step runs end here.** When the manager has already taken the money
+            //: there is nothing for step 3 to ask, so step 2's button IS the final button —
+            //: walking a settled family to a payment screen only to show them nothing is
+            //: the defect this closes. The write is the same one step 3 runs; a failure
+            //: leaves them on step 2, which is the retryable place, exactly as before.
+            onContinue={() => {
+              if (paymentNeeded) {
+                setStep(3)
+                return
+              }
+              void (async () => {
+                try {
+                  const landed = await submit()
+                  setSubmitResult(landed)
+                  setStep(4)
+                } catch {
+                  // `Step2Trainees` keeps the family where they are; `register` rejecting is
+                  // the one failure that must not advance them.
+                }
+              })()
+            }}
           />
         ) : null}
 

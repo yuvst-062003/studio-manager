@@ -560,6 +560,9 @@ function AuthedApp() {
    *  join wizard now, and it would otherwise open blank and ask a parent to re-type a child
    *  the club has had for weeks. `null` until read; an empty list is a real answer. */
   const [gateSeed, setGateSeed] = useState<readonly StudentDraft[] | null>(null)
+  /** Of those, the children whose payment the club has already arranged — a manager took
+   *  the money in person and said so. A run in which every child is settled is two steps. */
+  const [gateSettled, setGateSettled] = useState<readonly string[]>([])
   const [declarationsSigned, setDeclarationsSigned] = useState(0)
   // Bumped when a trial family joins the club. The child goes `trial` -> `active` while
   // still holding the short health form, so §5.5's gate must fire on the very next
@@ -677,12 +680,18 @@ function AuthedApp() {
                 grade: string | null
                 group_ids: string[]
                 price_plan_id: string | null
+                payment_settled: boolean
               }[]
             }>)
           : { items: [] },
       )
       .then((data) => {
         if (!alive) return
+        //: `payment_settled`, never `payment_method`. A non-null method only says the club
+        //: knows HOW this child pays — every family who has finished the wizard once has
+        //: one — and reading it as "already paid" would skip the step that collects what
+        //: they still owe, under a screen telling them it was already arranged.
+        setGateSettled(data.items.filter((child) => child.payment_settled).map((child) => child.id))
         setGateSeed(
           data.items.map((child) =>
             //: Keyed by the REAL student id, not a fresh draft id. `submitJoin` matches a
@@ -968,6 +977,7 @@ function AuthedApp() {
                 billingClient={billingClient}
                 onEnterApp={() => setDeclarationsSigned((count) => count + 1)}
                 seedStudents={gateSeed ?? []}
+                settledStudentIds={gateSettled}
                 source={memberSource}
                 standingOrderLinks={loadStandingOrderLinks}
                 startAtStep={wizardStepFor(startingStep('addChild', onboardingStatus))}

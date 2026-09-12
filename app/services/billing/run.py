@@ -534,9 +534,16 @@ class BillingRunService:
         Never prorated: it is a fee for joining, not for a month's teaching, and prorating
         it would charge a child who joined late less to join than one who joined on the 1st.
         """
-        if plan.registration_fee_agorot is None:
+        if not plan.registration_fee_agorot:
             # Nullable because most plans have none. A zero-amount charge would appear on
             # the parent's screen as a line item for nothing.
+            #
+            # **Zero counts, and only checking for NULL was a live defect.** The dashboard's
+            # class wizard initialises its registration box to `'0'` and posts a number, so
+            # every plan created through the product arrives here as `0` rather than `None`
+            # -- and every child on one got a ₪0 registration line. It also 500'd the
+            # manager's already-paid conversion, because a charge with nothing outstanding
+            # cannot enter a payment promise.
             return
         already = self._session.execute(
             select(Charge.id)

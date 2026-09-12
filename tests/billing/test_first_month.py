@@ -114,6 +114,34 @@ def test_a_registration_fee_is_charged_once_and_never_again(
     assert fees[0].period_year is None
 
 
+def test_a_registration_fee_of_zero_raises_no_charge_either(
+    tenant_session, studio, a_joiner_on_a_zero_fee_plan
+):
+    """**Zero is the value the product actually produces.** The dashboard's class wizard
+    starts its registration box at `'0'` and posts a number, so `registration_fee_agorot` is
+    `0` for every plan a club has ever created through the app — and the guard above it
+    checked only for `None`. The result was a ₪0 line on the parent's balance screen for
+    every one of them, which is the exact thing `_charge_registration_fee`'s own comment
+    says must not happen.
+
+    It also broke something louder. A zero-amount charge has nothing outstanding, and
+    `PaymentPromiseService.create` refuses those — so a manager converting a child as
+    already-paid got a 500 and no conversion at all.
+    """
+    BillingRunService(tenant_session).run(studio.id, period_year=2026, period_month=11, at=T0)
+    assert (
+        tenant_session.execute(
+            select(Charge).where(
+                Charge.student_id == a_joiner_on_a_zero_fee_plan.student_id,
+                Charge.kind == "registration",
+            )
+        )
+        .scalars()
+        .all()
+        == []
+    )
+
+
 def test_a_plan_with_no_registration_fee_raises_none(
     tenant_session, studio, a_joiner_on_a_free_plan
 ):

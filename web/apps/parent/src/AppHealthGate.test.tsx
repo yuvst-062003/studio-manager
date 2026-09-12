@@ -49,6 +49,9 @@ function stubChildren(
    * exercising the health-only fallback it was written for.
    */
   agreementComplete?: boolean,
+  /** What `/me/wizard-prefill` says about this child's money. `undefined` is the wire
+   *  state of a response from before the field existed. */
+  paymentSettled?: boolean,
 ) {
   vi.stubGlobal(
     'fetch',
@@ -63,6 +66,27 @@ function stubChildren(
                 first_name: 'נועה',
                 last_name: 'לוי',
                 status,
+                health_status: healthStatus,
+                agreement_complete: agreementComplete,
+              },
+            ],
+          }),
+          { status: 200 },
+        )
+      }
+      if (url.includes('/api/v1/me/wizard-prefill')) {
+        return new Response(
+          JSON.stringify({
+            items: [
+              {
+                id: 'st-1',
+                first_name: 'נועה',
+                last_name: 'לוי',
+                birthdate: '2016-04-01',
+                grade: 'grade_3',
+                group_ids: [],
+                price_plan_id: null,
+                payment_settled: paymentSettled ?? false,
                 health_status: healthStatus,
                 agreement_complete: agreementComplete,
               },
@@ -224,5 +248,29 @@ describe('the registration agreement reaches the gate', () => {
     stubChildren('missing', 'active', [], undefined)
     render(<App />)
     expect(await screen.findByTestId('health-gate')).toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------------------
+// `payment_settled` — the SEAM between /me/wizard-prefill and the wizard's step count.
+//
+// Written for the same reason the block above it was: the wizard counts its own steps
+// correctly and the endpoint answers correctly, and neither proves that the twenty lines
+// in `App.tsx` between them carry the field at all. The owner's rule is the assertion —
+// "Only if he pairs already and the manager write it / He does 2/3 and not 3/3."
+// ---------------------------------------------------------------------------------
+describe('a payment the manager already took reaches the wizard', () => {
+  it('drops the gate’s wizard to two steps for a child the club has been paid for', async () => {
+    stubChildren('missing', 'active', [], false, true)
+    render(<App />)
+    expect(await screen.findByTestId('health-gate')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText(/מתוך 2/)).toBeInTheDocument())
+  })
+
+  it('keeps all three steps when nobody has been paid', async () => {
+    stubChildren('missing', 'active', [], false, false)
+    render(<App />)
+    expect(await screen.findByTestId('health-gate')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText(/מתוך 3/)).toBeInTheDocument())
   })
 })

@@ -30,6 +30,10 @@ export type OutcomeState =
   | 'awaiting_review'
   /** The club knows how this child is paying — a promise was written. */
   | 'recorded'
+  /** The money is already with the club: a manager took it in person and recorded it
+   *  before the family ever opened the wizard. Distinct from `recorded`, which says a
+   *  chosen METHOD was filed — this family chose nothing and owes nothing. */
+  | 'settled'
   /** Recorded, and a standing-order mandate is still to be signed. */
   | 'mandate_pending'
   /** A uPay order was opened for this child; the card page settles it. */
@@ -187,6 +191,16 @@ export type SubmitJoinInput = {
    * family was never shown is the 2026-09-12 defect in a new place.
    */
   prepayMonths?: { cash: number; cheque: number }
+  /**
+   * Children whose payment the club has ALREADY arranged — a manager took the money in
+   * person and said so on the convert step.
+   *
+   * They are not asked for a method, not counted towards step 3, and no promise or order is
+   * written for them here: one already exists, made by the manager, and a second would show
+   * the same money twice on the payments screen. Their outcome is `recorded`, because from
+   * the family's side it is.
+   */
+  settledStudentIds?: readonly string[]
   deps: SubmitJoinDeps
 }
 
@@ -205,6 +219,7 @@ type ActiveRow = {
 export async function submitJoin(input: SubmitJoinInput): Promise<SubmitJoinResult> {
   const { students, plans, methods, alreadyArranged, deps } = input
   const prepay = input.prepayMonths ?? { cash: 0, cheque: 0 }
+  const settled = new Set(input.settledStudentIds ?? [])
 
   //: `register` is given JOINING children only (`toRegisterPayload` filters them), so a
   //: submission of nothing but trial children has nobody to register — and calling it
@@ -221,7 +236,11 @@ export async function submitJoin(input: SubmitJoinInput): Promise<SubmitJoinResu
   //: lock, and it throws before `register` so the family exists nowhere yet and can simply
   //: answer and press again.
   const unanswered = joiningDrafts.filter(
-    (candidate) => !needsManagerReview(candidate) && methods[candidate.id] === undefined,
+    (candidate) =>
+      !needsManagerReview(candidate) &&
+      //: A child the club has already settled is never asked, so it can never be missing.
+      !settled.has(candidate.id) &&
+      methods[candidate.id] === undefined,
   )
   if (unanswered.length > 0) {
     throw new MissingPaymentMethodError(unanswered.map((candidate) => candidate.id))
@@ -334,6 +353,17 @@ export async function submitJoin(input: SubmitJoinInput): Promise<SubmitJoinResu
       // `method: null` — the outcome type already allows it, and a trial child has no
       // payment method by design rather than by omission.
       outcomes.push({ draftId: draft.id, name, method: null, amountAgorot: 0, state: 'trial_booked' })
+      return
+    }
+
+    if (settled.has(draft.id)) {
+      //: The manager already took this money in person and said so. Nothing to promise,
+      //: nothing to charge, nothing to declare — and **this must stand above the method
+      //: guard below**, because nobody ever asked this family for a method: their run of
+      //: the wizard had no step 3 at all. Placed under it, as it was when written, every
+      //: settled child ended on `not_recorded: no_method` — the one ending that tells a
+      //: family who has already paid that their payment did not land.
+      outcomes.push({ draftId: draft.id, name, method: null, amountAgorot, state: 'settled' })
       return
     }
 
