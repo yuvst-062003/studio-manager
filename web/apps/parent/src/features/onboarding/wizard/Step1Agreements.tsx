@@ -105,7 +105,7 @@ export function Step1Agreements({
               <span className="text-[11px] font-semibold opacity-75 group-hover:opacity-100">
                 {STEP1_COPY.viewDocument}
               </span>
-              <ChevronLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
+              <ChevronLeft className="w-5 h-5 wz-dir-icon transition-transform group-hover:-translate-x-1" />
             </div>
           </button>
         ))}
@@ -133,7 +133,7 @@ export function Step1Agreements({
             <span className="text-[11px] font-semibold opacity-75 group-hover:opacity-100">
               {STEP1_COPY.faqCount}
             </span>
-            <ChevronLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
+            <ChevronLeft className="w-5 h-5 wz-dir-icon transition-transform group-hover:-translate-x-1" />
           </div>
         </button>
       </div>
@@ -178,7 +178,7 @@ export function Step1Agreements({
           }`}
         >
           <span>{STEP1_COPY.continue}</span>
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className="w-5 h-5 wz-dir-icon" />
         </button>
       </div>
 

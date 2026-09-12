@@ -595,6 +595,18 @@ export const people: Bundle = {
   // -- the join wizard (task 6) -- mirrors he/people.ts key-for-key.
 
   // STEP1_COPY -> joinWizard.step1.*
+  'joinWizard.header.pill.1': 'Joining terms',
+  'joinWizard.header.pill.2': 'Trainee details',
+  'joinWizard.header.pill.3': 'Payment and summary',
+  'joinWizard.header.title.1': 'Agreements and joining terms',
+  'joinWizard.header.stage.1': 'Step 1 of 3: agreements and club rules',
+  'joinWizard.header.title.2': 'Registering trainees for the season',
+  'joinWizard.header.stage.2': 'Step 2 of 3: trainee details',
+  'joinWizard.header.title.3': 'Payment and joining summary',
+  'joinWizard.header.stage.3': 'Step 3 of 3: payment and summary',
+  'joinWizard.header.title.4': 'Welcome to the family',
+  'joinWizard.header.stage.4': 'Registration completed',
+  'joinWizard.card.seasonValue': 'תשפ״ז',
   'joinWizard.header.back': 'Back to the previous step',
   'joinWizard.step1.seasonBadge': '2025–2026 training season',
   'joinWizard.step1.heading': 'Welcome to Gladiator Club',

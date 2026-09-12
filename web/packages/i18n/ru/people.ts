@@ -595,6 +595,18 @@ export const people: Bundle = {
   // -- the join wizard (task 6) -- mirrors he/people.ts key-for-key.
 
   // STEP1_COPY -> joinWizard.step1.*
+  'joinWizard.header.pill.1': 'Условия вступления',
+  'joinWizard.header.pill.2': 'Данные занимающихся',
+  'joinWizard.header.pill.3': 'Оплата и итог',
+  'joinWizard.header.title.1': 'Соглашения и условия вступления',
+  'joinWizard.header.stage.1': 'Шаг 1 из 3: соглашения и устав',
+  'joinWizard.header.title.2': 'Запись занимающихся на сезон',
+  'joinWizard.header.stage.2': 'Шаг 2 из 3: данные занимающихся',
+  'joinWizard.header.title.3': 'Оплата и итог вступления',
+  'joinWizard.header.stage.3': 'Шаг 3 из 3: оплата и итог',
+  'joinWizard.header.title.4': 'Добро пожаловать в семью',
+  'joinWizard.header.stage.4': 'Регистрация завершена',
+  'joinWizard.card.seasonValue': 'תשפ״ז',
   'joinWizard.header.back': 'Назад к предыдущему шагу',
   'joinWizard.step1.seasonBadge': 'Сезон тренировок 2025–2026',
   'joinWizard.step1.heading': 'Добро пожаловать в клуб «Гладиатор»',

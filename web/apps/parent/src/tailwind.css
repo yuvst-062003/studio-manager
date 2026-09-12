@@ -82,6 +82,25 @@
  *
  * The light values are exactly what the files already contained; nothing shifted in light
  * mode, which is what makes the before/after screenshots comparable. */
+
+/* Direction-aware navigation icons in the join wizard.
+ *
+ * The wizard was ported from an RTL-only prototype, so every back/forward arrow is drawn
+ * pointing the way Hebrew reads: `ArrowRight` means BACK, `ChevronLeft` means FORWARD. A
+ * parent who chooses English or Русский gets an LTR document in which all six point the
+ * wrong way — reported 2026-09-12 as the wizard "not supporting rtl/ltr properly", and the
+ * arrow on `Продолжить` pointing backwards is exactly that.
+ *
+ * Mirrored rather than swapped for six different lucide components, because the geometry is
+ * the ONLY difference between them and a swap would be six places to keep in step.
+ *
+ * `scale` and not `transform`: two of these already carry Tailwind's `-translate-x-1` hover,
+ * and `transform` would overwrite it. The standalone `scale` property composes with
+ * `translate` instead of replacing it. */
+[dir='ltr'] .wz-dir-icon {
+  scale: -1 1;
+}
+
 .tw-scope {
   /* Ground and surfaces */
   --wz-ground: #faf8ff;

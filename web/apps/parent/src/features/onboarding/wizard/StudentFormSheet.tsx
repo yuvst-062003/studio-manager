@@ -471,7 +471,7 @@ export function StudentFormSheet({
               }
               className="h-12 px-4 rounded-xl bg-[var(--wz-tint)] text-[var(--wz-secondary)] hover:bg-[var(--wz-line)] text-[14px] font-semibold flex items-center justify-center gap-1 transition-colors cursor-pointer shrink-0"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4 wz-dir-icon" />
               <span>{STUDENT_FORM_COPY.previous}</span>
             </button>
           ) : null}
@@ -483,7 +483,7 @@ export function StudentFormSheet({
               className="flex-1 h-12 rounded-xl bg-[var(--wz-btn-bg)] hover:bg-[var(--wz-accent)] text-white text-[15px] font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99] cursor-pointer"
             >
               <span className="truncate">{meta.next}</span>
-              <ChevronLeft className="w-5 h-5 shrink-0" />
+              <ChevronLeft className="w-5 h-5 shrink-0 wz-dir-icon" />
             </button>
           ) : (
             <button

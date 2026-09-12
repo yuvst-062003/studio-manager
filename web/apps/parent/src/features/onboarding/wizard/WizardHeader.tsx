@@ -9,18 +9,16 @@ import { step1Copy } from './copy'
 
 export type WizardStep = 1 | 2 | 3 | 4
 
-const STEP_PILLS = [
-  { step: 1 as const, title: 'תנאי הצטרפות' },
-  { step: 2 as const, title: 'פרטי מתאמנים' },
-  { step: 3 as const, title: 'תשלום וסיכום' },
-]
+// **These were eleven hardcoded Hebrew strings until 2026-09-12**, which is why a parent
+// who chose Русский got a Russian page under a Hebrew header: the club name, the step title,
+// the `שלב 1 מתוך 3` line and all three tabs stayed Hebrew while the percentage beside them
+// translated, because that one came from `step1Copy`. `.claude/rules/ui-rtl-a11y.md` forbids
+// an inlined user-facing string and this file held the app's most visible set of them.
+//
+// The PERCENTAGES stay here: they are the progress bar's geometry, not language.
+const STEP_PERCENT: Record<WizardStep, number> = { 1: 33, 2: 67, 3: 100, 4: 100 }
 
-const STEP_DETAIL: Record<WizardStep, { title: string; stage: string; percent: number }> = {
-  1: { title: 'הסכמים ותנאי הצטרפות', stage: 'שלב 1 מתוך 3: הסכמים ותקנון', percent: 33 },
-  2: { title: 'רישום מתאמנים לעונה', stage: 'שלב 2 מתוך 3: פרטי מתאמנים', percent: 67 },
-  3: { title: 'תשלום וסיכום הצטרפות', stage: 'שלב 3 מתוך 3: תשלום וסיכום', percent: 100 },
-  4: { title: 'ברוכים הבאים למשפחה', stage: 'הרישום הושלם בהצלחה', percent: 100 },
-}
+const PILL_STEPS = [1, 2, 3] as const
 
 export type WizardHeaderProps = {
   locale: Locale
@@ -42,7 +40,11 @@ export function WizardHeader({
   onBack,
 }: WizardHeaderProps) {
   const copy = step1Copy(locale)
-  const current = STEP_DETAIL[currentStep]
+  const current = {
+    title: t(locale, `people.joinWizard.header.title.${currentStep}`),
+    stage: t(locale, `people.joinWizard.header.stage.${currentStep}`),
+    percent: STEP_PERCENT[currentStep],
+  }
 
   return (
     <header className="tw-scope fixed top-0 w-full z-40 bg-[var(--wz-ground)]/95 backdrop-blur-xl border-b border-[var(--wz-tint)] shadow-[0_2px_10px_rgba(0,0,0,0.04)]">
@@ -56,7 +58,7 @@ export function WizardHeader({
                 aria-label={t(locale, 'people.joinWizard.header.back')}
                 className="w-10 h-10 flex items-center justify-center rounded-full text-[var(--wz-ink)] hover:bg-[var(--wz-tint)] active:scale-95 transition-all shrink-0 cursor-pointer"
               >
-                <ArrowRight className="w-5 h-5" />
+                <ArrowRight className="w-5 h-5 wz-dir-icon" />
               </button>
             ) : (
               <div className="w-2" />
@@ -96,15 +98,15 @@ export function WizardHeader({
         </div>
 
         <div className="grid grid-cols-3 gap-1.5 w-full mb-1.5">
-          {STEP_PILLS.map((item) => {
-            const isCompleted = currentStep > item.step
-            const isCurrent = currentStep === item.step
+          {PILL_STEPS.map((step) => {
+            const isCompleted = currentStep > step
+            const isCurrent = currentStep === step
             return (
               <button
-                key={item.step}
+                key={step}
                 type="button"
                 aria-current={isCurrent ? 'step' : undefined}
-                onClick={() => onNavigate(item.step)}
+                onClick={() => onNavigate(step)}
                 className={`flex items-center justify-center gap-1.5 py-1 px-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                   isCurrent
                     ? 'bg-[var(--wz-btn-bg)] text-white shadow-xs ring-2 ring-[var(--wz-heading)]/20'
@@ -121,10 +123,12 @@ export function WizardHeader({
                       isCurrent ? 'bg-[var(--wz-surface)] text-[var(--wz-heading)]' : 'bg-[var(--wz-line)] text-[var(--wz-secondary)]'
                     }`}
                   >
-                    {item.step}
+                    {step}
                   </span>
                 )}
-                <span className="truncate">{item.title}</span>
+                <span className="truncate">
+                  {t(locale, `people.joinWizard.header.pill.${step}`)}
+                </span>
               </button>
             )
           })}

@@ -719,6 +719,18 @@ export const people: Bundle = {
   // WIZARD_FLOW_COPY, LEGAL_DOCS, FAQ_ITEMS.
 
   // STEP1_COPY -> joinWizard.step1.*
+  'joinWizard.header.pill.1': 'תנאי הצטרפות',
+  'joinWizard.header.pill.2': 'פרטי מתאמנים',
+  'joinWizard.header.pill.3': 'תשלום וסיכום',
+  'joinWizard.header.title.1': 'הסכמים ותנאי הצטרפות',
+  'joinWizard.header.stage.1': 'שלב 1 מתוך 3: הסכמים ותקנון',
+  'joinWizard.header.title.2': 'רישום מתאמנים לעונה',
+  'joinWizard.header.stage.2': 'שלב 2 מתוך 3: פרטי מתאמנים',
+  'joinWizard.header.title.3': 'תשלום וסיכום הצטרפות',
+  'joinWizard.header.stage.3': 'שלב 3 מתוך 3: תשלום וסיכום',
+  'joinWizard.header.title.4': 'ברוכים הבאים למשפחה',
+  'joinWizard.header.stage.4': 'הרישום הושלם בהצלחה',
+  'joinWizard.card.seasonValue': 'תשפ״ז',
   'joinWizard.header.back': 'חזרה לשלב הקודם',
   'joinWizard.step1.seasonBadge': 'עונת האימונים תשפ״ה',
   'joinWizard.step1.heading': 'ברוכים הבאים למועדון גלדיאטור',

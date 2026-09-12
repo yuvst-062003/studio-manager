@@ -1736,13 +1736,20 @@ a.studio-stat-tile:focus-visible {
  * in the DOM, reachable by a screen reader, invisible to everyone else. A control that has
  * to survive another element's `position: fixed` has to be fixed itself.
  *
- * TOP, opposite the accessibility FAB at the bottom, so the two never collide and neither
- * lands on the wizard's footer button. Same 44px circle and the same scrim and panel
- * classes: one family of floating controls, not two. */
+ * **Stacked directly above the accessibility FAB, not at the top** (owner, 2026-09-12).
+ * The top was the first attempt and it collided: the wizard's header spans the full width
+ * of the screen and both of its corners are already occupied — the club's logo at one end,
+ * the account button at the other — so a fixed button at the top landed on the logo. The
+ * bottom corner is this app's established home for floating controls and is the one strip
+ * nothing else claims; `--a11y-fab-clearance` already keeps page content out of it.
+ *
+ * Offset by the accessibility FAB's own height plus a gap, derived from that rule's numbers
+ * rather than restated, so moving one moves the other. Same 44px circle and the same scrim
+ * and panel classes: one family of floating controls, not two. */
 .studio-lang__fab {
   position: fixed;
   inset-inline-start: var(--space-3);
-  inset-block-start: var(--space-3);
+  inset-block-end: calc(var(--space-3) + 44px + var(--space-2));
   z-index: 60;
   inline-size: 44px;
   block-size: 44px;

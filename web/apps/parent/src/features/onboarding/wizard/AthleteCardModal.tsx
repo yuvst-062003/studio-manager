@@ -88,7 +88,7 @@ export function AthleteCardModal({
           <dl className="grid grid-cols-2 gap-2 text-[12px]">
             {[
               { label: copy.belt, value: beltLabel(student.beltId), Icon: Award },
-              { label: copy.season, value: 'תשפ״ה', Icon: ShieldCheck },
+              { label: copy.season, value: copy.seasonValue, Icon: ShieldCheck },
             ].map(({ label, value, Icon }) =>
               value ? (
                 <div

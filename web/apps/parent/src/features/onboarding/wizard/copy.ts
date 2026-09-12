@@ -443,6 +443,11 @@ export function athleteCardCopy(locale: Locale) {
     guardian: t(locale, 'people.joinWizard.card.guardian'),
     phone: t(locale, 'people.joinWizard.card.phone'),
     season: t(locale, 'people.joinWizard.card.season'),
+    //: **Was the literal `'תשפ״ה'` in `AthleteCardModal`** — inlined against
+    //: `.claude/rules/ui-rtl-a11y.md`, and stale besides: the club's active training year
+    //: is תשפ״ז. It belongs on the wire (`training_year.name`), which the wizard does not
+    //: read today; one string to bump each August beats a card naming the wrong season.
+    seasonValue: t(locale, 'people.joinWizard.card.seasonValue'),
     status: t(locale, 'people.joinWizard.card.status'),
     active: t(locale, 'people.joinWizard.card.active'),
     awaiting: t(locale, 'people.joinWizard.card.awaiting'),
