@@ -119,6 +119,10 @@ export const common: Bundle = {
   'tabs.staffTasks': 'משימות',
   'tabs.staffAccount': 'חשבון',
   // §6.1's first run. The refusal wording is §6.1's own, verbatim.
+  'language.button': 'בחירת שפה',
+  'language.short.he': 'עב',
+  'language.short.en': 'EN',
+  'language.short.ru': 'RU',
   'language.title': 'שפה',
   // -- the parent app's sign-in face (owner's Stitch design, 2026-09-01) ---------
   'auth.parentHint': 'הזדהו עם חשבון Google כדי להיכנס ליומן האימונים, החגורות והתחרויות.',

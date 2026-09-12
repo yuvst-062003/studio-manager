@@ -22,6 +22,7 @@ import {
   AccessibilityMenu,
   InstallBanner,
   InstallWalkthrough,
+  LanguageButton,
   LanguagePicker,
   SignIn,
   ThemeProvider,
@@ -411,7 +412,12 @@ function JoinShell({ token }: { token: string }) {
     return (
       <ThemeProvider>
         <AccessibilityMenu locale={locale} />
-        <LanguagePicker locale={locale} onChoose={setLocale} />
+        {/* The BUTTON, not the inline row — see `LanguageButton`'s header. The wizard below
+            is `position: fixed` at the top, and an inline picker rendered beside it was
+            painted underneath: present, reachable by a screen reader, invisible to the
+            person holding the phone. The wall uses the same control so the two screens of
+            this route do not offer language two different ways. */}
+        <LanguageButton locale={locale} onChoose={setLocale} />
         <div data-testid="join-sign-in-wall">
           {wallInfo ? (
             <div className="studio-page-header" data-testid="join-wall-studio">
@@ -437,7 +443,7 @@ function JoinShell({ token }: { token: string }) {
   return (
     <ThemeProvider>
       <AccessibilityMenu locale={locale} />
-      <LanguagePicker locale={locale} onChoose={setLocale} />
+      <LanguageButton locale={locale} onChoose={setLocale} />
       <JoinWizard
         locale={locale}
         billingClient={billingClient}

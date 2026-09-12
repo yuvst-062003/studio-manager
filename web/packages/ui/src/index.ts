@@ -104,6 +104,7 @@ export type { SwitchableStudio } from './shell/StudioSwitcher'
 // four screens; only the branch AFTER sign-in differs, and that lives in each app's own
 // features/identity/Resolve.tsx.
 export { LanguagePicker } from './first-run/LanguagePicker'
+export { LanguageButton } from './first-run/LanguageButton'
 // The one list of language endonyms. `GuardianSettings` kept its own copy only because
 // this line did not exist; two spellings of Русский is a real outcome of that.
 export { ENDONYM } from './first-run/LanguagePicker'

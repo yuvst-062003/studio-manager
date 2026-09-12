@@ -116,6 +116,10 @@ export const common: Bundle = {
   'tabs.staffTasks': 'Задачи',
   'tabs.staffAccount': 'Аккаунт',
   // §6.1's first run.
+  'language.button': 'Выбор языка',
+  'language.short.he': 'עב',
+  'language.short.en': 'EN',
+  'language.short.ru': 'RU',
   'language.title': 'язык',
   // -- the parent app's sign-in face (owner's Stitch design, 2026-09-01) ---------
   'auth.parentHint': 'Войдите через Google, чтобы открыть расписание тренировок, пояса и соревнования.',

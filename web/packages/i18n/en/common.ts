@@ -108,6 +108,10 @@ export const common: Bundle = {
   'tabs.staffTasks': 'Tasks',
   'tabs.staffAccount': 'Account',
   // §6.1's first run.
+  'language.button': 'Choose language',
+  'language.short.he': 'עב',
+  'language.short.en': 'EN',
+  'language.short.ru': 'RU',
   'language.title': 'language',
   // -- the parent app's sign-in face (owner's Stitch design, 2026-09-01) ---------
   'auth.parentHint': 'Sign in with Google to reach the training schedule, belts and competitions.',
