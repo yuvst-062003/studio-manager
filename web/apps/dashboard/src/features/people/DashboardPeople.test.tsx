@@ -115,6 +115,14 @@ function makeClient(over: Partial<DashboardPeopleClient> = {}): DashboardPeopleC
     pricePlan: vi.fn(() =>
       Promise.resolve({ student_id: 'st1', price_plan_id: null, weekly_volume: 2 }),
     ),
+    //: The convert step's price picker (2026-09-12). A closed plan is last year's price and
+    //: must never be offered for a child joining today.
+    pricePlans: vi.fn(async () => ({
+      items: [
+        { id: 'plan-1', name: 'פעמיים בשבוע', monthly_amount_agorot: 30_000, active_to: null },
+        { id: 'plan-closed', name: 'תשפ״ו', monthly_amount_agorot: 28_000, active_to: '2026-08-31' },
+      ],
+    })),
     enrollments: vi.fn(() =>
       Promise.resolve([
         {
@@ -534,6 +542,54 @@ describe('documentLabelKey', () => {
 })
 
 // -- 3c: adding a student -------------------------------------------------------
+
+describe('converting a student — the price travels with it', () => {
+  it('sends the chosen price plan, so the student is not left unbilled', async () => {
+    // **§5.4a step 5 is ONE decision** — "picks group, sets price, status=active" — and this
+    // screen sent only the group until 2026-09-12. Every child a manager converted came out
+    // unpriced: active, enrolled, training, billed nothing. `billing/unpriced-students`
+    // listed them and offered no way to fix it.
+    const user = userEvent.setup()
+    const client = makeClient()
+    render(<StudentDetailScreen locale="he" client={client} studentId="st1" />)
+
+    await user.click(await screen.findByTestId('detail-convert'))
+    await user.selectOptions(screen.getByTestId('detail-convert-group'), 'g1')
+    await user.selectOptions(screen.getByTestId('detail-convert-plan'), 'plan-1')
+    await user.click(screen.getByTestId('detail-convert-submit'))
+
+    await waitFor(() => expect(client.convert).toHaveBeenCalled())
+    expect(vi.mocked(client.convert).mock.calls[0]![1]).toMatchObject({
+      group_id: 'g1',
+      price_plan_id: 'plan-1',
+    })
+  })
+
+  it('leaves the plan null when the manager has not agreed one yet', async () => {
+    // Empty is a real answer, not a gap to force a guess into: the billing screen's own
+    // unpriced list is where that is chased.
+    const user = userEvent.setup()
+    const client = makeClient()
+    render(<StudentDetailScreen locale="he" client={client} studentId="st1" />)
+
+    await user.click(await screen.findByTestId('detail-convert'))
+    await user.selectOptions(screen.getByTestId('detail-convert-group'), 'g1')
+    await user.click(screen.getByTestId('detail-convert-submit'))
+
+    await waitFor(() => expect(client.convert).toHaveBeenCalled())
+    expect(vi.mocked(client.convert).mock.calls[0]![1]!.price_plan_id).toBeNull()
+  })
+
+  it('never offers a closed plan — that is last year\'s price', async () => {
+    const user = userEvent.setup()
+    const client = makeClient()
+    render(<StudentDetailScreen locale="he" client={client} studentId="st1" />)
+
+    await user.click(await screen.findByTestId('detail-convert'))
+    const options = [...screen.getByTestId('detail-convert-plan').querySelectorAll('option')]
+    expect(options.map((o) => o.value)).not.toContain('plan-closed')
+  })
+})
 
 describe('AddStudentScreen — 3c', () => {
   // Decision 20 (2026-09-03 onboarding doors spec) — student-first, three fields.

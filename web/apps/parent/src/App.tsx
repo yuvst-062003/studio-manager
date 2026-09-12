@@ -932,6 +932,13 @@ function AuthedApp() {
                 setFamilyJoined((n) => n + 1)
               }}
               prefillFirstRowName={invitedStudent.name ?? undefined}
+              //: **What the manager already answered, carried across.** Door C used to pass
+              //: the invited child's NAME and nothing else, so a parent re-entered the group
+              //: their manager had just chosen — and a different pick re-synced the
+              //: enrolment over it. The same read §5.5's gate uses, narrowed to the one
+              //: child this invitation names: §3 is explicit that Door C is "Door B with one
+              //: row pre-filled", not the whole family.
+              seedStudents={(gateSeed ?? []).filter((child) => child.id === invitedStudent.id)}
               source={memberSource}
               standingOrderLinks={loadStandingOrderLinks}
               startAtStep={wizardStepFor(startingStep('invite', onboardingStatus))}

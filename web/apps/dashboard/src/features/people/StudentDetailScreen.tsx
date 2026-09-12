@@ -139,6 +139,12 @@ export function StudentDetailScreen({
   const [groups, setGroups] = useState<GroupOption[]>([])
   const [converting, setConverting] = useState(false)
   const [convertGroup, setConvertGroup] = useState('')
+  //: **The price, at the moment the manager decides it.** §5.4a step 5 is one decision —
+  //: "picks group, sets price, status=active" — and until 2026-09-12 this screen sent only
+  //: the group. Every child a manager converted came out UNPRICED: active, enrolled,
+  //: training, billed nothing. The billing screen listed them and could not fix them.
+  const [convertPlan, setConvertPlan] = useState('')
+  const [plans, setPlans] = useState<readonly { id: string; name: string; active_to: string | null }[]>([])
   // F2 — the two buttons on either side of convert, wired at last. Each expands into
   // its own small form: the second press is the confirmation step, and the fields ARE
   // the decision (§5.4's freeze keeps the spot; mark-lost wants the manager's reason).
@@ -166,17 +172,22 @@ export function StudentDetailScreen({
       client.enrollments(studentId),
       client.statusHistory(studentId),
       client.pricePlan(studentId),
+      client.pricePlans().catch(() => ({ items: [] })),
       client.groups().catch(() => ({ items: [] as GroupOption[] })),
       // Best-effort, like the group list beside it: one section of a composite card, and a
       // failed read here must not take the guardians and the status history down with it.
       client.attendance(studentId).catch(() => ({ items: [] as AttendanceMarkRow[] })),
     ])
-      .then(([detail, rows, statuses, pricePlan, groupList, attendance]) => {
+      .then(([detail, rows, statuses, pricePlan, planList, groupList, attendance]) => {
         if (!live) return
         setStudent(detail)
         setEnrollments(rows)
         setHistory(statuses.items)
         setPlan(pricePlan)
+        //: Closed plans are last year's price and must not be offered for a child joining
+        //: today — `_charge_one` reports a student pointed at one as unpriced rather than
+        //: billing it.
+        setPlans(planList.items.filter((row) => row.active_to === null))
         setGroups(groupList.items)
         setMarks(attendance.items)
         // Cleared on success rather than at the top of the effect: a synchronous setState
@@ -199,16 +210,18 @@ export function StudentDetailScreen({
     if (!convertGroup || busy) return
     setBusy(true)
     try {
-      // `price_plan_id` is deliberately absent: C11 and L2 make the price an id this lane
-      // stores and never resolves, and the plans live on the billing screen. A conversion
-      // without one leaves the student unpriced, which the billing run reports rather than
-      // charging zero — see `_charge_one`'s `tally.unpriced`.
+      //: The price travels WITH the conversion (§5.4a step 5), and the id is all this lane
+      //: knows about it — C11/L2 keep the amount on the billing side. Empty stays empty:
+      //: a manager who has not agreed a price yet leaves the student unpriced deliberately,
+      //: and the billing screen's own list is where that is chased.
       await client.convert(studentId, {
         group_id: convertGroup,
         started_on: new Date().toISOString().slice(0, 10),
+        price_plan_id: convertPlan || null,
       })
       setConverting(false)
       setConvertGroup('')
+      setConvertPlan('')
       setReloads((n) => n + 1)
     } finally {
       setBusy(false)
@@ -586,6 +599,23 @@ export function StudentDetailScreen({
                 {groups.map((group) => (
                   <option key={group.id} value={group.id}>
                     {group.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              {t(locale, 'people.convert.plan')}
+              <select
+                data-testid="detail-convert-plan"
+                value={convertPlan}
+                onChange={(event) => setConvertPlan(event.target.value)}
+              >
+                {/* Empty is a real choice: a manager who has not agreed a price yet says so
+                    here rather than being forced to guess one. */}
+                <option value="">{t(locale, 'people.convert.planNone')}</option>
+                {plans.map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {row.name}
                   </option>
                 ))}
               </select>

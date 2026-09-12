@@ -61,6 +61,23 @@ export function makeDashboardPeopleClient(fetcher: Fetcher) {
     pricePlan: (id: string) =>
       fetcher(`/api/v1/students/${id}/price-plan`).then(json<StudentPricePlan>),
 
+    /**
+     * The club's live price plans, for the picker on the convert step.
+     *
+     * **Why this exists (2026-09-12).** `convert` has always accepted a `price_plan_id` and
+     * the dashboard never sent one, so every child a manager converted came out UNPRICED —
+     * active, enrolled, training, billed nothing. The billing screen listed them and could
+     * not fix them. A manager who knows the plan had nowhere to say so.
+     *
+     * Closed plans are filtered out at the call site rather than here: this is the same
+     * route `5a` renders, and that screen legitimately shows last year's plans below the
+     * current ones.
+     */
+    pricePlans: () =>
+      fetcher('/api/v1/price-plans').then(
+        json<{ items: { id: string; name: string; monthly_amount_agorot: number; active_to: string | null }[] }>,
+      ),
+
     enrollments: (studentId: string) =>
       fetcher(`/api/v1/enrollments?student_id=${studentId}`).then(json<EnrollmentOut[]>),
 

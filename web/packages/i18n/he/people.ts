@@ -487,6 +487,8 @@ export const people: Bundle = {
   // -- conversion (staff 11b, dashboard 4a). L2 — an id, never an amount.
   'convert.title': 'צירוף למועדון',
   'convert.group': 'קבוצה',
+  'convert.plan': 'מסלול מחיר',
+  'convert.planNone': 'ללא מסלול — ייקבע מאוחר יותר',
   'convert.startedOn': 'מתאריך',
   'convert.pricePlan': 'מסלול מחיר',
   'convert.pricePlanHint': 'המסלולים ייבחרו במסך המחירים',

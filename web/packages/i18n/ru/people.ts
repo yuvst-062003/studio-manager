@@ -420,6 +420,8 @@ export const people: Bundle = {
   'weekdays.6': 'Суббота',
 
   'convert.title': 'Вступление в клуб',
+  'convert.plan': 'Тарифный план',
+  'convert.planNone': 'Без плана — решить позже',
   'convert.group': 'Группа',
   'convert.startedOn': 'С даты',
   'convert.pricePlan': 'Тарифный план',
