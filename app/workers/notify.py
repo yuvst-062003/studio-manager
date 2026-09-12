@@ -197,7 +197,11 @@ def _send_to_any(
     for token in tokens:
         try:
             return sender.send(
-                token=token, title=note.title, body=note.body, payload=note.payload
+                token=token,
+                title=note.title,
+                body=note.body,
+                kind=note.kind,
+                payload=note.payload,
             ), None
         except PushSendError as exc:
             last_error = str(exc)

@@ -380,6 +380,42 @@ plaintext to rotate a key. Only once every row reports the new version via
 Locally the key lives in `.env`, which is gitignored. `.env.example` carries an
 all-zero placeholder so the shape is documented without a usable key being committed.
 
+## Push notification keys (VAPID, HB-push-transport)
+
+**Until these three are set, the environment does not send push notifications and does not
+say so.** `app/services/comms/push.py::default_push_sender` falls back to
+`RecordingPushSender` when any one of them is missing, and that sender accepts every message
+and invents a plausible message id — so `notification_delivery` fills with `sent`, the
+delivery report reads green, and no phone ever buzzes. All three, or none.
+
+```bash
+.venv/bin/python scripts/generate-vapid-keys.py     # prints a pair; writes nothing
+railway variables --service api --environment staging --skip-deploys \
+  --set "VAPID_PUBLIC_KEY=<public>" \
+  --set "VAPID_PRIVATE_KEY=<private>" \
+  --set "VAPID_SUBJECT=mailto:yuvalstolin@gmail.com"
+```
+
+`--environment` rather than a `cd` into the staging worktree: variables are not an upload, so
+the directory-linking rule that governs `railway up` does not apply here.
+
+**One pair per environment, generated once, and never rotated casually.** The public half is
+handed to every subscribing browser and is baked into each `PushSubscription` that browser
+creates. Replacing the pair does not just change a credential — it invalidates every
+subscription ever made against the old one, and each device only recovers when someone opens
+the app and `reconcilePushRegistration` re-subscribes it. A rotation is a slow tail of silent
+phones, not a clean cut.
+
+`VAPID_SUBJECT` must carry a scheme (`mailto:` or `https:`). Push services use it to reach a
+human about a misbehaving sender; a bare address is accepted at subscribe time and rejected
+at send time, which is the kind of mistake that only appears on a real device.
+
+**How to know it worked.** `app/services/ops/checks.py`'s `comms.push_transport` signal reads
+`job_run.detail['push_transport']` off the latest `comms-notify` run. It reports `unknown`
+until a run actually attempts a push, then `ok` for `webpush` and **red** for `recording` —
+which is precisely the "green heartbeat, nobody reached" state above. So: set the variables,
+let one `comms-notify` run with something queued, then read the console.
+
 ## Scheduled jobs
 
 [`infra/railway/jobs.json`](../../infra/railway/jobs.json) is the source of truth for

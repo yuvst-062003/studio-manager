@@ -2600,6 +2600,55 @@ holdbacks:
     opened: 2026-08-24
     closed: 2026-08-26
     source: docs/plan/milestone-plan.md Part 5 · D9
+  - id: HB-push-delivery
+    kind: carried
+    title: The transport was built and the notification still never arrived
+    why: >-
+      HB-push-transport below closed on 2026-09-02 having fixed everything it named, and
+      push still did not work anywhere. Two things nobody had looked for. First, NO SERVICE
+      WORKER EVER HANDLED THE push EVENT: all three apps use vite-plugin-pwa's generateSW
+      strategy, whose output listens for 'message' and nothing else, so a delivered push
+      woke a worker that did nothing with it — and because the apps subscribe with
+      userVisibleOnly, Chrome substitutes its own "this site has been updated in the
+      background" and eventually revokes the permission. Second, NO ENVIRONMENT HAD THE
+      KEYS: neither staging nor production carried VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY or
+      VAPID_SUBJECT, so default_push_sender returned RecordingPushSender in both, which
+      accepts every message and invents a plausible id. The two compound in the worst
+      direction: notification_delivery fills with 'sent', the delivery report reads green,
+      and the only honest signal is a parent saying their phone never rang.
+
+      A third, smaller one found alongside them: nothing re-registered a rotated push
+      endpoint. Browsers replace an endpoint when their push service moves and the old one
+      then 410s forever, while the app reads Notification.permission, finds 'granted', and
+      reports הודעות פעילות for a device the server can no longer reach.
+
+      And a fourth: useStaffPushRegistration was written, tested and exported, and no staff
+      screen imported it — so every coach's delivery row read no_token (never asked, rather
+      than denied) while §5.11's eight switches offered to mute notifications they had no
+      way to turn on.
+
+      CLOSED 2026-09-13 for everything except the keys. tools/push-sw-source.js carries the
+      push, notificationclick and pushsubscriptionchange handlers, injected into each app's
+      generated worker through workbox.importScripts by tools/push-sw.mjs — generateSW kept
+      rather than swapped for injectManifest, so §6.1's offline priming and its
+      sw-precache.test.ts assertions are untouched. app/services/comms/push.py now puts the
+      notification's kind on the wire, which is the only thing a worker with no session and
+      no router can route a tap on. reconcilePushRegistration (both apps) re-posts the
+      current subscription at launch. StaffPushSetting mounts on the account screen above
+      the switches. Verified in a real Chrome against the real built worker.
+
+      STILL OPEN: the VAPID key pair is set in no environment, so both staging and
+      production continue to run RecordingPushSender. scripts/generate-vapid-keys.py
+      generates the pair and docs/deploy/railway-runbook.md carries the procedure; setting
+      a deployed environment variable was refused by this session's permission classifier
+      and is the one step left. app/services/ops/checks.py's comms.push_transport signal
+      turns red once a comms-notify run attempts a push through the recording fallback,
+      which is how to confirm the fix landed.
+    blocks: M8
+    status: open
+    opened: 2026-09-13
+    source: this session; supersedes the closure of HB-push-transport below
+
   - id: HB-push-transport
     kind: carried
     title: Push notifications had no transport, and no token was ever created either

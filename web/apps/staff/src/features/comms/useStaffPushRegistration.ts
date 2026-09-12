@@ -40,6 +40,50 @@ export function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuf
   return bytes
 }
 
+
+/**
+ * Make the server's idea of this device match the browser's. Silent, and safe on every launch.
+ *
+ * The staff twin of the parent app's `reconcilePushRegistration`, and it closes the same bug:
+ * a push endpoint is not permanent, browsers rotate one when their push service moves, and
+ * `initial` above reads `Notification.permission` — true about the PERMISSION and silent
+ * about the SUBSCRIPTION. A coach whose endpoint was replaced keeps seeing התראות פעילות
+ * while `notification_delivery` fills with `failed`.
+ *
+ * `tools/push-sw-source.js` re-subscribes in the browser but holds no access token and cannot
+ * tell our server. This is the half that can.
+ *
+ * **It never asks for anything**: it runs only when the permission is ALREADY `granted`, so
+ * `subscribe()` opens no dialog. §6.5 gives iOS exactly one chance at that dialog.
+ */
+export async function reconcileStaffPushRegistration(
+  client: Pick<StaffCommsClient, 'vapidPublicKey' | 'registerPush'>,
+  platform: 'ios' | 'android' | 'web',
+): Promise<void> {
+  if (typeof globalThis.Notification === 'undefined') return
+  if (globalThis.Notification.permission !== 'granted') return
+  try {
+    const navigatorWithSW = globalThis.navigator as PushCapableNavigator
+    const registration = await navigatorWithSW.serviceWorker?.ready
+    if (!registration) return
+    let subscription = await registration.pushManager.getSubscription()
+    if (!subscription) {
+      const { public_key: publicKey } = await client.vapidPublicKey()
+      if (!publicKey) return
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      })
+    }
+    if (!subscription) return
+    await client.registerPush(JSON.stringify(subscription), platform)
+  } catch {
+    // Silent on purpose: a failure here is a network blip as often as a real problem, and
+    // flipping a working install into an error state on a bad connection teaches coaches to
+    // ignore the banner that matters.
+  }
+}
+
 export function useStaffPushRegistration(
   client: StaffCommsClient,
   { userAgent = globalThis.navigator?.userAgent ?? '' }: { userAgent?: string } = {},

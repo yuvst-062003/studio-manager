@@ -21,7 +21,7 @@
 // first, and §6.5 is why: on iOS a denial is permanent and cannot be re-requested in-app.
 // There is exactly one chance, and it is spent only after the parent has been told what it
 // buys them.
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useDisplayMode } from '@studio/core'
 import { isIosSafari } from '@studio/ui'
 import type { ParentCommsClient } from './commsClient'
@@ -131,6 +131,60 @@ export function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuf
   return bytes
 }
 
+
+/**
+ * Make the server's idea of this device match the browser's. Silent, and safe to call on
+ * every launch.
+ *
+ * **The bug it closes.** A push endpoint is not permanent: browsers rotate one when their
+ * push service moves, and the old endpoint then 410s for good. Nothing noticed. `initial`
+ * below reads `Notification.permission`, finds `granted`, and reports `'registered'` — true
+ * of the PERMISSION and false of the SUBSCRIPTION — so the app says `הודעות פעילות` for a
+ * device the server can no longer reach, while the delivery report says `failed`. Those two
+ * screens are read by different people and neither one is wrong on its own.
+ *
+ * `tools/push-sw-source.js` handles `pushsubscriptionchange` and re-subscribes, but a service
+ * worker holds no access token (`packages/core/src/identity/session.ts` keeps that in the
+ * page's memory) so it cannot tell our server. This is the half that can.
+ *
+ * **It never asks for anything.** It runs only when the permission is ALREADY `granted`, so
+ * `subscribe()` opens no dialog. §6.5 gives iOS exactly one chance at that dialog and a
+ * reconcile that spent it would be far worse than the endpoint it was fixing.
+ *
+ * **It never changes what the parent is shown.** A failure here is a network blip as often
+ * as a real problem, and flipping a working install to an error state on a bad connection
+ * would teach parents to ignore the banner that matters. `POST /push-tokens` answers 201 to
+ * a re-registration deliberately, which is what makes calling this unconditionally cheap.
+ */
+export async function reconcilePushRegistration(
+  client: Pick<ParentCommsClient, 'vapidPublicKey' | 'registerPush'>,
+  platform: 'ios' | 'android' | 'web',
+): Promise<void> {
+  if (typeof globalThis.Notification === 'undefined') return
+  if (globalThis.Notification.permission !== 'granted') return
+  try {
+    const navigatorWithSW = globalThis.navigator as PushCapableNavigator
+    const registration = await navigatorWithSW.serviceWorker?.ready
+    if (!registration) return
+    let subscription = await registration.pushManager.getSubscription()
+    if (!subscription) {
+      // Granted, and yet no subscription: the browser dropped one without handing the worker
+      // anything to re-subscribe with. This device will never buzz again unless the page
+      // does it, and the page is here.
+      const { public_key: publicKey } = await client.vapidPublicKey()
+      if (!publicKey) return
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      })
+    }
+    if (!subscription) return
+    await client.registerPush(JSON.stringify(subscription), platform)
+  } catch {
+    // See the docstring: silent on purpose.
+  }
+}
+
 /**
  * `useDisplayMode()` is read rather than a build flag, and `app/../App.tsx` says why it must
  * stay that way: "M8 reports install rates from it, and a measurement that lies to make a dev
@@ -169,6 +223,14 @@ export function usePushRegistration(
   // mid-session moves from `unsupported-ios-tab` to askable without a reload. `useState`'s
   // initialiser only runs once, so the derived value wins until something is asked.
   const effective = state === 'unasked' ? initial : state
+
+  // Settings is one of the two places this runs; `App.tsx` runs it at launch, which is the
+  // one that actually catches a rotation — a parent who never opens Settings would otherwise
+  // never reconcile. One function, two callers, rather than two implementations.
+  useEffect(() => {
+    if (platform === 'ios' && displayMode === 'browser') return
+    void reconcilePushRegistration(client, platform)
+  }, [client, platform, displayMode])
 
   /** Show §5.11's value pre-prompt. Never the OS dialog directly. */
   const offer = useCallback(() => setState('pre-prompt'), [])

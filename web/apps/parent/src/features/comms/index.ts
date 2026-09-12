@@ -16,7 +16,7 @@
 // own header.
 export { PushDisabledBanner } from './PushDisabledBanner'
 export { EventCalendarButtons, eventIcsUrl } from './EventCalendarButtons'
-export { usePushRegistration, platformOf } from './usePushRegistration'
+export { usePushRegistration, platformOf, reconcilePushRegistration } from './usePushRegistration'
 export type { PushState } from './usePushRegistration'
 export { makeParentCommsClient, googleSubscribeUrl, webcalUrl } from './commsClient'
 export type { NotificationOut, ParentCommsClient } from './commsClient'

@@ -32,7 +32,7 @@ class _Refusing:
     """A provider that errors. §5.11's `failed` -- distinct from `no_token` and `denied`
     because a retry might work."""
 
-    def send(self, *, token: str, title: str, body: str, payload: dict) -> str:
+    def send(self, *, token: str, title: str, body: str, kind: str, payload: dict) -> str:
         raise PushSendError("UNAVAILABLE")
 
 

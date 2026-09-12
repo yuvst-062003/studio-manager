@@ -552,3 +552,92 @@ describe('clearing an unread notice', () => {
     await waitFor(() => expect(screen.queryByTestId('updates-mark-read-n1')).toBeNull())
   })
 })
+
+// -- the endpoint that rotates underneath us (2026-09-13) ---------------------
+/**
+ * **A push subscription is not forever, and nothing here used to notice.**
+ *
+ * Browsers rotate a push endpoint when their push service moves, and after that the old one
+ * 410s permanently. `initial` reads `Notification.permission`, sees `granted`, and reports
+ * `'registered'` — truthfully about the PERMISSION and falsely about the SUBSCRIPTION, so
+ * the parent is shown `הודעות פעילות` for a device the server can no longer reach. The
+ * delivery report then says `failed` for a family whose app says everything is on.
+ *
+ * The service worker re-subscribes in the browser (tools/push-sw-source.js) but holds no
+ * access token and cannot tell our server. This is the half that can: `POST /push-tokens`
+ * answers 201 to a re-registration deliberately, which is what makes a launch-time re-post
+ * safe to do unconditionally.
+ */
+function stubServiceWorkerWithSubscription(
+  subscription: unknown,
+  subscribe: (options: unknown) => unknown = () => subscription,
+) {
+  Object.defineProperty(globalThis.navigator, 'serviceWorker', {
+    value: {
+      ready: Promise.resolve({
+        pushManager: { subscribe, getSubscription: () => Promise.resolve(subscription) },
+      }),
+    },
+    configurable: true,
+  })
+}
+
+describe('a subscription the browser replaced', () => {
+  it('re-registers the current subscription at launch', async () => {
+    vi.stubGlobal('Notification', { permission: 'granted', requestPermission: vi.fn() })
+    const rotated = { endpoint: 'https://push.example.invalid/ROTATED', toJSON: () => ({ endpoint: 'https://push.example.invalid/ROTATED' }) }
+    stubServiceWorkerWithSubscription(rotated)
+    const client = makeClient()
+
+    render(<Push client={client} userAgent={ANDROID} />)
+
+    await waitFor(() => expect(client.registerPush).toHaveBeenCalled())
+    expect(vi.mocked(client.registerPush).mock.calls[0]?.[0]).toContain('ROTATED')
+  })
+
+  it('subscribes afresh when the permission is granted but the subscription is gone', async () => {
+    // The other half of the rotation: some browsers drop the old subscription without
+    // handing the worker anything to re-subscribe with. Granted permission plus no
+    // subscription is a device that will never buzz again unless this path exists.
+    vi.stubGlobal('Notification', { permission: 'granted', requestPermission: vi.fn() })
+    const fresh = { endpoint: 'https://push.example.invalid/FRESH', toJSON: () => ({ endpoint: 'https://push.example.invalid/FRESH' }) }
+    const subscribe = vi.fn(() => fresh)
+    Object.defineProperty(globalThis.navigator, 'serviceWorker', {
+      value: {
+        ready: Promise.resolve({
+          pushManager: { subscribe, getSubscription: () => Promise.resolve(null) },
+        }),
+      },
+      configurable: true,
+    })
+    const client = makeClient()
+
+    render(<Push client={client} userAgent={ANDROID} />)
+
+    await waitFor(() => expect(client.registerPush).toHaveBeenCalled())
+    expect(subscribe).toHaveBeenCalled()
+    expect(vi.mocked(client.registerPush).mock.calls[0]?.[0]).toContain('FRESH')
+  })
+
+  it('does not re-register for a parent who never granted the permission', async () => {
+    // The reconcile must not become a second way to ask. §6.5: on iOS there is exactly one
+    // chance at the OS dialog, and `subscribe()` on a `default` permission spends it.
+    vi.stubGlobal('Notification', { permission: 'default', requestPermission: vi.fn() })
+    const subscribe = vi.fn()
+    Object.defineProperty(globalThis.navigator, 'serviceWorker', {
+      value: {
+        ready: Promise.resolve({
+          pushManager: { subscribe, getSubscription: () => Promise.resolve(null) },
+        }),
+      },
+      configurable: true,
+    })
+    const client = makeClient()
+
+    render(<Push client={client} userAgent={ANDROID} />)
+
+    await waitFor(() => expect(screen.getByTestId('push-setting')).toBeInTheDocument())
+    expect(subscribe).not.toHaveBeenCalled()
+    expect(client.registerPush).not.toHaveBeenCalled()
+  })
+})

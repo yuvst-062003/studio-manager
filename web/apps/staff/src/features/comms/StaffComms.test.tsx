@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { t } from '@studio/i18n'
 import { CoachCalendarFeed } from './CoachCalendarFeed'
 import { NotificationPreferences } from './NotificationPreferences'
+import { StaffPushSetting } from './StaffPushSetting'
 import { staffPlatformOf, urlBase64ToUint8Array, useStaffPushRegistration } from './useStaffPushRegistration'
 import type { StaffCommsClient } from './staffCommsClient'
 import { webcalUrl } from './staffCommsClient'
@@ -224,5 +225,82 @@ describe('layout', () => {
       expect(style).not.toMatch(/(^|;)\s*(left|right)\s*:/)
       expect(style).not.toMatch(/text-align:\s*(left|right)/)
     }
+  })
+})
+
+// -- the control that did not exist (2026-09-13) -------------------------------
+/**
+ * **`useStaffPushRegistration` shipped with nothing rendering it.** The hook was written,
+ * tested, and exported; no screen imported it. Every coach's `notification_delivery` row
+ * therefore read `no_token` — never asked, rather than denied — and §5.11's eight switches
+ * muted notifications a coach had no way to turn on.
+ *
+ * These tests are about the SEAM, not the hook: the hook's own behaviour is covered above,
+ * and a component test that stubbed it would have passed just as happily while nothing was
+ * mounted at all.
+ */
+describe('the staff push setting', () => {
+  function stubWorker(subscribe: (o: unknown) => unknown, subscription: unknown = null) {
+    Object.defineProperty(globalThis.navigator, 'serviceWorker', {
+      value: {
+        ready: Promise.resolve({
+          pushManager: { subscribe, getSubscription: () => Promise.resolve(subscription) },
+        }),
+      },
+      configurable: true,
+    })
+  }
+
+  it('offers to turn notifications on, and asks in words before the OS dialog', async () => {
+    // §6.5: on iOS a denial is permanent. The OS dialog is opened from the accept button and
+    // from nowhere else, so the one chance is spent only after the coach has been told what
+    // it buys them.
+    const requestPermission = vi.fn().mockResolvedValue('granted')
+    vi.stubGlobal('Notification', { permission: 'default', requestPermission })
+    const subscription = { endpoint: 'https://push.example.invalid/coach' }
+    stubWorker(vi.fn().mockResolvedValue(subscription))
+    const client = makeClient()
+
+    render(<StaffPushSetting client={client} locale="he" userAgent={ANDROID} />)
+
+    await userEvent.click(screen.getByTestId('staff-push-offer'))
+    expect(requestPermission, 'the OS dialog opened before the coach was asked').not.toHaveBeenCalled()
+
+    await userEvent.click(screen.getByTestId('staff-push-accept'))
+    await waitFor(() => expect(client.registerPush).toHaveBeenCalled())
+    expect(await screen.findByTestId('staff-push-on')).toBeInTheDocument()
+  })
+
+  it('says so, persistently, when the OS refused', async () => {
+    vi.stubGlobal('Notification', { permission: 'denied', requestPermission: vi.fn() })
+    stubWorker(vi.fn())
+
+    render(<StaffPushSetting client={makeClient()} locale="he" userAgent={ANDROID} />)
+
+    expect(screen.getByTestId('staff-push-disabled')).toBeInTheDocument()
+    // Not offered again — the banner is the whole of §5.11's answer for a refusal.
+    expect(screen.queryByTestId('staff-push-offer')).toBeNull()
+  })
+
+  it('re-registers a rotated subscription at launch without asking again', async () => {
+    vi.stubGlobal('Notification', { permission: 'granted', requestPermission: vi.fn() })
+    const rotated = {
+      endpoint: 'https://push.example.invalid/ROTATED',
+      toJSON: () => ({ endpoint: 'https://push.example.invalid/ROTATED' }),
+    }
+    stubWorker(vi.fn(), rotated)
+    const client = makeClient()
+
+    render(<StaffPushSetting client={client} locale="he" userAgent={ANDROID} />)
+
+    await waitFor(() => expect(client.registerPush).toHaveBeenCalled())
+    expect(vi.mocked(client.registerPush).mock.calls[0]?.[0]).toContain('ROTATED')
+  })
+
+  it('is actually mounted on the account screen', async () => {
+    // The seam, and the reason this whole feature was dead: everything above passes with the
+    // component rendered by a test and by nothing else.
+    const account = await import('../account/AccountScreen')
+    expect(String(account.AccountScreen)).toContain('StaffPushSetting')
   })
 })

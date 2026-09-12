@@ -62,7 +62,7 @@ import {
 } from '@studio/ui'
 import type { SwitchableStudio } from '@studio/ui'
 import { PermissionBoundaries, roleLabelsOf } from '../identity/DrawerIdentity'
-import { CoachCalendarFeed, NotificationPreferences } from '../comms'
+import { CoachCalendarFeed, NotificationPreferences, StaffPushSetting } from '../comms'
 import type { StaffCommsClient } from '../comms'
 import type { MyProfileUpdate, StaffPeopleClient } from '../people'
 import { EditProfileSheet } from './EditProfileSheet'
@@ -393,6 +393,9 @@ export function AccountScreen({
           {t(locale, 'common.account.group.notifications')}
         </GroupHeading>
         <div className="bg-[var(--surface-raised)] rounded-2xl border border-[var(--border)] shadow-xs p-3.5 text-xs">
+          {/* Above the switches, not beside them: the switches mute notifications, and
+              until this component existed there was no way to turn any on. */}
+          <StaffPushSetting client={commsClient} locale={locale} />
           <NotificationPreferences client={commsClient} locale={locale} />
         </div>
       </section>

@@ -86,7 +86,11 @@ def test_a_send_signs_and_encrypts_for_real_and_returns_an_id(mock_post) -> None
     subscription = _subscription()
 
     message_id = _sender().send(
-        token=json.dumps(subscription), title="ביטול שיעור", body="השיעור היום מבוטל", payload={}
+        token=json.dumps(subscription),
+        title="ביטול שיעור",
+        body="השיעור היום מבוטל",
+        kind="session.cancelled",
+        payload={},
     )
 
     assert message_id
@@ -111,6 +115,7 @@ def test_the_title_and_body_are_encrypted_never_sent_in_the_clear(mock_post) -> 
         token=json.dumps(_subscription()),
         title="שם ילד סודי",
         body="עוד תוכן סודי",
+        kind="belt.awarded",
         payload={"student_id": "secret-id"},
     )
 
@@ -127,7 +132,9 @@ def test_a_provider_refusal_becomes_a_push_send_error(mock_post) -> None:
     mock_post.return_value.headers = {}
 
     try:
-        _sender().send(token=json.dumps(_subscription()), title="t", body="b", payload={})
+        _sender().send(
+            token=json.dumps(_subscription()), title="t", body="b", kind="manual", payload={}
+        )
         raised = False
     except PushSendError as exc:
         raised = True
@@ -140,7 +147,7 @@ def test_a_malformed_token_is_a_push_send_error_not_a_crash() -> None:
     take the whole drain down with it -- `app/workers/notify.py::_send_to_any` only knows how
     to catch `PushSendError`."""
     try:
-        _sender().send(token="not json", title="t", body="b", payload={})
+        _sender().send(token="not json", title="t", body="b", kind="manual", payload={})
         raised = False
     except PushSendError:
         raised = True
@@ -177,3 +184,101 @@ def test_a_partially_configured_pair_still_falls_back(monkeypatch) -> None:
     monkeypatch.setattr(settings, "VAPID_SUBJECT", "mailto:ops@example.invalid")
 
     assert isinstance(default_push_sender(), RecordingPushSender)
+
+
+# -- the tap-through (2026-09-13) ---------------------------------------------
+@patch("app.services.comms.push.webpush")
+def test_the_wire_carries_the_kind_so_a_tap_knows_where_to_open(mock_webpush) -> None:
+    """`notificationclick` runs in the service worker, which has no session and no router --
+    the only thing it can route on is what arrived in the message. Title and body say what
+    happened; `kind` is the one field that says WHICH SCREEN it happened on, and without it
+    every notification in the product can only open the app's front door.
+
+    Patched at `webpush` rather than at `requests.post` (the convention the tests above use)
+    because the payload leaves this process already encrypted -- asserting on the ciphertext
+    is exactly what `test_the_title_and_body_are_encrypted_never_sent_in_the_clear` does, and
+    this test needs to read the cleartext the device will decrypt.
+    """
+    mock_webpush.return_value.headers = {}
+
+    _sender().send(
+        token=json.dumps(_subscription()),
+        title="חגורה חדשה!",
+        body="נועה עלתה לחגורה צהובה",
+        kind="belt.awarded",
+        payload={"student_id": "s-1"},
+    )
+
+    data = json.loads(mock_webpush.call_args[1]["data"])
+    assert data["kind"] == "belt.awarded"
+    # Still present and still beside it -- the worker reads `payload.student_id` to build the
+    # per-child link, so a `kind` that displaced the payload would trade one gap for another.
+    assert data["payload"] == {"student_id": "s-1"}
+    assert data["title"] == "חגורה חדשה!"
+
+
+def test_the_recording_sender_takes_the_kind_too() -> None:
+    """The two senders share one Protocol, and a `RecordingPushSender` that rejected the
+    keyword would make every local run and every test crash the moment the drain started
+    passing it -- which is the one environment where nobody would see a push fail."""
+    sender = RecordingPushSender()
+    message_id = sender.send(token="t", title="a", body="b", kind="session.cancelled", payload={})
+    assert message_id
+
+
+def test_the_key_pair_the_script_generates_actually_sends() -> None:
+    """`scripts/generate-vapid-keys.py` → `WebPushSender`, end to end.
+
+    The test above this one round-trips a pair that was PASTED into this file, which proves
+    the format `push.py` reads and proves nothing at all about the script an operator will
+    actually run. A generator that emitted padded base64, or the private key in DER, or the
+    public key compressed rather than uncompressed, would pass every existing test here and
+    fail on the first real device — with a provider error, hours later, on someone's phone.
+
+    Imported by path because the filename has a dash and is therefore not importable as a
+    module. That is deliberate: it is an operator script, not part of the package.
+    """
+    import importlib.util
+    from pathlib import Path
+    from unittest.mock import patch
+
+    from py_vapid import Vapid
+
+    spec = importlib.util.spec_from_file_location(
+        "generate_vapid_keys", Path(__file__).resolve().parents[2] / "scripts/generate-vapid-keys.py"
+    )
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    public, private = module.generate()
+
+    # 1. `py_vapid` reads the private half back, and derives exactly the public half printed
+    #    beside it -- a mismatched pair is the failure that only shows up on a device.
+    vapid = Vapid.from_string(private_key=private)
+    derived = base64.urlsafe_b64encode(
+        vapid.private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.X962,
+            format=serialization.PublicFormat.UncompressedPoint,
+        )
+    ).rstrip(b"=")
+    assert derived.decode() == public
+
+    # 2. The public half is what a browser is handed as `applicationServerKey`: 65 raw bytes,
+    #    uncompressed point, base64url and unpadded. A compressed point decodes to 33 and
+    #    `pushManager.subscribe` throws on it in the browser, where no test can see.
+    assert len(base64.urlsafe_b64decode(public + "==")) == 65
+    assert "=" not in public and "+" not in public and "/" not in public
+
+    # 3. And a real send signs with it.
+    with patch("requests.post") as mock_post:
+        mock_post.return_value.status_code = 201
+        mock_post.return_value.headers = {}
+        sender = WebPushSender(private_key=private, subject="mailto:ops@example.invalid")
+        assert sender.send(
+            token=json.dumps(_subscription()),
+            title="t",
+            body="b",
+            kind="session.cancelled",
+            payload={},
+        )

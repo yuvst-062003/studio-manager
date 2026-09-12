@@ -14,7 +14,12 @@
 // coach-scoped inbox `AtRiskAlert` used to.
 export { NotificationPreferences } from './NotificationPreferences'
 export { CoachCalendarFeed } from './CoachCalendarFeed'
-export { useStaffPushRegistration, staffPlatformOf } from './useStaffPushRegistration'
+export { StaffPushSetting } from './StaffPushSetting'
+export {
+  useStaffPushRegistration,
+  staffPlatformOf,
+  reconcileStaffPushRegistration,
+} from './useStaffPushRegistration'
 export type { StaffPushState } from './useStaffPushRegistration'
 export { makeStaffCommsClient, AT_RISK_KIND, byMostMissed } from './staffCommsClient'
 export type { AtRiskPayload, StaffCommsClient } from './staffCommsClient'

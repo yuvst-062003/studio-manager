@@ -82,7 +82,7 @@ import { BeltProgressScreen, makeParentBeltsClient, registerBeltSections } from 
 // rewritten in parallel, and wired here by the merge of the two.
 import { TechniqueDetail, TechniquesScreen, matchTechniquesPath } from './features/techniques'
 import { BeltRouteResolver } from './features/belts/BeltRouteResolver'
-import { makeParentCommsClient } from './features/comms'
+import { makeParentCommsClient, platformOf, reconcilePushRegistration } from './features/comms'
 import { UpdatesScreen } from './features/comms/redesign/UpdatesScreen'
 import { JoinClubSection, makePeopleClient, registerPeopleSections } from './features/people'
 import { ProfileScreen } from './features/people/redesign/ProfileScreen'
@@ -581,6 +581,20 @@ function AuthedApp() {
   // demand they had not met.
   const [pendingCount, setPendingCount] = useState(0)
   const [notificationsRead, setNotificationsRead] = useState(0)
+
+  // **A push subscription rotates, and until 2026-09-13 nothing noticed.** Browsers replace
+  // a push endpoint when their push service moves and the old one then 410s for good, so a
+  // family who turned notifications on months ago silently stops receiving them while
+  // Settings still reads הודעות פעילות — it reports the PERMISSION, which is untouched.
+  //
+  // Here rather than in `usePushRegistration` alone, because that hook only mounts when the
+  // parent opens Profile → הגדרות. A parent who never opens Settings is exactly the parent
+  // who would never be reconciled. It asks for nothing (it runs only on an already-granted
+  // permission) and `POST /push-tokens` answers 201 to a re-registration by design.
+  useEffect(() => {
+    if (session.status !== 'signed-in') return
+    void reconcilePushRegistration(commsClient, platformOf(globalThis.navigator?.userAgent ?? ''))
+  }, [session.status, commsClient])
   useEffect(() => {
     if (session.status !== 'signed-in') return
     let alive = true

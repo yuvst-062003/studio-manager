@@ -57,7 +57,9 @@ class PushSender(Protocol):
     every call site shifting by one positional argument.
     """
 
-    def send(self, *, token: str, title: str, body: str, payload: dict[str, Any]) -> str: ...
+    def send(
+        self, *, token: str, title: str, body: str, kind: str, payload: dict[str, Any]
+    ) -> str: ...
 
 
 class RecordingPushSender:
@@ -72,7 +74,7 @@ class RecordingPushSender:
     def __init__(self) -> None:
         self.sent: list[tuple[str, str]] = []
 
-    def send(self, *, token: str, title: str, body: str, payload: dict[str, Any]) -> str:
+    def send(self, *, token: str, title: str, body: str, kind: str, payload: dict[str, Any]) -> str:
         # Neither `title` nor `body` is stored on the instance and neither is logged -- §18.3.
         # The token prefix is kept so a test can assert which device was addressed without
         # the whole credential appearing in an assertion message.
@@ -95,7 +97,7 @@ class WebPushSender:
         self._private_key = private_key
         self._subject = subject
 
-    def send(self, *, token: str, title: str, body: str, payload: dict[str, Any]) -> str:
+    def send(self, *, token: str, title: str, body: str, kind: str, payload: dict[str, Any]) -> str:
         try:
             subscription_info = json.loads(token)
         except ValueError as exc:
@@ -105,7 +107,11 @@ class WebPushSender:
                 subscription_info=subscription_info,
                 # Encrypted end to end (aes128gcm, RFC 8291) before it leaves this process --
                 # §18.3's title and body reach the device, never the push service in between.
-                data=json.dumps({"title": title, "body": body, "payload": payload}),
+                # `kind` rides beside the payload rather than inside it: the payload is the
+                # column §18.3 never logs and whose shape each producer chooses, while `kind`
+                # is the routing fact `push-sw.js` reads to decide which screen a tap opens.
+                # Merging them would make a producer's stray `kind` key silently steer taps.
+                data=json.dumps({"title": title, "body": body, "kind": kind, "payload": payload}),
                 vapid_private_key=self._private_key,
                 vapid_claims={"sub": self._subject},
                 # A push service that never answers must not hang the drain that every other

@@ -6,6 +6,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { manifest } from './manifest.config'
 import { workspaceAliases } from '../../tools/workspace-aliases'
+import { PUSH_SW_FILENAME, pushServiceWorkerPlugin } from '../../tools/push-sw.mjs'
 import { splashLinksPlugin } from '../../tools/splash-screens.mjs'
 
 export default defineConfig({
@@ -18,6 +19,7 @@ export default defineConfig({
     tailwindcss(),
     // Injects the apple-touch-startup-image tags from tools/splash-screens.mjs.
     splashLinksPlugin(),
+    pushServiceWorkerPlugin('staff'),
     VitePWA({
       registerType: 'prompt',
       manifest,
@@ -30,6 +32,10 @@ export default defineConfig({
         // would spend most of the offline budget §6.1 reserves for the font on images no
         // offline session can use.
         globIgnores: ['**/splash/*.png'],
+        // The push half of the worker — tools/push-sw.mjs emits `push-sw.js` and this pulls
+        // it in. It must stay inside `globPatterns`' `.js` for updates to reach devices at
+        // all; that file's header explains why.
+        importScripts: [PUSH_SW_FILENAME],
         navigateFallback: 'index.html',
         cleanupOutdatedCaches: true,
       },
