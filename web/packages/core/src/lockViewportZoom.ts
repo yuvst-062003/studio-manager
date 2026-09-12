@@ -19,11 +19,30 @@
 
 const GESTURES = ['gesturestart', 'gesturechange', 'gestureend'] as const
 
+/** How close together in time two taps must be to read as a double-tap rather than as two
+ *  deliberate ones. 300ms is the interval Safari itself waits before settling a single tap. */
+const DOUBLE_TAP_MS = 300
+
+/** ...and how close together on the glass. **This bound is what makes suppressing the second
+ *  tap safe.** Cancelling every quick second tap would cancel a parent tapping two different
+ *  buttons in a hurry — and cancelling `touchend` cancels the click the app needed. Two taps
+ *  more than a fingertip apart are two taps, whatever their timing. */
+const DOUBLE_TAP_PX = 40
+
 /** A hair narrower than `EventTarget` so a test can pass a stub without a DOM. */
 export type GestureTarget = Pick<EventTarget, 'addEventListener' | 'removeEventListener'>
 
 /**
- * Refuses WebKit's pinch gestures for the lifetime of the document.
+ * Refuses WebKit's pinch gestures, and iOS Safari's double-tap zoom, for the life of the
+ * document.
+ *
+ * **The double-tap half was added 2026-09-12**, after the wizard was reported as still
+ * zooming on an iPhone. Everything else was already right and verified live: the viewport
+ * meta carries `user-scalable=no`, `html` carries `touch-action: pan-x pan-y`, and the three
+ * `gesture*` listeners below were confirmed attached and preventing. What none of those
+ * reaches is the double tap — `touch-action` is SPECIFIED to suppress it, and Safari has
+ * been unreliable about honouring that on the root element for years, which leaves the
+ * gesture a page can still feel and cannot otherwise refuse.
  *
  * Returns a disposer. Nothing in the apps calls it — this is installed once from `main.tsx`
  * and lives as long as the page — but a listener with no way off is a listener no test can
@@ -36,7 +55,34 @@ export function lockViewportZoom(target: GestureTarget = document): () => void {
   // off is a silent no-op rather than an error.
   const block = (event: Event) => event.preventDefault()
   for (const type of GESTURES) target.addEventListener(type, block, { passive: false })
+
+  let lastTapAt = 0
+  let lastTapX = 0
+  let lastTapY = 0
+  const blockDoubleTap = (event: Event) => {
+    const touch = (event as TouchEvent).changedTouches?.[0]
+    if (!touch) return
+    const now = Date.now()
+    const quick = now - lastTapAt <= DOUBLE_TAP_MS
+    const near =
+      Math.abs(touch.clientX - lastTapX) <= DOUBLE_TAP_PX &&
+      Math.abs(touch.clientY - lastTapY) <= DOUBLE_TAP_PX
+    if (quick && near) {
+      // Only the SECOND tap of a pair is cancelled, so the first one's click has already
+      // been delivered. A double-tap on a button therefore still acts once, which is what
+      // a reader who taps twice by accident expects anyway.
+      event.preventDefault()
+      lastTapAt = 0
+      return
+    }
+    lastTapAt = now
+    lastTapX = touch.clientX
+    lastTapY = touch.clientY
+  }
+  target.addEventListener('touchend', blockDoubleTap, { passive: false })
+
   return () => {
     for (const type of GESTURES) target.removeEventListener(type, block)
+    target.removeEventListener('touchend', blockDoubleTap)
   }
 }
