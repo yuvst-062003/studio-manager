@@ -26,7 +26,7 @@ import { Step4Done } from './Step4Done'
 import { WizardHeader } from './WizardHeader'
 import type { WizardStep } from './WizardHeader'
 import { toRegisterPayload } from './adapters'
-import { clearStudentDraft } from './draft'
+import { clearStudentDraft, clearWizardDraft, loadWizardDraft, saveWizardDraft } from './draft'
 import { wizardFlowCopy } from './copy'
 import { submitJoin } from './submitJoin'
 import type { SubmitJoinResult } from './submitJoin'
@@ -124,6 +124,23 @@ export type JoinWizardProps = {
   startAtStep?: WizardStep
   /** Where "enter the app" goes once the family is registered. */
   onEnterApp: () => void
+  /** Children who ALREADY exist and are being re-opened in the wizard rather than created.
+   *
+   *  §5.5's gate uses this. A family blocked for a missing הסכם הרשמה used to get a second,
+   *  older five-step flow of its own; there is one wizard now, so the gate sends them here
+   *  with their children loaded instead of an empty form asking them to re-type a child the
+   *  club has had for weeks. Used only when no resumable draft exists -- a half-finished
+   *  run the family was in the middle of always wins over a fresh seed.
+   *
+   *  `/me/students/register` skips a child already on the account rather than duplicating
+   *  them, and submits their declaration either way, so re-submitting these is safe and is
+   *  what clears the gate. */
+  seedStudents?: readonly StudentDraft[]
+  /** Which door's resumable draft this run owns -- door B's token, or `'me'` for the
+   *  signed-in doors. A shared family phone can open one join link, abandon it and open
+   *  another; restoring the first family's children into the second's wizard would be
+   *  worse than losing them, so the draft records its scope and refuses a mismatch. */
+  draftScope?: string
 }
 
 export function JoinWizard({
@@ -134,24 +151,60 @@ export function JoinWizard({
   prefillFirstRowName,
   startAtStep,
   onEnterApp,
+  draftScope = 'me',
+  seedStudents,
 }: JoinWizardProps) {
   const copy = wizardFlowCopy(locale)
   const [studio, setStudio] = useState<StudioState>({ status: 'loading' })
   const [catalogue, setCatalogue] = useState<CatalogueState>({ status: 'loading' })
-  const [step, setStep] = useState<WizardStep>(startAtStep ?? 1)
+  //: **Read once, during the first render.** Restoring in an effect instead would paint an
+  //: empty step 1 and then jump, which reads as the wizard having lost the work before it
+  //: gives it back -- exactly the moment this is meant to remove.
+  const restored = useMemo(() => loadWizardDraft(draftScope), [draftScope])
+
+  const [step, setStep] = useState<WizardStep>(
+    (restored?.step as WizardStep | undefined) ?? startAtStep ?? 1,
+  )
   // The agreements step was SKIPPED because the family HAS agreed -- that is the whole
   // meaning of `startAtStep` being past 1 -- so the register payload must say so from the
   // start, not only once a family that opened on step 1 ticks the box. Re-sending it is
   // safe and deliberate: `AgreementService.accept_club_terms` returns `None` when the
   // person already holds the current version, and its own docstring calls a re-signature
   // reaching it a duplicate rather than a mistake.
-  const [agreed, setAgreed] = useState(() => (startAtStep ?? 1) > 1)
-  const [students, setStudents] = useState<StudentDraft[]>([])
-  const [methods, setMethods] = useState<Record<string, PaymentMethod>>({})
+  const [agreed, setAgreed] = useState(() => restored?.agreed ?? (startAtStep ?? 1) > 1)
+  //: The resumed draft wins over the seed: a family halfway through their own run must not
+  //: have it replaced by the roster they started from.
+  const [students, setStudents] = useState<StudentDraft[]>(() =>
+    restored ? [...restored.students] : [...(seedStudents ?? [])],
+  )
+  //: Sanitised rather than cast. `localStorage` is writable by anything on the origin, and
+  //: a junk value reaching `submitJoin`'s method bucketing would be billed, not rejected --
+  //: so anything that is not one of the four known methods is dropped, which leaves that
+  //: child simply unanswered and holds the button.
+  const [methods, setMethods] = useState<Record<string, PaymentMethod>>(() => {
+    const known: readonly string[] = ['credit', 'cash', 'cheque', 'standing_order']
+    const seed: Record<string, PaymentMethod> = {}
+    for (const [id, value] of Object.entries(restored?.methods ?? {})) {
+      if (known.includes(value)) seed[id] = value as PaymentMethod
+    }
+    return seed
+  })
   //: Step 3's own "כן, התשלום כבר הוסדר מראש" choice, lifted here because `submitJoin`
   //: needs it and step 3 does not call `submitJoin` itself.
-  const [alreadyArranged, setAlreadyArranged] = useState(false)
+  const [alreadyArranged, setAlreadyArranged] = useState(restored?.alreadyArranged ?? false)
   const [submitResult, setSubmitResult] = useState<SubmitJoinResult | null>(null)
+
+  //: **Saved on every change, not on a timer or on unload.** A reclaimed tab never runs an
+  //: unload handler -- that is precisely the case this exists for -- so the only write that
+  //: can be relied on is the one that already happened.
+  //:
+  //: Stops once the registration has landed: `submitResult` means the family exists, and
+  //: `submit()` has already cleared the draft. Re-saving here would put it straight back and
+  //: offer a finished registration as resumable work (§5.7 rule 4).
+  useEffect(() => {
+    if (submitResult !== null) return
+    saveWizardDraft({ scope: draftScope, step, agreed, students, methods, alreadyArranged })
+  }, [draftScope, step, agreed, students, methods, alreadyArranged, submitResult])
   //: Bumped by `WizardLoadFailed`'s retry. The effect below keys on it as well as on
   //: `source`, which is what turns two one-shot reads into two retryable ones -- a counter
   //: rather than a hand-rolled re-fetch, so the retry path is the SAME code as the first
@@ -296,9 +349,10 @@ export function JoinWizard({
       },
     })
 
-    //: The draft has served its purpose; leaving it would offer a family the child they
-    //: have just registered (§5.7 rule 4).
+    //: Both drafts have served their purpose; leaving either would offer a family the
+    //: children they have just registered (§5.7 rule 4).
     clearStudentDraft()
+    clearWizardDraft()
     return result
   }
 

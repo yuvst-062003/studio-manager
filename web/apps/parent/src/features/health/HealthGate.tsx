@@ -30,19 +30,7 @@
 // to keep nagging a `trial_signed` family for the full form.
 import { useMemo } from 'react'
 import type { ReactNode } from 'react'
-import type { CSSProperties } from 'react'
-import { Card } from '@studio/ui'
-import { t } from '@studio/i18n'
-import type { Locale } from '@studio/i18n'
-import { AgreementFlow } from './AgreementFlow'
-import type { HealthClient, HealthStatus } from './healthClient'
-
-const gateStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 'var(--space-4)',
-  padding: 'var(--space-4)',
-}
+import type { HealthStatus } from './healthClient'
 
 export type GatedStudent = {
   id: string
@@ -93,24 +81,27 @@ export function firstStudentNeedingDeclaration(students: readonly GatedStudent[]
 }
 
 export type HealthGateProps = {
-  locale: Locale
-  client: HealthClient
   students: readonly GatedStudent[]
-  signerName?: string
-  today?: string
-  onSigned?: () => void
   children: ReactNode
+  /**
+   * The one join wizard, opened on this family.
+   *
+   * **A render function, and a prop rather than an import.** Until 2026-09-12 this gate
+   * rendered `AgreementFlow` — a second, five-step onboarding flow with its own chrome,
+   * its own rail and its own registration and declaration screens. A manager who joined
+   * through the redesigned three-step wizard and then opened the app was thrown into it,
+   * and reasonably reported the app had reverted to an older version. It had not; there
+   * were simply two flows, and the gate rendered the older one.
+   *
+   * There is one now. The gate's job is the DECISION — who is blocked, and when the app
+   * opens again — and that is all that is left here. What to show is the shell's, which is
+   * where the wizard's client, source and billing dependencies already live; passing a
+   * node would construct it on every render of an unblocked app, so it is a function.
+   */
+  wizard: (blocked: GatedStudent) => ReactNode
 }
 
-export function HealthGate({
-  locale,
-  client,
-  students,
-  signerName,
-  today,
-  onSigned,
-  children,
-}: HealthGateProps) {
+export function HealthGate({ students, children, wizard }: HealthGateProps) {
   const blocked = useMemo(() => firstStudentNeedingDeclaration(students), [students])
 
   if (!blocked) return <>{children}</>
@@ -119,32 +110,10 @@ export function HealthGate({
     // `children` is not rendered at all — not hidden, not disabled, not behind an overlay. §5.5
     // says "no other screen is reachable", and a screen that is merely covered is one CSS bug
     // away from being reachable.
-    <div data-testid="health-gate" style={gateStyle}>
-      <Card>
-        <h1>{t(locale, 'health.gate.title')}</h1>
-        <p>{t(locale, 'health.gate.body')}</p>
-        <p style={{ color: 'var(--text-muted)' }}>
-          {t(locale, 'health.declaration.forChild')} <bdi>{blocked.display_name}</bdi>
-        </p>
-        {blocked.health_status === 'trial_signed' ? (
-          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-caption)' }}>
-            {t(locale, 'health.badge.trialSigned')}
-          </p>
-        ) : null}
-      </Card>
-      {/* The whole agreement, not just the declaration. `AgreementFlow` reads the status and
-          renders only the steps this family still owes — so a parent correcting one asthma
-          answer is not made to re-type an address or re-read the `תקנון`. */}
-      <AgreementFlow
-        client={client}
-        locale={locale}
-        onCompleted={onSigned}
-        signerName={signerName}
-        studentId={blocked.id}
-        studentName={blocked.display_name}
-        students={students}
-        today={today}
-      />
-    </div>
+    //
+    // No card, no heading and no explanatory paragraph above it any more: the wizard opens on
+    // its own step 1 and says who it is for. The old pair — a gate card AND a flow that
+    // re-introduced itself underneath — was two headings for one task.
+    <div data-testid="health-gate">{wizard(blocked)}</div>
   )
 }

@@ -36,6 +36,7 @@ const REASON_COPY: Record<OutcomeReason, Step4CopyKey> = {
   no_charge_for_card: 'paymentReasonNoChargeForCard',
   write_failed: 'paymentReasonWriteFailed',
   no_student: 'paymentReasonNoStudent',
+  no_method: 'paymentReasonNoMethod',
 }
 
 /** F1 (fix round 1) — the trainee-list chip used to draw a green "תשלום אושר" tick for

@@ -366,6 +366,66 @@ def test_me_students_is_the_guardian_table(client, app_session, as_manager, as_g
     assert [row["id"] for row in mine.json()["items"]] == [created["student"]["id"]]
 
 
+def test_wizard_prefill_returns_the_callers_own_children_with_what_the_wizard_needs(
+    client, app_session, as_manager, as_guardian
+):
+    """§5.5's gate opens the one join wizard now, and this is what stops it opening blank.
+
+    Until 2026-09-12 the gate rendered a second, five-step onboarding flow of its own. There
+    is one wizard; it BUILDS children rather than loading them, so without this read a
+    family blocked for a missing declaration would be asked to re-type a child the club has
+    had for weeks.
+    """
+    from app.models.person import Person
+
+    parent = app_session.get(Person, as_guardian.person_id)
+    payload = _payload()
+    payload["guardian"]["email"] = parent.email
+    created = _create(client, as_manager, payload)
+
+    got = client.get("/api/v1/me/wizard-prefill", headers=as_guardian.headers)
+    assert got.status_code == 200
+    items = got.json()["items"]
+    assert [row["id"] for row in items] == [created["student"]["id"]]
+    # The fields the wizard's step 2 pre-fills from. `group_ids`, not names: the form binds
+    # a group by id, and a name would have to be matched back.
+    assert set(items[0]) >= {
+        "first_name",
+        "last_name",
+        "birthdate",
+        "grade",
+        "group_ids",
+        "price_plan_id",
+        "health_status",
+    }
+
+
+def test_wizard_prefill_never_returns_a_minors_national_id(
+    client, app_session, as_manager, as_guardian
+):
+    """`person.national_id_encrypted` is encrypted at rest so a minor's id is not casually
+    in flight, and this read does not undo that. The wizard asks for it again -- one field,
+    against widening where that number travels."""
+    from app.models.person import Person
+
+    parent = app_session.get(Person, as_guardian.person_id)
+    payload = _payload()
+    payload["guardian"]["email"] = parent.email
+    _create(client, as_manager, payload)
+
+    body = client.get("/api/v1/me/wizard-prefill", headers=as_guardian.headers).json()
+    assert body["items"]
+    for row in body["items"]:
+        assert "national_id" not in row
+
+
+def test_wizard_prefill_never_leaks_another_familys_child(client, as_manager, as_guardian):
+    """The same guardian scoping `/me/students` has. Knowing an id is not the check; being
+    that child's guardian is."""
+    _create(client, as_manager)
+    assert client.get("/api/v1/me/wizard-prefill", headers=as_guardian.headers).json()["items"] == []
+
+
 def test_a_guardian_never_sees_another_familys_child(client, as_manager, as_guardian):
     _create(client, as_manager)
     mine = client.get("/api/v1/me/students", headers=as_guardian.headers)

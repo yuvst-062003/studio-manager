@@ -48,6 +48,9 @@ export type OutcomeReason =
   | 'write_failed'
   /** The register response named no student for this child. Should not happen. */
   | 'no_student'
+  /** No payment method was ever chosen for this child. `submitJoin` refuses before
+   *  `register` for this, so reaching it means a caller skipped that guard. */
+  | 'no_method'
 
 export type PaymentOutcome = {
   draftId: string
@@ -67,6 +70,22 @@ export type MandateRow = {
   name: string
   amountAgorot: number
   url: string
+}
+
+/** Raised when a chargeable child reaches submit with no payment method chosen.
+ *
+ *  **Thrown before `register`**, so nothing has been written and the family can answer and
+ *  press again -- which is exactly the retry state step 3 keeps for a failed registration.
+ *  Its own class rather than a bare `Error` so the screen can tell it from a network
+ *  failure and say something useful. */
+export class MissingPaymentMethodError extends Error {
+  readonly draftIds: readonly string[]
+
+  constructor(draftIds: readonly string[]) {
+    super(`no payment method chosen for ${draftIds.length} child(ren)`)
+    this.name = 'MissingPaymentMethodError'
+    this.draftIds = draftIds
+  }
 }
 
 export type SubmitJoinResult = {
@@ -161,6 +180,21 @@ export async function submitJoin(input: SubmitJoinInput): Promise<SubmitJoinResu
   //: and D; on door B the trial endpoint creates them as a lead.
   const joiningDrafts = students.filter((draft) => draft.intent !== 'trial')
 
+  //: **Refused rather than defaulted, and refused BEFORE anything is written.**
+  //: `methods[draft.id]` used to read `?? 'credit'` here and in the picker, which made "the
+  //: family chose card" and "the family answered nothing" the same value in both places --
+  //: so they agreed, and agreed wrongly. An untouched screen opened a real card order on a
+  //: live merchant account, and a choice lost to a reloaded tab did the same silently. That
+  //: reached a family on 2026-09-12. Step 3 now holds its own button; this is the second
+  //: lock, and it throws before `register` so the family exists nowhere yet and can simply
+  //: answer and press again.
+  const unanswered = joiningDrafts.filter(
+    (candidate) => !needsManagerReview(candidate) && methods[candidate.id] === undefined,
+  )
+  if (unanswered.length > 0) {
+    throw new MissingPaymentMethodError(unanswered.map((candidate) => candidate.id))
+  }
+
   // Let this reject: the caller keeps the family on step 3 and shows the error.
   // Everything below runs only once the family exists.
   const registered =
@@ -222,7 +256,9 @@ export async function submitJoin(input: SubmitJoinInput): Promise<SubmitJoinResu
   const stored = (method: PaymentMethod) => (method === 'credit' ? 'upay_card' : method)
 
   students.forEach((draft) => {
-    const method = methods[draft.id] ?? 'credit'
+    //: `null`, never a fallback method -- see the guard above. A review child legitimately
+    //: has none, and `PaymentOutcome.method` is typed for exactly that.
+    const method = methods[draft.id] ?? null
     const amountAgorot = plans.find((plan) => plan.id === draft.planId)?.pricePerMonthAgorot ?? 0
     const name = `${draft.firstName} ${draft.lastName}`.trim()
 
@@ -255,6 +291,21 @@ export async function submitJoin(input: SubmitJoinInput): Promise<SubmitJoinResu
       // `method: null` — the outcome type already allows it, and a trial child has no
       // payment method by design rather than by omission.
       outcomes.push({ draftId: draft.id, name, method: null, amountAgorot: 0, state: 'trial_booked' })
+      return
+    }
+
+    if (method === null) {
+      //: Unreachable while the guard above runs -- kept as a typed floor rather than a
+      //: non-null assertion, so a future caller that skips the guard fails visibly here
+      //: instead of quietly billing a card.
+      outcomes.push({
+        draftId: draft.id,
+        name,
+        method,
+        amountAgorot,
+        state: 'not_recorded',
+        reason: 'no_method',
+      })
       return
     }
 

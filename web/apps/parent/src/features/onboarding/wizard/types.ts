@@ -21,6 +21,32 @@ export type GradeKey =
    *  a member between school and whatever comes next has one of those but not the other. */
   | 'post_highschool'
 
+const GRADE_KEYS: readonly GradeKey[] = [
+  'kindergarten',
+  'grade_1',
+  'grade_2',
+  'grade_3',
+  'grade_4',
+  'grade_5',
+  'grade_6',
+  'grade_7',
+  'grade_8',
+  'grade_9',
+  'highschool',
+  'post_highschool',
+]
+
+/** Is this stored value one of the grades the picker can actually show?
+ *
+ *  `student.grade` is free text on the server and predates `GradeKey`, so a row written by
+ *  an import, an older client or a manager typing into the staff app can hold anything. The
+ *  gate's wizard pre-fill reads it (`App.tsx`), and a value outside this set must become an
+ *  empty field the parent is asked to fill -- never a `<select>` holding an option that is
+ *  not in its own list, which renders as blank and silently submits the wrong thing. */
+export function isGradeKey(value: string | null | undefined): value is GradeKey {
+  return value !== null && value !== undefined && (GRADE_KEYS as readonly string[]).includes(value)
+}
+
 export type HealthFund = 'clalit' | 'maccabi' | 'meuhedet' | 'leumit'
 
 /** One training group as the group card needs it -- richer than the wizard's current

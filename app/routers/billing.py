@@ -85,6 +85,12 @@ from app.services.billing.orders import OrderService
 from app.services.billing.payment_promise import PaymentPromiseService
 from app.services.billing.reconciliation import ReconciliationService
 from app.services.billing.run import BillingRunService
+from app.services.billing.studio_settings import (
+    CASH_PREPAY_MONTHS,
+    CHEQUE_PREPAY_MONTHS,
+    RUN_DAY,
+)
+from app.services.billing.studio_settings import SETTINGS_KEY as _SETTINGS_KEY
 from app.services.people.students import StudentService
 
 router = APIRouter(tags=["billing"])
@@ -1295,9 +1301,13 @@ def create_billing_run(
 
 
 # -- studio-level billing settings --------------------------------------------
-#: The key `studio.settings` holds this lane's three fields under. Namespaced so no other
-#: lane writing that column can collide with them.
-SETTINGS_KEY = "billing"
+#: The key and the defaults live in `app/services/billing/studio_settings.py`, because the
+#: join wizard needs `cash_prepay_months` too -- it has to show a cash family the total it is
+#: about to have recorded -- and a second literal beside this one would make that a canonical
+#: value with two producers. They drift, and then the screen and the promise disagree, which
+#: is the 2026-09-12 defect exactly. Re-exported so this module's existing readers are
+#: unchanged.
+SETTINGS_KEY = _SETTINGS_KEY
 
 
 class BillingSettingsOut(BaseModel):
@@ -1317,14 +1327,15 @@ class BillingSettingsOut(BaseModel):
 
     cash_instructions: str | None = None
     #: Which day of the month the run fires on. §5.10: 'a configurable day (default the 1st)'.
-    run_day: int = 1
+    run_day: int = RUN_DAY
 
-    #: The club's own prepayment rules: cash three months forward, twelve cheques. Settings
-    #: rather than constants, because they ARE the club's rules and another club's differ.
-    #: `0` removes the forward offer for that route and returns it to settling open charges
-    #: only, which is how cash behaved before prepayment existed.
-    cash_prepay_months: int = 3
-    cheque_prepay_months: int = 12
+    #: The club's own prepayment rules, defaulted from `studio_settings` so this router and
+    #: the join wizard's public read cannot disagree about them. `0` removes the forward
+    #: offer for that route and returns it to settling open charges only, which is how cash
+    #: behaved before prepayment existed. See that module for why cash is `2` and why `2`
+    #: is the club's "three months".
+    cash_prepay_months: int = CASH_PREPAY_MONTHS
+    cheque_prepay_months: int = CHEQUE_PREPAY_MONTHS
 
     #: Tolerated on the way IN, dropped on the way out. `_settings_of` reads whatever JSONB
     #: is in the column, and a studio that was configured before §13 still has the old key

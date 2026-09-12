@@ -372,10 +372,15 @@ def test_a_forward_promise_cannot_over_collect_after_a_card_payment(
 
 # -- §5 the studio's terms -----------------------------------------------------
 def test_the_prepay_terms_default_to_the_clubs_own_rules(client, as_manager):
-    """Cash three months forward, twelve cheques. Configuration rather than constants --
-    they are the club's rules, and another club's are different."""
+    """Configuration rather than constants -- they are the club's rules, and another club's
+    are different.
+
+    **Cash is 2 and that is the club's "three months".** These count months bought FORWARD,
+    beside whatever is already open, so a signup with one month owed collects three in
+    total. It was `3` until 2026-09-12, which would have asked a joining family for four.
+    """
     read = client.get("/api/v1/billing/settings", headers=as_manager.headers).json()
-    assert read["cash_prepay_months"] == 3
+    assert read["cash_prepay_months"] == 2
     assert read["cheque_prepay_months"] == 12
 
 

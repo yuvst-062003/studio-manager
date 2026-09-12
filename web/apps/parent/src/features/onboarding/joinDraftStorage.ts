@@ -48,14 +48,25 @@ export function clearJoinDraft(token: string): void {
   localStorage.removeItem(key(token))
 }
 
-/** Sign-out (decision 3: "cleared ... on sign-out") -- every `join-draft:*` entry,
+//: Every key any join flow writes. `join-draft:` is this module's own, per token;
+//: `studio.join.` is `wizard/draft.ts`'s pair -- the child currently being typed, and the
+//: whole wizard's resumable state.
+//:
+//: **The second prefix was missing until 2026-09-12.** `draft.ts` has said since it was
+//: written that its draft is "cleared on sign-out (`clearAllJoinDrafts`)", and this
+//: function never matched its key -- so a minor's health answers and ת.ז. survived a
+//: sign-out on what is usually a shared family phone. The rule was right and the code did
+//: not implement it.
+const JOIN_DRAFT_PREFIXES = ['join-draft:', 'studio.join.'] as const
+
+/** Sign-out (decision 3: "cleared ... on sign-out") -- every join draft on this device,
  *  not just the current token's. A signed-out browser is not necessarily the same
  *  person signing back in, and a stale draft from token A must not surface for
  *  whoever opens token B's link next on this device. */
 export function clearAllJoinDrafts(): void {
   for (let index = localStorage.length - 1; index >= 0; index -= 1) {
     const storedKey = localStorage.key(index)
-    if (storedKey !== null && storedKey.startsWith('join-draft:')) {
+    if (storedKey !== null && JOIN_DRAFT_PREFIXES.some((prefix) => storedKey.startsWith(prefix))) {
       localStorage.removeItem(storedKey)
     }
   }

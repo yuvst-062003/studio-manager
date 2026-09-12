@@ -34,6 +34,7 @@ import { step3Copy } from './copy'
 import { PaymentFrame } from './PaymentFrame'
 import type { PaymentFrameRequest } from './PaymentFrame'
 import type { PaymentOrderOut } from '../../billing/billingClient'
+import { MissingPaymentMethodError } from './submitJoin'
 import type { SubmitJoinResult } from './submitJoin'
 import { formatShekels, needsManagerReview } from './types'
 import type { PaymentMethod, StudentDraft, WizardPlan } from './types'
@@ -130,16 +131,27 @@ export function Step3Payment({
   const isTrial = (student: StudentDraft) => student.intent === 'trial'
   const joining = students.filter((student) => !isTrial(student))
 
-  const { chargeable, awaiting, total, creditSum, coachSum } = useMemo(() => {
+  const { chargeable, awaiting, total, creditSum, coachSum, undecided } = useMemo(() => {
     const awaitingList = joining.filter(needsManagerReview)
     const chargeableList = joining.filter((student) => !needsManagerReview(student))
     let credit = 0
     let coach = 0
+    let notChosen = 0
     for (const student of chargeableList) {
       if (isTrial(student)) continue
       const price = priceOf(student)
-      //: Default to credit when nothing is chosen yet, matching the picker's own default.
-      if ((methods[student.id] ?? 'credit') === 'credit') credit += price
+      //: **No default.** This read used to be `?? 'credit'`, which made "the family chose
+      //: card" and "the family chose nothing" the same value -- so an untouched screen
+      //: billed a card, and a choice lost to a reloaded tab did too, silently and with the
+      //: footer still reading the full monthly price. A real family was charged that way on
+      //: 2026-09-12. An unanswered child now counts towards neither sum and holds the
+      //: button instead.
+      const chosen = methods[student.id]
+      if (chosen === undefined) {
+        notChosen += 1
+        continue
+      }
+      if (chosen === 'credit') credit += price
       else coach += price
     }
     return {
@@ -150,6 +162,7 @@ export function Step3Payment({
         .reduce((sum, student) => sum + priceOf(student), 0),
       creditSum: credit,
       coachSum: coach,
+      undecided: notChosen,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [joining, plans, methods])
@@ -169,9 +182,15 @@ export function Step3Payment({
     if (phase === 'mandates') return allMandatesSigned ? copy.mandatesFinish : copy.mandatesFinishWithOpen
     if (subView === 'decision') return intent === 'now' ? copy.continueToPay : copy.reportArranged
     if (chargeable.length === 0) return copy.submitReviewOnly
+    if (undecided > 0) return copy.chooseMethodFirst
     if (creditSum > 0) return `${copy.submitWithCredit} (₪${formatShekels(creditSum)})`
     return copy.submitNoCredit
   }
+
+  //: Held, not defaulted. The button is the last thing between an unanswered screen and a
+  //: real charge on a live merchant account, and until 2026-09-12 it was pressable with
+  //: nothing chosen -- reading `(₪550)` while the order it opened was something else.
+  const awaitingChoice = phase === 'form' && subView === 'methods' && undecided > 0
 
   const runSubmit = async () => {
     setPhase('working')
@@ -196,9 +215,13 @@ export function Step3Payment({
       // Both doors' `register` (`wizardSources.ts`) throw the same `RegisterCodeError`
       // for this, so this is the one place that reads it.
       setSubmitError(
-        error instanceof RegisterCodeError && error.code === 'national_id_invalid'
-          ? copy.submitFailedNationalId
-          : copy.submitFailed,
+        error instanceof MissingPaymentMethodError
+          ? //: The button is held for this, so reaching it means something got past the
+            //: screen -- say what is missing rather than "something went wrong".
+            copy.chooseMethodFirst
+          : error instanceof RegisterCodeError && error.code === 'national_id_invalid'
+            ? copy.submitFailedNationalId
+            : copy.submitFailed,
       )
       setPhase('form')
     }
@@ -545,7 +568,9 @@ export function Step3Payment({
               )
             }
 
-            const method = methods[student.id] ?? 'credit'
+            //: Undefined until the family answers -- `active` below is then false for all
+            //: four buttons, which is what makes "not yet chosen" visible on the screen.
+            const method = methods[student.id]
             return (
               <div
                 key={student.id}
@@ -565,7 +590,9 @@ export function Step3Payment({
                     <span className="text-[16px] font-bold text-[var(--wz-heading)]">
                       ₪{formatShekels(price)}
                     </span>
-                    <span className="text-[11px] text-[var(--wz-secondary)]">{copy[LONG_LABEL[method]]}</span>
+                    <span className="text-[11px] text-[var(--wz-secondary)]">
+                      {method ? copy[LONG_LABEL[method]] : copy.methodNotChosen}
+                    </span>
                   </div>
                 </div>
 
@@ -614,7 +641,7 @@ export function Step3Payment({
               family of two where one is awaiting manager review has exactly one payer,
               and "one form either way" is not a multi-child note. */}
           {chargeable.length >= 2 &&
-          chargeable.some((student) => (methods[student.id] ?? 'credit') === 'standing_order') ? (
+          chargeable.some((student) => methods[student.id] === 'standing_order') ? (
             <div className="bg-[var(--wz-accent)]/10 border border-[var(--wz-accent)]/20 rounded-xl p-3 flex items-start gap-2 text-[var(--wz-heading)]">
               <Repeat className="w-4 h-4 text-[var(--wz-accent)] shrink-0 mt-0.5" />
               <p className="text-[12px] leading-relaxed">{copy.standingOrderMultiNote}</p>
@@ -623,9 +650,8 @@ export function Step3Payment({
 
           {/* §6.5 — the breakdown */}
           <div className="bg-[var(--wz-surface)] rounded-2xl p-4 shadow-xs border border-[var(--wz-line)] flex flex-col gap-2.5">
-            <div className="flex items-center justify-between border-b border-[var(--wz-line)] pb-2">
+            <div className="flex items-center border-b border-[var(--wz-line)] pb-2">
               <span className="text-[15px] font-bold text-[var(--wz-heading)]">{copy.breakdownTitle}</span>
-              <span className="text-[11px] text-[var(--wz-accent)] font-semibold">{copy.insuranceIncluded}</span>
             </div>
 
             {awaiting.length > 0 ? (
@@ -707,10 +733,10 @@ export function Step3Payment({
             ) : null}
             <button
               type="button"
-              disabled={phase === 'working'}
+              disabled={phase === 'working' || awaitingChoice}
               onClick={onFooter}
               className={`flex-1 h-12 rounded-xl text-white text-[15px] font-bold shadow-md transition-all flex items-center justify-center gap-2 ${
-                phase === 'working'
+                phase === 'working' || awaitingChoice
                   ? 'bg-[var(--wz-tertiary)] cursor-not-allowed'
                   : 'bg-[var(--wz-btn-bg)] hover:bg-[var(--wz-accent)] active:scale-[0.99] cursor-pointer'
               }`}

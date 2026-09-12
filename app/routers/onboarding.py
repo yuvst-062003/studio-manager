@@ -35,6 +35,7 @@ from app.models.person import Person
 from app.models.studio import Studio
 from app.schemas._pagination import MAX_PAGE_SIZE
 from app.services.billing.catalogue import CatalogueService
+from app.services.billing.studio_settings import cash_prepay_months
 from app.services.health.agreement import (
     AgreementError,
     NationalIdInvalidError,
@@ -121,6 +122,16 @@ class OnboardingInfoOut(BaseModel):
     #: keeping the two in sync. Non-optional: this endpoint always has the number, the
     #: same way it always has `slug`.
     club_terms_version: int
+    #: The club's cash prepayment term, so step 3 can show a cash family the total it is
+    #: about to record BEFORE they commit to it. Counted as months bought FORWARD, beside
+    #: whatever this registration already owes -- `2` and one open month is the club's
+    #: three. Published here rather than read from `/me/prepay-terms` because a door B
+    #: family belongs to no studio until `register` returns, so every `/me/*` read 403s at
+    #: the moment this number has to be on the screen.
+    #:
+    #: **The screen and the promise must read the same number.** A total shown as one month
+    #: and recorded as three is the 2026-09-12 defect in a new place.
+    cash_prepay_months: int
 
 
 class OnboardingPickupIn(BaseModel):
@@ -366,6 +377,7 @@ def onboarding_info(token: str, request: Request, session: SessionDep) -> Onboar
         slug=studio.slug,
         logo_url=(f"/api/v1/public/studios/{studio.slug}/logo" if studio.logo_object_key else None),
         club_terms_version=CLUB_TERMS_VERSION,
+        cash_prepay_months=cash_prepay_months(studio),
     )
 
 

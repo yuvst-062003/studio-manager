@@ -58,6 +58,10 @@ import { matchJoinPath } from './features/onboarding/joinPath'
 // (`BookingFlow.tsx`) is unrelated and still runs its own flow. `JoinFlow.tsx` itself is
 // gone (task 7); only `matchJoinPath` above survived it, moved to `joinPath.ts`.
 import { JoinWizard } from './features/onboarding/wizard/JoinWizard'
+//: §5.5's gate seeds the wizard with the family's existing children rather than opening
+//: it blank -- see `gateSeed` below.
+import { emptyStudent, isGradeKey } from './features/onboarding/wizard/types'
+import type { StudentDraft } from './features/onboarding/wizard/types'
 import { studioSource, tokenSource } from './features/onboarding/wizard/wizardSources'
 // Task 3b -- doors C and D read the same `/me/onboarding-status` this decides between,
 // and translate its answer into the wizard's own step numbering.
@@ -442,6 +446,7 @@ function JoinShell({ token }: { token: string }) {
           globalThis.location.assign('/')
         }}
         standingOrderLinks={loadStandingOrderLinks}
+        draftScope={token}
       />
     </ThemeProvider>
   )
@@ -545,6 +550,10 @@ function AuthedApp() {
    *  by `UpdatesScreen` to say who a notification is about. Named for the payment-setup
    *  screen it used to feed until that was removed (2026-09-07). */
   const [familyChildren, setFamilyChildren] = useState<readonly FamilyChild[]>([])
+  /** The gated family's children as the WIZARD needs them -- §5.5's gate opens the one
+   *  join wizard now, and it would otherwise open blank and ask a parent to re-type a child
+   *  the club has had for weeks. `null` until read; an empty list is a real answer. */
+  const [gateSeed, setGateSeed] = useState<readonly StudentDraft[] | null>(null)
   const [declarationsSigned, setDeclarationsSigned] = useState(0)
   // Bumped when a trial family joins the club. The child goes `trial` -> `active` while
   // still holding the short health form, so §5.5's gate must fire on the very next
@@ -638,6 +647,65 @@ function AuthedApp() {
       alive = false
     }
   }, [session.status, declarationsSigned, familyJoined])
+
+  //: The seed for §5.5's gate, read beside `gatedChildren` and on the same counters so the
+  //: two can never describe different families. Separate from `/me/students` because the
+  //: wizard needs a child's grade, groups and plan, and that shape is shared with the staff
+  //: roster -- whose route is `coach`-tagged, where a plan id may never appear (SPEC §13).
+  //:
+  //: A failure leaves `gateSeed` empty rather than null: the gate still opens the wizard,
+  //: just without the children pre-filled. Blocking the app on a prefill read would punish
+  //: the family for a convenience.
+  useEffect(() => {
+    if (session.status !== 'signed-in' || !session.access.parent) return
+    let alive = true
+    apiFetch('/api/v1/me/wizard-prefill')
+      .then((response) =>
+        response.ok
+          ? (response.json() as Promise<{
+              items: {
+                id: string
+                first_name: string
+                last_name: string
+                birthdate: string | null
+                grade: string | null
+                group_ids: string[]
+                price_plan_id: string | null
+              }[]
+            }>)
+          : { items: [] },
+      )
+      .then((data) => {
+        if (!alive) return
+        setGateSeed(
+          data.items.map((child) =>
+            //: Keyed by the REAL student id, not a fresh draft id. `submitJoin` matches a
+            //: child to what `register` returned by position, and the payment methods map is
+            //: keyed by draft id -- a stable id here is what keeps a resumed draft pointing
+            //: at the same child across a reload.
+            emptyStudent(child.id, {
+              firstName: child.first_name,
+              lastName: child.last_name,
+              birthDate: child.birthdate ?? '',
+              //: `grade` is a closed set on the draft (`GradeKey`), and the column is free
+              //: text that predates it. An unrecognised value becomes empty rather than
+              //: being forced through -- the form then asks for it, which is honest, where
+              //: a cast would put an unselectable value in a select.
+              grade: isGradeKey(child.grade) ? child.grade : '',
+              groupId: child.group_ids[0] ?? '',
+              planId: child.price_plan_id ?? '',
+            }),
+          ),
+        )
+      })
+      .catch(() => {
+        if (alive) setGateSeed([])
+      })
+    return () => {
+      alive = false
+    }
+  }, [session.status, session.access.parent, declarationsSigned, familyJoined])
+
   const hash = useHash()
   // Each screen keeps its own scroll offset, and a screen with none opens at the top. A
   // hash link moves neither by itself — see useScrollMemory's header.
@@ -875,10 +943,23 @@ function AuthedApp() {
             onStatusChange={setConsentStatus}
           >
           <HealthGate
-            locale={locale}
-            client={healthClient}
             students={gatedChildren}
-            onSigned={() => setDeclarationsSigned((count) => count + 1)}
+            wizard={() => (
+              // **One wizard.** This used to be `AgreementFlow`, a second five-step flow
+              // with its own chrome -- which is what a manager hit on 2026-09-12 and
+              // reported as the app having gone back to an older version. Same component,
+              // same three steps and same design as every other door now; the family's
+              // existing children are seeded so it opens on them instead of blank.
+              <JoinWizard
+                locale={locale}
+                billingClient={billingClient}
+                onEnterApp={() => setDeclarationsSigned((count) => count + 1)}
+                seedStudents={gateSeed ?? []}
+                source={memberSource}
+                standingOrderLinks={loadStandingOrderLinks}
+                startAtStep={wizardStepFor(startingStep('addChild', onboardingStatus))}
+              />
+            )}
           >
           {/* §6.1's plan step used to stand HERE, as `PaymentSetupGate`. Removed on the
               owner's call (2026-09-07), and the reason is worth keeping: its

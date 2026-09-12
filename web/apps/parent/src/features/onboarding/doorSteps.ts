@@ -15,7 +15,13 @@
 // Doors C (`/?invite=<token>`) and D (`#/add-child`) are the two doors this module
 // serves: both are reached by a caller who ALREADY has an active studio, and both use
 // `/me/onboarding-status` to decide whether the agreements step is still needed.
-import type { WizardStepKey } from './OnboardingWizardChrome'
+//: **Moved here from `OnboardingWizardChrome.tsx` on 2026-09-12**, when the retired 5-step
+//: flow and its rail were deleted. These are the names the STATUS endpoint's steps are
+//: mapped through, not the names of any screen that still exists -- the redesigned wizard
+//: has three (`wizardStepFor` below is the translation), and `health` folded into step 2.
+//: They stay as this module's own vocabulary because `/me/onboarding-status` still speaks
+//: it on the wire.
+export type WizardStepKey = 'welcome' | 'family' | 'health' | 'payment'
 
 export type Door = 'join' | 'invite' | 'addChild'
 
@@ -70,8 +76,12 @@ export function startingStep(door: Door, status: OnboardingStatus | null): Wizar
   const steps = DOOR_STEPS[door]
   const first = steps[0] ?? 'welcome'
   if (first !== 'welcome') return first
+  //: `steps` is optional-chained too, not just `status`. The shape comes off the wire, and a
+  //: response that is present but malformed (an older server, an error body that still
+  //: parsed) used to throw here -- which, since §5.5's gate now opens this wizard, took the
+  //: whole parent app down rather than costing one skipped step.
   const agreementsDone =
-    status?.steps.find((row) => row.key === STATUS_KEY_FOR_STEP.welcome)?.complete ?? false
+    status?.steps?.find((row) => row.key === STATUS_KEY_FOR_STEP.welcome)?.complete ?? false
   if (!agreementsDone) return first
   return steps[1] ?? first
 }

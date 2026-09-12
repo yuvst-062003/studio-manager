@@ -41,7 +41,7 @@ from app.core.config import settings
 from app.core.cors import app_origin
 from app.core.tenancy import TenantSession, TenantSessionDep, require_current_studio_id
 from app.models.belts import BeltRank
-from app.models.people import Student
+from app.models.people import Enrollment, Student
 from app.models.person import Person
 from app.models.studio import Studio
 from app.schemas._pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, IdempotencyKey
@@ -781,6 +781,88 @@ def set_primary_guardian(
 
 
 # -- the parent's own children -------------------------------------------------
+class MyStudentPrefillOut(BaseModel):
+    """One of the caller's own children, shaped to PRE-FILL the join wizard's step 2.
+
+    **Why this exists.** §5.5's gate blocks the parent app whenever a child still owes their
+    הסכם הרשמה. Until 2026-09-12 that gate rendered a second, older five-step flow of its
+    own; there is now one wizard, so the gate sends the family there instead. The wizard
+    builds children rather than loading them, so without this read it would open blank and
+    ask a parent to re-type a child who has been in the club for weeks.
+
+    **Not `StudentSummaryOut`.** That shape is shared with the staff roster, and `9h`'s
+    route is `coach`-tagged -- SPEC §13's third invariant forbids a financial field on a
+    coach shape, so `price_plan_id` can never live there. This one is reachable only as the
+    caller's own family.
+
+    **No ת.ז.** The wizard asks a minor's national id and this deliberately does not send it
+    back: `person.national_id_encrypted` is encrypted at rest precisely so a minor's id is
+    not casually in flight, and re-asking one field costs a parent far less than widening
+    where that number travels. Everything else they typed comes back.
+    """
+
+    id: uuid.UUID
+    first_name: str
+    last_name: str
+    birthdate: date | None
+    grade: str | None
+    group_ids: list[uuid.UUID]
+    price_plan_id: uuid.UUID | None
+    health_status: str
+    #: Whether this child is the reason the gate is up. The wizard shows every child so the
+    #: family can see the whole household, and acts on the ones still owing.
+    agreement_complete: bool | None = None
+
+
+class MyStudentPrefillListOut(BaseModel):
+    items: list[MyStudentPrefillOut]
+
+
+@router.get("/me/wizard-prefill", response_model=MyStudentPrefillListOut)
+def my_students_prefill(request: Request, session: TenantSessionDep) -> MyStudentPrefillListOut:
+    """The caller's own children, enough to re-open the wizard on them.
+
+    **Deliberately NOT under `/me/students/`.** That prefix is matched by name in a lot of
+    client-side fetch stubs, and a second route sharing it makes an unrelated test hang on
+    whichever call the stub happened to capture last. The route is named for what it is for.
+
+    No role dependency, like every other `/me/*` read -- §3.1: "guardian is not a role".
+    Scoped by `Guardian.person_id` through `StudentService.for_guardian`, so it can only
+    ever answer for the family asking.
+    """
+    person_id = _person_id(request)
+    rows = StudentService.for_guardian(session, person_id=person_id)
+    items: list[MyStudentPrefillOut] = []
+    for row in rows:
+        student = session.get(Student, row.id)
+        if student is None:  # pragma: no cover -- the projection just read it
+            continue
+        person = session.get(Person, student.person_id)
+        group_ids = list(
+            session.execute(
+                select(Enrollment.group_id).where(
+                    Enrollment.student_id == student.id, Enrollment.status == "active"
+                )
+            ).scalars()
+        )
+        items.append(
+            MyStudentPrefillOut(
+                id=student.id,
+                first_name=person.first_name if person else "",
+                last_name=person.last_name if person else "",
+                birthdate=person.birthdate if person else None,
+                grade=student.grade,
+                group_ids=group_ids,
+                price_plan_id=student.price_plan_id,
+                health_status=student.health_status,
+                agreement_complete=agreement_status(
+                    session, student, signer_person_id=person_id
+                ).complete,
+            )
+        )
+    return MyStudentPrefillListOut(items=items)
+
+
 @router.get("/me/students", response_model=StudentSummaryPage)
 def my_students(request: Request, session: TenantSessionDep) -> StudentSummaryPage:
     """§6.3's home, and L9 verbatim.

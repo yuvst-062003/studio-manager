@@ -23,21 +23,18 @@ from __future__ import annotations
 import calendar
 import uuid
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.billing import BillingRun, Charge, Payment, PricePlan, StudentClassPrice
 from app.models.people import Enrollment, Student, StudentFreeze
 from app.models.person import Guardian
-from app.models.schedule import Session as SessionRow
 from app.models.structure import Group
 from app.services.billing.errors import ConflictError
 from app.services.billing.payments import PaymentService
 from app.services.billing.service import BillingService
-from app.services.people.attendance_pattern import expected_weekdays
-from app.services.people.group_days import studio_weekday
 
 
 def period_end(period_year: int, period_month: int) -> date:
@@ -48,42 +45,6 @@ def period_end(period_year: int, period_month: int) -> date:
     arithmetic over 28/30/31 -- February 2028 is the case that catches a hand-rolled one.
     """
     return date(period_year, period_month, calendar.monthrange(period_year, period_month)[1])
-
-
-def _midnight(day: date) -> datetime:
-    """A date as a UTC instant, for comparing against `session.starts_at`.
-
-    UTC rather than Asia/Jerusalem, and that is a deliberate approximation with a bound: a
-    session at 17:00 local is 15:00 UTC, so a two-hour window at each end of the period
-    could in principle land a session in the neighbouring month. No group in this product
-    trains between 22:00 and 02:00, which is the only range where the two disagree.
-    """
-    return datetime(day.year, day.month, day.day, tzinfo=UTC)
-
-
-def proration(monthly_agorot: int, *, remaining: int, total: int) -> int:
-    """§5.10 step 2 -- `round(monthly x remaining / total_sessions_in_period)`.
-
-    **Integer arithmetic, half-up.** G2 forbids a float touching money, and Python's
-    `round` is banker's rounding: `round(2.5)` is 2, so a float path charges a family one
-    agora less than the spec says for every exact half. `(n + d // 2) // d` is half-up in
-    integers and has no representation error to argue about.
-
-    `total == 0` is a real state -- a group whose period was entirely cancelled, or a
-    student joining after the last session -- and it charges nothing. `remaining > total`
-    is not: it means the two were computed against different periods, and clamping would
-    hide a plausible over-charge behind a correct-looking number.
-    """
-    if remaining < 0 or total < 0:
-        raise ValueError(f"negative session counts: remaining={remaining} total={total}")
-    if remaining > total:
-        raise ValueError(
-            f"remaining={remaining} exceeds total={total}: the two were computed against "
-            "different periods"
-        )
-    if total == 0:
-        return 0
-    return (monthly_agorot * remaining + total // 2) // total
 
 
 @dataclass
@@ -97,7 +58,6 @@ class _Tally:
     charged: int = 0
     already_charged: int = 0
     registrations: int = 0
-    prorated: int = 0
     unpriced: list[str] = field(default_factory=list)
     #: §5.10 step 4 -- reported rather than silently skipped. A family who asked for a
     #: freeze and was billed anyway is a phone call; a family who was frozen and does not
@@ -152,7 +112,7 @@ class BillingRunService:
         for student_id, price_plan_id, class_id in self._billable_students(
             studio_id, starts, due, tally
         ):
-            self._charge_one(studio_id, student_id, price_plan_id, class_id, starts, due, tally)
+            self._charge_one(studio_id, student_id, price_plan_id, class_id, due, tally)
         # Step 7, after every charge for the period has been raised and INSIDE the same
         # transaction. See `_apply_credit`.
         self._apply_credit(tally)
@@ -163,7 +123,6 @@ class BillingRunService:
             "charged": tally.charged,
             "already_charged": tally.already_charged,
             "registrations": tally.registrations,
-            "prorated": tally.prorated,
             "unpriced": tally.unpriced,
             "frozen": tally.frozen,
             "no_active_enrollment": tally.no_active_enrollment,
@@ -210,7 +169,6 @@ class BillingRunService:
             student_id,
             price_plan_id,
             class_id,
-            on.replace(day=1),
             period_end(on.year, on.month),
             counter,
         )
@@ -477,7 +435,6 @@ class BillingRunService:
         student_id: uuid.UUID,
         price_plan_id: uuid.UUID | None,
         class_id: uuid.UUID | None,
-        starts: date,
         due: date,
         tally: _Tally,
     ) -> None:
@@ -499,35 +456,26 @@ class BillingRunService:
             tally.unpriced.append(str(student_id))
             return
 
-        amount = plan.monthly_amount_agorot
-        original: int | None = None
-        note: str | None = None
-        if self._is_first_tuition(studio_id, student_id):
-            remaining, total = self._sessions_in_period(
-                student_id, starts=starts, ends=due, joined=self._joined_on(student_id, starts)
-            )
-            # **No sessions means no denominator, not a free month.** A studio whose
-            # schedule has not been materialized yet counts zero of zero, and prorating
-            # against that bills every family in the club nothing -- silently, in the one
-            # run nobody re-reads. The two cases the count cannot tell apart are "every
-            # session was cancelled" and "the schedule was never generated", and §5.10
-            # step 3 already says closures never change the amount, so the flat month is
-            # right for the first and the only safe answer for the second.
-            prorated = proration(amount, remaining=remaining, total=total) if total > 0 else amount
-            if prorated != amount:
-                # Only when it actually differs. A first month the student was present for
-                # the whole of is a full month, and a note reading 'בגין 8 מתוך 8 שיעורים'
-                # would explain something that did not happen.
-                original, amount = amount, prorated
-                note = f"בגין {remaining} מתוך {total} שיעורים"
-
+        # §5.10 step 2 -- **the first month is the full month.** Proration was removed on
+        # 2026-09-12 by owner decision; `tests/billing/test_first_month.py` carries the two
+        # reasons, of which the load-bearing one is that הוראת קבע is a fixed uPay link at
+        # the plan's monthly amount and cannot be varied. A rule the mandate route could
+        # not honour meant the same family was priced by which button they pressed.
+        #
+        # A late joiner a manager wants to be generous to is `POST /charges/{id}/adjust`
+        # or `/close` -- a judgement call belongs with the human, not in a rule that has to
+        # hold for everybody.
         if self._raise_charge(
-            studio_id, payer_person_id, "tuition", amount, due, student_id, tally, class_id
+            studio_id,
+            payer_person_id,
+            "tuition",
+            plan.monthly_amount_agorot,
+            due,
+            student_id,
+            tally,
+            class_id,
         ):
             tally.charged += 1
-            if note is not None:
-                tally.prorated += 1
-            self._explain_proration(studio_id, student_id, due, original, note)
         self._charge_registration_fee(studio_id, student_id, payer_person_id, plan, due, tally)
 
     def _raise_charge(
@@ -565,35 +513,6 @@ class BillingRunService:
         except _AlreadyChargedError:
             return False
         return True
-
-    def _explain_proration(
-        self,
-        studio_id: uuid.UUID,
-        student_id: uuid.UUID,
-        due: date,
-        original: int | None,
-        note: str | None,
-    ) -> None:
-        """§5.10 -- 'The original amount and a human-readable proration_note are stored so
-        the parent sees בגין 3 מתוך 8 שיעורים.'
-
-        Written after the fact rather than passed into `create_charge`, because the seam's
-        signature is W4's contract and carries neither field. Both belong to the charge and
-        neither is money the family owes, so nothing here touches `amount_agorot`.
-        """
-        if note is None:
-            return
-        charge = self._session.execute(
-            select(Charge).where(
-                Charge.studio_id == studio_id,
-                Charge.student_id == student_id,
-                Charge.kind == "tuition",
-                Charge.period_year == due.year,
-                Charge.period_month == due.month,
-            )
-        ).scalar_one()
-        charge.original_amount_agorot = original
-        charge.proration_note = note
 
     def _charge_registration_fee(
         self,
@@ -641,97 +560,6 @@ class BillingRunService:
         ):
             tally.charged += 1
             tally.registrations += 1
-
-    def _is_first_tuition(self, studio_id: uuid.UUID, student_id: uuid.UUID) -> bool:
-        """§5.10 step 2 -- proration applies to the **first month only**.
-
-        Asked as "has this student ever been billed tuition", not as "did they join this
-        month". A club that starts using the app in March has students who joined in
-        September, and comparing dates would prorate every one of them against a period
-        they were present for the whole of.
-        """
-        return (
-            self._session.execute(
-                select(Charge.id)
-                .where(
-                    Charge.studio_id == studio_id,
-                    Charge.student_id == student_id,
-                    Charge.kind == "tuition",
-                )
-                .limit(1)
-            ).scalar_one_or_none()
-            is None
-        )
-
-    def _joined_on(self, student_id: uuid.UUID, starts: date) -> date:
-        """When this student's teaching in this period begins.
-
-        The **earliest active enrollment start**, not `student.joined_on`: a child converted
-        from a trial in September and enrolled into their group in November is taught from
-        November, and §5.10 prorates what they are taught. Clamped to the period's own start
-        so an enrollment that predates it prorates nothing.
-        """
-        earliest = self._session.execute(
-            select(func.min(Enrollment.started_on)).where(
-                Enrollment.student_id == student_id, Enrollment.status == "active"
-            )
-        ).scalar_one_or_none()
-        return max(earliest, starts) if earliest else starts
-
-    def _sessions_in_period(
-        self, student_id: uuid.UUID, *, starts: date, ends: date, joined: date
-    ) -> tuple[int, int]:
-        """(remaining, total) for one student across one period, from MATERIALIZED sessions.
-
-        §5.10 step 2 is explicit that this is not a calendar-day calculation, and the club's
-        own timetable is why: it trains Tuesdays and Fridays (§5.6), which are not evenly
-        spread through a month, so the two answers differ for most joining dates.
-
-        The student's expected days come from `app/services/people/attendance_pattern.py` --
-        C11 and C12's shared seam. The roster reads the same module, because a second
-        implementation of "what is this child expected at" is a second answer.
-
-        A student in two groups counts **both** groups' sessions: C11 prices training
-        volume, and the volume is every session they attend.
-        """
-        enrollments = self._session.execute(
-            select(Enrollment.group_id, Enrollment.attends_weekdays).where(
-                Enrollment.student_id == student_id, Enrollment.status == "active"
-            )
-        ).all()
-        if not enrollments:
-            return (0, 0)
-
-        rows = self._session.execute(
-            select(SessionRow.group_id, SessionRow.starts_at).where(
-                SessionRow.group_id.in_([group_id for group_id, _ in enrollments]),
-                SessionRow.starts_at >= _midnight(starts),
-                SessionRow.starts_at < _midnight(ends + timedelta(days=1)),
-                SessionRow.status != "cancelled",
-            )
-        ).all()
-
-        # The days each group actually trains, as this period's own sessions show them --
-        # read from the materialized rows rather than from the rules, so a rule closed
-        # mid-period cannot claim a day that produced no session.
-        group_weekdays: dict[uuid.UUID, set[int]] = {}
-        for group_id, starts_at in rows:
-            group_weekdays.setdefault(group_id, set()).add(studio_weekday(starts_at))
-
-        expected: dict[uuid.UUID, frozenset[int]] = {
-            group_id: expected_weekdays(attends, group_weekdays.get(group_id, set()))
-            for group_id, attends in enrollments
-        }
-
-        total = 0
-        remaining = 0
-        for group_id, starts_at in rows:
-            if studio_weekday(starts_at) not in expected.get(group_id, frozenset()):
-                continue
-            total += 1
-            if starts_at.date() >= joined:
-                remaining += 1
-        return (remaining, total)
 
     def _primary_guardian(self, student_id: uuid.UUID) -> uuid.UUID | None:
         """§4.3 -- `charge.payer_person_id` is captured at creation from the primary

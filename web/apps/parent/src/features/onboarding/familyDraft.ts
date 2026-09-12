@@ -33,7 +33,47 @@
 // and unticking a later row's checkbox is what makes it diverge (its own fields, frozen at
 // whatever they last resolved to, become editable).
 import { isValidNationalId } from '../health/nationalId'
-import type { GuardianRelation, JoinFamilyPayload } from './JoinFamilyStep'
+
+//: **Moved here from `JoinFamilyStep.tsx` on 2026-09-12**, when that file — the last
+//: renderer of the retired 5-step onboarding flow — was deleted. These two are the wire
+//: shape of `POST /onboarding/<token>/register`, which is still very much live; they lived
+//: in a component only because that component was once the only thing that built one.
+//: `toJoinFamilyPayload` below is that builder, so this is where they belong.
+
+export type GuardianRelation = 'mother' | 'father' | 'other'
+
+export type JoinFamilyPayload = {
+  first_name: string
+  last_name: string
+  phone: string | null
+  signer: {
+    national_id: string
+    address: string
+    city: string
+    phone_home: string | null
+    aliyah_year: string | null
+    relation: GuardianRelation
+  }
+  children: {
+    first_name: string
+    last_name: string
+    birthdate: string | null
+    group_ids: string[]
+    self_student: boolean
+    national_id: string | null
+    grade: string | null
+    /** Decision 14 -- this student's own plan, or `null` when none covers their groups. */
+    price_plan_id: string | null
+    /** F7 -- per student. `null` for a `self` row or a row 18 or older. */
+    other_parent: {
+      first_name: string
+      last_name: string | null
+      national_id: string | null
+      phone: string | null
+    } | null
+    pickup_contacts: { name: string; phone: string }[]
+  }[]
+}
 
 export type PickupContact = { name: string; phone: string }
 

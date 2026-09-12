@@ -157,7 +157,7 @@ function renderWizard(
   const billingClient = options.billingClient ?? billingClientStub()
   const standingOrderLinks = options.standingOrderLinks ?? vi.fn(async () => [])
   const source = options.source ?? fakeSource()
-  render(
+  const view = render(
     <JoinWizard
       locale="he"
       billingClient={billingClient}
@@ -168,7 +168,7 @@ function renderWizard(
       prefillFirstRowName={options.prefillFirstRowName}
     />,
   )
-  return { billingClient, standingOrderLinks, source }
+  return { billingClient, standingOrderLinks, source, unmount: view.unmount }
 }
 
 /** Confirms the club's health declaration on part 4.
@@ -369,6 +369,113 @@ describe('JoinWizard -- wiring submitJoin into the screens', () => {
     )
   }, 20000)
 
+  it('the wizard survives being thrown away and reopened: the child, the step and the chosen method all come back', async () => {
+    // The 2026-09-12 report, as a test. A manager filled this in on a phone BROWSER (not the
+    // installed app), the tab was reclaimed while he was away from it, and everything was
+    // gone -- he typed the whole registration a second time. `JoinWizard` held every one of
+    // these in `useState` and persisted none of them.
+    //
+    // **Remount rather than reload**, because that is what a reclaimed tab actually does to
+    // React: the module stays, the component tree is rebuilt from nothing. Anything the
+    // wizard did not write down is what the family loses.
+    const user = userEvent.setup()
+    const billingClient = billingClientStub({ openCharges: vi.fn(async () => [charge('ch1', 's1')]) })
+    const { unmount } = renderWizard({ billingClient })
+
+    await addOneChildAndReachStep3(user)
+    await user.click(screen.getByRole('button', { name: STEP3_COPY.continueToPay }))
+    await user.click(screen.getByRole('radio', { name: STEP3_COPY.methodStandingOrder }))
+
+    unmount()
+    renderWizard({ billingClient })
+
+    // Back on step 3, not on an empty step 1. (`subView` is Step3Payment's own state and
+    // legitimately restarts at the decision question -- the child cards live behind it.)
+    await user.click(await screen.findByRole('button', { name: STEP3_COPY.continueToPay }))
+
+    // The child he typed is still there, and so is the method he picked.
+    expect(screen.getByText('נועה כהן')).toBeInTheDocument()
+    expect(
+      (screen.getByRole('radio', { name: STEP3_COPY.methodStandingOrder }) as HTMLInputElement)
+        .checked,
+    ).toBe(true)
+  }, 30000)
+
+  it('a draft from another join link is never restored into this one', async () => {
+    // A shared family phone: one link opened and abandoned, another opened after it.
+    // Handing the second family the first one's children would be worse than losing them.
+    const user = userEvent.setup()
+    const { unmount } = renderWizard()
+    await addOneChildAndReachStep3(user)
+    unmount()
+
+    // Same device, different door -- `draftScope` defaults to 'me' here, and door B above
+    // scoped its draft to the token.
+    localStorage.setItem(
+      'studio.join.wizardDraft.v1',
+      JSON.stringify({
+        savedAt: Date.now(),
+        scope: 'some-other-token',
+        step: 3,
+        agreed: true,
+        students: [{ id: 'x', firstName: 'לא', lastName: 'שלי' }],
+        methods: {},
+        alreadyArranged: false,
+      }),
+    )
+    renderWizard()
+    expect(screen.queryByText('לא שלי')).toBeNull()
+  }, 30000)
+
+  it('nothing is chosen by default, and the family cannot submit until they answer', async () => {
+    // The other half of the same defect. `?? \'credit\'` made "chose card" and "answered
+    // nothing" one value, so a reloaded screen looked ready to pay and billed a card.
+    const user = userEvent.setup()
+    const billingClient = billingClientStub({ openCharges: vi.fn(async () => [charge('ch1', 's1')]) })
+    const { source } = renderWizard({ billingClient })
+
+    await addOneChildAndReachStep3(user)
+    await user.click(screen.getByRole('button', { name: STEP3_COPY.continueToPay }))
+
+    expect(
+      (screen.getByRole('radio', { name: STEP3_COPY.methodCredit }) as HTMLInputElement).checked,
+    ).toBe(false)
+    const submit = screen.getByRole('button', { name: STEP3_COPY.chooseMethodFirst })
+    expect(submit).toBeDisabled()
+
+    await user.click(submit)
+    expect(source.register).not.toHaveBeenCalled()
+    expect(billingClient.createOrder).not.toHaveBeenCalled()
+  }, 30000)
+
+  it('standing order chosen from the screen is promised, and opens no card order', async () => {
+    const user = userEvent.setup()
+    const billingClient = billingClientStub({ openCharges: vi.fn(async () => [charge('ch1', 's1')]) })
+    renderWizard({ billingClient })
+
+    await addOneChildAndReachStep3(user)
+    await chooseMethodAndSubmit(user, STEP3_COPY.methodStandingOrder)
+
+    await waitFor(() =>
+      expect(billingClient.createPromise).toHaveBeenCalledWith(['ch1'], 'standing_order', 0, false),
+    )
+    expect(billingClient.createOrder).not.toHaveBeenCalled()
+  }, 30000)
+
+  it('cheque chosen from the screen is promised as cheque, not as something else', async () => {
+    const user = userEvent.setup()
+    const billingClient = billingClientStub({ openCharges: vi.fn(async () => [charge('ch1', 's1')]) })
+    renderWizard({ billingClient })
+
+    await addOneChildAndReachStep3(user)
+    await chooseMethodAndSubmit(user, STEP3_COPY.methodCheque)
+
+    await waitFor(() =>
+      expect(billingClient.createPromise).toHaveBeenCalledWith(['ch1'], 'cheque', 0, false),
+    )
+    expect(billingClient.createOrder).not.toHaveBeenCalled()
+  }, 30000)
+
   it('a failed registration keeps the family on step 3 with the error visible, and step 4 never renders', async () => {
     const user = userEvent.setup()
     const source = fakeSource({
@@ -381,6 +488,10 @@ describe('JoinWizard -- wiring submitJoin into the screens', () => {
 
     await addOneChildAndReachStep3(user)
     await user.click(screen.getByRole('button', { name: STEP3_COPY.continueToPay }))
+    //: Card is CHOSEN, not assumed. The screen stopped pre-selecting it on 2026-09-12 and
+    //: the footer is held until every chargeable child has an answer, so a test that skips
+    //: this is now testing a button it cannot press.
+    await user.click(screen.getByRole('radio', { name: STEP3_COPY.methodCredit }))
     await user.click(screen.getByRole('button', { name: new RegExp(STEP3_COPY.submitWithCredit) }))
 
     const alert = await screen.findByRole('alert')
@@ -413,6 +524,10 @@ describe('JoinWizard -- wiring submitJoin into the screens', () => {
 
     await addOneChildAndReachStep3(user)
     await user.click(screen.getByRole('button', { name: STEP3_COPY.continueToPay }))
+    //: Card is CHOSEN, not assumed. The screen stopped pre-selecting it on 2026-09-12 and
+    //: the footer is held until every chargeable child has an answer, so a test that skips
+    //: this is now testing a button it cannot press.
+    await user.click(screen.getByRole('radio', { name: STEP3_COPY.methodCredit }))
     await user.click(screen.getByRole('button', { name: new RegExp(STEP3_COPY.submitWithCredit) }))
 
     const alert = await screen.findByRole('alert')
@@ -554,9 +669,13 @@ describe('JoinWizard -- wiring submitJoin into the screens', () => {
     await user.click(screen.getByRole('button', { name: STEP2_COPY.continueToStep3 }))
 
     // Step 3 -- child 2 is awaiting manager review (flagged above), so only child 1 has a
-    // payment-method radio; the default (credit) is fine here since this test is about the
-    // payload `register` receives, not the payment outcome.
+    // payment-method radio. Card is picked explicitly because there is no default any
+    // more; this test is about the payload `register` receives, not the payment outcome.
     await user.click(screen.getByRole('button', { name: STEP3_COPY.continueToPay }))
+    //: Card is CHOSEN, not assumed. The screen stopped pre-selecting it on 2026-09-12 and
+    //: the footer is held until every chargeable child has an answer, so a test that skips
+    //: this is now testing a button it cannot press.
+    await user.click(screen.getByRole('radio', { name: STEP3_COPY.methodCredit }))
     await user.click(screen.getByRole('button', { name: new RegExp(STEP3_COPY.submitWithCredit) }))
 
     await waitFor(() => expect(source.register).toHaveBeenCalledTimes(1))

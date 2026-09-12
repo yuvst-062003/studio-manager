@@ -29,7 +29,6 @@ import type { Locale } from '@studio/i18n'
 import type { PolicyDoc } from '@studio/ui'
 
 import type { ConsentState, PrivacyClient } from './privacyClient'
-import { OnboardingWizardChrome } from '../onboarding/OnboardingWizardChrome'
 
 const gateStyle: CSSProperties = {
   display: 'flex',
@@ -60,8 +59,6 @@ export type ConsentGateProps = {
   /** Controlled review state for the join wizard's back navigation into step 1. */
   reviewed?: boolean
   onReviewedChange?: (reviewed: boolean) => void
-  /** When set, the gate renders inside the parent onboarding chrome. */
-  wizard?: { position: number; title: string; onBack?: () => void }
   /** Called once per transition. The shell hides the tab bar unless this says `open`. */
   onStatusChange?: (status: ConsentGateStatus) => void
 }
@@ -73,7 +70,6 @@ export function ConsentGate({
   forceReview = false,
   reviewed: controlledReviewed,
   onReviewedChange,
-  wizard,
   onStatusChange,
 }: ConsentGateProps) {
   // `undefined` is "still asking"; `null` is "asked and could not tell" — the failure that
@@ -249,18 +245,7 @@ export function ConsentGate({
     // §6.1 says no other screen is reachable, and a screen that is merely covered is one
     // CSS bug away from being reachable.
     <div data-testid="consent-gate" style={gateStyle}>
-      {wizard ? (
-        <OnboardingWizardChrome
-          locale={locale}
-          onBack={wizard.onBack}
-          position={wizard.position}
-          title={wizard.title}
-        >
-          {body}
-        </OnboardingWizardChrome>
-      ) : (
-        body
-      )}
+      {body}
     </div>
   )
 }
