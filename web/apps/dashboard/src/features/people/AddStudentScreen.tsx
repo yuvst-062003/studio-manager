@@ -54,6 +54,26 @@ function splitFullName(fullName: string): { first_name: string; last_name: strin
   }
 }
 
+/** A phone as `wa.me` wants it: digits only, international, no `+`.
+ *
+ * **This is the free half of "send the parent their link".** The app sends nothing itself —
+ * there is no SMS integration and, on a deployment without `SMTP_PASSWORD`, no email either
+ * — so the manager has always had to pass the link on by hand. A `wa.me` link costs nothing,
+ * needs no account and no API: it opens WhatsApp with the message already written, and the
+ * manager presses send.
+ *
+ * Israeli local form (`050…`) becomes `972…`; anything already international is left alone.
+ * Returns null for a number too short to be real, so the button is simply absent rather than
+ * opening WhatsApp on a broken chat.
+ */
+function whatsappNumber(raw: string): string | null {
+  const trimmed = raw.trim()
+  const digits = trimmed.replace(/\D/g, '')
+  if (digits.length < 7) return null
+  if (trimmed.startsWith('+')) return digits
+  return digits.startsWith('0') ? `972${digits.slice(1)}` : digits
+}
+
 export function AddStudentScreen({
   locale,
   client,
@@ -178,6 +198,23 @@ export function AddStudentScreen({
               </span>
               <CopyButton locale={locale} value={invitationUrl ?? invitationToken} />
             </p>
+            {/* Free, and the reason the phone field is worth having: no SMS gateway, no
+                WhatsApp Business account, no per-message cost — just a link that opens the
+                chat with the invitation already typed. */}
+            {whatsappNumber(guardianPhone) ? (
+              <p style={{ margin: 0 }}>
+                <a
+                  data-testid="add-student-invite-whatsapp"
+                  href={`https://wa.me/${whatsappNumber(guardianPhone)}?text=${encodeURIComponent(
+                    invitationUrl ?? invitationToken ?? '',
+                  )}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {t(locale, 'people.invite.whatsapp')}
+                </a>
+              </p>
+            ) : null}
             {/* Decision 21 — the email half must be visible, not silent, either way. */}
             {invitationEmailSent ? (
               <p data-testid="add-student-invite-email-sent">

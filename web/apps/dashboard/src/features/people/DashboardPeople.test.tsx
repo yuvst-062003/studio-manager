@@ -553,6 +553,54 @@ describe('AddStudentScreen — 3c', () => {
     expect(screen.queryByTestId('add-student-add-child')).toBeNull()
   })
 
+  it('offers a free WhatsApp send when a phone was given — the app itself sends nothing', async () => {
+    // There is no SMS integration, and no email either on a deployment without an SMTP
+    // password, so the manager has always had to pass the link on by hand. A `wa.me` link
+    // costs nothing and needs no account: it opens the chat with the invitation written.
+    const user = userEvent.setup()
+    const client = makeClient({
+      createStudent: vi.fn(async () =>
+        new Response(
+          JSON.stringify({ invitation_token: 'tok-1', invitation_url: 'https://p.example/?invite=tok-1' }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    })
+    render(<AddStudentScreen locale="he" client={client} />)
+    await user.type(screen.getByLabelText(t('he', 'people.student.fullName')), 'דנה כהן')
+    await user.type(screen.getByLabelText(t('he', 'people.student.guardianPhone')), '050-123-4567')
+    await user.click(screen.getByTestId('add-student-submit'))
+
+    const link = await screen.findByTestId('add-student-invite-whatsapp')
+    // Israeli local form becomes international, digits only, no plus.
+    expect(link).toHaveAttribute(
+      'href',
+      `https://wa.me/972501234567?text=${encodeURIComponent('https://p.example/?invite=tok-1')}`,
+    )
+  })
+
+  it('offers no WhatsApp link when only an email was given', async () => {
+    const user = userEvent.setup()
+    const client = makeClient({
+      createStudent: vi.fn(async () =>
+        new Response(JSON.stringify({ invitation_token: 'tok-2' }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    })
+    render(<AddStudentScreen locale="he" client={client} />)
+    await user.type(screen.getByLabelText(t('he', 'people.student.fullName')), 'דנה כהן')
+    await user.type(
+      screen.getByLabelText(t('he', 'people.student.guardianEmail')),
+      'a@example.invalid',
+    )
+    await user.click(screen.getByTestId('add-student-submit'))
+
+    await screen.findByTestId('add-student-done')
+    expect(screen.queryByTestId('add-student-invite-whatsapp')).toBeNull()
+  })
+
   it('refuses a student with neither a parent email nor a phone, and says which', async () => {
     // **The API has always refused this** — 422 `a guardian needs an email or a phone to be
     // invited on` — and the form both allowed it and, on the way back, turned it into the

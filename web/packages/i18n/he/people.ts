@@ -61,7 +61,7 @@ export const people: Bundle = {
   'student.isAdultHint': 'החניך/ה יהיו האחראים על עצמם, והאימייל למטה הוא שלהם',
   'student.guardianEmail': 'אימייל ההורה',
   'student.guardianPhone': 'טלפון ההורה',
-  'student.guardianContactHint': 'אימייל או טלפון — אחד מהם מספיק כדי להזמין את ההורה',
+  'student.guardianContactHint': 'אימייל או טלפון — כך המועדון מזהה את ההורה. את הקישור שולחים ידנית',
   'student.guardianContactRequired': 'צריך אימייל או טלפון של ההורה כדי לשלוח הזמנה',
   'student.joinedOn': 'הצטרף בתאריך',
   'student.leftOn': 'עזב בתאריך',
@@ -148,6 +148,7 @@ export const people: Bundle = {
   'import.row.sending': 'נשלח…',
   'import.row.created': 'נוצר',
   'import.row.failed': 'נכשל',
+  'invite.whatsapp': 'שליחה בוואטסאפ',
   'invite.linkHint': 'שלחו להורה את הקישור — הוא נכנס עם חשבון Google ומחובר ישירות לילד:',
   // -- decision 21's visible half — the email half must never be silent ---------
   'invite.emailSent': 'ההזמנה נשלחה גם במייל',
