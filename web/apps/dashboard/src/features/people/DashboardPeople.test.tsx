@@ -553,6 +553,43 @@ describe('AddStudentScreen — 3c', () => {
     expect(screen.queryByTestId('add-student-add-child')).toBeNull()
   })
 
+  it('refuses a student with neither a parent email nor a phone, and says which', async () => {
+    // **The API has always refused this** — 422 `a guardian needs an email or a phone to be
+    // invited on` — and the form both allowed it and, on the way back, turned it into the
+    // generic "something went wrong". An invitation is the ONLY route onto a child a manager
+    // created: there is no self-service door. So a save without one is a child nobody can be
+    // contacted about, and the manager was not told which field was missing.
+    const user = userEvent.setup()
+    const client = makeClient()
+    render(<AddStudentScreen locale="he" client={client} />)
+    await user.type(screen.getByLabelText(t('he', 'people.student.fullName')), 'דנה כהן')
+    await user.click(screen.getByTestId('add-student-submit'))
+
+    expect(await screen.findByTestId('add-student-contact-required')).toHaveTextContent(
+      t('he', 'people.student.guardianContactRequired'),
+    )
+    // Refused BEFORE the round trip, not after it.
+    expect(client.createStudent).not.toHaveBeenCalled()
+  })
+
+  it('accepts a phone with no email, and sends it', async () => {
+    // `POST /students` mints an invitation from a phone alone and always has; this form only
+    // ever offered email, so a club that reaches its families by WhatsApp had nowhere to put
+    // the number. The link is the delivery channel either way — email cannot send it on a
+    // deployment with no SMTP password, which is production's state today.
+    const user = userEvent.setup()
+    const client = makeClient()
+    render(<AddStudentScreen locale="he" client={client} />)
+    await user.type(screen.getByLabelText(t('he', 'people.student.fullName')), 'דנה כהן')
+    await user.type(screen.getByLabelText(t('he', 'people.student.guardianPhone')), '0501234567')
+    await user.click(screen.getByTestId('add-student-submit'))
+
+    await waitFor(() => expect(client.createStudent).toHaveBeenCalled())
+    const body = vi.mocked(client.createStudent).mock.calls[0]![0]
+    expect(body.guardian.phone).toBe('0501234567')
+    expect(body.guardian.email).toBeNull()
+  })
+
   it('splits a typed full name on the first whitespace, and sends the guardian email with NO guardian names', async () => {
     // Proving test 1 — assert on the body the client actually sends, not on props.
     const user = userEvent.setup()
@@ -581,6 +618,10 @@ describe('AddStudentScreen — 3c', () => {
     const client = makeClient()
     render(<AddStudentScreen locale="he" client={client} />)
     await user.type(screen.getByLabelText(t('he', 'people.student.fullName')), 'מדונה')
+    await user.type(
+      screen.getByLabelText(t('he', 'people.student.guardianEmail')),
+      'contact@example.invalid',
+    )
     await user.click(screen.getByTestId('add-student-submit'))
 
     await waitFor(() => expect(client.createStudent).toHaveBeenCalled())
@@ -631,6 +672,10 @@ describe('AddStudentScreen — 3c', () => {
     const user = userEvent.setup()
     render(<AddStudentScreen locale="he" client={client} />)
     await user.type(screen.getByLabelText(t('he', 'people.student.fullName')), 'דנה כהן')
+    await user.type(
+      screen.getByLabelText(t('he', 'people.student.guardianEmail')),
+      'contact@example.invalid',
+    )
     await user.click(screen.getByTestId('add-student-submit'))
 
     expect(await screen.findByTestId('add-student-invite-email-unavailable')).toHaveTextContent(
@@ -660,6 +705,10 @@ describe('AddStudentScreen — 3c', () => {
     const user = userEvent.setup()
     render(<AddStudentScreen locale="he" client={client} />)
     await user.type(screen.getByLabelText(t('he', 'people.student.fullName')), 'דנה כהן')
+    await user.type(
+      screen.getByLabelText(t('he', 'people.student.guardianEmail')),
+      'contact@example.invalid',
+    )
     await user.click(screen.getByTestId('add-student-submit'))
 
     expect(await screen.findByTestId('add-student-invite-email-sent')).toHaveTextContent(
@@ -673,6 +722,10 @@ describe('AddStudentScreen — 3c', () => {
     const user = userEvent.setup()
     render(<AddStudentScreen locale="he" client={makeClient()} />)
     await user.type(screen.getByLabelText(t('he', 'people.student.fullName')), 'דנה כהן')
+    await user.type(
+      screen.getByLabelText(t('he', 'people.student.guardianEmail')),
+      'contact@example.invalid',
+    )
     await user.click(screen.getByTestId('add-student-submit'))
 
     await screen.findByTestId('add-student-invitation')
@@ -693,6 +746,10 @@ describe('AddStudentScreen — 3c', () => {
     const user = userEvent.setup()
     render(<AddStudentScreen locale="he" client={makeClient()} />)
     await user.type(screen.getByLabelText(t('he', 'people.student.fullName')), 'דנה כהן')
+    await user.type(
+      screen.getByLabelText(t('he', 'people.student.guardianEmail')),
+      'contact@example.invalid',
+    )
     await user.click(screen.getByTestId('add-student-submit'))
 
     expect(await screen.findByTestId('add-student-invitation')).toHaveTextContent('tok-123')

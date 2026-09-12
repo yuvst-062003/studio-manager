@@ -60,6 +60,9 @@ export const people: Bundle = {
   // birthdate to derive an age from. Do not delete it to match the parent wizard.
   'student.isAdultHint': 'החניך/ה יהיו האחראים על עצמם, והאימייל למטה הוא שלהם',
   'student.guardianEmail': 'אימייל ההורה',
+  'student.guardianPhone': 'טלפון ההורה',
+  'student.guardianContactHint': 'אימייל או טלפון — אחד מהם מספיק כדי להזמין את ההורה',
+  'student.guardianContactRequired': 'צריך אימייל או טלפון של ההורה כדי לשלוח הזמנה',
   'student.joinedOn': 'הצטרף בתאריך',
   'student.leftOn': 'עזב בתאריך',
   'student.group': 'קבוצה',

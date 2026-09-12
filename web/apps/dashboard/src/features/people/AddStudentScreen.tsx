@@ -70,6 +70,7 @@ export function AddStudentScreen({
   // here for exactly that reason. Do not "tidy" it away to match the wizard.
   const [isAdult, setIsAdult] = useState(false)
   const [guardianEmail, setGuardianEmail] = useState('')
+  const [guardianPhone, setGuardianPhone] = useState('')
   const [sending, setSending] = useState(false)
   const [failed, setFailed] = useState(false)
   const [invitationToken, setInvitationToken] = useState<string | null>(null)
@@ -83,11 +84,26 @@ export function AddStudentScreen({
   >(undefined)
   const [invitationEmailSent, setInvitationEmailSent] = useState<boolean | undefined>(undefined)
   const [done, setDone] = useState(false)
+  //: **The one refusal this form could not previously explain.** `POST /students` answers
+  //: 422 `a guardian needs an email or a phone to be invited on`, and the handler below
+  //: turned every non-ok response into the generic "something went wrong" — so a manager
+  //: who left the email blank was told nothing about the field that was missing, on a form
+  //: that had not marked it required either. Caught here instead, before the round trip.
+  const [contactMissing, setContactMissing] = useState(false)
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
-    setSending(true)
     setFailed(false)
+    setContactMissing(false)
+    //: An invitation is the ONLY way this parent ever reaches the app — there is no
+    //: self-service door onto a child a manager created — so a student saved without one
+    //: is a child nobody can be contacted about. Refused here rather than accepted and
+    //: refused downstream, which is `CLAUDE.md`'s own rule about dead ends.
+    if (!guardianEmail.trim() && !guardianPhone.trim()) {
+      setContactMissing(true)
+      return
+    }
+    setSending(true)
     try {
       const { first_name, last_name } = splitFullName(fullName)
       const response = await client.createStudent({
@@ -102,6 +118,7 @@ export function AddStudentScreen({
               first_name,
               last_name,
               email: guardianEmail || null,
+              phone: guardianPhone || null,
               relation: 'self',
             }
           : {
@@ -109,6 +126,12 @@ export function AddStudentScreen({
               // exactly this form. The manager never types a guardian's name; the parent
               // gives it when they accept the invitation.
               email: guardianEmail || null,
+              //: The API has always accepted a phone and mints an invitation from one
+              //: alone; this form only ever offered email, so a club that reaches its
+              //: families by WhatsApp had no way to record how. The link is the delivery
+              //: channel either way — email cannot send it on a deployment with no
+              //: `SMTP_PASSWORD`, which is production's state today.
+              phone: guardianPhone || null,
               relation: 'parent',
             },
       })
@@ -211,6 +234,29 @@ export function AddStudentScreen({
         onChange={(event) => setGuardianEmail(event.target.value)}
         data-testid="add-student-guardian-email"
       />
+
+      <TextField
+        label={t(locale, 'people.student.guardianPhone')}
+        type="tel"
+        value={guardianPhone}
+        onChange={(event) => setGuardianPhone(event.target.value)}
+        data-testid="add-student-guardian-phone"
+      />
+
+      <p data-testid="add-student-contact-hint" style={{ margin: 0 }}>
+        {t(locale, 'people.student.guardianContactHint')}
+      </p>
+
+      {contactMissing ? (
+        <span data-testid="add-student-contact-required">
+          <Alert
+            tone="danger"
+            iconLabel={t(locale, 'people.student.guardianContactRequired')}
+          >
+            {t(locale, 'people.student.guardianContactRequired')}
+          </Alert>
+        </span>
+      ) : null}
 
       {failed ? (
         <span data-testid="add-student-error">
