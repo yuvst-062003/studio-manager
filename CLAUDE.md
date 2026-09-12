@@ -88,6 +88,16 @@ a bare `python3`/`pytest` resolves to an old 3.8 interpreter earlier on PATH.
   not ticked is progress nobody can see. Never write anything measurable there — no test
   results, no branch, no environment health. Those are computed, and a declaration that
   contradicts a measurement is how a status board stops being trusted.
+- **Never finish a session with a piece deliberately left undone.** When something is
+  blocked on a decision only the owner can make — a number, a business rule, a choice
+  between two shapes — **ask with the question tool and then finish it**. A blocker is a
+  question, not a status. Handing back "not done, here is why" is the one outcome that is
+  never wanted: the work is still open, the session's context is gone, and the next session
+  pays again to rediscover what was already understood. The only things that may be left
+  open are ones the owner has been asked about and has chosen to defer.
+  (2026-09-12: three items were handed back this way at the end of a long session — the
+  cash prepay wiring, the cheque term, and a live family's reconciliation. Every one of them
+  was a single question that could have been asked while the context was still loaded.)
 - Write a failing test before fixing a bug.
 - Typecheck and lint after a series of edits.
 - Prefer running a single test file over the whole suite.
