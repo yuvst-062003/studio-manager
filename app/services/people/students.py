@@ -1061,7 +1061,8 @@ class StudentService:
         payer = rows[0][1]
         charge_ids = [charge_id for charge_id, owed_by in rows if owed_by == payer]
         try:
-            PaymentPromiseService(session).create(
+            service = PaymentPromiseService(session)
+            promise = service.create(
                 student.studio_id,
                 payer_person_id=payer,
                 charge_ids=charge_ids,
@@ -1070,6 +1071,21 @@ class StudentService:
                 already_paid=True,
                 at=at,
             )
+            #: **Raised and settled in the same breath** (owner, 2026-09-13: "why does the
+            #: manager need to confirm it — he added the user by himself?").
+            #:
+            #: A promise is normally a PARENT's sentence that a manager checks: the family
+            #: says "I'm bringing cash", the manager looks in the drawer and confirms. Here
+            #: both parties are the same person, so leaving it pending sent the manager to a
+            #: second screen to confirm their own statement — and until they did, the
+            #: family's balance still read as owing money the club already had.
+            #:
+            #: Confirmed rather than bypassed: `confirm` is the ONE writer that turns a
+            #: promise into a payment and closes the charges, the promise stays as the record
+            #: of what was collected and how, and `decided_by_person_id` names the manager
+            #: who took it. Writing a payment straight in here would be a second way for
+            #: money to enter the ledger.
+            service.confirm(promise.id, actor_person_id=actor_person_id, at=at)
         except BillingConflict, BillingRefused:
             #: **The conversion is what the manager asked for; this promise is a note beside
             #: it.** A charge already inside a pending promise or covered by an open card

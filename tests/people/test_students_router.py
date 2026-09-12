@@ -356,6 +356,61 @@ def test_the_manager_records_WHICH_way_the_family_already_paid(
     assert app_session.get(PaymentPromise, promise_ids[0]).method == method
 
 
+def test_the_managers_own_statement_needs_no_second_confirmation(
+    client, app_session, as_manager, a_group, a_price_plan
+):
+    """**"Why does the manager need to confirm it — he added the user by himself?"** (owner,
+    2026-09-13).
+
+    The promise object exists so that a PARENT's claim gets a human check: the family says
+    "I'm bringing cash", a manager looks in the drawer and confirms. When the manager is the
+    one recording it, both parties are the same person — leaving the promise pending sent
+    them to a second screen to confirm their own sentence, and until they did, the family's
+    balance still read as owing money the club already had.
+
+    So the promise is raised AND settled in the same breath, by the manager who converted.
+    It is still raised rather than bypassed: the promise is the record of what was collected
+    and how, `decided_by_person_id` names who took it, and `confirm` is the one writer that
+    turns it into a payment — a second path that wrote payments directly would be a second
+    way for money to enter the ledger.
+    """
+    from app.models.billing import Charge, Payment
+    from app.models.payment_promise import PaymentPromise
+
+    created = _create(client, as_manager)
+    student_id = created["student"]["id"]
+    response = client.post(
+        f"/api/v1/students/{student_id}/convert",
+        json={
+            "group_id": str(a_group),
+            "started_on": "2026-09-01",
+            "price_plan_id": str(a_price_plan),
+            "payment_received": "cheque",
+        },
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 200, response.text
+
+    app_session.expire_all()
+    promise_ids = _already_paid_promises_for(app_session, uuid.UUID(student_id))
+    assert len(promise_ids) == 1
+    promise = app_session.get(PaymentPromise, promise_ids[0])
+    # Settled, not waiting for anybody.
+    assert promise.status == "received"
+    assert promise.decided_by_person_id == as_manager.person_id
+    assert promise.payment_id is not None
+
+    # And the money is real: one payment, in the method the manager named, and the charges
+    # it covered are closed rather than sitting on the family's balance.
+    payment = app_session.get(Payment, promise.payment_id)
+    assert payment.method == "cheque"
+    charges = (
+        app_session.query(Charge).filter(Charge.student_id == uuid.UUID(student_id)).all()
+    )
+    assert charges
+    assert {charge.status for charge in charges} == {"settled"}
+
+
 def test_the_card_is_refused_as_an_already_paid_method(
     client, as_manager, a_group, a_price_plan
 ):
