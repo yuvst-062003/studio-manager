@@ -146,11 +146,14 @@ export function makeDashboardPeopleClient(fetcher: Fetcher) {
         started_on: string
         price_plan_id?: string | null
         attends_weekdays?: number[] | null
-        //: The family handed the money over in person. Records an `already_paid` cash
-        //: promise over the first charge and sets the student's payment method — together,
-        //: what stops the parent's wizard asking how they intend to pay money they have
-        //: already paid.
-        payment_settled?: boolean
+        //: **How the family already paid**, in the club's own three words. Records an
+        //: `already_paid` promise of that method over the first charge and sets the
+        //: student's payment method — together, what stops the parent's wizard asking how
+        //: they intend to pay money they have already handed over.
+        //:
+        //: No card: a card payment arrives through uPay and closes its own charge, so
+        //: there is nothing here for a human to mark. The server refuses it with a 422.
+        payment_received?: 'cash' | 'cheque' | 'standing_order' | null
       },
     ) =>
       fetcher(`/api/v1/students/${studentId}/convert`, {

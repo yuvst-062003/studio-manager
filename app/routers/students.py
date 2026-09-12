@@ -586,7 +586,7 @@ def convert_student(
             at=now(),
             actor_person_id=getattr(request.state, "person_id", None),
             schedule=schedule_reader(session),
-            payment_settled=body.payment_settled,
+            payment_received=body.payment_received,
         )
     except NotFoundError as exc:
         raise _not_found() from exc

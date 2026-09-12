@@ -933,7 +933,7 @@ class StudentService:
         at: datetime,
         actor_person_id: uuid.UUID | None,
         schedule: ScheduleReader,
-        payment_settled: bool = False,
+        payment_received: str | None = None,
     ) -> Student:
         """§5.4a step 5 -- 'Manager converts → picks group, sets price, status=active,
         enrollment created.'
@@ -986,15 +986,21 @@ class StudentService:
         #:
         #: `already_paid` is the promise's own word for this and is a TENSE, not a method:
         #: it tells the manager whether to go and look for this money now or wait for it.
-        #: Recorded as `cash` because that is what being handed money in a dojo is; a
-        #: manager who took a cheque corrects the method on the payments screen, which is
-        #: the screen that owns it.
+        #: **Which** method is the manager's to say — `payment_received` carries it, and the
+        #: first cut of this wrote `cash` for everyone on the theory that a cheque could be
+        #: corrected later on the payments screen. That made twelve post-dated cheques and a
+        #: wad of notes the same row in the ledger, and cost a second screen for a fact the
+        #: manager already had in hand (owner, 2026-09-12).
         #:
         #: Raised AFTER the first charge, deliberately — the promise names specific open
         #: charges, and before that call there are none to name.
-        if payment_settled:
+        if payment_received:
             StudentService._settle_with_the_manager(
-                session, student=student, at=at, actor_person_id=actor_person_id
+                session,
+                student=student,
+                method=payment_received,
+                at=at,
+                actor_person_id=actor_person_id,
             )
         return student
 
@@ -1003,15 +1009,21 @@ class StudentService:
         session: Session,
         *,
         student: Student,
+        method: str,
         at: datetime,
         actor_person_id: uuid.UUID | None,
     ) -> None:
-        """Record that this student's money already reached the club, in person.
+        """Record that this student's money already reached the club, and by which route.
 
         Two writes, and both are needed. `student.payment_method` is what the parent app
         reads to decide whether it still has to ask — a child whose method the club already
         knows is not asked again. The promise is what the MANAGER reads on the payments
-        screen: a row saying this money is accounted for rather than owed.
+        screen: a row saying this money is accounted for rather than owed, in the same three
+        words the club itself uses — מזומן, צ׳קים, הוראת קבע.
+
+        `method` is validated at the schema (`SettledMethod`), so it is always one of
+        `PROMISE_METHODS`; the card never reaches here, because a card payment closes its
+        own charge through uPay and a hand-typed one could never be reconciled.
 
         Silent when there is nothing open to promise over. An unpriced student has no first
         charge, and a promise over no charges is refused by `PaymentPromiseService` — which
@@ -1026,7 +1038,7 @@ class StudentService:
         from app.services.billing.errors import RefusedError as BillingRefused
         from app.services.billing.payment_promise import PaymentPromiseService
 
-        student.payment_method = "cash"
+        student.payment_method = method
         #: **The payer comes off the CHARGE, not out of the guardian table.**
         #: `charge.payer_person_id` is captured at creation from the primary guardian, so
         #: reading it back addresses the promise to exactly whoever the charge was addressed
@@ -1053,7 +1065,7 @@ class StudentService:
                 student.studio_id,
                 payer_person_id=payer,
                 charge_ids=charge_ids,
-                method="cash",
+                method=method,
                 prepay_months=0,
                 already_paid=True,
                 at=at,

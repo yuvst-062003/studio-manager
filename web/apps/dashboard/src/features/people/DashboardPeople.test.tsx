@@ -580,23 +580,48 @@ describe('converting a student — the price travels with it', () => {
     expect(vi.mocked(client.convert).mock.calls[0]![1]!.price_plan_id).toBeNull()
   })
 
-  it('sends payment_settled when the manager took the money in person', async () => {
-    // Until 2026-09-12 there was no way to say this, so the parent opened the app and was
-    // asked how they intended to pay money they had already handed over.
+  it.each(['cash', 'cheque', 'standing_order'] as const)(
+    'sends the method the manager took the money by: %s',
+    async (method) => {
+      // Until 2026-09-12 there was no way to say this at all, so the parent opened the app
+      // and was asked how they intended to pay money they had already handed over. The
+      // first fix took a BOOLEAN and wrote `cash` for everyone — which made twelve
+      // post-dated cheques and a wad of notes the same row in the club's ledger. The
+      // manager knows which; the screen now asks.
+      const user = userEvent.setup()
+      const client = makeClient()
+      render(<StudentDetailScreen locale="he" client={client} studentId="st1" />)
+
+      await user.click(await screen.findByTestId('detail-convert'))
+      await user.selectOptions(screen.getByTestId('detail-convert-group'), 'g1')
+      await user.selectOptions(screen.getByTestId('detail-convert-paid'), method)
+      await user.click(screen.getByTestId('detail-convert-submit'))
+
+      await waitFor(() => expect(client.convert).toHaveBeenCalled())
+      expect(vi.mocked(client.convert).mock.calls[0]![1]).toMatchObject({
+        payment_received: method,
+      })
+    },
+  )
+
+  it('never offers the card as something a manager marks by hand', async () => {
+    // uPay's IPN closes a card charge on its own. A card option here would invite a
+    // payment recorded twice — once by the machine and once by a person — and the club
+    // could not reconcile the second against its merchant account.
     const user = userEvent.setup()
-    const client = makeClient()
-    render(<StudentDetailScreen locale="he" client={client} studentId="st1" />)
+    render(<StudentDetailScreen locale="he" client={makeClient()} studentId="st1" />)
 
     await user.click(await screen.findByTestId('detail-convert'))
-    await user.selectOptions(screen.getByTestId('detail-convert-group'), 'g1')
-    await user.click(screen.getByTestId('detail-convert-paid'))
-    await user.click(screen.getByTestId('detail-convert-submit'))
-
-    await waitFor(() => expect(client.convert).toHaveBeenCalled())
-    expect(vi.mocked(client.convert).mock.calls[0]![1]).toMatchObject({ payment_settled: true })
+    const picker = screen.getByTestId('detail-convert-paid') as HTMLSelectElement
+    expect([...picker.options].map((option) => option.value)).toEqual([
+      '',
+      'cash',
+      'cheque',
+      'standing_order',
+    ])
   })
 
-  it('leaves payment_settled false unless the manager says so', async () => {
+  it('sends no method unless the manager picks one', async () => {
     const user = userEvent.setup()
     const client = makeClient()
     render(<StudentDetailScreen locale="he" client={client} studentId="st1" />)
@@ -606,7 +631,7 @@ describe('converting a student — the price travels with it', () => {
     await user.click(screen.getByTestId('detail-convert-submit'))
 
     await waitFor(() => expect(client.convert).toHaveBeenCalled())
-    expect(vi.mocked(client.convert).mock.calls[0]![1]!.payment_settled).toBe(false)
+    expect(vi.mocked(client.convert).mock.calls[0]![1]!.payment_received).toBeNull()
   })
 
   it('never offers a closed plan — that is last year\'s price', async () => {

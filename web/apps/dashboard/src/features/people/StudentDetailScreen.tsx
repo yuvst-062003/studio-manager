@@ -144,7 +144,12 @@ export function StudentDetailScreen({
   //: the group. Every child a manager converted came out UNPRICED: active, enrolled,
   //: training, billed nothing. The billing screen listed them and could not fix them.
   const [convertPlan, setConvertPlan] = useState('')
-  const [paymentSettled, setPaymentSettled] = useState(false)
+  //: Which of the club's three arrangements the money already arrived by, or `''` for
+  //: "it has not". One control instead of a boolean plus a correction on another screen:
+  //: a manager who took twelve cheques and one who took notes were recorded identically.
+  const [paymentReceived, setPaymentReceived] = useState<
+    '' | 'cash' | 'cheque' | 'standing_order'
+  >('')
   const [plans, setPlans] = useState<readonly { id: string; name: string; active_to: string | null }[]>([])
   // F2 — the two buttons on either side of convert, wired at last. Each expands into
   // its own small form: the second press is the confirmation step, and the fields ARE
@@ -219,12 +224,12 @@ export function StudentDetailScreen({
         group_id: convertGroup,
         started_on: new Date().toISOString().slice(0, 10),
         price_plan_id: convertPlan || null,
-        payment_settled: paymentSettled,
+        payment_received: paymentReceived || null,
       })
       setConverting(false)
       setConvertGroup('')
       setConvertPlan('')
-      setPaymentSettled(false)
+      setPaymentReceived('')
       setReloads((n) => n + 1)
     } finally {
       setBusy(false)
@@ -624,16 +629,30 @@ export function StudentDetailScreen({
               </select>
             </label>
             <label>
-              <input
-                type="checkbox"
+              {t(locale, 'people.convert.paymentReceived')}
+              <select
                 data-testid="detail-convert-paid"
-                checked={paymentSettled}
-                onChange={(event) => setPaymentSettled(event.target.checked)}
-              />
-              {t(locale, 'people.convert.paymentSettled')}
+                value={paymentReceived}
+                onChange={(event) =>
+                  setPaymentReceived(
+                    event.target.value as '' | 'cash' | 'cheque' | 'standing_order',
+                  )
+                }
+              >
+                {/* The default is "not yet", because most conversions are exactly that and
+                    a pre-selected method would record money nobody received. */}
+                <option value="">{t(locale, 'people.convert.paymentReceivedNone')}</option>
+                <option value="cash">{t(locale, 'people.convert.methodCash')}</option>
+                <option value="cheque">{t(locale, 'people.convert.methodCheque')}</option>
+                <option value="standing_order">
+                  {t(locale, 'people.convert.methodStandingOrder')}
+                </option>
+              </select>
             </label>
             <p style={{ margin: 0 }} data-testid="detail-convert-paid-hint">
-              {t(locale, 'people.convert.paymentSettledHint')}
+              {paymentReceived
+                ? t(locale, 'people.convert.paymentReceivedHint')
+                : t(locale, 'people.convert.paymentReceivedCardNote')}
             </p>
             <Button
               data-testid="detail-convert-submit"

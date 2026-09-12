@@ -312,6 +312,96 @@ def test_an_unpromisable_charge_never_fails_the_managers_conversion(
     assert named
 
 
+@pytest.mark.parametrize("method", ["cash", "cheque", "standing_order"])
+def test_the_manager_records_WHICH_way_the_family_already_paid(
+    client, app_session, as_manager, a_group, a_price_plan, method
+):
+    """**"The manager has to set what option the parent already paid for"** (owner,
+    2026-09-12).
+
+    The first cut of this took a boolean and wrote `cash` for everyone, on the theory that a
+    manager who took a cheque would correct it on the payments screen. That is a second
+    screen and a second memory for a fact the manager had in front of them — and it made the
+    club's own three arrangements indistinguishable in the ledger: twelve post-dated cheques
+    and a wad of notes both arrived as `cash`.
+
+    Card is deliberately absent. It is the one method that settles itself: uPay's IPN closes
+    the charge, so there is nothing for a human to mark, and offering it here would invite a
+    payment the club cannot reconcile against its own merchant account.
+    """
+    from app.models.people import Student
+
+    created = _create(client, as_manager)
+    student_id = created["student"]["id"]
+    response = client.post(
+        f"/api/v1/students/{student_id}/convert",
+        json={
+            "group_id": str(a_group),
+            "started_on": "2026-09-01",
+            "price_plan_id": str(a_price_plan),
+            "payment_received": method,
+        },
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 200, response.text
+
+    app_session.expire_all()
+    from app.models.payment_promise import PaymentPromise
+
+    # Both halves carry the SAME method — the student's column, which is what the parent
+    # app reads, and the promise, which is what the manager's payments screen shows.
+    assert app_session.get(Student, uuid.UUID(student_id)).payment_method == method
+    promise_ids = _already_paid_promises_for(app_session, uuid.UUID(student_id))
+    assert len(promise_ids) == 1
+    assert app_session.get(PaymentPromise, promise_ids[0]).method == method
+
+
+def test_the_card_is_refused_as_an_already_paid_method(
+    client, as_manager, a_group, a_price_plan
+):
+    """A 422 that names the problem, not a silent fallback to cash. Card money arrives
+    through uPay and closes its own charge; a manager marking it here would be recording a
+    payment twice."""
+    created = _create(client, as_manager)
+    response = client.post(
+        f"/api/v1/students/{created['student']['id']}/convert",
+        json={
+            "group_id": str(a_group),
+            "started_on": "2026-09-01",
+            "price_plan_id": str(a_price_plan),
+            "payment_received": "upay_card",
+        },
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 422
+
+
+def test_the_retired_boolean_still_means_cash(
+    client, app_session, as_manager, a_group, a_price_plan
+):
+    """One deploy cycle of tolerance, and no more. This app registers a service worker, so a
+    manager whose browser still holds yesterday's bundle posts `payment_settled: true` for a
+    day after the API ships — and refusing it would lose a real conversion over a field
+    name."""
+    from app.models.people import Student
+
+    created = _create(client, as_manager)
+    student_id = created["student"]["id"]
+    response = client.post(
+        f"/api/v1/students/{student_id}/convert",
+        json={
+            "group_id": str(a_group),
+            "started_on": "2026-09-01",
+            "price_plan_id": str(a_price_plan),
+            "payment_settled": True,
+        },
+        headers=as_manager.headers,
+    )
+    assert response.status_code == 200, response.text
+    app_session.expire_all()
+    assert app_session.get(Student, uuid.UUID(student_id)).payment_method == "cash"
+
+
 def test_converting_without_the_flag_leaves_the_payment_open(
     client, app_session, as_manager, a_group
 ):

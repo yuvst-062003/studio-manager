@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -513,6 +513,13 @@ class GuardianListResponse(BaseModel):
     items: list[GuardianOut]
 
 
+#: The methods a manager can record as ALREADY received. `payment_promise.method`'s
+#: vocabulary exactly (`PROMISE_METHODS`), because that is the object this writes — and it
+#: excludes the card for the reason that object excludes it: only `upay_card` arrives
+#: without a human, so only `upay_card` cannot be a human's statement that it arrived.
+SettledMethod = Literal["cash", "cheque", "standing_order"]
+
+
 class StudentConvertIn(BaseModel):
     """§5.4a step 5 — 'Manager converts → picks group, sets price, status=active,
     enrollment created.' Three decisions in one request, because they are one decision."""
@@ -526,11 +533,28 @@ class StudentConvertIn(BaseModel):
     #: default. `None` means all of them.
     attends_weekdays: list[Weekday] | None = Field(default=None, min_length=1)
     reason: str | None = Field(default=None, max_length=200)
-    #: The family handed the money over in person, and the manager is saying so. Records an
-    #: `already_paid` cash promise over the first charge and sets the student's payment
-    #: method, which together are what let the parent's join wizard stop asking how they
-    #: intend to pay money they have already paid (owner, 2026-09-12).
+    #: **How the family already paid, in the manager's own words** — the club's three
+    #: human-settled arrangements, and nothing else. Records an `already_paid` promise of
+    #: that method over the first charge and sets the student's payment method, which
+    #: together are what let the parent's join wizard stop asking how they intend to pay
+    #: money they have already handed over (owner, 2026-09-12).
+    #:
+    #: **`upay_card` is deliberately not offered**, and is refused with a 422 rather than
+    #: quietly stored: a card payment arrives through uPay and closes its own charge, so
+    #: there is nothing for a human to mark, and a card "payment" typed in by hand is one
+    #: the club cannot reconcile against its merchant account.
+    payment_received: SettledMethod | None = None
+    #: The boolean this replaced, kept for one deploy cycle. The dashboard registers a
+    #: service worker, so a manager's browser can still be posting yesterday's bundle after
+    #: the API ships; refusing it would lose a real conversion over a field name. `True`
+    #: means cash, which is what it always wrote.
     payment_settled: bool = False
+
+    @model_validator(mode="after")
+    def _settled_method(self) -> StudentConvertIn:
+        if self.payment_received is None and self.payment_settled:
+            self.payment_received = "cash"
+        return self
 
 
 class StudentMarkLostIn(BaseModel):
