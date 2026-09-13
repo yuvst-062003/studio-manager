@@ -103,6 +103,13 @@ export const people: Bundle = {
   'guardian.message': 'Отправить сообщение',
   'guardian.notRegisteredYet': 'Ещё не зарегистрирован(а)',
   'guardian.noContactInfo': 'Нет контактных данных',
+  'guardian.hasLogin': 'Зарегистрирован(а)',
+  'guardian.resend': 'Отправить приглашение снова',
+  'guardian.resending': 'Отправка…',
+  'guardian.resentEmail': 'Приглашение отправлено повторно на {email}',
+  'guardian.resentNoEmail': 'Создана новая ссылка. Передайте её родителю',
+  'guardian.resendFailed': 'Не удалось отправить приглашение повторно',
+  'guardian.resendHint': 'Предыдущая ссылка перестаёт работать',
 
   'import.title': 'Импорт учеников из файла',
   'import.hint': 'CSV — по строке на ребёнка. Братья и сёстры — отдельные строки с одинаковым email родителя; сервер объединит их в один аккаунт.',

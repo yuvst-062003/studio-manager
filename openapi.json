@@ -1192,7 +1192,7 @@
             "title": "Cash Instructions"
           },
           "cash_prepay_months": {
-            "default": 3,
+            "default": 2,
             "title": "Cash Prepay Months",
             "type": "integer"
           },
@@ -5742,6 +5742,11 @@
             ],
             "title": "Email"
           },
+          "has_login": {
+            "default": false,
+            "title": "Has Login",
+            "type": "boolean"
+          },
           "is_primary": {
             "title": "Is Primary",
             "type": "boolean"
@@ -6445,6 +6450,41 @@
           "token"
         ],
         "title": "InvitationOut",
+        "type": "object"
+      },
+      "InvitationResendOut": {
+        "description": "What the manager gets back from pressing \"send the invitation again\".\n\nBoth channels, because the manager has to know which one to rely on: `invitation_url`\nis the copyable link that always works, and `email_sent` says whether the message also\nwent out on its own. Reporting only the email would leave a manager who cannot email\nwith nothing; reporting only the link would have them read a URL aloud when a message\nhad already arrived.\n\n`invitation_token` is deliberately absent. The create route returns it because the\ndashboard once built its own link; there is no reason to hand the raw credential back\na second time when `invitation_url` is the only thing anybody uses.",
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "email_configured": {
+            "title": "Email Configured",
+            "type": "boolean"
+          },
+          "email_sent": {
+            "title": "Email Sent",
+            "type": "boolean"
+          },
+          "invitation_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invitation Url"
+          }
+        },
+        "required": [
+          "email",
+          "email_configured",
+          "email_sent"
+        ],
+        "title": "InvitationResendOut",
         "type": "object"
       },
       "InviteOwnerRequest": {
@@ -7895,6 +7935,127 @@
         "title": "MyStandingOrderOut",
         "type": "object"
       },
+      "MyStudentPrefillListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MyStudentPrefillOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "MyStudentPrefillListOut",
+        "type": "object"
+      },
+      "MyStudentPrefillOut": {
+        "description": "One of the caller's own children, shaped to PRE-FILL the join wizard's step 2.\n\n**Why this exists.** §5.5's gate blocks the parent app whenever a child still owes their\nהסכם הרשמה. Until 2026-09-12 that gate rendered a second, older five-step flow of its\nown; there is now one wizard, so the gate sends the family there instead. The wizard\nbuilds children rather than loading them, so without this read it would open blank and\nask a parent to re-type a child who has been in the club for weeks.\n\n**Not `StudentSummaryOut`.** That shape is shared with the staff roster, and `9h`'s\nroute is `coach`-tagged -- SPEC §13's third invariant forbids a financial field on a\ncoach shape, so `price_plan_id` can never live there. This one is reachable only as the\ncaller's own family.\n\n**No ת.ז.** The wizard asks a minor's national id and this deliberately does not send it\nback: `person.national_id_encrypted` is encrypted at rest precisely so a minor's id is\nnot casually in flight, and re-asking one field costs a parent far less than widening\nwhere that number travels. Everything else they typed comes back.",
+        "properties": {
+          "agreement_complete": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agreement Complete"
+          },
+          "birthdate": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Birthdate"
+          },
+          "first_name": {
+            "title": "First Name",
+            "type": "string"
+          },
+          "grade": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grade"
+          },
+          "group_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Group Ids",
+            "type": "array"
+          },
+          "health_status": {
+            "title": "Health Status",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_name": {
+            "title": "Last Name",
+            "type": "string"
+          },
+          "payment_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Method"
+          },
+          "payment_settled": {
+            "default": false,
+            "title": "Payment Settled",
+            "type": "boolean"
+          },
+          "price_plan_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Plan Id"
+          }
+        },
+        "required": [
+          "id",
+          "first_name",
+          "last_name",
+          "birthdate",
+          "grade",
+          "group_ids",
+          "price_plan_id",
+          "health_status",
+          "payment_method"
+        ],
+        "title": "MyStudentPrefillOut",
+        "type": "object"
+      },
       "MyStudentStatusHistoryListResponse": {
         "properties": {
           "items": {
@@ -8457,6 +8618,14 @@
       },
       "OnboardingInfoOut": {
         "properties": {
+          "cash_prepay_months": {
+            "title": "Cash Prepay Months",
+            "type": "integer"
+          },
+          "cheque_prepay_months": {
+            "title": "Cheque Prepay Months",
+            "type": "integer"
+          },
           "club_terms_version": {
             "title": "Club Terms Version",
             "type": "integer"
@@ -8505,7 +8674,9 @@
           "email",
           "slug",
           "logo_url",
-          "club_terms_version"
+          "club_terms_version",
+          "cash_prepay_months",
+          "cheque_prepay_months"
         ],
         "title": "OnboardingInfoOut",
         "type": "object"
@@ -14239,6 +14410,27 @@
             "format": "uuid",
             "title": "Group Id",
             "type": "string"
+          },
+          "payment_received": {
+            "anyOf": [
+              {
+                "enum": [
+                  "cash",
+                  "cheque",
+                  "standing_order"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Received"
+          },
+          "payment_settled": {
+            "default": false,
+            "title": "Payment Settled",
+            "type": "boolean"
           },
           "price_plan_id": {
             "anyOf": [
@@ -24130,6 +24322,28 @@
         ]
       }
     },
+    "/api/v1/me/wizard-prefill": {
+      "get": {
+        "description": "The caller's own children, enough to re-open the wizard on them.\n\n**Deliberately NOT under `/me/students/`.** That prefix is matched by name in a lot of\nclient-side fetch stubs, and a second route sharing it makes an unrelated test hang on\nwhichever call the stub happened to capture last. The route is named for what it is for.\n\nNo role dependency, like every other `/me/*` read -- §3.1: \"guardian is not a role\".\nScoped by `Guardian.person_id` through `StudentService.for_guardian`, so it can only\never answer for the family asking.",
+        "operationId": "my_students_prefill_api_v1_me_wizard_prefill_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyStudentPrefillListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "My Students Prefill",
+        "tags": [
+          "people"
+        ]
+      }
+    },
     "/api/v1/notification-preferences": {
       "get": {
         "description": "§7's `GET /notification-preferences`.\n\nReturns every group whatever is stored, because absence means on: a screen rendering\nonly stored rows would show a guardian who has never touched it nothing at all.",
@@ -31326,6 +31540,50 @@
         "summary": "Send Reminder",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/v1/students/{student_id}/invitation/resend": {
+      "post": {
+        "description": "Send the invitation again -- the second chance that did not exist.\n\nUntil 2026-09-13 this product could not email at all (the host blocks SMTP), so every\ninvitation was a link the manager copied off the screen and passed on by hand. When one\nwent astray -- lost in a chat, mistyped, sent to the wrong parent -- there was no way to\nreissue it. The only recovery was deleting the child and creating them again.\n\nManager-scoped rather than coach-reachable, unlike the guardian LIST beside it: this\nmints a bearer credential for a child's record. Reading who the parent is and issuing a\nkey to their account are different permissions.\n\nThe old link stops working the moment this succeeds -- see\n`StudentService.reinvite_guardian` for why two live tokens for one child is not a\nconvenience.",
+        "operationId": "resend_student_invitation_api_v1_students__student_id__invitation_resend_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "student_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Student Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationResendOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resend Student Invitation",
+        "tags": [
+          "people"
         ]
       }
     },

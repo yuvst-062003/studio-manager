@@ -57,6 +57,19 @@ export function makeDashboardPeopleClient(fetcher: Fetcher) {
     student: (id: string) => fetcher(`/api/v1/students/${id}`).then(json<StudentDetail>),
 
     /**
+     * Send the family's invitation again, when the first one did not land.
+     *
+     * **The old link stops working.** One pending invitation per child, refreshed rather
+     * than duplicated — two live tokens for one record is two bearer credentials where the
+     * manager believes there is one.
+     *
+     * Refused with 422 when the guardian already signed in (there is nothing to invite
+     * them to) or when no guardian has an address to send to.
+     */
+    resendInvitation: (studentId: string) =>
+      fetcher(`/api/v1/students/${studentId}/invitation/resend`, { method: 'POST' }),
+
+    /**
      * C11's two numbers, manager-scoped. Never coach-reachable — `price_plan_id` is what
      * invariant 3's detector reads as a financial field, which is why it lives behind its
      * own route instead of on the card.

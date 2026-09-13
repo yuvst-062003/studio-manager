@@ -2866,6 +2866,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/wizard-prefill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Students Prefill
+         * @description The caller's own children, enough to re-open the wizard on them.
+         *
+         *     **Deliberately NOT under `/me/students/`.** That prefix is matched by name in a lot of
+         *     client-side fetch stubs, and a second route sharing it makes an unrelated test hang on
+         *     whichever call the stub happened to capture last. The route is named for what it is for.
+         *
+         *     No role dependency, like every other `/me/*` read -- §3.1: "guardian is not a role".
+         *     Scoped by `Guardian.person_id` through `StudentService.for_guardian`, so it can only
+         *     ever answer for the family asking.
+         */
+        get: operations["my_students_prefill_api_v1_me_wizard_prefill_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/notification-preferences": {
         parameters: {
             query?: never;
@@ -5603,6 +5631,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/students/{student_id}/invitation/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resend Student Invitation
+         * @description Send the invitation again -- the second chance that did not exist.
+         *
+         *     Until 2026-09-13 this product could not email at all (the host blocks SMTP), so every
+         *     invitation was a link the manager copied off the screen and passed on by hand. When one
+         *     went astray -- lost in a chat, mistyped, sent to the wrong parent -- there was no way to
+         *     reissue it. The only recovery was deleting the child and creating them again.
+         *
+         *     Manager-scoped rather than coach-reachable, unlike the guardian LIST beside it: this
+         *     mints a bearer credential for a child's record. Reading who the parent is and issuing a
+         *     key to their account are different permissions.
+         *
+         *     The old link stops working the moment this succeeds -- see
+         *     `StudentService.reinvite_guardian` for why two live tokens for one child is not a
+         *     convenience.
+         */
+        post: operations["resend_student_invitation_api_v1_students__student_id__invitation_resend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/students/{student_id}/leave": {
         parameters: {
             query?: never;
@@ -6750,7 +6811,7 @@ export interface components {
             cash_instructions?: string | null;
             /**
              * Cash Prepay Months
-             * @default 3
+             * @default 2
              */
             cash_prepay_months: number;
             /**
@@ -8760,6 +8821,11 @@ export interface components {
             display_name: string;
             /** Email */
             email?: string | null;
+            /**
+             * Has Login
+             * @default false
+             */
+            has_login: boolean;
             /** Is Primary */
             is_primary: boolean;
             /**
@@ -9158,6 +9224,30 @@ export interface components {
             id: string;
             /** Token */
             token: string;
+        };
+        /**
+         * InvitationResendOut
+         * @description What the manager gets back from pressing "send the invitation again".
+         *
+         *     Both channels, because the manager has to know which one to rely on: `invitation_url`
+         *     is the copyable link that always works, and `email_sent` says whether the message also
+         *     went out on its own. Reporting only the email would leave a manager who cannot email
+         *     with nothing; reporting only the link would have them read a URL aloud when a message
+         *     had already arrived.
+         *
+         *     `invitation_token` is deliberately absent. The create route returns it because the
+         *     dashboard once built its own link; there is no reason to hand the raw credential back
+         *     a second time when `invitation_url` is the only thing anybody uses.
+         */
+        InvitationResendOut: {
+            /** Email */
+            email: string;
+            /** Email Configured */
+            email_configured: boolean;
+            /** Email Sent */
+            email_sent: boolean;
+            /** Invitation Url */
+            invitation_url?: string | null;
         };
         /** InviteOwnerRequest */
         InviteOwnerRequest: {
@@ -9746,6 +9836,61 @@ export interface components {
             /** Active */
             active: boolean;
         };
+        /** MyStudentPrefillListOut */
+        MyStudentPrefillListOut: {
+            /** Items */
+            items: components["schemas"]["MyStudentPrefillOut"][];
+        };
+        /**
+         * MyStudentPrefillOut
+         * @description One of the caller's own children, shaped to PRE-FILL the join wizard's step 2.
+         *
+         *     **Why this exists.** §5.5's gate blocks the parent app whenever a child still owes their
+         *     הסכם הרשמה. Until 2026-09-12 that gate rendered a second, older five-step flow of its
+         *     own; there is now one wizard, so the gate sends the family there instead. The wizard
+         *     builds children rather than loading them, so without this read it would open blank and
+         *     ask a parent to re-type a child who has been in the club for weeks.
+         *
+         *     **Not `StudentSummaryOut`.** That shape is shared with the staff roster, and `9h`'s
+         *     route is `coach`-tagged -- SPEC §13's third invariant forbids a financial field on a
+         *     coach shape, so `price_plan_id` can never live there. This one is reachable only as the
+         *     caller's own family.
+         *
+         *     **No ת.ז.** The wizard asks a minor's national id and this deliberately does not send it
+         *     back: `person.national_id_encrypted` is encrypted at rest precisely so a minor's id is
+         *     not casually in flight, and re-asking one field costs a parent far less than widening
+         *     where that number travels. Everything else they typed comes back.
+         */
+        MyStudentPrefillOut: {
+            /** Agreement Complete */
+            agreement_complete?: boolean | null;
+            /** Birthdate */
+            birthdate: string | null;
+            /** First Name */
+            first_name: string;
+            /** Grade */
+            grade: string | null;
+            /** Group Ids */
+            group_ids: string[];
+            /** Health Status */
+            health_status: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Name */
+            last_name: string;
+            /** Payment Method */
+            payment_method: string | null;
+            /**
+             * Payment Settled
+             * @default false
+             */
+            payment_settled: boolean;
+            /** Price Plan Id */
+            price_plan_id: string | null;
+        };
         /** MyStudentStatusHistoryListResponse */
         MyStudentStatusHistoryListResponse: {
             /** Items */
@@ -10022,6 +10167,10 @@ export interface components {
         };
         /** OnboardingInfoOut */
         OnboardingInfoOut: {
+            /** Cash Prepay Months */
+            cash_prepay_months: number;
+            /** Cheque Prepay Months */
+            cheque_prepay_months: number;
             /** Club Terms Version */
             club_terms_version: number;
             /** Email */
@@ -12666,6 +12815,13 @@ export interface components {
              * Format: uuid
              */
             group_id: string;
+            /** Payment Received */
+            payment_received?: ("cash" | "cheque" | "standing_order") | null;
+            /**
+             * Payment Settled
+             * @default false
+             */
+            payment_settled: boolean;
             /** Price Plan Id */
             price_plan_id?: string | null;
             /** Reason */
@@ -18131,6 +18287,26 @@ export interface operations {
             };
         };
     };
+    my_students_prefill_api_v1_me_wizard_prefill_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyStudentPrefillListOut"];
+                };
+            };
+        };
+    };
     get_notification_preferences_api_v1_notification_preferences_get: {
         parameters: {
             query?: never;
@@ -22465,6 +22641,37 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resend_student_invitation_api_v1_students__student_id__invitation_resend_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationResendOut"];
                 };
             };
             /** @description Validation Error */

@@ -100,6 +100,13 @@ export const people: Bundle = {
   'guardian.message': 'Send a message',
   'guardian.notRegisteredYet': 'Not registered yet',
   'guardian.noContactInfo': 'No contact info',
+  'guardian.hasLogin': 'Signed up',
+  'guardian.resend': 'Send the invitation again',
+  'guardian.resending': 'Sending…',
+  'guardian.resentEmail': 'The invitation was sent again to {email}',
+  'guardian.resentNoEmail': 'A new link was created. Pass it to the parent',
+  'guardian.resendFailed': 'The invitation could not be sent again',
+  'guardian.resendHint': 'The previous link stops working',
 
   'import.title': 'Import students from a file',
   'import.hint': 'A CSV — one row per child. Siblings share a row each with the same parent email, and the server joins them onto one account.',

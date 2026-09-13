@@ -337,6 +337,96 @@ class StudentService:
         )
         return token
 
+    @staticmethod
+    def reinvite_guardian(
+        session: Session,
+        *,
+        student_id: uuid.UUID,
+        at: datetime,
+        actor_person_id: uuid.UUID | None,
+    ) -> tuple[str, str]:
+        """Mint a fresh invitation for a family whose first one did not land. Returns
+        (token, the address it is for).
+
+        **Why this exists.** The invitation email could not be delivered at all until
+        2026-09-13 -- the host blocks SMTP, so every link was copied out of the screen and
+        handed over by the manager. Links got lost in WhatsApp, mistyped, or sent to the
+        wrong parent, and the only recovery was to delete the child and add them again.
+        There was no second chance for one family.
+
+        **It reuses the pending invitation rather than adding another.** A second live row
+        for the same family means two valid credentials for one child's record, and
+        `accept_invitation` would honour whichever arrived -- so the old token dies here,
+        exactly as `app/services/structure/staff.py::resend_invitation` kills its own. A
+        re-send that left the previous link working would double the credential surface
+        for nobody's benefit.
+
+        **Refused when the guardian already signed in.** There is nothing to invite them
+        to: `resolution.py` binds a login to the Person once, and minting a token that
+        `accept_invitation` will then refuse (it matches only on `auth_identity_id IS
+        NULL`) would hand the manager a link that silently fails. `RefusedError` says so
+        while there is still a screen to say it on.
+
+        **Refused when no guardian has an address.** An invitation needs a recipient, and
+        the CHECK on `invitation` says the same thing in the database.
+        """
+        guardians = StudentService.list_guardians(session, student_id=student_id)
+        if not guardians:
+            raise RefusedError("this student has no guardian to invite")
+
+        signed_in = [person for _, person in guardians if person.auth_identity_id is not None]
+        if signed_in:
+            raise RefusedError("this guardian already has a login")
+
+        addressed = next((person for _, person in guardians if person.email), None)
+        if addressed is None or not addressed.email:
+            raise RefusedError("no guardian on this student has an email address")
+        email = addressed.email
+
+        pending = (
+            session.execute(
+                select(Invitation).where(
+                    Invitation.student_id == student_id,
+                    Invitation.accepted_at.is_(None),
+                )
+            )
+            .scalars()
+            .first()
+        )
+
+        token = secrets.token_urlsafe(32)
+        if pending is None:
+            # No row to refresh -- a guardian added after the child, or an invitation that
+            # was already accepted and then unwound. `issue_invitation` is the one place
+            # that mints, so the token shape and the audit trail stay identical.
+            token = StudentService.issue_invitation(
+                session,
+                student_id=student_id,
+                email=email,
+                phone=addressed.phone,
+                at=at,
+                actor_person_id=actor_person_id,
+            )
+            return token, email
+
+        pending.token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        pending.expires_at = at + timedelta(days=INVITATION_TTL_DAYS)
+        # The address may have been corrected since -- a wrong email is the likeliest
+        # reason anybody presses this button, so the row follows the Person.
+        pending.email = email
+        session.flush()
+        AuditService.record(
+            session,
+            action="guardian.reinvited",
+            entity_type="invitation",
+            entity_id=pending.id,
+            studio_id=pending.studio_id,
+            actor_person_id=actor_person_id,
+            # The recipient, never the token -- same rule as `issue_invitation`.
+            diff={"email": email, "student_id": str(student_id)},
+        )
+        return token, email
+
     # -- reads -----------------------------------------------------------------
     @staticmethod
     def _base_query(viewer_group_ids: list[uuid.UUID] | None) -> Select[tuple[Student, Person]]:

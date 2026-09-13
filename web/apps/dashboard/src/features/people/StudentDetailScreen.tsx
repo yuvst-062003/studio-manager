@@ -23,6 +23,7 @@ import { ClassPricesCard } from '../billing/ClassPricesCard'
 import { fill, formatDateInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { CopyButton } from './SharingCards'
 import { chipToneFor } from './StudentsScreen'
 import type {
   AttendanceMarkRow,
@@ -137,6 +138,11 @@ export function StudentDetailScreen({
   // §5.4a step 5 — 'Manager converts → picks group, sets price, status=active, enrollment
   // created. Three decisions in one request, because they are one decision.'
   const [groups, setGroups] = useState<GroupOption[]>([])
+  // Sending the invitation again. `null` is "not asked"; the rest is what to tell the
+  // manager afterwards, which differs by whether the email actually went.
+  const [resend, setResend] = useState<
+    null | { state: 'sending' } | { state: 'sent'; url: string | null; email: string; emailed: boolean } | { state: 'failed'; reason: string }
+  >(null)
   const [converting, setConverting] = useState(false)
   const [convertGroup, setConvertGroup] = useState('')
   //: **The price, at the moment the manager decides it.** §5.4a step 5 is one decision —
@@ -211,6 +217,50 @@ export function StudentDetailScreen({
       live = false
     }
   }, [client, studentId, reloads])
+
+  /**
+   * Issue a fresh invitation for this family.
+   *
+   * **The previous link stops working**, which is why the button says so before it is
+   * pressed rather than after: one pending invitation per child, refreshed rather than
+   * duplicated. A manager who had already passed the old link on needs to know the one
+   * they sent is now dead.
+   *
+   * Refused with 422 when the guardian has already signed in or has no address -- the
+   * server names which, and that message is shown rather than a generic failure, because
+   * the two have completely different fixes.
+   */
+  async function resendInvitation() {
+    if (resend?.state === 'sending') return
+    setResend({ state: 'sending' })
+    try {
+      const response = await client.resendInvitation(studentId)
+      if (!response.ok) {
+        const detail = await response
+          .json()
+          .then((body: { detail?: { message?: string } }) => body?.detail?.message)
+          .catch(() => undefined)
+        setResend({ state: 'failed', reason: detail ?? '' })
+        return
+      }
+      const body = (await response.json()) as {
+        invitation_url: string | null
+        email: string
+        email_sent: boolean
+      }
+      setResend({
+        state: 'sent',
+        url: body.invitation_url,
+        email: body.email,
+        emailed: body.email_sent,
+      })
+      // The guardian list is unchanged by this, but the reload keeps the card honest if
+      // anything else moved while the manager was looking at it.
+      setReloads((n) => n + 1)
+    } catch {
+      setResend({ state: 'failed', reason: '' })
+    }
+  }
 
   async function convert() {
     if (!convertGroup || busy) return
@@ -371,21 +421,29 @@ export function StudentDetailScreen({
                   <ul className="student-card__stack">
                     {(student.guardians ?? []).map((guardian) => (
                       <li data-testid="detail-guardian" key={guardian.person_id}>
-                        {guardian.display_name ? (
-                          <bdi>{guardian.display_name}</bdi>
-                        ) : guardian.email ? (
-                          <>
-                            <bdi>{guardian.email}</bdi>{' '}
-                            <span
-                              className="student-card__muted"
-                              data-testid="detail-guardian-pending"
-                            >
-                              {t(locale, 'people.guardian.notRegisteredYet')}
-                            </span>
-                          </>
+                        {/* **`has_login` and not a guess at the name.** This used to infer
+                            "not registered yet" from an EMPTY display name, which was only
+                            ever right by accident: a manager adding a family types the
+                            parent's name, so the name was present and the note never
+                            appeared for a family with no login at all. */}
+                        {guardian.display_name || guardian.email ? (
+                          <bdi>{guardian.display_name || guardian.email}</bdi>
                         ) : (
                           <bdi>{t(locale, 'people.guardian.noContactInfo')}</bdi>
-                        )}
+                        )}{' '}
+                        <span
+                          className="student-card__muted"
+                          data-testid={
+                            guardian.has_login ? 'detail-guardian-joined' : 'detail-guardian-pending'
+                          }
+                        >
+                          {t(
+                            locale,
+                            guardian.has_login
+                              ? 'people.guardian.hasLogin'
+                              : 'people.guardian.notRegisteredYet',
+                          )}
+                        </span>
                         {guardian.is_primary ? (
                           <span className="student-card__muted" data-testid="detail-primary">
                             {t(locale, 'people.guardian.primary')}
@@ -395,6 +453,60 @@ export function StudentDetailScreen({
                     ))}
                   </ul>
                 )}
+                {/* **The second chance.** Offered only while nobody on this student has a
+                    login: once a parent is in, there is nothing to invite them to, and the
+                    server refuses for the same reason. The hint is on the button rather
+                    than in the confirmation because pressing it KILLS the previous link —
+                    a manager who already passed that one on needs to know before, not
+                    after. */}
+                {(student.guardians ?? []).length > 0 &&
+                !(student.guardians ?? []).some((guardian) => guardian.has_login) ? (
+                  <div className="student-card__stack">
+                    <button
+                      type="button"
+                      data-testid="detail-resend-invitation"
+                      disabled={resend?.state === 'sending'}
+                      onClick={() => void resendInvitation()}
+                    >
+                      {t(
+                        locale,
+                        resend?.state === 'sending'
+                          ? 'people.guardian.resending'
+                          : 'people.guardian.resend',
+                      )}
+                    </button>
+                    <span className="student-card__muted">
+                      {t(locale, 'people.guardian.resendHint')}
+                    </span>
+                    {resend?.state === 'sent' ? (
+                      <span data-testid="detail-resend-sent">
+                        {/* Which of the two channels actually carried it. A manager told
+                            only "sent" would not know whether to also read the link out. */}
+                        {resend.emailed
+                          ? t(locale, 'people.guardian.resentEmail').replace(
+                              '{email}',
+                              resend.email,
+                            )
+                          : t(locale, 'people.guardian.resentNoEmail')}
+                        {resend.url ? (
+                          <>
+                            {' '}
+                            <bdi data-testid="detail-resend-url">{resend.url}</bdi>{' '}
+                            <CopyButton locale={locale} value={resend.url} />
+                          </>
+                        ) : null}
+                      </span>
+                    ) : null}
+                    {resend?.state === 'failed' ? (
+                      // The server's own sentence when it gave one: "already has a login"
+                      // and "no email address" have completely different fixes, and a
+                      // generic failure would hide which.
+                      <span data-testid="detail-resend-failed">
+                        {resend.reason || t(locale, 'people.guardian.resendFailed')}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
               </Field>
               <Field label={t(locale, 'people.guardian.phone')}>
                 {primary?.phone ? (

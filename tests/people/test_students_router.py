@@ -1010,3 +1010,133 @@ def test_a_guardian_may_not_edit_the_other_parent(client, as_manager, as_guardia
 def test_me_profile_refuses_an_anonymous_caller(client):
     response = client.patch("/api/v1/me/profile", json={"first_name": "x"})
     assert response.status_code in (401, 403)
+
+
+# -- sending the invitation again (2026-09-14) --------------------------------
+"""**The second chance that did not exist.**
+
+Until 2026-09-13 this product could not send email at all -- the host blocks every
+outbound SMTP port -- so an invitation was a link the manager copied off the screen and
+passed on by hand. When one went astray (lost in a chat, mistyped, sent to the wrong
+parent) there was no way to reissue it: the only recovery was deleting the child and
+creating them again, which loses the enrolment, the plan and the charges with them.
+"""
+
+
+def _guardian_person_id(client, caller, student_id: str) -> str:
+    rows = client.get(f"/api/v1/students/{student_id}/guardians", headers=caller.headers).json()
+    return rows["items"][0]["person_id"]
+
+
+def test_resending_issues_a_working_link_and_kills_the_old_one(client, as_manager, app_session):
+    """The old token must stop working. Two live tokens for one child's record is two
+    bearer credentials where the manager believes there is one -- and `accept_invitation`
+    would honour whichever arrived first."""
+    from app.models.person import Invitation
+
+    created = _create(client, as_manager)
+    first_url = created["invitation_url"]
+    assert first_url, "fixture: the create route issued no link"
+    student_id = created["student"]["id"]
+    before = app_session.execute(
+        select(Invitation).where(Invitation.student_id == uuid.UUID(student_id))
+    ).scalars().one()
+    old_hash = before.token_hash
+
+    response = client.post(
+        f"/api/v1/students/{student_id}/invitation/resend", headers=as_manager.headers
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["invitation_url"] and body["invitation_url"] != first_url
+    # Named, so the manager can see WHICH parent was written to -- a wrong address is
+    # the commonest reason for pressing this button at all.
+    assert "@" in body["email"]
+
+    app_session.expire_all()
+    after = app_session.execute(
+        select(Invitation).where(Invitation.student_id == uuid.UUID(student_id))
+    ).scalars().all()
+    # One row, not two -- the pending invitation is refreshed rather than duplicated.
+    assert len(after) == 1
+    assert after[0].token_hash != old_hash
+
+
+def test_resending_refuses_once_the_guardian_has_a_login(client, as_manager, app_session):
+    """**The load-bearing refusal.** `accept_invitation` binds a login to a Person exactly
+    once and matches only on `auth_identity_id IS NULL`, so a token minted for a family
+    that already signed in is a link that silently fails. Refusing says so while there is
+    still a screen to say it on."""
+    from app.models.identity import AuthIdentity
+    from app.models.person import Person
+
+    created = _create(client, as_manager)
+    student_id = created["student"]["id"]
+    guardian_id = _guardian_person_id(client, as_manager, student_id)
+
+    identity = AuthIdentity(provider="google", provider_subject=f"g-{uuid.uuid4()}", email_verified=True)
+    app_session.add(identity)
+    app_session.flush()
+    guardian = app_session.get(Person, uuid.UUID(guardian_id))
+    guardian.auth_identity_id = identity.id
+    app_session.commit()
+
+    response = client.post(
+        f"/api/v1/students/{student_id}/invitation/resend", headers=as_manager.headers
+    )
+
+    assert response.status_code == 422, response.text
+    assert "login" in response.json()["detail"]["message"]
+
+
+def test_resending_refuses_when_no_guardian_has_an_address(client, as_manager, app_session):
+    """An invitation needs a recipient -- the CHECK on `invitation` says the same thing."""
+    from app.models.person import Person
+
+    payload = _payload()
+    payload["guardian"]["email"] = None
+    payload["guardian"]["phone"] = "050-1234567"
+    created = _create(client, as_manager, payload)
+    student_id = created["student"]["id"]
+    guardian_id = _guardian_person_id(client, as_manager, student_id)
+    app_session.get(Person, uuid.UUID(guardian_id)).email = None
+    app_session.commit()
+
+    response = client.post(
+        f"/api/v1/students/{student_id}/invitation/resend", headers=as_manager.headers
+    )
+
+    assert response.status_code == 422, response.text
+    assert "email" in response.json()["detail"]["message"]
+
+
+def test_a_coach_may_read_the_guardian_but_may_not_reissue_their_key(
+    client, as_assistant_coach, as_manager
+):
+    """Reading who the parent is and issuing a key to their account are different
+    permissions. The guardian LIST beside this route is coach-reachable on purpose."""
+    created = _create(client, as_manager)
+    student_id = created["student"]["id"]
+
+    assert client.get(
+        f"/api/v1/students/{student_id}/guardians", headers=as_assistant_coach.headers
+    ).status_code in (200, 404)
+    assert client.post(
+        f"/api/v1/students/{student_id}/invitation/resend", headers=as_assistant_coach.headers
+    ).status_code == 403
+
+
+def test_the_guardian_list_reports_whether_they_can_actually_sign_in(client, as_manager):
+    """**The screens used to guess this from an empty display name**, which was only ever
+    right by accident: a manager types the parent's name when adding a family, so the name
+    is present and the "not registered yet" note never appeared for a family with no login
+    at all."""
+    created = _create(client, as_manager)
+    rows = client.get(
+        f"/api/v1/students/{created['student']['id']}/guardians", headers=as_manager.headers
+    ).json()
+
+    assert rows["items"], "fixture: no guardian was created"
+    assert rows["items"][0]["has_login"] is False
+    assert rows["items"][0]["display_name"], "the name is present; the login is not"

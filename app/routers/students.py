@@ -51,6 +51,7 @@ from app.schemas.people import (
     GuardianCreate,
     GuardianListResponse,
     GuardianOut,
+    InvitationResendOut,
     MyStudentStatusHistoryListResponse,
     MyTrialDeclarationOut,
     SiblingRequestIn,
@@ -214,6 +215,7 @@ def _detail(session: TenantSession, student: Student, person: Person) -> Student
                 is_primary=g.is_primary,
                 phone=p.phone,
                 email=p.email,
+                has_login=p.auth_identity_id is not None,
             )
             for g, p in guardians
         ],
@@ -673,9 +675,70 @@ def _guardian_list(session: TenantSession, student_id: uuid.UUID) -> GuardianLis
                 is_primary=guardian.is_primary,
                 phone=person.phone,
                 email=person.email,
+                has_login=person.auth_identity_id is not None,
             )
             for guardian, person in StudentService.list_guardians(session, student_id=student_id)
         ]
+    )
+
+
+@router.post("/students/{student_id}/invitation/resend", response_model=InvitationResendOut)
+def resend_student_invitation(
+    _: ManagerOrOwner,
+    student_id: uuid.UUID,
+    request: Request,
+    session: TenantSessionDep,
+) -> InvitationResendOut:
+    """Send the invitation again -- the second chance that did not exist.
+
+    Until 2026-09-13 this product could not email at all (the host blocks SMTP), so every
+    invitation was a link the manager copied off the screen and passed on by hand. When one
+    went astray -- lost in a chat, mistyped, sent to the wrong parent -- there was no way to
+    reissue it. The only recovery was deleting the child and creating them again.
+
+    Manager-scoped rather than coach-reachable, unlike the guardian LIST beside it: this
+    mints a bearer credential for a child's record. Reading who the parent is and issuing a
+    key to their account are different permissions.
+
+    The old link stops working the moment this succeeds -- see
+    `StudentService.reinvite_guardian` for why two live tokens for one child is not a
+    convenience.
+    """
+    try:
+        token, email = StudentService.reinvite_guardian(
+            session,
+            student_id=student_id,
+            at=now(),
+            actor_person_id=_person_id(request),
+        )
+    except NotFoundError as exc:
+        raise _not_found() from exc
+    except RefusedError as exc:
+        # 422 and not 409: the caller asked for something this family's state does not
+        # allow (already signed in, no address), and the message names which.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": "invitation_refused", "message": str(exc)},
+        ) from exc
+    session.commit()
+
+    origin = app_origin("parent", settings.ENV)
+    invitation_url = f"{origin}/?invite={token}" if origin else None
+    sent = False
+    if invitation_url:
+        studio_row = session.get(Studio, require_current_studio_id())
+        # Swallowed inside `send_invitation_email`, same as the create route: the token is
+        # already committed, so a provider outage must not read as "nothing was issued".
+        sent = send_invitation_email(
+            to_email=email,
+            studio_name=studio_row.name if studio_row is not None else "",
+            invitation_url=invitation_url,
+        )
+    return InvitationResendOut(
+        invitation_url=invitation_url,
+        email=email,
+        email_configured=email_configured(),
+        email_sent=sent,
     )
 
 

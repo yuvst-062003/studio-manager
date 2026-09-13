@@ -108,6 +108,7 @@ function makeClient(over: Partial<DashboardPeopleClient> = {}): DashboardPeopleC
             is_primary: true,
             phone: '0521234567',
             email: 'y@example.invalid',
+            has_login: false,
           },
         ],
       }),
@@ -1047,8 +1048,12 @@ describe('StudentDetailScreen — 4a', () => {
   //
   // The 3-field add-student form sends a guardian email and no guardian name at all, so
   // `GuardianOut.display_name` comes back `""` until the parent finishes the onboarding
-  // wizard. A blank row told the manager nothing; the card falls back to the email plus
-  // a hint instead.
+  // wizard. A blank row told the manager nothing; the card falls back to the email.
+  //
+  // **The "not registered yet" note is no longer inferred from the missing name** — it
+  // reads `has_login`, which is the actual fact. The old heuristic was right here and
+  // wrong everywhere else: a manager who types the parent's name got a named row with no
+  // note, for a family with no login at all.
 
   it('shows the email and a not-yet-registered hint when a guardian has no name', async () => {
     const client = makeClient({
@@ -1066,6 +1071,7 @@ describe('StudentDetailScreen — 4a', () => {
               is_primary: true,
               phone: null,
               email: 'nameless@example.invalid',
+              has_login: false,
             },
           ],
         }),
@@ -1490,5 +1496,140 @@ describe('F12 — bulk actions on the students screen', () => {
       t('he', 'people.bulk.refused.multiple_enrollments'),
     )
     vi.unstubAllGlobals()
+  })
+})
+
+// -- sending the invitation again (2026-09-14) --------------------------------
+/**
+ * **The second chance that did not exist.** Until 2026-09-13 this product could not send
+ * email at all — the host blocks every outbound SMTP port — so an invitation was a link
+ * the manager copied off the screen and handed over. When one went astray there was no way
+ * to reissue it: the only recovery was deleting the child and creating them again, which
+ * loses the enrolment, the plan and the charges with them.
+ */
+describe('resending a family’s invitation', () => {
+  type GuardianRow = {
+    person_id: string
+    student_id: string
+    display_name: string
+    relation: string
+    is_primary: boolean
+    phone: string | null
+    email: string
+    has_login: boolean
+  }
+
+  function guardian(over: Partial<GuardianRow> = {}): GuardianRow {
+    return {
+      person_id: 'p9',
+      student_id: 'st1',
+      display_name: 'יעל כהן',
+      relation: 'parent',
+      is_primary: true,
+      phone: null,
+      email: 'yael@example.invalid',
+      has_login: false,
+      ...over,
+    }
+  }
+
+  function clientWith(guardians: GuardianRow[], resendImpl?: () => Promise<Response>) {
+    return makeClient({
+      student: vi.fn(() =>
+        Promise.resolve({
+          ...summary(),
+          current_belt_color_hex: '#ffffff',
+          current_belt_name: 'לבנה',
+          guardians,
+        }),
+      ),
+      ...(resendImpl ? { resendInvitation: vi.fn(resendImpl) } : {}),
+    })
+  }
+
+  it('offers the button while nobody in the family has a login', async () => {
+    render(<StudentDetailScreen studentId="st1" locale="he" client={clientWith([guardian()])} />)
+
+    expect(await screen.findByTestId('detail-resend-invitation')).toBeInTheDocument()
+    // The consequence is stated BEFORE it is pressed: resending kills the previous link,
+    // and a manager who already passed that one on needs to know beforehand.
+    expect(screen.getByText(t('he', 'people.guardian.resendHint'))).toBeInTheDocument()
+  })
+
+  it('hides the button once a parent has signed in', async () => {
+    // There is nothing to invite them to — `accept_invitation` binds a login once and
+    // matches only on an unbound Person, so a fresh token would silently fail. The server
+    // refuses for the same reason; this keeps the manager from meeting that refusal.
+    render(
+      <StudentDetailScreen
+        studentId="st1"
+        locale="he"
+        client={clientWith([guardian({ has_login: true })])}
+      />,
+    )
+
+    await screen.findByTestId('detail-guardian')
+    expect(screen.queryByTestId('detail-resend-invitation')).toBeNull()
+    expect(screen.getByTestId('detail-guardian-joined')).toBeInTheDocument()
+  })
+
+  it('says which address it went to, and offers the fresh link beside it', async () => {
+    // Both channels, because the manager has to know which to rely on. Told only "sent",
+    // they would not know whether to also read the link out.
+    const client = clientWith([guardian()], async () =>
+      new Response(
+        JSON.stringify({
+          invitation_url: 'https://app.example.invalid/?invite=NEW-TOKEN',
+          email: 'yael@example.invalid',
+          email_sent: true,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    )
+    render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
+
+    await userEvent.click(await screen.findByTestId('detail-resend-invitation'))
+
+    const sent = await screen.findByTestId('detail-resend-sent')
+    expect(sent).toHaveTextContent('yael@example.invalid')
+    expect(screen.getByTestId('detail-resend-url')).toHaveTextContent('invite=NEW-TOKEN')
+  })
+
+  it('still hands over a link when the email could not be sent', async () => {
+    // The link is the channel that always works. Reporting only the failed email would
+    // leave the manager with nothing, for a token that was minted successfully.
+    const client = clientWith([guardian()], async () =>
+      new Response(
+        JSON.stringify({
+          invitation_url: 'https://app.example.invalid/?invite=NEW-TOKEN',
+          email: 'yael@example.invalid',
+          email_sent: false,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    )
+    render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
+
+    await userEvent.click(await screen.findByTestId('detail-resend-invitation'))
+
+    const sent = await screen.findByTestId('detail-resend-sent')
+    expect(sent).toHaveTextContent(t('he', 'people.guardian.resentNoEmail'))
+    expect(screen.getByTestId('detail-resend-url')).toBeInTheDocument()
+  })
+
+  it('shows the server’s own reason when it refuses', async () => {
+    // "already has a login" and "no email address" have completely different fixes, and a
+    // generic failure message would hide which one the manager is looking at.
+    const client = clientWith([guardian()], async () =>
+      new Response(
+        JSON.stringify({ detail: { code: 'invitation_refused', message: 'no guardian on this student has an email address' } }),
+        { status: 422, headers: { 'Content-Type': 'application/json' } },
+      ),
+    )
+    render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
+
+    await userEvent.click(await screen.findByTestId('detail-resend-invitation'))
+
+    expect(await screen.findByTestId('detail-resend-failed')).toHaveTextContent('email address')
   })
 })

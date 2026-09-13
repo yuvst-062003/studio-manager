@@ -134,6 +134,13 @@ export const people: Bundle = {
   'guardian.notRegisteredYet': 'טרם נרשם/ה',
   // Neither a name nor an email — a fallback that is still true, never a blank row.
   'guardian.noContactInfo': 'אין פרטי קשר',
+  'guardian.hasLogin': 'רשום/ה באפליקציה',
+  'guardian.resend': 'שליחת ההזמנה מחדש',
+  'guardian.resending': 'שולח…',
+  'guardian.resentEmail': 'ההזמנה נשלחה שוב ל־{email}',
+  'guardian.resentNoEmail': 'נוצר קישור חדש. יש להעביר אותו להורה',
+  'guardian.resendFailed': 'לא ניתן היה לשלוח את ההזמנה מחדש',
+  'guardian.resendHint': 'הקישור הקודם מפסיק לפעול',
 
   // -- the public landing page (parent 13a–13c) ---------------------------------
   'import.title': 'ייבוא תלמידים מקובץ',

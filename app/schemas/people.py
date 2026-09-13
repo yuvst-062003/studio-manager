@@ -52,6 +52,13 @@ class GuardianOut(BaseModel):
     is_primary: bool
     phone: str | None = None
     email: str | None = None
+    #: Whether this guardian can actually sign in -- `person.auth_identity_id` is set.
+    #:
+    #: **The screens used to infer this from an empty `display_name`**, which was only ever
+    #: right by accident: a manager who adds a family types the parent's name, so the name
+    #: is present and the "not registered yet" note never appeared, for a family with no
+    #: login at all. Inferring an account from a name is guessing; this is the fact.
+    has_login: bool = False
 
 
 class StudentOut(BaseModel):
@@ -563,6 +570,28 @@ class StudentMarkLostIn(BaseModel):
     only knows that time passed."""
 
     reason: str = Field(min_length=1, max_length=200)
+
+
+class InvitationResendOut(BaseModel):
+    """What the manager gets back from pressing "send the invitation again".
+
+    Both channels, because the manager has to know which one to rely on: `invitation_url`
+    is the copyable link that always works, and `email_sent` says whether the message also
+    went out on its own. Reporting only the email would leave a manager who cannot email
+    with nothing; reporting only the link would have them read a URL aloud when a message
+    had already arrived.
+
+    `invitation_token` is deliberately absent. The create route returns it because the
+    dashboard once built its own link; there is no reason to hand the raw credential back
+    a second time when `invitation_url` is the only thing anybody uses.
+    """
+
+    invitation_url: str | None = None
+    #: The address it went to, so the manager can see WHICH parent was written to -- the
+    #: commonest reason for pressing this button is that the first address was wrong.
+    email: str
+    email_configured: bool
+    email_sent: bool
 
 
 class StudentCreateResult(BaseModel):
