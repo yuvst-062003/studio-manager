@@ -64,6 +64,7 @@ from app.services.identity.resolution import (
     InvitationRejectedError,
     StudioMembership,
     accept_invitation,
+    accept_invitations_for_verified_email,
     app_access,
     effective_identity_id,
     is_platform_admin,
@@ -357,6 +358,21 @@ def _complete_callback(
                 detail={"code": "invitation_rejected", "message": "this invitation is not valid"},
             ) from exc
         invited_student_id = accepted.student_id
+
+    # Claim whatever else this mailbox was already invited to, so a parent whose record a
+    # manager pre-created lands on it instead of on an empty app (where the join wizard
+    # would then make them a SECOND, duplicate family).
+    #
+    # **After the token block, not before it.** Running first, this consumed the very
+    # invitation the token named and the explicit redemption below then failed with
+    # `invitation_rejected` -- three platform tests caught it. An explicit token is the
+    # more specific instruction and wins; by the time this runs, the invitation it named
+    # is already accepted and this skips it.
+    #
+    # Every sign-in rather than only a first one: an invitation raised after the family
+    # already had a login (a second child, a coach promoted to manager) is claimed on
+    # their next visit, and this is a no-op when nothing is pending.
+    accept_invitations_for_verified_email(session, identity=identity, at=at)
 
     memberships = studios_for_identity(session, resolved_id)
     # §5.2 -- the switcher exists only when there is a choice, so a single membership is

@@ -547,3 +547,96 @@ def test_the_post_callback_is_kept_for_apple(client, fake_provider):
         ).status_code
         == 200
     )
+
+
+# -- the sign-in claims a pending invitation (2026-09-13) ---------------------
+def test_signing_in_lands_on_the_record_a_manager_pre_created(client, fake_provider, app_session):
+    """**The seam, and the only assertion that proves the feature exists.**
+
+    `accept_invitations_for_verified_email` has its own unit tests in
+    `test_resolution.py`, and every one of them would pass while nothing called it — which
+    is exactly how the staff app shipped a push-registration hook no screen imported. This
+    drives the real callback and asserts the SESSION the parent gets back, so a future
+    edit that drops the call from `_complete_callback` fails here.
+
+    Before this, a manager who added a family by email handed the parent nothing: signing
+    in at that very address resolved to no Person at all, and walking the join wizard then
+    created a duplicate family beside the manager's orphaned record.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from app.core.tenancy import with_all_tenants
+    from app.models.people import Student
+    from app.models.person import Guardian, Invitation, Person
+    from app.models.studio import Studio
+
+    address = f"parent-{uuid.uuid4().hex[:10]}@example.invalid"
+    with with_all_tenants(reason="test sets up a pre-created family across studios"):
+        studio = Studio(name="מועדון בדיקה", slug=f"t-{uuid.uuid4().hex[:8]}")
+        app_session.add(studio)
+        app_session.flush()
+        parent = Person(
+            studio_id=studio.id, first_name="דנה", last_name="לוי", email=address
+        )
+        child = Person(studio_id=studio.id, first_name="נועה", last_name="לוי")
+        app_session.add_all([parent, child])
+        app_session.flush()
+        student = Student(studio_id=studio.id, person_id=child.id)
+        app_session.add(student)
+        app_session.flush()
+        # The guardian link is what §6.1's parent-app query keys on: without it the claim
+        # would attach a login to a Person with no children and the app would still be empty.
+        app_session.add(
+            Guardian(studio_id=studio.id, person_id=parent.id, student_id=student.id)
+        )
+        app_session.add(
+            Invitation(
+                studio_id=studio.id,
+                email=address,
+                intended_role="guardian",
+                student_id=student.id,
+                token_hash=uuid.uuid4().hex + uuid.uuid4().hex,
+                expires_at=datetime.now(UTC) + timedelta(days=7),
+            )
+        )
+        app_session.commit()
+
+    fake_provider.register(code="c-claim", subject=f"s-{uuid.uuid4()}", email=address)
+    response = sign_in(client, code="c-claim")
+
+    assert response.status_code == 200
+    body = response.json()
+    # The studio is on the session, which only happens if a Person in it resolved.
+    assert [m["studio_id"] for m in body["studios"]] == [str(studio.id)]
+    # And §6.1's parent-app door is open, which needs the Guardian row above.
+    assert body["access"]["parent"] is True
+
+    with with_all_tenants(reason="test verifies the binding landed"):
+        app_session.expire_all()
+        assert app_session.get(Person, parent.id).auth_identity_id is not None
+
+
+def test_signing_in_without_an_invitation_still_claims_nothing(client, fake_provider, app_session):
+    """The refusal, driven through the same door. A Person carrying an address that nobody
+    invited stays unreachable — otherwise every address a club ever typed would be a way in."""
+    from app.core.tenancy import with_all_tenants
+    from app.models.person import Person
+    from app.models.studio import Studio
+
+    address = f"stranger-{uuid.uuid4().hex[:10]}@example.invalid"
+    with with_all_tenants(reason="test sets up an uninvited person"):
+        studio = Studio(name="מועדון בדיקה", slug=f"t-{uuid.uuid4().hex[:8]}")
+        app_session.add(studio)
+        app_session.flush()
+        person = Person(studio_id=studio.id, first_name="ל", last_name="מ", email=address)
+        app_session.add(person)
+        app_session.commit()
+
+    fake_provider.register(code="c-no-claim", subject=f"s-{uuid.uuid4()}", email=address)
+    response = sign_in(client, code="c-no-claim")
+
+    assert response.status_code == 200
+    assert response.json()["studios"] == []
+    with with_all_tenants(reason="test verifies nothing was bound"):
+        app_session.expire_all()
+        assert app_session.get(Person, person.id).auth_identity_id is None

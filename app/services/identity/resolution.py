@@ -19,7 +19,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import with_all_tenants
@@ -333,6 +333,100 @@ def studios_for_identity(session: Session, identity_id: uuid.UUID) -> list[Studi
         return memberships
 
 
+def accept_invitations_for_verified_email(
+    session: Session, *, identity: AuthIdentity, at: datetime
+) -> list[Person]:
+    """§5.3's binding, reached by proving you own the invited mailbox instead of by holding
+    the link.
+
+    **The gap this closes.** A manager creates a family's Person with the parent's address,
+    and nothing connects that record to a login until an invitation TOKEN is redeemed --
+    `persons_for_identity` above consults `Person.auth_identity_id` and nothing else. So a
+    parent who signs in with Google at the very address the manager typed saw NOTHING; and
+    worse, walking the join wizard then created a SECOND Person, because
+    `onboarding.py::existing_registration` keys on the identity rather than the address,
+    leaving the manager's record orphaned with the child, the plan and the charges on it.
+    Production cannot send mail at all (its host blocks every SMTP port), so the link is
+    hand-delivered today -- which made that the whole of the gap between a manager adding a
+    family and the family being able to see anything.
+
+    **The Invitation is still the authorization, and that is the point.** This is not "any
+    matching address may claim any record": nothing here is claimable until a manager
+    deliberately invites that address, and the invitation still expires, is still
+    single-use, and is still revocable from the צוות screen. What changes is only the PROOF
+    of being the addressee -- a provider-verified email rather than possession of a link.
+    That is the stricter of the two. A link can be forwarded, screenshotted, or pasted into
+    a group chat and still works for whoever reads it; a verified address cannot be, because
+    the claimant has to hold the mailbox at the moment they sign in.
+
+    **Four refusals, each of which would be a real breach.** An unverified address (the
+    provider did not vouch for it, so it is a string the user typed); a private-relay
+    address (§5.2 already refuses to match on these, and Apple mints a different one per
+    app); a Person that already has a login (re-binding one is account takeover, and a
+    stale invitation beside an edited email column would be enough); and an anonymized
+    Person (§11.4 wiped it -- signing in as an erased profile is what
+    `persons_for_identity` excludes them to prevent).
+
+    **Every studio at once.** A parent whose children train at two clubs, or a coach who is
+    also a parent, holds an invitation in each; one sign-in should land on both records, the
+    same way `persons_for_identity` spans studios.
+
+    **Bound to the EFFECTIVE identity**, not to `identity.id`: §5.2 links a second provider
+    onto the first, `_complete_callback` resolves on the effective one, and a record left
+    behind the identity that did not win resolution is a record nobody can reach.
+
+    Returns the Persons claimed -- empty, and writing nothing, in every refusal above.
+    """
+    if not identity.email or not identity.email_verified or identity.is_private_relay:
+        return []
+    address = identity.email.strip().lower()
+    if not address:
+        return []
+    owner_id = effective_identity_id(identity)
+
+    claimed: list[Person] = []
+    with with_all_tenants(reason=_LOGIN_SCOPE):
+        invitations = (
+            session.execute(
+                select(Invitation).where(
+                    Invitation.accepted_at.is_(None),
+                    Invitation.expires_at > at,
+                    func.lower(Invitation.email) == address,
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for invitation in invitations:
+            # Matched inside the invitation's OWN studio. An address is not unique across
+            # studios and must not be: two clubs may both know this parent, and each
+            # invitation may only ever reach the record its own club created.
+            person = (
+                session.execute(
+                    select(Person).where(
+                        Person.studio_id == invitation.studio_id,
+                        Person.auth_identity_id.is_(None),
+                        Person.anonymized_at.is_(None),
+                        func.lower(Person.email) == address,
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            if person is None:
+                # An invitation whose Person is already claimed, erased, or was never
+                # created. Left untouched rather than marked accepted: it may still be
+                # redeemable by token, and burning it here would strand the family.
+                continue
+            person.auth_identity_id = owner_id
+            invitation.accepted_at = at
+            invitation.accepted_by_person_id = person.id
+            claimed.append(person)
+        if claimed:
+            session.flush()
+    return claimed
+
+
 def accept_invitation(
     session: Session, *, token: str, identity_id: uuid.UUID, at: datetime
 ) -> AcceptedInvitation:
@@ -377,7 +471,31 @@ def accept_invitation(
         invitation = session.execute(
             select(Invitation).where(Invitation.token_hash == token_hash)
         ).scalar_one_or_none()
-        if invitation is None or invitation.accepted_at is not None:
+        if invitation is None:
+            raise InvitationRejectedError("unknown or already accepted")
+        if invitation.accepted_at is not None:
+            # **Already accepted BY THIS IDENTITY is not a refusal.** Since
+            # `accept_invitations_for_verified_email` exists, the ordinary order of events
+            # is that a parent signs in (claiming their record by verified address, which
+            # marks this invitation accepted) and only afterwards clicks the link the
+            # manager sent them. Refusing that put a 400 error page in front of somebody
+            # who had just signed in perfectly well, about a record they already hold.
+            #
+            # Everyone else keeps the old refusal exactly: this succeeds only when the
+            # accepting Person is one THIS identity owns, which is the definition of
+            # "you already have what this link grants". A spent token stays spent for
+            # every other identity in the world.
+            holder = (
+                session.get(Person, invitation.accepted_by_person_id)
+                if invitation.accepted_by_person_id is not None
+                else None
+            )
+            if (
+                holder is not None
+                and holder.anonymized_at is None
+                and holder.auth_identity_id == identity_id
+            ):
+                return AcceptedInvitation(person=holder, student_id=invitation.student_id)
             raise InvitationRejectedError("unknown or already accepted")
         if at >= invitation.expires_at:
             raise InvitationRejectedError("expired")

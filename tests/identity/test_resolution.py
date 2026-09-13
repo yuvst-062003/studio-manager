@@ -23,6 +23,7 @@ from app.services.identity.providers import ProviderIdentity
 from app.services.identity.resolution import (
     InvitationRejectedError,
     accept_invitation,
+    accept_invitations_for_verified_email,
     app_access,
     effective_identity_id,
     persons_for_identity,
@@ -573,3 +574,275 @@ def test_an_invitation_with_no_student_id_behaves_exactly_as_before(app_session,
     accepted = accept_invitation(app_session, token=token, identity_id=identity.id, at=T0)
     assert accepted.person.id == person.id
     assert accepted.student_id is None
+
+
+def _mailbox(label: str) -> str:
+    """A mailbox no other test in this file shares.
+
+    `app_session` commits, and the test database is migrated once and never truncated, so
+    a literal address reused across tests leaves an earlier test's Person and Invitation
+    sitting there to answer a later test's lookup. That failed
+    `test_the_address_matches_regardless_of_how_the_manager_typed_it` on the first run of
+    this block, and the leak is in the fixtures, not in the code under test -- real
+    mailboxes belong to one person.
+    """
+    return f"{label}-{uuid.uuid4().hex[:10]}@example.invalid"
+
+
+
+# -- claiming a pending invitation with a verified address (2026-09-13) --------
+"""§5.3's binding, reached by proving you own the invited mailbox instead of by holding
+the link.
+
+**Why this exists.** A manager creates a family's Person with the parent's email, and
+nothing connects that record to a login until an invitation TOKEN is redeemed. Email is
+not consulted anywhere in `persons_for_identity`, so a parent who signs in with Google at
+the very address the manager typed sees nothing — and worse, walking the join wizard then
+creates a SECOND Person (`onboarding.py::existing_registration` keys on identity, not on
+address), leaving the manager's record orphaned with the child, the plan and the charges
+on it. Since production cannot send mail at all (Railway blocks every SMTP port), the link
+is hand-delivered today, which makes this the whole of the gap.
+
+**The Invitation is still the authorization.** This is not "any matching address may claim
+any record" — nothing is claimable until a manager deliberately invites that address, and
+the invitation still expires, is still single-use, and is still revocable. What changes is
+only the PROOF of being the addressee: a provider-verified email rather than possession of
+a link. That is the stricter of the two — a link can be forwarded, screenshotted, or
+pasted into a group chat, and a verified address cannot.
+"""
+
+
+def test_a_verified_address_claims_the_record_a_manager_pre_created(app_session, studio):
+    address = _mailbox("dana")
+    person = Person(studio_id=studio.id, first_name="דנה", last_name="לוי", email=address)
+    app_session.add(person)
+    app_session.flush()
+    _invitation(app_session, studio, email=address)
+    identity = _identity(app_session, email=address)
+    app_session.commit()
+
+    claimed = accept_invitations_for_verified_email(app_session, identity=identity, at=T0)
+
+    assert [p.id for p in claimed] == [person.id]
+    # The seam that matters: the resolver now finds her, which is the whole point.
+    with with_all_tenants(reason=_SCOPE):
+        assert [p.id for p in persons_for_identity(app_session, identity.id)] == [person.id]
+
+
+def test_the_address_matches_regardless_of_how_the_manager_typed_it(app_session, studio):
+    # A manager typing `Dana@Example.invalid` into a form has invited the same mailbox.
+    address = _mailbox("mixed")
+    person = Person(
+        studio_id=studio.id, first_name="דנה", last_name="לוי", email=address.upper()
+    )
+    app_session.add(person)
+    app_session.flush()
+    _invitation(app_session, studio, email=address.capitalize())
+    identity = _identity(app_session, email=address)
+    app_session.commit()
+
+    claimed = accept_invitations_for_verified_email(app_session, identity=identity, at=T0)
+
+    assert [p.id for p in claimed] == [person.id]
+
+
+def test_an_unverified_address_claims_nothing(app_session, studio):
+    """The provider's `email_verified` is the entire proof. Without it the address is a
+    string the user typed, and honouring it would let anyone claim any invited record by
+    naming its address."""
+    address = _mailbox("unverified")
+    person = Person(studio_id=studio.id, first_name="ל", last_name="מ", email=address)
+    app_session.add(person)
+    app_session.flush()
+    _invitation(app_session, studio, email=address)
+    identity = upsert_identity(
+        app_session,
+        ProviderIdentity.from_claims(
+            provider="google",
+            subject=f"google-{uuid.uuid4()}",
+            email=address,
+            email_verified=False,
+        ),
+        at=T0,
+    )
+    app_session.commit()
+
+    assert accept_invitations_for_verified_email(app_session, identity=identity, at=T0) == []
+    with with_all_tenants(reason=_SCOPE):
+        assert persons_for_identity(app_session, identity.id) == []
+
+
+def test_no_invitation_means_nothing_is_claimable(app_session, studio):
+    """A Person with an address and no pending invitation stays unreachable. The manager's
+    act of inviting is the authorization; without it an address is just a column."""
+    address = _mailbox("nobody")
+    person = Person(studio_id=studio.id, first_name="ל", last_name="מ", email=address)
+    app_session.add(person)
+    app_session.flush()
+    identity = _identity(app_session, email=address)
+    app_session.commit()
+
+    assert accept_invitations_for_verified_email(app_session, identity=identity, at=T0) == []
+    assert person.auth_identity_id is None
+
+
+def test_an_expired_invitation_claims_nothing(app_session, studio):
+    address = _mailbox("expired")
+    person = Person(studio_id=studio.id, first_name="ל", last_name="מ", email=address)
+    app_session.add(person)
+    app_session.flush()
+    _invitation(app_session, studio, email=address, expires_at=T0 - timedelta(days=1))
+    identity = _identity(app_session, email=address)
+    app_session.commit()
+
+    assert accept_invitations_for_verified_email(app_session, identity=identity, at=T0) == []
+
+
+def test_an_already_accepted_invitation_cannot_be_replayed(app_session, studio):
+    address = _mailbox("used")
+    person = Person(studio_id=studio.id, first_name="ל", last_name="מ", email=address)
+    app_session.add(person)
+    app_session.flush()
+    _invitation(app_session, studio, email=address, accepted_at=T0 - timedelta(hours=1))
+    identity = _identity(app_session, email=address)
+    app_session.commit()
+
+    assert accept_invitations_for_verified_email(app_session, identity=identity, at=T0) == []
+
+
+def test_a_record_that_already_has_a_login_is_never_stolen(app_session, studio):
+    """The load-bearing refusal. A Person already bound to somebody's login must never be
+    re-bound, whatever address an invitation names — otherwise a stale invitation plus a
+    changed email column is an account takeover."""
+    address = _mailbox("shared")
+    owner = _identity(app_session)
+    person = Person(
+        studio_id=studio.id,
+        first_name="ל",
+        last_name="מ",
+        email=address,
+        auth_identity_id=owner.id,
+    )
+    app_session.add(person)
+    app_session.flush()
+    _invitation(app_session, studio, email=address)
+    intruder = _identity(app_session, email=address)
+    app_session.commit()
+
+    assert accept_invitations_for_verified_email(app_session, identity=intruder, at=T0) == []
+    assert person.auth_identity_id == owner.id
+
+
+def test_an_anonymized_person_is_never_claimed(app_session, studio):
+    """§11.4 wipes the Person and leaves the financial rows. Binding a login to one would
+    sign somebody in as a profile that has been erased — `persons_for_identity` excludes
+    them for the same reason."""
+    address = _mailbox("gone")
+    person = Person(
+        studio_id=studio.id,
+        first_name="ל",
+        last_name="מ",
+        email=address,
+        anonymized_at=T0 - timedelta(days=30),
+    )
+    app_session.add(person)
+    app_session.flush()
+    _invitation(app_session, studio, email=address)
+    identity = _identity(app_session, email=address)
+    app_session.commit()
+
+    assert accept_invitations_for_verified_email(app_session, identity=identity, at=T0) == []
+
+
+def test_one_sign_in_claims_the_same_person_in_every_studio_that_invited_them(app_session):
+    """A parent whose children train at two clubs, or a coach who also has a child. Both
+    invitations are theirs and one sign-in should land on both records."""
+    first = Studio(name="א", slug=f"t-{uuid.uuid4().hex[:8]}")
+    second = Studio(name="ב", slug=f"t-{uuid.uuid4().hex[:8]}")
+    app_session.add_all([first, second])
+    app_session.flush()
+    address = _mailbox("both")
+    people = []
+    for studio_row in (first, second):
+        person = Person(studio_id=studio_row.id, first_name="ר", last_name="כ", email=address)
+        app_session.add(person)
+        app_session.flush()
+        people.append(person)
+        _invitation(app_session, studio_row, email=address)
+    identity = _identity(app_session, email=address)
+    app_session.commit()
+
+    claimed = accept_invitations_for_verified_email(app_session, identity=identity, at=T0)
+
+    assert {p.id for p in claimed} == {p.id for p in people}
+
+
+def test_the_claim_lands_on_the_linked_identity_not_the_new_one(app_session, studio):
+    """§5.2 links a second provider onto the first. Binding to the NEW identity's own id
+    would put the record behind the identity that did not win resolution, and
+    `_complete_callback` resolves on the effective one."""
+    address = _mailbox("link")
+    google = _identity(app_session, provider="google", email=address)
+    person = Person(studio_id=studio.id, first_name="ל", last_name="מ", email=address)
+    app_session.add(person)
+    app_session.flush()
+    _invitation(app_session, studio, email=address)
+    apple = _identity(app_session, provider="apple", email=address)
+    app_session.commit()
+    assert apple.linked_to_identity_id == google.id, "fixture: the link did not happen"
+
+    claimed = accept_invitations_for_verified_email(app_session, identity=apple, at=T0)
+
+    assert [p.id for p in claimed] == [person.id]
+    assert person.auth_identity_id == effective_identity_id(apple) == google.id
+
+
+def test_the_link_still_works_for_someone_who_already_signed_in_and_claimed_it(
+    app_session, studio
+):
+    """**A consequence of the claim above, and it would have been a bad one.**
+
+    The claim marks the invitation accepted. So a parent who signs in FIRST (claiming their
+    record by verified address) and only then clicks the link the manager sent used to hit
+    `unknown or already accepted` — a 400 error page, moments after signing in perfectly
+    well, about a record they already hold. The order is entirely normal now that signing
+    in works without the link at all.
+
+    The refusal is kept for everybody else: it succeeds only when the invitation was
+    accepted BY a Person this very identity owns, which is the definition of "you already
+    have what this link grants".
+    """
+    address = _mailbox("relink")
+    person = Person(studio_id=studio.id, first_name="ל", last_name="מ", email=address)
+    app_session.add(person)
+    app_session.flush()
+    _invitation_row, token = _invitation(app_session, studio, email=address)
+    identity = _identity(app_session, email=address)
+    app_session.commit()
+
+    claimed = accept_invitations_for_verified_email(app_session, identity=identity, at=T0)
+    assert [p.id for p in claimed] == [person.id], "fixture: the claim did not happen"
+
+    accepted = accept_invitation(app_session, token=token, identity_id=identity.id, at=T0)
+
+    assert accepted.person.id == person.id
+
+
+def test_a_stranger_still_cannot_replay_an_invitation_someone_else_claimed(app_session, studio):
+    """The other half of the tolerance above. Being lenient to the identity that already
+    holds the record must not be lenient to anyone else holding the same link — a token
+    that has been used is still spent for every other identity in the world."""
+    address = _mailbox("spent")
+    person = Person(studio_id=studio.id, first_name="ל", last_name="מ", email=address)
+    app_session.add(person)
+    app_session.flush()
+    _invitation_row, token = _invitation(app_session, studio, email=address)
+    owner = _identity(app_session, email=address)
+    app_session.commit()
+    accept_invitations_for_verified_email(app_session, identity=owner, at=T0)
+
+    stranger = _identity(app_session, email=_mailbox("stranger"))
+    app_session.commit()
+
+    with pytest.raises(InvitationRejectedError):
+        accept_invitation(app_session, token=token, identity_id=stranger.id, at=T0)
