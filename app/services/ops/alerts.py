@@ -1,14 +1,17 @@
 """The half of the monitor that reaches somebody who is not looking at a screen.
 
-**stdlib `smtplib`, and no vendor.** No Sentry, no Better Stack, no SDK, no account, no
-bill, and nothing about this product's data leaving for a third party to index. The cost
-is that this speaks SMTP and nothing else: point it at Gmail with an app password, at
-Fastmail, at whatever host already sends your mail.
+**No monitoring vendor.** No Sentry, no Better Stack, no SDK, and nothing about this
+product's data leaving for a third party to index. What it does need is something that can
+put a message in a mailbox, and since 2026-09-13 that is an HTTPS call rather than
+`smtplib` -- Railway blocks every outbound SMTP port, so the original "point it at Gmail
+with an app password" was advice that could not work from production. The measurement and
+the argument are in `app/services/comms/mail_transport.py`; the only vendor this now
+implies is a mail relay, which handles subject lines and nothing else.
 
-**Unconfigured is a state, not a silent default.** With no `SMTP_HOST` or `ALERT_EMAIL_TO`
-nothing is sent and `email_configured()` answers False, which the platform console
-renders as an explicit "email delivery is off". An alerting system nobody has configured
-is worse than none, because it is believed.
+**Unconfigured is a state, not a silent default.** Without a transport or an
+`ALERT_EMAIL_TO` nothing is sent and `email_configured()` answers False, which the platform
+console renders as an explicit "email delivery is off". An alerting system nobody has
+configured is worse than none, because it is believed.
 
 **The message carries no person.** Job names, check ids, counts, timestamps and exception
 CLASS names -- the same rule `app/models/ops.py` states for the rows this reads, and it
@@ -25,11 +28,10 @@ person.
 from __future__ import annotations
 
 import logging
-import smtplib
 from datetime import datetime
-from email.message import EmailMessage
 
 from app.core.config import settings
+from app.services.comms.mail_transport import deliver, mail_configured
 from app.services.ops.checks import JobHealth, Signal
 
 logger = logging.getLogger(__name__)
@@ -38,11 +40,12 @@ logger = logging.getLogger(__name__)
 def email_configured() -> bool:
     """Whether an alert could actually be delivered.
 
-    All three, because any one missing means nothing arrives. Reported to the ops screen
-    so "no alerts" can be distinguished from "no delivery" -- two states that look
-    identical from an empty inbox and mean opposite things.
+    Both, because either one missing means nothing arrives: a transport with nowhere to
+    send to is as silent as a recipient with no transport. Reported to the ops screen so
+    "no alerts" can be distinguished from "no delivery" -- two states that look identical
+    from an empty inbox and mean opposite things.
     """
-    return bool(settings.SMTP_HOST and settings.ALERT_EMAIL_TO)
+    return bool(mail_configured() and settings.ALERT_EMAIL_TO)
 
 
 def render(
@@ -92,36 +95,19 @@ def render(
 def send(subject: str, body: str) -> bool:
     """Deliver one alert. Returns whether it went.
 
-    **STARTTLS on 587 only.** Implicit TLS on 465 is not supported and the omission is
-    deliberate rather than an oversight: supporting both means choosing between them from
-    a port number, and a wrong guess sends credentials in the clear. If a host needs 465,
-    that is a change to make on purpose.
+    **Over HTTPS, not SMTP** since 2026-09-13: Railway blocks every outbound SMTP port, so
+    `smtplib` could never have delivered this from production whatever was configured.
+    `app/services/comms/mail_transport.py` carries the measurement and the argument.
 
-    A failure to send is logged and swallowed. The caller is a scheduled job whose real
-    work -- evaluating the checks -- has already succeeded, and an SMTP outage must not
-    turn into a failed job that then alerts about itself.
+    A failure to send is logged and swallowed there. The caller is a scheduled job whose
+    real work -- evaluating the checks -- has already succeeded, and a provider outage must
+    not turn into a failed job that then alerts about itself.
     """
     if not email_configured():
         logger.info("alert not sent: email delivery is not configured")
         return False
 
-    message = EmailMessage()
-    message["Subject"] = subject
-    message["From"] = settings.ALERT_EMAIL_FROM or settings.ALERT_EMAIL_TO or ""
-    message["To"] = settings.ALERT_EMAIL_TO or ""
-    message.set_content(body)
-
-    try:
-        with smtplib.SMTP(settings.SMTP_HOST or "", settings.SMTP_PORT, timeout=30) as smtp:
-            smtp.starttls()
-            if settings.SMTP_USERNAME and settings.SMTP_PASSWORD:
-                smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD.get_secret_value())
-            smtp.send_message(message)
-    except Exception:
-        # `logger.exception` and no `extra`: the SMTP host is in settings, and the one
-        # thing that must not reach a log here is the password, which is a SecretStr and
-        # would repr as `**********` anyway -- belt and braces.
-        logger.exception("could not send the alert email")
+    if not deliver(to=settings.ALERT_EMAIL_TO or "", subject=subject, body=body):
         return False
 
     logger.info("alert email sent", extra={"subject": subject})

@@ -6,17 +6,21 @@ says whether this deployment can send mail at all, `invitation_email_sent` says 
 this particular request's email actually went out, and neither one may turn a working
 student-creation request into a failed one.
 
-No socket is ever opened here -- `smtplib.SMTP` is replaced with `FakeSMTP` before any
-test that expects a send to be attempted, and the tests that expect NO send replace it
-with something that raises if called at all, so "nothing was sent" is proven rather than
-merely unobserved.
+No socket is ever opened here -- `httpx.post` inside `app/services/comms/mail_transport.py`
+is replaced with `FakeMailApi` before any test that expects a send to be attempted, and the
+tests that expect NO send replace it with something that raises if called at all, so
+"nothing was sent" is proven rather than merely unobserved.
+
+The transport is HTTPS rather than SMTP since 2026-09-13; that module carries the
+measurement showing why SMTP could never have worked from production.
 """
 
 from __future__ import annotations
 
 import logging
+from types import SimpleNamespace
 
-import app.services.people.invitations as invitations
+import app.services.comms.mail_transport as mail_transport
 from app.core.config import settings
 from pydantic import SecretStr
 from tests.people.conftest import Caller
@@ -45,78 +49,78 @@ def _create(client, caller: Caller, payload: dict | None = None) -> dict:
     return response.json()
 
 
-class FakeSMTP:
-    """A stand-in for `smtplib.SMTP` that never touches a socket."""
+class FakeMailApi:
+    """Stands in for the provider's HTTPS endpoint. No socket is ever opened.
 
-    def __init__(self) -> None:
-        self.started_tls = False
-        self.login_call: tuple[str, str] | None = None
-        self.sent_messages: list = []
+    One fake plays the whole seam: `mail_transport` calls `httpx.post(url, headers=...,
+    json=..., timeout=...)` and reads `.status_code` off the answer.
+    """
 
-    def __call__(self, *args, **kwargs) -> FakeSMTP:
-        # `smtplib.SMTP(host, port, timeout=...)` is a constructor call in the real
-        # module; this instance plays both the module attribute and the object the call
-        # returns, so one fake serves as the whole seam.
-        return self
+    def __init__(self, status: int = 200) -> None:
+        self.status = status
+        self.requests: list[dict] = []
 
-    def __enter__(self) -> FakeSMTP:
-        return self
+    def __call__(self, url, *, headers=None, json=None, timeout=None):
+        self.requests.append({"url": url, "headers": headers or {}, "json": json or {}})
+        return SimpleNamespace(status_code=self.status)
 
-    def __exit__(self, *exc) -> bool:
-        return False
-
-    def starttls(self) -> None:
-        self.started_tls = True
-
-    def login(self, username: str, password: str) -> None:
-        self.login_call = (username, password)
-
-    def send_message(self, message) -> None:
-        self.sent_messages.append(message)
+    @property
+    def sent_bodies(self) -> list[str]:
+        return [request["json"].get("text", "") for request in self.requests]
 
 
-class ExplodingSMTP:
-    """Fails the test the instant anything tries to reach an SMTP server at all."""
+class ExplodingMailApi:
+    """Fails the test the instant anything tries to reach the provider at all."""
 
     def __call__(self, *args, **kwargs):
-        raise AssertionError("SMTP was contacted although nothing should have been sent")
+        raise AssertionError("the mail provider was contacted although nothing should be sent")
 
 
-def _configure_smtp(monkeypatch, *, host="smtp.example.invalid", password="app-password"):
-    monkeypatch.setattr(settings, "SMTP_HOST", host)
-    monkeypatch.setattr(settings, "SMTP_PASSWORD", SecretStr(password) if password else None)
-    monkeypatch.setattr(settings, "SMTP_USERNAME", "bot@example.invalid")
+class BoomMailApi:
+    """The provider is unreachable -- the outage case."""
+
+    def __call__(self, *args, **kwargs):
+        raise OSError("connection refused")
+
+
+def _configure_mail(monkeypatch, *, key="re_test_key", sender="club@example.invalid"):
+    """Mail moved off SMTP on 2026-09-13 -- Railway blocks every outbound SMTP port, so the
+    old `SMTP_HOST`/`SMTP_PASSWORD` pair could never have delivered anything from
+    production. See `app/services/comms/mail_transport.py`."""
+    monkeypatch.setattr(settings, "RESEND_API_KEY", SecretStr(key) if key else None)
+    monkeypatch.setattr(settings, "MAIL_FROM", sender)
 
 
 # -- 1. configured, guardian has an email -> it is sent -----------------------------------
 
 
 def test_configured_and_a_guardian_email_sends_and_reports_it(client, as_manager, monkeypatch):
-    _configure_smtp(monkeypatch)
-    fake = FakeSMTP()
-    monkeypatch.setattr(invitations.smtplib, "SMTP", fake)
+    _configure_mail(monkeypatch)
+    fake = FakeMailApi()
+    monkeypatch.setattr(mail_transport.httpx, "post", fake)
 
     body = _create(client, as_manager)
 
     assert body["invitation_email_configured"] is True
     assert body["invitation_email_sent"] is True
-    assert len(fake.sent_messages) == 1
-    sent = fake.sent_messages[0]
-    assert body["invitation_url"] in sent.get_content()
-    assert fake.started_tls is True
+    assert len(fake.requests) == 1
+    assert body["invitation_url"] in fake.sent_bodies[0]
+    # It authenticated, and to the provider's endpoint rather than anywhere else.
+    assert fake.requests[0]["headers"]["Authorization"].startswith("Bearer ")
+    assert fake.requests[0]["url"].startswith("https://")
 
 
 # -- 2. SMTP_PASSWORD unset -> nothing is sent, reported as unconfigured ------------------
 
 
-def test_smtp_password_unset_means_unconfigured_and_nothing_is_sent(
-    client, as_manager, monkeypatch
-):
-    """Decision 21's whole point: a host with no password cannot authenticate, so
-    `SMTP_HOST` alone must not read as configured. This is the state production is in
-    today."""
-    _configure_smtp(monkeypatch, password=None)
-    monkeypatch.setattr(invitations.smtplib, "SMTP", ExplodingSMTP())
+def test_no_api_key_means_unconfigured_and_nothing_is_sent(client, as_manager, monkeypatch):
+    """Decision 21's whole point, on the transport that replaced SMTP: no key means nothing
+    can be delivered, so this must not read as configured. Production was in exactly this
+    state -- and when the old check said `SMTP_HOST and SMTP_PASSWORD`, both could be set on
+    a host where SMTP is blocked outright, which reported "configured" for a transport that
+    could not connect."""
+    _configure_mail(monkeypatch, key=None)
+    monkeypatch.setattr(mail_transport.httpx, "post", ExplodingMailApi())
 
     body = _create(client, as_manager)
 
@@ -130,23 +134,9 @@ def test_smtp_password_unset_means_unconfigured_and_nothing_is_sent(
 # -- 3. the transport raises -> student creation still succeeds ---------------------------
 
 
-class BoomSMTP:
-    def __call__(self, *args, **kwargs) -> BoomSMTP:
-        return self
-
-    def __enter__(self) -> BoomSMTP:
-        return self
-
-    def __exit__(self, *exc) -> bool:
-        return False
-
-    def starttls(self) -> None:
-        raise OSError("connection refused")
-
-
-def test_an_smtp_failure_does_not_fail_student_creation(client, as_manager, monkeypatch):
-    _configure_smtp(monkeypatch)
-    monkeypatch.setattr(invitations.smtplib, "SMTP", BoomSMTP())
+def test_a_provider_outage_does_not_fail_student_creation(client, as_manager, monkeypatch):
+    _configure_mail(monkeypatch)
+    monkeypatch.setattr(mail_transport.httpx, "post", BoomMailApi())
 
     response = client.post("/api/v1/students", json=_payload(), headers=as_manager.headers)
 
@@ -162,8 +152,8 @@ def test_an_smtp_failure_does_not_fail_student_creation(client, as_manager, monk
 
 
 def test_no_guardian_email_sends_nothing_and_does_not_crash(client, as_manager, monkeypatch):
-    _configure_smtp(monkeypatch)
-    monkeypatch.setattr(invitations.smtplib, "SMTP", ExplodingSMTP())
+    _configure_mail(monkeypatch)
+    monkeypatch.setattr(mail_transport.httpx, "post", ExplodingMailApi())
 
     payload = _payload()
     payload["guardian"]["email"] = None
@@ -181,9 +171,9 @@ def test_no_guardian_email_sends_nothing_and_does_not_crash(client, as_manager, 
 
 
 def test_the_invitation_token_never_reaches_a_log_record(client, as_manager, monkeypatch, caplog):
-    _configure_smtp(monkeypatch)
-    fake = FakeSMTP()
-    monkeypatch.setattr(invitations.smtplib, "SMTP", fake)
+    _configure_mail(monkeypatch)
+    fake = FakeMailApi()
+    monkeypatch.setattr(mail_transport.httpx, "post", fake)
 
     with caplog.at_level(logging.INFO, logger="app.services.people.invitations"):
         body = _create(client, as_manager)

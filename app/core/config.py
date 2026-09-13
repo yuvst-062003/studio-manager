@@ -158,6 +158,21 @@ class Settings(BaseSettings):
     SMTP_USERNAME: str | None = None
     SMTP_PASSWORD: SecretStr | None = None
 
+    # -- the transport that actually works -------------------------------------------
+    #: **The SMTP settings above cannot deliver anything on Railway** and are kept only so
+    #: an operator reading this file is not surprised by their absence. Measured from
+    #: inside the production container on 2026-09-13: ports 25/465/587/2525 all time out,
+    #: to three different providers, while HTTPS connects. See
+    #: `app/services/comms/mail_transport.py` for the whole finding.
+    #:
+    #: The provider's API key. Mail is sent over HTTPS, which nothing blocks.
+    RESEND_API_KEY: SecretStr | None = None
+    #: The envelope sender, and it must be an address the provider has VERIFIED -- either
+    #: a whole domain authenticated by DNS, or a single sender confirmed by clicking a
+    #: link. An unverified sender is refused at send time, which is a failure nobody sees
+    #: until a real message is dropped.
+    MAIL_FROM: str | None = None
+
     #: How long uPay may go without calling back before it counts as a red signal. Wide,
     #: because a small club genuinely takes no online payment for days and an alert that
     #: fires on a quiet week gets muted before it is ever right.

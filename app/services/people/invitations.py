@@ -7,21 +7,20 @@ Email is a second channel, additive -- when it works it saves the manager from r
 link off a screen out loud, and when it does not, `StudentCreateResult` says so and the
 link is still the whole invitation.
 
-**Deliberately parallel to `app/services/ops/alerts.py`, and deliberately a second copy
-rather than a shared one.** That module's `send()` is `smtplib` behind `STARTTLS` on 587,
-with the exact "unconfigured is a state, not a silent default" idea this module needs --
-but its audience is the operator (English, no vendor, one recipient from Railway
-variables) and this module's audience is a parent (Hebrew, per-guardian, an address that
-came out of a form). Importing `alerts.send` and reshaping its message for a different
-audience would couple two things that change for unrelated reasons; the duplication is
-noted rather than resolved here because resolving it -- e.g. a shared `mailer` module --
-is a change to `alerts.py`, which is outside this piece.
+**Deliberately parallel to `app/services/ops/alerts.py` in its MESSAGES, and no longer in
+its transport.** The two audiences stay apart for the reason they always did: that module
+writes to the operator (English, one recipient from Railway variables) and this one writes
+to a parent (Hebrew, per-guardian, an address that came out of a form), and folding them
+together would couple two things that change for unrelated reasons. What was duplicated and
+should never have been is the WIRE -- both carried their own copy of the same `smtplib`
+block. 2026-09-13 replaced both with `app/services/comms/mail_transport.py`, the shared
+`mailer` this file's older note said resolving would need.
 
-**Configured here means `SMTP_HOST` *and* `SMTP_PASSWORD`, not `alerts.email_configured`'s
-`SMTP_HOST` and `ALERT_EMAIL_TO`.** `SMTP_PASSWORD` is the field unset on production today
-(decision 21's whole reason for existing): a deployment with a host but no password cannot
-authenticate, so calling that "configured" would tell the dashboard the email half works
-when it cannot.
+**Configured here means the TRANSPORT is, and nothing about a recipient** -- unlike
+`alerts.email_configured`, which also needs its one `ALERT_EMAIL_TO` to exist. Every
+recipient here comes from a form. The distinction earned its keep on 2026-09-13: the old
+check read `SMTP_HOST and SMTP_PASSWORD`, both of which can be set on a host where SMTP is
+blocked outright, so it reported "configured" for a transport that could not connect.
 
 **Never logs the token or the URL.** The token is a bearer credential for a child's record
 -- only its SHA-256 reaches `invitation.token_hash` -- and the URL carries the token in its
@@ -37,14 +36,12 @@ guard-compose-try-log shape. Behaviour is unchanged for the invitation email: sa
 from __future__ import annotations
 
 import logging
-import smtplib
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from email.message import EmailMessage
 from zoneinfo import ZoneInfo
 
-from app.core.config import settings
+from app.services.comms.mail_transport import deliver, mail_configured
 
 logger = logging.getLogger(__name__)
 
@@ -67,12 +64,15 @@ def _format_local(moment: datetime) -> str:
 def email_configured() -> bool:
     """Whether this deployment can actually deliver the invitation email.
 
-    Both fields, because a host with no password cannot authenticate and a password with
-    no host has nowhere to go -- either gap means nothing is delivered, and
-    `StudentCreateResult.invitation_email_configured` exists so that state is visible on
-    the dashboard rather than indistinguishable from "sent and nobody noticed".
+    Delegated to the transport since 2026-09-13, when this moved off SMTP: Railway blocks
+    every outbound SMTP port, so the old check (`SMTP_HOST and SMTP_PASSWORD`) reported
+    "configured" for a transport that could not connect -- and because the two callers below
+    send inside a REQUEST with a 30-second timeout, turning it true made adding a student
+    and booking a trial each hang for thirty seconds before silently failing.
+    `StudentCreateResult.invitation_email_configured` exists so that state is visible on the
+    dashboard rather than indistinguishable from "sent and nobody noticed".
     """
-    return bool(settings.SMTP_HOST and settings.SMTP_PASSWORD)
+    return mail_configured()
 
 
 def render(*, studio_name: str, invitation_url: str) -> tuple[str, str]:
@@ -107,33 +107,16 @@ def _send(to_email: str, subject: str, body: str) -> bool:
     that would let a reader of the log act on the message in flight (an invitation's
     token, live in its URL).
 
-    **STARTTLS on 587 only** -- same reasoning as `alerts.py`: supporting implicit TLS on
-    465 too means guessing which one a host wants from a port number, and a wrong guess
-    sends the SMTP login in the clear.
+    **Over HTTPS, not SMTP** since 2026-09-13 -- same transport as `alerts.py`, for the
+    reason `app/services/comms/mail_transport.py` measures: Railway blocks every outbound
+    SMTP port, so nothing here could ever have been delivered from production.
     """
     if not email_configured():
-        logger.info("email not sent: SMTP is not configured for this deployment")
+        logger.info("email not sent: no mail transport is configured for this deployment")
         return False
 
-    message = EmailMessage()
-    message["Subject"] = subject
-    message["From"] = settings.SMTP_USERNAME or settings.SMTP_HOST or ""
-    message["To"] = to_email
-    message.set_content(body)
-
     logger.info("email send attempted")
-    try:
-        with smtplib.SMTP(settings.SMTP_HOST or "", settings.SMTP_PORT, timeout=30) as smtp:
-            smtp.starttls()
-            if settings.SMTP_USERNAME and settings.SMTP_PASSWORD:
-                smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD.get_secret_value())
-            smtp.send_message(message)
-    except Exception:
-        # `logger.exception` with no `extra`: the SMTP host is already in settings, and
-        # the one thing that must not reach a log here -- a live token or URL -- is never
-        # passed to the logger in the first place, so there is nothing an exception's
-        # default repr could leak either.
-        logger.exception("could not send an email")
+    if not deliver(to=to_email, subject=subject, body=body):
         return False
 
     logger.info("email sent")

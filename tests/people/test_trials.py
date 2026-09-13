@@ -11,7 +11,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
-import app.services.people.invitations as invitations
+import app.services.comms.mail_transport as mail_transport
 import pytest
 import sqlalchemy as sa
 from app.core.config import settings
@@ -24,7 +24,7 @@ from pydantic import SecretStr
 from sqlalchemy import select
 from tests.conftest import sign_in
 from tests.people.conftest import FakeSchedule, make_session
-from tests.people.test_invitation_email import BoomSMTP, ExplodingSMTP, FakeSMTP
+from tests.people.test_invitation_email import BoomMailApi, ExplodingMailApi, FakeMailApi
 
 SUNDAY = datetime(2026, 9, 6, 14, 0, tzinfo=UTC)
 
@@ -934,10 +934,12 @@ def test_the_coach_note_never_reaches_the_audit_trail(
 # -- Task 9 §2: the booking-time confirmation email ---------------------------
 
 
-def _configure_smtp(monkeypatch, *, host="smtp.example.invalid", password="app-password"):
-    monkeypatch.setattr(settings, "SMTP_HOST", host)
-    monkeypatch.setattr(settings, "SMTP_PASSWORD", SecretStr(password) if password else None)
-    monkeypatch.setattr(settings, "SMTP_USERNAME", "bot@example.invalid")
+def _configure_mail(monkeypatch, *, key="re_test_key", sender="club@example.invalid"):
+    """Mail moved off SMTP on 2026-09-13 -- Railway blocks every outbound SMTP port. The
+    fakes live in `tests/people/test_invitation_email.py`; imported rather than copied so
+    one change to the transport moves both files at once."""
+    monkeypatch.setattr(settings, "RESEND_API_KEY", SecretStr(key) if key else None)
+    monkeypatch.setattr(settings, "MAIL_FROM", sender)
 
 
 def test_the_confirmation_email_carries_the_lesson_time_in_jerusalem_and_no_app_link(
@@ -946,16 +948,16 @@ def test_the_confirmation_email_carries_the_lesson_time_in_jerusalem_and_no_app_
     """SUNDAY is 2026-09-06 14:00 UTC -- 17:00 in Asia/Jerusalem (DST, +3 in September).
     A confirmation naming the UTC hour would tell a family to show up two or three hours
     early or late, which is worse than sending nothing."""
-    _configure_smtp(monkeypatch)
-    fake = FakeSMTP()
-    monkeypatch.setattr(invitations.smtplib, "SMTP", fake)
+    _configure_mail(monkeypatch)
+    fake = FakeMailApi()
+    monkeypatch.setattr(mail_transport.httpx, "post", fake)
 
     session_id = bookable.sessions[a_group][0].id
     response = _book(client, a_stranger, a_group, session_id)
     assert response.status_code == 201, response.text
 
-    assert len(fake.sent_messages) == 1
-    body = fake.sent_messages[0].get_content()
+    assert len(fake.requests) == 1
+    body = fake.sent_bodies[0]
     assert "17:00" in body
     assert "06.09.2026" in body
     assert "ראשון" in body
@@ -970,14 +972,14 @@ def test_the_confirmation_omits_the_address_line_when_the_session_has_no_locatio
 ):
     """§2 -- 'omitting the line entirely when the studio has recorded neither.' No
     placeholder, no empty line -- `bookable`'s session carries no `location_id` at all."""
-    _configure_smtp(monkeypatch)
-    fake = FakeSMTP()
-    monkeypatch.setattr(invitations.smtplib, "SMTP", fake)
+    _configure_mail(monkeypatch)
+    fake = FakeMailApi()
+    monkeypatch.setattr(mail_transport.httpx, "post", fake)
 
     session_id = bookable.sessions[a_group][0].id
     _book(client, a_stranger, a_group, session_id)
 
-    body = fake.sent_messages[0].get_content()
+    body = fake.sent_bodies[0]
     # `·` is the separator this module only ever adds in front of an address.
     assert "·" not in body
 
@@ -987,9 +989,9 @@ def test_the_confirmation_includes_the_session_s_recorded_address(
 ):
     """§2 -- 'The address from the session's location_id -> Location.address.' Never
     invented: this is the positive case, proven against a real `Location` row."""
-    _configure_smtp(monkeypatch)
-    fake = FakeSMTP()
-    monkeypatch.setattr(invitations.smtplib, "SMTP", fake)
+    _configure_mail(monkeypatch)
+    fake = FakeMailApi()
+    monkeypatch.setattr(mail_transport.httpx, "post", fake)
 
     location = Location(studio_id=studio.id, name="אולם ראשי", address="הרצל 1, תל אביב")
     app_session.add(location)
@@ -1001,7 +1003,7 @@ def test_the_confirmation_includes_the_session_s_recorded_address(
 
     _book(client, a_stranger, a_group, row.id)
 
-    body = fake.sent_messages[0].get_content()
+    body = fake.sent_bodies[0]
     assert "הרצל 1, תל אביב" in body
 
 
@@ -1010,8 +1012,8 @@ def test_an_smtp_failure_on_the_confirmation_does_not_fail_the_booking(
 ):
     """§2 -- 'A send that fails must not fail the booking.' The booking is committed
     before the send is attempted, and `_send` swallows and logs the rest."""
-    _configure_smtp(monkeypatch)
-    monkeypatch.setattr(invitations.smtplib, "SMTP", BoomSMTP())
+    _configure_mail(monkeypatch)
+    monkeypatch.setattr(mail_transport.httpx, "post", BoomMailApi())
 
     session_id = bookable.sessions[a_group][0].id
     response = _book(client, a_stranger, a_group, session_id)
@@ -1023,8 +1025,8 @@ def test_with_smtp_unconfigured_the_confirmation_is_not_attempted_and_booking_st
 ):
     """Production's state today: `SMTP_HOST` set, `SMTP_PASSWORD` absent. This is the one
     case that absolutely must not throw."""
-    _configure_smtp(monkeypatch, password=None)
-    monkeypatch.setattr(invitations.smtplib, "SMTP", ExplodingSMTP())
+    _configure_mail(monkeypatch, key=None)
+    monkeypatch.setattr(mail_transport.httpx, "post", ExplodingMailApi())
 
     session_id = bookable.sessions[a_group][0].id
     response = _book(client, a_stranger, a_group, session_id)
