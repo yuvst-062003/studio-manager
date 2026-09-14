@@ -51,9 +51,21 @@ def _notify(app_session, studio, person_id: uuid.UUID, kind: str, payload: dict[
 
 
 def _sign_declaration(app_session, studio, student_id: uuid.UUID, person_id: uuid.UUID, at):
+    # **Scoped to THIS studio.** Unscoped, this picked whichever `full` template existed
+    # first — in practice the DEMO studio's — and then created a declaration in the test's
+    # own studio pointing at it. A cross-tenant reference the FK cannot refuse (it names
+    # `health_form_template.id` and not the studio), and it broke something apparently
+    # unrelated: `DemoStudioService.wipe` deletes the demo studio's templates and hit the
+    # RESTRICT from a declaration belonging to a studio it is not allowed to touch, so
+    # every demo-reset test failed on a database where these had ever run.
     template = (
         app_session.execute(
-            select(HealthFormTemplate).where(HealthFormTemplate.kind == "full").limit(1)
+            select(HealthFormTemplate)
+            .where(
+                HealthFormTemplate.studio_id == studio.id,
+                HealthFormTemplate.kind == "full",
+            )
+            .limit(1)
         )
         .scalars()
         .first()
