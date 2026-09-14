@@ -182,16 +182,23 @@ const LOGO_URL = '/clubs/gladiator-logo.png'
  *  that uploads its own strip through the הגדרות panel still gets that one; this is the
  *  designed page's own set. `focus` only appears where a centred square crop would take
  *  a head off. */
-/** **Not published, pending rights and consent (2026-09-08).**
+/** **Published again 2026-09-14.** Held back on 2026-09-08 pending two things the club
+ *  did not have on record: who owned the copyright, and whether the guardian of every
+ *  identifiable child had agreed. The owner confirmed both on 2026-09-14 — the club holds
+ *  the rights, and every parent in these five has agreed to their publication — so the
+ *  files are back under `public/clubs/` and the set below is what the page renders.
  *
- *  The five files are in `docs/club-assets/pending-photo-consent/`, out of `public/` —
- *  anything under `public/` is fetchable by direct URL whether or not a page links to it,
- *  so un-rendering alone would not have taken them down. That directory's README carries
- *  the two open questions and what has to be true to put one back.
+ *  The confirmation is the owner's, not a row in `consent_record`. That distinction is
+ *  worth keeping in view: `photo_video` exists in `CONSENT_TYPES` and most of the children
+ *  in these photographs have no `person` row at all, so the ledger could not have backed
+ *  this even in principle. If the club ever publishes a photograph of a CURRENT member,
+ *  that is the point at which the ledger should be the thing consulted.
  *
- *  Kept here rather than deleted because the per-photo `alt` text below is good and was
- *  written for these images; the set goes back a photo at a time as consent arrives. */
-export const GALLERY_PENDING_CONSENT: Quintet<{ src: string; focus?: string }> = [
+ *  **A `Quintet`, and the alt text is zipped by position.** Dropping one entry here would
+ *  slide every later caption onto the wrong photograph, silently. The fixed arity means
+ *  the compiler refuses that: a photograph that has to come down takes its `galleryAlts`
+ *  line with it, in all three locales. */
+const GALLERY: Quintet<{ src: string; focus?: string }> = [
   { src: '/clubs/gladiator-team.jpg' },
   { src: '/clubs/gladiator-medals.jpg' },
   // Portrait: centred, the square would cut the coach's head and the children's faces.
@@ -199,12 +206,6 @@ export const GALLERY_PENDING_CONSENT: Quintet<{ src: string; focus?: string }> =
   { src: '/clubs/gladiator-celebration.jpg' },
   { src: '/clubs/gladiator-podium.jpg' },
 ]
-
-/** What the page actually renders. Empty until a photo has BOTH a licence and a
- *  `photo_video` consent from every identifiable child's guardian. `PublicLanding` draws no
- *  gallery section at all for an empty list — a heading over nothing reads as a broken page,
- *  and this is the one page a stranger sees first. */
-const GALLERY: readonly { src: string; focus?: string }[] = []
 
 /** Fixed arities, so a translation that drops a plan or a nav entry fails to COMPILE
  *  rather than rendering a short page in one language only. */
