@@ -81,6 +81,12 @@ Parts B and C need the Business API for **four conversations a month**. §5.11 a
 weighed and rejected that, on the record, in the file above. The first draft rediscovered a
 decision without noticing it had been made.
 
+> **This cut is scoped to reaching parents, and §20.5.3 reverses it for one other use.**
+> Broadcasting to a hundred families and capturing leads from ads are what fail here. A
+> single-recipient approval loop with the *manager* — who replies, and whose replies make
+> every message in the exchange free — is a different calculation that comes out the other
+> way. Both verdicts are in this document on purpose.
+
 ### §20.3 Facebook and Instagram — cut
 
 Lead capture requires a Meta Business account, a Facebook Page, a linked Instagram Business
@@ -251,23 +257,26 @@ cannot look at while looking at the lens. Revisit an in-app prompter only if a r
 and a real Android both prove the camera works from the installed app — **half a day of
 testing that should happen before any of E is estimated**, not after.
 
-### The consent problem, which is real and not solved
+### The consent problem — answered in §20.5.1
 
-**B is the best idea here and it has a gap.** `photo_video` consent is recorded today
-against `subject_type='person'` — the **guardian who toggled it**
-([app/services/privacy/consent.py:159](../app/services/privacy/consent.py#L159)) — not
-against the child. So "may this child be filmed" is currently an inference from the
-parent's row, not a fact the ledger states.
+**This section asked a question and the owner has since answered it.** It is kept because
+the reasoning is what makes the answer safe to rely on.
 
-That is a decision, not a bug, and it needs making before B is built: either a guardian's
-grant explicitly covers their children (cheap, and defensible if the consent text says so),
-or consent moves to `subject_type='student'` (correct, and a migration). **Ask before
-building.** Either way the ledger already has versioning and revocation, which is the
-expensive half.
+`photo_video` consent is recorded against `subject_type='person'` — the **guardian**
+([app/services/privacy/consent.py:159](../app/services/privacy/consent.py#L159)) — not the
+child. So "may this child be filmed" is an inference from the parent's row rather than a
+fact the ledger states, and the choice was: let a guardian's grant explicitly cover their
+children (cheap, and defensible **only if the parent actually agreed to that in writing**),
+or move consent to `subject_type='student'` (correct, and a migration).
 
-And the rule that falls out of it: **if a coach films, the clip is not the club's to publish
-until every identifiable child in it has consent.** The same sentence that took five
-photographs down in September. The app should say this on the screen, not in a policy
+**The owner chose the first, and supplied the missing half**: the parent signs their
+agreement to image use **at registration**, which is what makes the guardian's row
+load-bearing rather than an assumption. §20.5.1 is that change, it is a day's work, and it
+has a deadline — the onboarding link.
+
+The rule that falls out of it is unchanged: **if a coach films, the clip is not the club's
+to publish until every identifiable child in it has consent.** The same sentence that took
+five photographs down in September. The app should say this on the screen, not in a policy
 document nobody opens.
 
 ### Coaches, and the review gate
@@ -285,12 +294,134 @@ The spec assumes these stay outside the product. Building any of them is out of 
 | Tool | What it is genuinely for | What to know |
 |---|---|---|
 | **Canva** | Posters, story templates, anything designed. Hebrew and RTL support are workable | This is where a flier gets made, if one ever does. Do not rebuild it |
-| **CapCut** | Trimming, music, transitions — the editor most Israeli clubs already use, free | **Its auto-captions may not cover Hebrew** — the language list is short and I could not confirm Hebrew on CapCut's own documentation. **Test it on one real clip before relying on it.** If it does not, that is precisely the gap **D** fills |
+| **CapCut** | Trimming, music, transitions — the editor most Israeli clubs already use, free | **Its auto-captions may not cover Hebrew** — the language list is short and CapCut's own documentation does not enumerate it. It does not matter: **§20.5.2 found five tools that do Hebrew well**, so captioning is not the reason to pick an editor. Pick CapCut for the cutting |
 | **Google AI (Gemini / Veo)** | Gemini for drafting; Veo for generated video | Veo is priced and judged above — cut. If Gemini is preferred over Claude for Hebrew drafting that is a swap of one API for another, not a change of plan |
 
 The honest division of labour: **the app briefs and writes, the phone films, CapCut cuts,
 Canva designs.** A product that tries to be all four will be worse at each than the free
 tool it replaced, and this is a club with four enquiries a month.
+
+---
+
+## §20.5 Three answers from the third round
+
+### 1. Photo consent is signed at registration — and this is urgent
+
+The owner's answer to the open question: **the parent signs, at registration, that they
+agree to the use of images, and the content studio checks the parent's file.** So a
+guardian's grant covers their children, and `subject_type='person'` is the right shape
+after all. §20.4 **B** is unblocked.
+
+The machinery is already there and this is genuinely small:
+
+- `photo_video` is already in `GRANTABLE_CONSENT_TYPES`
+  ([app/services/privacy/policy.py:63](../app/services/privacy/policy.py#L63)).
+- `ConsentService.record` already writes person-level rows, versioned, append-only and
+  audited, from a `grants` dict ([app/services/privacy/consent.py:159](../app/services/privacy/consent.py#L159)).
+- The registration agreement **already grants a consent at the moment of signature** —
+  `club_terms`, through exactly that call ([app/services/health/agreement.py:655](../app/services/health/agreement.py#L655)).
+
+So this is one more key in a dict that is already being written. Perhaps a day.
+
+**The one rule that cannot be bent.** The club's own published privacy policy says, in
+Hebrew, that photo consent is entirely optional — *"הסכמה לפרסום תמונות היא רשות מלאה —
+סירוב אינו משפיע על ההשתתפות ואינו נרשם כהסכמה"*. So it is a **tick inside the signature,
+never a condition of it**: registration must complete with the box unticked, refusal must
+change nothing, and an unanswered box must be recorded as **no**, not as silence. Getting
+this wrong makes the club's own policy text untrue — which is precisely the finding that
+took the landing-page photographs down on 2026-09-08.
+
+> **Do this before the onboarding link goes out.** The link is due **this week** and will
+> bring in over a hundred families in one pass. If the tick is not in the signing flow when
+> they register, every one of them signs without ever being asked, and the only way to ask
+> afterwards is to hope they visit the privacy screen and opt in — which almost nobody
+> does. **One day of work now, or a hundred families with no answer on file.** This is the
+> most time-sensitive item in this document.
+
+The known limitation, stated rather than discovered later: person-level consent means a
+parent with two children cannot say yes for one and no for the other. That is almost
+certainly fine for this club, and the upgrade path — consent at `subject_type='student'` —
+stays open because the ledger is versioned.
+
+### 2. The tools — Hebrew captioning is solved, and CapCut was the wrong worry
+
+The owner is right that it need not be CapCut. Researched properly, **Hebrew auto-captioning
+is well served**: Sonix claims 85–99% on Hebrew, VEED ~95%, and Flixier, Submagic and
+Filmora all handle Hebrew with Filmora documenting RTL support explicitly. The doubt in
+§20.4's table was about CapCut specifically, and it stops mattering — there are five
+alternatives and the club needs one.
+
+Two things follow, and they pull in opposite directions from what you would expect:
+
+- **It does not make D more valuable — it makes it cheaper to skip.** If any of those tools
+  does the job for free, three days of building transcription buys very little. Try one on
+  one real clip first.
+- **But if D is built, the app's own path is still the cheapest**: Whisper at ~2 agorot a
+  minute, inside a flow that already knows the club, with no second account and no upload
+  to a third party. That last part is not nothing when the video is of children.
+
+**The real technical gotcha is not accuracy, it is direction.** Hebrew subtitle files come
+out of many tools flipped or misaligned, and fixing it needs explicit Unicode RTL embedding
+in the `.srt` — there are standalone tools that exist to do nothing else. Any caption work
+here must be checked in a player, not in a text editor: an `.srt` that looks right in code
+is the single most likely way to ship broken Hebrew subtitles.
+
+So the division of labour in §20.4 stands, with one correction: **the outside tool is for
+cutting and design, not for captions.** Captions are either free in the editor the club
+picks, or two agorot a minute in the app — and the decision is one test clip away.
+
+### 3. The approval loop over WhatsApp
+
+The owner wants the system to draft content, send it to the manager **in WhatsApp**, and
+publish nothing until the manager approves — with the manager able to send corrections back
+and get a revision. WhatsApp specifically, because it is where the manager already lives.
+
+**This reverses §20.2's verdict, and the reversal is honest rather than convenient.** That
+section cut the Business API for *broadcasting to two hundred parents* and for *lead
+capture from ads that do not exist*. **One recipient with a reply loop is a completely
+different calculation**, and it comes out the other way.
+
+**The economics, which are better than anyone expects.** Since per-message pricing replaced
+conversation pricing on 1 July 2025:
+
+- **Service messages** — non-template replies inside an open 24-hour customer service
+  window — are **free, with no monthly cap**. The old "1,000 free service conversations"
+  limit was retired with the old model.
+- **Utility templates sent inside an open window are also free.**
+- Only a business-initiated message **outside** the window costs anything. Israel's exact
+  utility rate sits in a rate-card CSV I could not read; it is small, and the design below
+  avoids it entirely.
+
+**So make the loop manager-initiated, which is both the free path and the correct one.**
+The manager messages the club's number — *"תכין פוסט על הבחינות"* — which opens the free
+window; the app replies with a draft; the manager replies *"קצר יותר"*; the app revises;
+the manager replies *"אשר"*. Every message in that exchange is free, in both directions,
+for as long as the manager keeps replying. **₪0 a month.** And an approval loop that only
+starts when the manager asks for something is exactly the consent semantics the owner
+described, rather than a bot that interrupts them.
+
+**What it actually costs is setup, not messages**, and it is the same gate that killed lead
+capture: a **Meta Business Portfolio**, completed **Business Verification** (1–5 working
+days), and a **dedicated number not already on WhatsApp**. The club has none of the three.
+The difference from §20.3 is that here the ongoing cost is genuinely zero and the value is
+concrete, so the gate is worth walking through rather than a reason to stop. Note also that
+**Coexistence** (§20.2's corrected facts) means that number can still run the Business app —
+the club does not lose a phone.
+
+**Build it transport-agnostic, and ship push first.** The expensive half of this is not
+WhatsApp, it is the state machine: *draft → sent for approval → corrections → revised →
+approved → published*, with nothing leaving that flow unapproved. Push notifications have
+been live since 2026-09-13, so that state machine plus an in-app approve/revise screen
+**works today, costs nothing, and needs no Meta account at all**. Wire WhatsApp in as a
+second transport once the Business account exists. This is not an argument against the
+owner's preference — it is the order that gets the loop working in days instead of weeks,
+and the WhatsApp half is then a transport, not a rebuild. The inbound webhook has a pattern
+to copy in [app/routers/webhooks.py](../app/routers/webhooks.py).
+
+**One privacy note, stated and not laboured.** A draft carrying photographs of children
+that goes out over WhatsApp puts those images on Meta's servers. The manager would almost
+certainly send them there anyway, and that is a fair argument — but it is a decision, and
+§11 is the reason to write it down rather than let it happen by default.
 
 ---
 
@@ -333,24 +464,29 @@ further eight or so, and worth it only in the order below.
 
 | | | |
 |---|---|---|
+| **Before the link goes out** | **§20.5.1** — the photo-consent tick in the registration signature | **~1 day** |
 | This week | Send the onboarding link to the club | no code |
 | Then | The share button in the parent app | ~1 day |
 | Then | **§20.4 B** — the consent check before a coach films | ~2 days |
 | Then | **§20.4 A + C** — the shot brief and the caption writer | ~4 days |
-| Then | **§20.4 D** — captions from speech, *if* CapCut turns out not to do Hebrew | ~3 days |
+| Then | **§20.5.3** — the approve/revise state machine, **over push first** | ~3 days |
+| Then | **§20.5.3** — the same loop over WhatsApp, once the Meta account exists | ~3 days + verification |
+| Ten minutes, before estimating D | Try one real clip in one Hebrew captioning tool | — |
+| Then, only if that fails | **§20.4 D** — captions from speech, with RTL checked in a player | ~3 days |
 | Half a day, before estimating E | Prove the camera works in the installed app on a real iPhone **and** a real Android | — |
 | **Deferred** | **§20.4 E** — the in-app teleprompter that owns the camera | pending that test |
-| **Not on today's numbers** | the lead table · the lead screen · the WhatsApp Business API · Meta lead capture · AI fliers · **§20.4 F** video rendering · **§20.4 G** AI-generated video | — |
+| **Not on today's numbers** | the lead table · the lead screen · WhatsApp broadcasts to parents · Meta lead capture · AI fliers · **§20.4 F** video rendering · **§20.4 G** AI-generated video | — |
 
-**Running cost: under ₪2 a month**, almost all of it captions and transcription. The
-₪100/month the owner was willing to spend is **not needed** — the expense here is weeks of
-work, and the only item that would have spent real money (Veo) is cut for being wrong as
-well as dear.
+**Running cost: under ₪2 a month**, almost all of it captions and transcription — and the
+WhatsApp loop adds **₪0** to that, because a manager who replies keeps every message in the
+exchange free. The ₪100/month the owner was willing to spend is **not needed**. The expense
+here is weeks of work, and the only item that would have spent real money (Veo) is cut for
+being wrong as well as dear.
 
-Two things must be decided by the owner before §20.4 starts, and both are one question
-each: **does a guardian's `photo_video` grant cover their children, or does consent move to
-the student?** — and **does CapCut caption Hebrew?**, which is one real clip and ten
-minutes, and which decides whether D is worth three days.
+**The first row is the one that cannot slip.** Everything else in this table can be done in
+any order, later, at leisure. The consent tick has a deadline set by someone else's
+calendar: once a hundred families have signed without being asked, asking them again is a
+campaign rather than a checkbox.
 
 Revisit WhatsApp and Meta if enquiries ever pass roughly **30 a month** — the point at which
 a person stops being able to hold them all in their head, and therefore the first point at
@@ -390,9 +526,23 @@ Answered in the second round, after the owner asked for the content studio:
 9. **Who films?** The owner *and the coaches* — which is the whole reason §20.4 carries a
    review gate and why **B** exists at all.
 
-Still open, and both are the owner's to answer:
+Answered in the third round, and each one closed something:
 
-10. **Does a guardian's `photo_video` grant cover their children, or must consent move to
-    `subject_type='student'`?** Blocks **B**.
-11. **Does CapCut caption Hebrew?** One clip, ten minutes. Decides whether **D** is three
-    days well spent or three days wasted.
+10. **Does a guardian's grant cover their children?** **Yes** — the parent signs it at
+    registration and the app reads their file. `subject_type='person'` stands, **B** is
+    unblocked, and §20.5.1 became the most urgent item in the document.
+11. **Does CapCut caption Hebrew?** Wrong question — it need not be CapCut, and five other
+    tools do Hebrew well. §20.5.2 replaces it with a better one: *does any free editor do
+    it well enough that D is not worth building at all?*
+12. **How should approval work?** The system drafts, the manager approves in WhatsApp, and
+    corrections go back the same way. §20.5.3 — and it reverses §20.2 for this one use.
+
+Still open, and all three are cheap to close:
+
+13. **Which captioning tool, if any?** One real clip through one of the five. Ten minutes,
+    and it decides three days of work.
+14. **Does the club want a Meta Business Portfolio?** Verification is 1–5 working days and
+    a dedicated number. Needed for WhatsApp, not for push — so the loop can ship before
+    this is answered.
+15. **Does the club accept photographs of children passing through Meta's servers?**
+    §20.5.3's last paragraph. Probably yes, but it should be a decision.
