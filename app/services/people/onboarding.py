@@ -713,6 +713,7 @@ class OnboardingService:
         schedule: ScheduleReader,
         actor_identity_id: uuid.UUID | None = None,
         club_terms_accepted: bool = False,
+        photo_video: bool | None = None,
         signed_ip: str | None = None,
         signed_user_agent: str | None = None,
     ) -> RegistrationResult:
@@ -890,6 +891,10 @@ class OnboardingService:
                 at=at,
                 ip=signed_ip,
                 actor_identity_id=actor_identity_id,
+                # §20.5.1 -- ticked beside the terms on the same screen, recorded as its own
+                # row. Gated by `club_terms_accepted` only because that is what marks this a
+                # real signature; the photograph answer itself never gates anything.
+                photo_video=photo_video,
             )
 
         AuditService.record(

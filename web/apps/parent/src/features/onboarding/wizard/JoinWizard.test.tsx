@@ -1210,7 +1210,9 @@ describe('Step1Agreements -- renders in English when given locale="en" (task 6)'
     const he = step1Copy('he')
 
     render(
-      <Step1Agreements locale="en" agreed={false} onAgreedChange={() => {}} onContinue={() => {}} />,
+      <Step1Agreements locale="en" agreed={false} onAgreedChange={() => {}}
+        photoConsent={false}
+        onPhotoConsentChange={() => {}} onContinue={() => {}} />,
     )
 
     expect(screen.getByText(en.heading)).toBeInTheDocument()
@@ -1244,6 +1246,8 @@ describe('Step1Agreements -- no version number on a document (owner, 2026-09-08)
         locale="he"
         agreed={false}
         onAgreedChange={() => {}}
+        photoConsent={false}
+        onPhotoConsentChange={() => {}}
         onContinue={() => {}}
       />,
     )

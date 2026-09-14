@@ -35,7 +35,11 @@ CLUB_TERMS_CONSENT_TYPE = "club_terms"
 #: `POLICY_VERSION` started at 0. Raised to 2 alongside `POLICY_VERSION` for decision 24
 #: (2026-09-03): the cheque payee clause changed (decision 22), so every family is asked
 #: again -- the rule this module's docstring states above.
-CLUB_TERMS_VERSION = 2
+#:
+#: Raised to 3 for the photography clause (2026-09-14, owner-approved). Deliberately done
+#: BEFORE §5.4b's onboarding link goes out: a version bump re-asks every family, which
+#: costs nothing at three and is a hundred interruptions the week after.
+CLUB_TERMS_VERSION = 3
 
 
 # ---------------------------------------------------------------------------------------
@@ -71,6 +75,27 @@ PAYMENT_TERMS: tuple[str, ...] = (
     "בעת ביטול מנוי שנתי, התעריף החודשי יחושב בהתאם לניצול החודשים בפועל של המנוי "
     "(לדוגמה: אם המנוי ניצל שלושה חודשים, החישוב יבוצע לפי תעריף מנוי לשלושה חודשים).",
 )
+
+#: §20.5.1 -- the photography clause (owner-approved 2026-09-14). **Information, not
+#: consent**, and the distinction is the whole design. Accepting these terms is a
+#: CONDITION of registering (`clubTerms.required`), so a consent folded into them would be
+#: compulsory by construction -- which contradicts the privacy policy's promise that photo
+#: consent is רשות מלאה and that refusing changes nothing, and which Amendment 13 to
+#: חוק הגנת הפרטיות (in force 2025-08-14) independently forbids: separate purposes need
+#: separate consents and may not be merged into one tick.
+#:
+#: So this clause says only that the club photographs and that publication rests on a
+#: SEPARATE, optional permission. The permission itself is the `photo_video` consent,
+#: granted beside this one and never inside it.
+PHOTO_TITLE = "צילום ופרסום"
+
+PHOTO_CLAUSE_TEXT = (
+    "במהלך האימונים, התחרויות והאירועים המועדון מצלם תמונות ווידאו לצורך תיעוד "
+    "הפעילות. פרסום הצילומים נעשה אך ורק על בסיס הסכמה נפרדת, שאותה אפשר לתת או לא "
+    "לתת במסך ההרשמה, ולבטל בכל עת. אי-מתן הסכמה אינו משפיע על ההשתתפות באימונים "
+    "ואינו גורע מזכויותיכם."
+)
+
 
 #: The heading over the payment terms.
 TERMS_TITLE = "תקנון ותנאי תשלום"
@@ -128,6 +153,19 @@ def clause_title() -> str:
 
 def payment_terms() -> tuple[str, ...]:
     return PAYMENT_TERMS
+
+
+def photo_title() -> str:
+    return PHOTO_TITLE
+
+
+def photo_clause() -> tuple[str, ...]:
+    """The photography clause, as the signed PDF's own paragraphs.
+
+    A tuple for the same reason `payment_terms` is one: `RenderedSection` takes a list of
+    paragraphs, and a clause that grows a second sentence should not have to change shape
+    at the call site."""
+    return (PHOTO_CLAUSE_TEXT,)
 
 
 def signature_line(*, signer: str, studio: str) -> str:

@@ -153,6 +153,10 @@ export function step1Copy(locale: Locale) {
     faqLead: t(locale, 'people.joinWizard.step1.faqLead'),
     faqCount: t(locale, 'people.joinWizard.step1.faqCount'),
     agree: t(locale, 'people.joinWizard.step1.agree'),
+    //: §20.5.1 — the optional photography permission beside the agreement.
+    photoLabel: t(locale, 'people.joinWizard.step1.photoLabel'),
+    photoOptional: t(locale, 'people.joinWizard.step1.photoOptional'),
+    photoDetail: t(locale, 'people.joinWizard.step1.photoDetail'),
     continue: t(locale, 'people.joinWizard.step1.continue'),
     closeDocument: t(locale, 'people.joinWizard.step1.closeDocument'),
     close: t(locale, 'people.joinWizard.step1.close'),

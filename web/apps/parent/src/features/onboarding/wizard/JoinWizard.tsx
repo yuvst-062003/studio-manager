@@ -181,6 +181,9 @@ export function JoinWizard({
   // person already holds the current version, and its own docstring calls a re-signature
   // reaching it a duplicate rather than a mistake.
   const [agreed, setAgreed] = useState(() => restored?.agreed ?? (startAtStep ?? 1) > 1)
+  //: §20.5.1 — opens UNTICKED, always, including on a restored draft that never held one.
+  //: A photo permission that defaults to granted is not a permission.
+  const [photoConsent, setPhotoConsent] = useState(() => restored?.photoConsent ?? false)
   //: The resumed draft wins over the seed: a family halfway through their own run must not
   //: have it replaced by the roster they started from.
   const [students, setStudents] = useState<StudentDraft[]>(() =>
@@ -212,8 +215,25 @@ export function JoinWizard({
   //: offer a finished registration as resumable work (§5.7 rule 4).
   useEffect(() => {
     if (submitResult !== null) return
-    saveWizardDraft({ scope: draftScope, step, agreed, students, methods, alreadyArranged })
-  }, [draftScope, step, agreed, students, methods, alreadyArranged, submitResult])
+    saveWizardDraft({
+      scope: draftScope,
+      step,
+      agreed,
+      photoConsent,
+      students,
+      methods,
+      alreadyArranged,
+    })
+  }, [
+    draftScope,
+    step,
+    agreed,
+    photoConsent,
+    students,
+    methods,
+    alreadyArranged,
+    submitResult,
+  ])
   //: Bumped by `WizardLoadFailed`'s retry. The effect below keys on it as well as on
   //: `source`, which is what turns two one-shot reads into two retryable ones -- a counter
   //: rather than a hand-rolled re-fetch, so the retry path is the SAME code as the first
@@ -323,7 +343,13 @@ export function JoinWizard({
       templateId,
       deps: {
         register: () =>
-          source.register(toRegisterPayload(students, { templateId, clubTermsAccepted: agreed })),
+          source.register(
+            toRegisterPayload(students, {
+              templateId,
+              clubTermsAccepted: agreed,
+              photoConsent,
+            }),
+          ),
         refreshSession: async () => {
           await refresh()
         },
@@ -452,6 +478,8 @@ export function JoinWizard({
             locale={locale}
             emblemUrl={studio.logoUrl}
             agreed={agreed}
+            photoConsent={photoConsent}
+            onPhotoConsentChange={setPhotoConsent}
             onAgreedChange={setAgreed}
             onContinue={() => setStep(2)}
           />

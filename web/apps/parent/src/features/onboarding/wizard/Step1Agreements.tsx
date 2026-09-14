@@ -44,6 +44,15 @@ export type Step1AgreementsProps = {
    *  back-navigation and on refresh while the step number IS persisted (§14.2). */
   agreed: boolean
   onAgreedChange: (agreed: boolean) => void
+  /** §20.5.1 — the optional photography permission. Lifted for the same reason `agreed`
+   *  is: the step number survives a refresh, so an answer kept in local state would be
+   *  silently lost while the wizard claims to be on the step after it.
+   *
+   *  **Never gates `onContinue`.** The club's privacy policy promises that refusing
+   *  changes nothing, and a Continue button that dims when this is unticked would make
+   *  that untrue on the one screen where the family reads it. */
+  photoConsent: boolean
+  onPhotoConsentChange: (granted: boolean) => void
   onContinue: () => void
 }
 
@@ -52,6 +61,8 @@ export function Step1Agreements({
   emblemUrl,
   agreed,
   onAgreedChange,
+  photoConsent,
+  onPhotoConsentChange,
   onContinue,
 }: Step1AgreementsProps) {
   const STEP1_COPY = step1Copy(locale)
@@ -166,6 +177,54 @@ export function Step1Agreements({
             {STEP1_COPY.agree}
           </span>
         </label>
+
+        {/* §20.5.1 — a SECOND tick, deliberately not part of the one above. Separated by a
+            rule and carrying its own "optional" pill, because the two must not read as one
+            block of small print: the first is a condition of registering and this one is
+            not, and Amendment 13 to חוק הגנת הפרטיות requires the two purposes to carry
+            separate consents. */}
+        <div className="border-t border-[var(--wz-line)] pt-4">
+          <label
+            htmlFor="wizard-photo-consent"
+            className="flex items-start gap-3 cursor-pointer group"
+          >
+            <div className="relative flex items-center justify-center shrink-0 mt-0.5">
+              <input
+                id="wizard-photo-consent"
+                type="checkbox"
+                checked={photoConsent}
+                onChange={(event) => onPhotoConsentChange(event.target.checked)}
+                className="sr-only peer"
+                aria-describedby="wizard-photo-consent-detail"
+              />
+              <div
+                className={`w-6 h-6 rounded-lg flex items-center justify-center shadow-inner transition-all group-hover:scale-105 peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--wz-accent)] peer-focus-visible:ring-offset-2 ${
+                  photoConsent
+                    ? 'bg-[var(--wz-accent)] text-white'
+                    : 'bg-[var(--wz-tint-4)] text-transparent border border-[var(--wz-line-strong)]'
+                }`}
+              >
+                <Check className="w-4 h-4 stroke-[3]" />
+              </div>
+            </div>
+            <span className="flex flex-col gap-1 min-w-0">
+              <span className="flex items-center gap-2 flex-wrap">
+                <span className="text-[13px] font-medium text-[var(--wz-ink)] leading-snug group-hover:text-[var(--wz-accent)] transition-colors">
+                  {STEP1_COPY.photoLabel}
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--wz-tint-4)] text-[var(--wz-tertiary)] shrink-0">
+                  {STEP1_COPY.photoOptional}
+                </span>
+              </span>
+              <span
+                id="wizard-photo-consent-detail"
+                className="text-[11px] text-[var(--wz-tertiary)] leading-relaxed"
+              >
+                {STEP1_COPY.photoDetail}
+              </span>
+            </span>
+          </label>
+        </div>
 
         <button
           type="button"

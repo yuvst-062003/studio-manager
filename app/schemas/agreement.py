@@ -85,6 +85,15 @@ class ClubTermsIn(BaseModel):
 
     accepted: bool
     version: int
+    #: §20.5.1 -- the optional photography permission, ticked beside the terms rather
+    #: than inside them. Three states and all three are meaningful: `True` is consent,
+    #: `False` is **asked and declined**, and `None` is *not asked* -- which is what a client
+    #: that predates this field sends, and what must not be silently recorded as a refusal.
+    #:
+    #: Deliberately NOT part of `accepted`. The terms block registration; this never may
+    #: (`privacy.policy.s3.body`: "סירוב אינו משפיע על ההשתתפות"), and Amendment 13 to
+    #: חוק הגנת הפרטיות requires separate purposes to carry separate consents.
+    photo_video: bool | None = None
 
 
 class PickupContactOut(BaseModel):

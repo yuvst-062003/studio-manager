@@ -235,6 +235,9 @@ class OnboardingRegisterIn(BaseModel):
     #: the wizard always re-fetches step 1 fresh (no cached, possibly-stale version to
     #: echo back), so there is no stale-screen case for the client to name a version for.
     club_terms_accepted: bool = False
+    #: §20.5.1's optional photography permission. `None` is "not asked"; see `ClubTermsIn`
+    #: in app/schemas/agreement.py for why the three states are kept apart.
+    photo_video: bool | None = None
 
 
 class OnboardingRegisterOut(BaseModel):
@@ -541,6 +544,7 @@ def register(
                     for child in body.children
                 ],
                 club_terms_accepted=body.club_terms_accepted,
+                photo_video=body.photo_video,
                 signed_ip=request.client.host if request.client else None,
                 signed_user_agent=request.headers.get("user-agent"),
                 signer=(

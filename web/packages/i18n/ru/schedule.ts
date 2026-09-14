@@ -701,6 +701,9 @@ export const schedule: Bundle = {
   'plan.group.inviteOnly': 'Только по приглашению',
   'plan.group.eligibility': 'Базовые группы, которым разрешено',
   // -- בית, the parent app's home tab (the redesign of 2026-09-05) ---------------
+  // §20 — см. файл he/: сообщение звучит от имени родителя, а не клуба.
+  'home.shareClub': 'Поделиться клубом',
+  'home.shareClubMessage': 'Мои дети занимаются здесь, и мы очень довольны — стоит посмотреть:',
   'home.greeting': 'Здравствуйте',
   'home.greetingFamily': 'Здравствуйте, семья {{name}}',
   'home.reportAbsence': 'Сообщить об отсутствии',

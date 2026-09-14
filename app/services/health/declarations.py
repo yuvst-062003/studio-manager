@@ -724,6 +724,18 @@ def build_terms_sections(answers: Mapping[str, Any]) -> list[RenderedSection]:
             paragraphs=list(club_terms.payment_terms()),
         )
     )
+    # §20.5.1 -- the club photographs, and publication rests on a SEPARATE permission.
+    # In the signed document because a term that exists only on screen is a term absent from
+    # the record it is about; this module's own `_DISCLAIMER` exists for the same reason.
+    # What is NOT here is the permission itself: that is a `photo_video` consent row, and
+    # printing it as a clause of a document the family had to accept would misrepresent an
+    # optional answer as part of a mandatory agreement.
+    sections.append(
+        RenderedSection(
+            title=club_terms.photo_title(),
+            paragraphs=list(club_terms.photo_clause()),
+        )
+    )
     return sections
 
 

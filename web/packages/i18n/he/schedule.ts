@@ -812,6 +812,11 @@ export const schedule: Bundle = {
   // API has no source for one it is ABSENT rather than invented — the season line most of
   // all: `SessionRow.training_year_id` is a uuid and nothing resolves it to a name, so the
   // greeting renders the family alone rather than a Hebrew year guessed on the client.
+  // §20 — the club's one acquisition affordance. The message is the PARENT's voice, not
+  // the club's: it is sent from their phone, to their friend, and copy that reads like an
+  // advertisement is copy nobody forwards.
+  'home.shareClub': 'שיתוף המועדון',
+  'home.shareClubMessage': 'הילדים שלי מתאמנים כאן ואנחנו מרוצים מאוד — שווה הצצה:',
   'home.greeting': 'שלום',
   'home.greetingFamily': 'שלום, משפחת {{name}}',
   'home.reportAbsence': 'דיווח היעדרות',

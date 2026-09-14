@@ -162,9 +162,23 @@ def test_photo_video_consent_is_recordable_and_defaults_to_nothing(
         .all()
     )
 
-    granted = client.post(
+    # §20.5.1 -- a photo grant is made against the CLUB's version, not ours. The text a
+    # family reads about photography is the club's תקנון (`expected_version`), so the
+    # screen posts `club_terms_version` here and `policy_version` for terms and privacy.
+    club_terms_version = state["club_terms_version"]
+    stale = client.post(
         "/api/v1/privacy/consents",
         json={"version": POLICY_VERSION, "grants": {"photo_video": True}},
+        headers=as_guardian.headers,
+    )
+    assert stale.status_code == 409, (
+        "our POLICY_VERSION must not be accepted for a consent the club's text governs -- "
+        "the two numbers agreeing today is a coincidence, not a rule"
+    )
+
+    granted = client.post(
+        "/api/v1/privacy/consents",
+        json={"version": club_terms_version, "grants": {"photo_video": True}},
         headers=as_guardian.headers,
     )
     assert granted.status_code == 200, granted.text

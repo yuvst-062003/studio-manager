@@ -78,9 +78,21 @@ def expected_version(consent_type: str) -> int:
     version mismatch while our own policy sat at draft 0. The two numbers were never going
     to agree, and making them agree would have coupled a club's agreement to our lawyer's
     calendar.
+
+    **`photo_video` moved onto the club's number on 2026-09-14**, when the photography
+    clause was added to the club's own תקנון. The rule is that a version tracks the TEXT a
+    family read, and the text a family reads about photography is now the club's, revised
+    on the club's schedule. Left on `POLICY_VERSION` it would have been the exact bug this
+    function exists to prevent, one document later: the club rewrites its photography
+    wording, `CLUB_TERMS_VERSION` moves, and every existing photo consent still reads as
+    current against wording nobody agreed to.
+
+    The two numbers happened to both be 2 the day this changed, which is precisely why it
+    had to be written down rather than left to coincide.
     """
     # Imported here, not at module scope: app.services.health imports this module, and a
     # top-level import would close the cycle.
     from app.services.health.club_terms import CLUB_TERMS_CONSENT_TYPE, CLUB_TERMS_VERSION
 
-    return CLUB_TERMS_VERSION if consent_type == CLUB_TERMS_CONSENT_TYPE else POLICY_VERSION
+    club_owned = (CLUB_TERMS_CONSENT_TYPE, "photo_video")
+    return CLUB_TERMS_VERSION if consent_type in club_owned else POLICY_VERSION

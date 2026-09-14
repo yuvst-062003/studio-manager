@@ -11,3 +11,6 @@ export {
   matchLandingPath,
 } from './route'
 export type { LandingRoute, LandingView } from './route'
+// §20 — the share affordance. Lives here because building the link needs this feature's
+// own knowledge of where the club's public page actually answers (#25's apex rule).
+export { clubPublicUrl, shareClubHref } from './shareClub'

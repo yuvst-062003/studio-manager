@@ -43,6 +43,7 @@ from pydantic import BaseModel, Field
 
 from app.core.clock import now
 from app.core.tenancy import TenantSessionDep, require_current_studio_id
+from app.services.health.club_terms import CLUB_TERMS_VERSION
 from app.services.privacy import (
     POLICY_IS_DRAFT,
     POLICY_VERSION,
@@ -96,6 +97,13 @@ class ConsentStateOut(BaseModel):
     policy_version: int
     policy_version_label: str
     policy_is_draft: bool
+    #: §20.5.1 -- the version a `photo_video` grant must be made against, which is the
+    #: CLUB's number and not ours: the text a family reads about photography is the club's
+    #: תקנון, revised on the club's schedule (`privacy.policy::expected_version`). On the
+    #: wire for the same reason `policy_version` is -- a client that hand-mirrored either
+    #: number would drift from it silently, and the screen would start posting stale
+    #: versions the moment the club revised its terms.
+    club_terms_version: int
     required: list[str]
     outstanding: list[str]
     records: list[ConsentRecordOut]
@@ -239,6 +247,7 @@ def _consent_state(session: TenantSessionDep, person_id: uuid.UUID) -> ConsentSt
         policy_version=POLICY_VERSION,
         policy_version_label=POLICY_VERSION_LABEL,
         policy_is_draft=POLICY_IS_DRAFT,
+        club_terms_version=CLUB_TERMS_VERSION,
         required=list(REQUIRED_CONSENT_TYPES),
         outstanding=ConsentService.outstanding(session, person_id=person_id),
         records=[

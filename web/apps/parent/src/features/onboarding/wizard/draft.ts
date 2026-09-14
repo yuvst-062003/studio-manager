@@ -103,6 +103,10 @@ export type WizardDraft = {
   scope: string
   step: number
   agreed: boolean
+  /** §20.5.1 — optional, because every draft saved before this field existed lacks it.
+   *  `JoinWizard` reads it as `?? false`, so an old draft restores UNTICKED rather than
+   *  inheriting a permission its owner was never asked for. */
+  photoConsent?: boolean
   students: readonly StudentDraft[]
   methods: Readonly<Record<string, string>>
   alreadyArranged: boolean

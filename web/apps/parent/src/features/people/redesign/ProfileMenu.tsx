@@ -24,9 +24,10 @@
 // percentages here — but a completely silent row would hide an unpaid balance behind a
 // popup, and a dot is a mark rather than a number.
 import type { LucideIcon } from 'lucide-react'
-import { Building2, ChevronLeft, CreditCard, Settings, User, Users } from 'lucide-react'
+import { Building2, ChevronLeft, CreditCard, Settings, Share2, User, Users } from 'lucide-react'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { clubPublicUrl, landingHostsFrom, shareClubHref } from '../../landing'
 
 export type MenuKey = 'personal' | 'trainees' | 'payments' | 'club'
 
@@ -53,6 +54,18 @@ export function ProfileMenu({
   /** Which rows need the parent to do something. */
   attention: Readonly<Partial<Record<MenuKey, boolean>>>
 }) {
+  //: §20 — same derivation as `HomeTop`, and for the same reason: it depends only on
+  //: build-time configuration and the origin. `null` hides the row rather than offering a
+  //: link that resolves to nothing.
+  const publicUrl = clubPublicUrl(
+    import.meta.env.VITE_LANDING_SLUG,
+    landingHostsFrom(import.meta.env.VITE_LANDING_HOSTS),
+    globalThis.location?.origin ?? '',
+  )
+  const shareHref = publicUrl
+    ? shareClubHref(t(locale, 'schedule.home.shareClubMessage'), publicUrl)
+    : null
+
   return (
     <div className="px-4 space-y-3">
       <div
@@ -74,8 +87,30 @@ export function ProfileMenu({
 
       {/* A card of its own. "What I have" and "my account" are different questions, and a
           sign-out sitting one row under a child's name is a sign-out somebody taps by
-          accident. */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-xs overflow-hidden">
+          accident.
+
+          §20 puts שיתוף המועדון here as well as on home. The home icon is for the parent
+          who is already looking at the app; this row is for the one who came to the profile
+          screen looking for something to send — and a feature reachable from exactly one
+          place is one most people never find. */}
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-xs overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
+        {shareHref ? (
+          <a
+            data-testid="profile-row-share"
+            href={shareHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full flex items-center gap-3 px-4 py-4 text-start hover:bg-slate-50 dark:hover:bg-slate-800/60 active:scale-[0.99] transition-all cursor-pointer"
+          >
+            <span className="w-9 h-9 rounded-2xl bg-blue-50 dark:bg-blue-400/15 text-[#0056c5] dark:text-blue-300 flex items-center justify-center shrink-0">
+              <Share2 className="w-4.5 h-4.5" aria-hidden="true" />
+            </span>
+            <span className="flex-1 text-sm font-semibold text-slate-900 dark:text-slate-50 min-w-0 truncate">
+              {t(locale, 'schedule.home.shareClub')}
+            </span>
+            <ChevronLeft className="w-4 h-4 text-slate-300 dark:text-slate-600 shrink-0 wz-dir-icon" />
+          </a>
+        ) : null}
         <Row
           icon={Settings}
           label={t(locale, 'people.profile.menuSettings')}

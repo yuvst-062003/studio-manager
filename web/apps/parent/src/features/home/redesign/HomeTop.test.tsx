@@ -6,7 +6,8 @@
 // The strip is worth keeping for a family with two or three children, so this is a gate
 // rather than a deletion — which is why both halves are asserted here.
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { t } from '@studio/i18n'
 import { HomeTop } from './HomeTop'
 import type { HomePlan } from './HomeTop'
 import type { HomeChild } from './types'
@@ -104,5 +105,42 @@ describe('the plan, beside the bell', () => {
   it('draws nothing at all when there is no plan to show', () => {
     renderTop([CHILDREN[0]!], null)
     expect(screen.queryByTestId('home-plan-pill')).toBeNull()
+  })
+})
+
+describe('§20 — שיתוף המועדון, beside the bell', () => {
+  // The seam, not the component. A test that only finds the button passes while the link
+  // points at the sign-in wall, which is the one way this feature can fail silently: the
+  // parent sees a share icon, sends it to a friend, and the friend gets a login box.
+  it('shares the club’s public page over WhatsApp, with the message and the link', () => {
+    vi.stubEnv('VITE_LANDING_SLUG', 'gladiator')
+    vi.stubEnv('VITE_LANDING_HOSTS', 'gladiatorclub.co.il,www.gladiatorclub.co.il')
+    renderTop(CHILDREN)
+
+    const share = screen.getByTestId('home-share-club')
+    const href = share.getAttribute('href') ?? ''
+    // `wa.me/?text=` with no recipient — §5.11's rule, inherited: the sender picks who
+    // gets it, and no phone number goes into a URL.
+    expect(href).toMatch(/^https:\/\/wa\.me\/\?text=/)
+    expect(href).not.toMatch(/wa\.me\/\d/)
+
+    const shared = decodeURIComponent(href)
+    // The APEX, not `location.origin` — the app's own root is the sign-in wall (#25).
+    expect(shared).toContain('https://gladiatorclub.co.il/')
+    expect(shared).not.toContain('/t/gladiator')
+    // And the parent's own words, so what arrives reads like a recommendation.
+    expect(shared).toContain(t('he', 'schedule.home.shareClubMessage'))
+
+    vi.unstubAllEnvs()
+  })
+
+  it('hides itself rather than sharing a link that resolves to nothing', () => {
+    // An environment with no slug configured. `/t/` 404s against the API, so the fallback
+    // would hand a friend a refusal page on the one screen that exists to impress them.
+    vi.stubEnv('VITE_LANDING_SLUG', '')
+    vi.stubEnv('VITE_LANDING_HOSTS', '')
+    renderTop(CHILDREN)
+    expect(screen.queryByTestId('home-share-club')).toBeNull()
+    vi.unstubAllEnvs()
   })
 })

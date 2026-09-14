@@ -62,7 +62,7 @@ describe('toWizardGroup', () => {
 // form: a field collected and then dropped on the way to the write passes every component
 // test there is. CLAUDE.md names this one directly.
 describe('toRegisterPayload — שנת עליה and הורה 2', () => {
-  const OPTIONS = { templateId: 'tmpl-1', clubTermsAccepted: true }
+  const OPTIONS = { templateId: 'tmpl-1', clubTermsAccepted: true, photoConsent: false }
 
   /** A minor with everything the review asked for filled in. */
   function minorDraft() {
@@ -192,7 +192,7 @@ describe('toRegisterPayload — שנת עליה and הורה 2', () => {
 // was handed, so the child became two rows and the funnel counted a conversion that had
 // not happened (found 2026-09-12, before it shipped).
 describe('toRegisterPayload — a trial child is not registered as a member', () => {
-  const OPTIONS = { templateId: 'tmpl-1', clubTermsAccepted: true }
+  const OPTIONS = { templateId: 'tmpl-1', clubTermsAccepted: true, photoConsent: false }
 
   const child = (id: string, extra: Record<string, unknown> = {}) => ({
     ...emptyStudent(id),
@@ -239,7 +239,7 @@ describe('the belt a family declares', () => {
   it('rides on the payload the registration actually posts', () => {
     const payload = toRegisterPayload(
       [emptyStudent('c1', { firstName: 'נועה', lastName: 'לוי', beltId: 'belt-blue' })],
-      { templateId: null, clubTermsAccepted: true },
+      { templateId: null, clubTermsAccepted: true, photoConsent: false },
     )
     expect(payload.children[0]!.belt_rank_id).toBe('belt-blue')
   })
@@ -248,7 +248,7 @@ describe('the belt a family declares', () => {
     // "No belt recorded" is a beginner's ordinary state and must not become a guess.
     const payload = toRegisterPayload(
       [emptyStudent('c1', { firstName: 'נועה', lastName: 'לוי' })],
-      { templateId: null, clubTermsAccepted: true },
+      { templateId: null, clubTermsAccepted: true, photoConsent: false },
     )
     expect(payload.children[0]!.belt_rank_id).toBeNull()
   })

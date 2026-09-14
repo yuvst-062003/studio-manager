@@ -1,6 +1,7 @@
-import { Bell, Ticket } from 'lucide-react'
+import { Bell, Share2, Ticket } from 'lucide-react'
 
 import { fill, formatAgorot } from '@studio/core'
+import { clubPublicUrl, landingHostsFrom, shareClubHref } from '../../landing'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { HomeChild } from './types'
@@ -33,6 +34,18 @@ export function HomeTop({
   onOpenNotifications: () => void
 }) {
   const greeting = familyName ? fill(t(locale, 'schedule.home.greetingFamily'), { name: familyName }) : t(locale, 'schedule.home.greeting')
+
+  //: §20 — built here rather than passed in, because it depends only on build-time
+  //: configuration and the current origin, neither of which the caller knows better than
+  //: this component does. `null` hides the control entirely — see `clubPublicUrl`.
+  const publicUrl = clubPublicUrl(
+    import.meta.env.VITE_LANDING_SLUG,
+    landingHostsFrom(import.meta.env.VITE_LANDING_HOSTS),
+    globalThis.location?.origin ?? '',
+  )
+  const shareHref = publicUrl
+    ? shareClubHref(t(locale, 'schedule.home.shareClubMessage'), publicUrl)
+    : null
 
 
 
@@ -94,6 +107,30 @@ export function HomeTop({
               badges עדכונים, and two counts for one inbox means two things to keep in
               agreement and two places a stale number can sit. The tab badge is the one the
               parent sees from every screen, so it is the one that stays. */}
+          {/* §20 — the club's one acquisition affordance, and deliberately small. Under
+              five enquiries a month reach this club and every one arrives by word of mouth:
+              a parent tells a friend, a child brings a schoolfriend. Both of those
+              conversations already happen in WhatsApp, so this is an ordinary link that
+              opens one with the club's page attached — no vendor, no API, nothing monthly.
+
+              An `<a>` rather than a button: it is a navigation to `wa.me`, so long-press to
+              copy and middle-click both work, which a click handler would swallow. Hidden
+              entirely when there is no slug to build a link from — a share button that
+              hands a friend a 404 is worse than no share button. */}
+          {shareHref ? (
+            <a
+              data-testid="home-share-club"
+              href={shareHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-2.5 rounded-2xl bg-white dark:bg-slate-900 hover:bg-slate-50 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 shadow-xs active:scale-95 transition-all cursor-pointer group"
+              title={t(locale, 'schedule.home.shareClub')}
+              aria-label={t(locale, 'schedule.home.shareClub')}
+            >
+              <Share2 className="w-5 h-5 text-slate-600 dark:text-slate-300 group-hover:scale-110 transition-transform" />
+            </a>
+          ) : null}
+
           <button
             type="button"
             data-testid="home-notifications"

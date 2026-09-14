@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import pytest
 from app.services.health.club_terms import CLUB_TERMS_VERSION
+from sqlalchemy import select
 
 VALID_CHILD_ID = "100000009"
 VALID_PARENT_ID = "100000017"
@@ -118,6 +119,79 @@ def test_accepting_the_terms_flips_only_that_condition(client, as_guardian_of, a
     assert body["terms_accepted"] is True
     assert body["registration_complete"] is False, "each condition stands on its own"
     assert body["complete"] is False
+
+
+def test_the_photo_permission_is_optional_and_never_blocks(client, as_guardian_of, a_student):
+    """§20.5.1 -- the tick BESIDE the terms, and the whole point is that it is not part of them.
+
+    `privacy.policy.s3.body` promises a family "סירוב אינו משפיע על ההשתתפות", and Amendment
+    13 to חוק הגנת הפרטיות forbids merging two purposes into one consent. So declining must
+    leave registration exactly as accepting does, and the only difference on the wire is the
+    row that gets written.
+    """
+    parent = as_guardian_of(a_student)
+    response = client.post(
+        f"/api/v1/students/{a_student}/agreement/club-terms",
+        json={"accepted": True, "version": CLUB_TERMS_VERSION, "photo_video": False},
+        headers=parent.headers,
+    )
+    assert response.status_code == 201, response.text
+    # Declining the photograph changed nothing about the agreement itself.
+    assert response.json()["terms_accepted"] is True
+
+
+def test_declining_the_photograph_is_recorded_rather_than_left_silent(
+    client, as_guardian_of, a_student, tenant_session
+):
+    """"Asked and said no" and "never asked" are different facts, and only the first is an answer.
+
+    The club needs to tell them apart before it films: a family that declined must not be
+    chased, and a family nobody asked is a gap to close. A silent skip collapses the two.
+    """
+    from app.models.health import ConsentRecord
+
+    parent = as_guardian_of(a_student)
+    client.post(
+        f"/api/v1/students/{a_student}/agreement/club-terms",
+        json={"accepted": True, "version": CLUB_TERMS_VERSION, "photo_video": False},
+        headers=parent.headers,
+    )
+    rows = (
+        tenant_session.execute(
+            select(ConsentRecord).where(ConsentRecord.consent_type == "photo_video")
+        )
+        .scalars()
+        .all()
+    )
+    assert len(rows) == 1, "a refusal is an answer and belongs in the ledger"
+    assert rows[0].granted is False
+    assert rows[0].version == CLUB_TERMS_VERSION, "versioned by the club's text, not ours"
+
+
+def test_a_client_that_never_asked_about_photographs_writes_no_row(
+    client, as_guardian_of, a_student, tenant_session
+):
+    """Omitting the field is "not asked", and must never be recorded as a refusal.
+
+    Every client that predates this field omits it. Defaulting to `False` would fabricate a
+    refusal for families nobody ever put the question to — which is the same class of untruth
+    as recording a consent nobody gave.
+    """
+    from app.models.health import ConsentRecord
+
+    parent = as_guardian_of(a_student)
+    client.post(
+        f"/api/v1/students/{a_student}/agreement/club-terms",
+        json={"accepted": True, "version": CLUB_TERMS_VERSION},
+        headers=parent.headers,
+    )
+    assert (
+        not tenant_session.execute(
+            select(ConsentRecord).where(ConsentRecord.consent_type == "photo_video")
+        )
+        .scalars()
+        .all()
+    )
 
 
 def test_a_stale_version_is_refused(client, as_guardian_of, a_student):

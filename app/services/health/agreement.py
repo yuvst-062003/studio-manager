@@ -633,6 +633,7 @@ class AgreementService:
         at: datetime,
         ip: str | None = None,
         actor_identity_id: uuid.UUID | None = None,
+        photo_video: bool | None = None,
     ) -> ConsentRecord | None:
         """Append the acceptance, unless this person already holds the current version.
 
@@ -640,6 +641,18 @@ class AgreementService:
         the terms step for a family who accepted this version already, so a re-signature that
         does reach here is a duplicate rather than a mistake, and §11.6 makes consent an
         append-only ledger rather than a set of rows to pile up.
+
+        **`photo_video` is the optional answer beside this one, and it is a different kind of
+        thing.** §20.5.1: accepting the club's terms is a CONDITION of registering, so a
+        photography permission folded into them would be compulsory -- contradicting the
+        privacy policy's promise that it is רשות מלאה, and merging two purposes into one tick
+        in a way Amendment 13 to חוק הגנת הפרטיות forbids. So it rides along in the same
+        submission and the same signature moment, and is recorded as its own row.
+
+        `None` means *not asked* and writes nothing. `False` means **asked and declined**,
+        which is worth a row: it is how the club later tells "this family said no" from "this
+        family was never asked", and only the first of those is an answer. Neither ever
+        blocks: this method's refusals are all about the terms, never about the photograph.
         """
         from app.services.privacy.consent import ConsentService, PolicyVersionMismatchError
 
@@ -648,18 +661,38 @@ class AgreementService:
             # screen that showed last month's is how a ledger comes to hold agreements nobody
             # made -- the same rule `ConsentService.record` states for the platform's policy.
             raise PolicyVersionMismatchError(version, CLUB_TERMS_VERSION)
-        if ConsentService.holds_current(
+
+        # Both consents are versioned by CLUB_TERMS_VERSION (see `privacy.policy`
+        # ::expected_version), so one call can carry both -- which also makes them one row
+        # pair at one timestamp, rather than two writes that could half-fail.
+        grants: dict[str, bool] = {}
+        already_held = ConsentService.holds_current(
             session, person_id=person_id, consent_type=CLUB_TERMS_CONSENT_TYPE
+        )
+        if not already_held:
+            grants[CLUB_TERMS_CONSENT_TYPE] = True
+        if photo_video is not None and not ConsentService.holds_current(
+            session, person_id=person_id, consent_type="photo_video"
         ):
+            # Guarded so a family who re-signs for a second child does not pile up a second
+            # identical photo row -- the same reasoning the terms check above applies. A
+            # CHANGE of mind goes through §11.6's withdrawal path, not through this one.
+            grants["photo_video"] = photo_video
+
+        if not grants:
             return None
         rows = ConsentService.record(
             session,
             person_id=person_id,
-            grants={CLUB_TERMS_CONSENT_TYPE: True},
+            grants=grants,
             version=version,
             at=at,
             ip=ip,
             actor_identity_id=actor_identity_id,
             studio_id=studio_id,
         )
-        return rows[0] if rows else None
+        # The terms row is what this method is named for and what its caller reports on.
+        return next(
+            (row for row in rows if row.consent_type == CLUB_TERMS_CONSENT_TYPE),
+            None,
+        )

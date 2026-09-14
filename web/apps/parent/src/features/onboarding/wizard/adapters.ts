@@ -81,6 +81,10 @@ export type RegisterPayload = {
     relation: 'mother' | 'father' | 'other'
   }
   club_terms_accepted: boolean
+  /** §20.5.1 — the optional photography permission. `null` is "not asked" and must stay
+   *  distinguishable from `false`, "asked and declined": the API records the second and
+   *  writes nothing for the first. */
+  photo_video: boolean | null
   children: {
     first_name: string
     last_name: string
@@ -140,7 +144,7 @@ export function toHealthDeclaration(
 
 export function toRegisterPayload(
   students: readonly StudentDraft[],
-  options: { templateId: string | null; clubTermsAccepted: boolean },
+  options: { templateId: string | null; clubTermsAccepted: boolean; photoConsent: boolean },
 ): RegisterPayload {
   //: **Trial children are not registered as members.** `register` creates an enrolled
   //: student and, for a child already on the roster, promotes them to `active` — which is
@@ -183,6 +187,9 @@ export function toRegisterPayload(
       relation: 'mother',
     },
     club_terms_accepted: options.clubTermsAccepted,
+    //: Only meaningful alongside a real signature — an unsigned submission asked nobody
+    //: anything, so it sends `null` rather than manufacturing a refusal.
+    photo_video: options.clubTermsAccepted ? options.photoConsent : null,
     children: joining.map((student) => {
       const minor = isMinor(student.birthDate)
       return {

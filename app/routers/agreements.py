@@ -258,6 +258,11 @@ def accept_club_terms(
             at=now(),
             ip=ip,
             actor_identity_id=identity_id,
+            # §20.5.1 -- the optional answer beside the terms. Passed straight through,
+            # including `None`: the service treats "not asked" and "asked and declined" as
+            # different things, and flattening them here would record a refusal for every
+            # client that has not been updated yet.
+            photo_video=body.photo_video,
         )
     except PolicyVersionMismatchError as exc:
         raise _unprocessable("club_terms_version_mismatch", str(exc)) from exc

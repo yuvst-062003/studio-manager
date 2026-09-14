@@ -699,6 +699,9 @@ export const schedule: Bundle = {
   'plan.group.inviteOnly': 'By invitation only',
   'plan.group.eligibility': 'Base groups allowed to attend',
   // -- בית, the parent app's home tab (the redesign of 2026-09-05) ---------------
+  // §20 — see the he/ file: the message is the parent's voice, not the club's.
+  'home.shareClub': 'Share the club',
+  'home.shareClubMessage': 'My children train here and we are very happy with it — worth a look:',
   'home.greeting': 'Hello',
   'home.greetingFamily': 'Hello, the {{name}} family',
   'home.reportAbsence': 'Report an absence',

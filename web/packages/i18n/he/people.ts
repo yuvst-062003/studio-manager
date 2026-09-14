@@ -819,6 +819,14 @@ export const people: Bundle = {
   'joinWizard.step1.faqTitle': 'שאלות נפוצות של הורים',
   'joinWizard.step1.faqLead': 'מידע חשוב על ציוד, חליפות, מבנה האימונים ונהלים',
   'joinWizard.step1.faqCount': '5 שאלות',
+  // §20.5.1 — the photography permission, ticked BESIDE the agreement above and never
+  // inside it. `photoOptional` is load-bearing copy, not decoration: the club's privacy
+  // policy promises "סירוב אינו משפיע על ההשתתפות", so the screen has to say so where the
+  // question is asked rather than only in a document behind a link.
+  'joinWizard.step1.photoLabel': 'אני מאשר/ת פרסום תמונות ווידאו של ילדיי',
+  'joinWizard.step1.photoOptional': 'רשות',
+  'joinWizard.step1.photoDetail':
+    'תמונות ווידאו שצולמו על ידי המועדון יפורסמו באתר המועדון, בעמוד הפייסבוק, בחשבון האינסטגרם ובקבוצות הוואטסאפ של המועדון — לצורך תיעוד הפעילות ופרסום המועדון בלבד. אין חובה לאשר, וסירוב אינו משפיע על ההשתתפות. אפשר לבטל בכל עת במסך הפרטיות.',
   'joinWizard.step1.agree': 'קראתי ואני מאשר/ת: תנאי שימוש, מדיניות פרטיות ותקנות ותנאי תשלום',
   'joinWizard.step1.continue': 'המשך',
   'joinWizard.step1.closeDocument': 'אישור וסגירה',

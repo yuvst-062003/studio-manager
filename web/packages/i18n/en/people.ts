@@ -695,6 +695,11 @@ export const people: Bundle = {
   'joinWizard.step1.faqTitle': 'Frequently asked questions for parents',
   'joinWizard.step1.faqLead': 'Important information about gear, uniforms, class structure and policies',
   'joinWizard.step1.faqCount': '5 questions',
+  // §20.5.1 — see the he/ file for why the "optional" wording is load-bearing.
+  'joinWizard.step1.photoLabel': 'I agree to photographs and video of my children being published',
+  'joinWizard.step1.photoOptional': 'optional',
+  'joinWizard.step1.photoDetail':
+    "Photographs and video taken by the club will be published on the club's website, Facebook page, Instagram account and parent WhatsApp groups — to document activity and promote the club, and nothing else. You do not have to agree, and refusing does not affect participation. You can withdraw at any time from the privacy screen.",
   'joinWizard.step1.agree': 'I have read and agree to: the terms of use, privacy policy, and payment terms',
   'joinWizard.step1.continue': 'Continue',
   'joinWizard.step1.closeDocument': 'Acknowledge and close',

@@ -44,6 +44,7 @@ const REGISTER_PAYLOAD: RegisterPayload = {
     relation: 'mother',
   },
   club_terms_accepted: true,
+  photo_video: null,
   children: [
     {
       first_name: 'נועה',
