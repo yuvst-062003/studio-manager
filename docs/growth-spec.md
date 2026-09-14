@@ -70,6 +70,11 @@ The screen it proposed sorted "the oldest neglected lead first". There are four 
 owner adds them by hand, and the app chases them without being asked. A list that shows you
 what you already know is a screen you stop opening.
 
+> **What is cut is the screen, not the subject.** §20.6 adds a WhatsApp bot that *creates*
+> leads and books them a trial. That is a door, and the club has a real shortage of doors.
+> §20.1 was furniture for leads that already exist, which is a different thing and still
+> not worth building.
+
 ### §20.2 WhatsApp — cut
 
 Its part A, "click-to-WhatsApp links, zero integration, ship this first", **shipped months
@@ -425,6 +430,120 @@ certainly send them there anyway, and that is a fair argument — but it is a de
 
 ---
 
+## §20.6 The lead bot — welcome, ask, book the trial
+
+The owner's fourth addition: the same WhatsApp number should also **greet a stranger who
+messages the club, ask what it needs to know, and book them a trial lesson.**
+
+### Why this fits when §20.1 did not
+
+§20.1 was cut for being a **screen for filing four leads**. This is the opposite: a **door
+that creates them**. Nothing in it duplicates `Student.status='lead'` — it feeds it.
+
+And it is the same funnel as the share button, which is the real argument:
+
+> A parent shares the club with a friend **over WhatsApp**. The friend is already in
+> WhatsApp. A `wa.me` link is one tap — no form, no web page, no account, no app install.
+
+The landing page has produced **zero** bookings in its entire life. The two channels that
+have actually produced members for this club — a parent telling a friend, a child bringing a
+schoolfriend — both end in a WhatsApp conversation. This is the first thing in the document
+that meets them where they already are.
+
+### The economics: the best-priced item here
+
+The lead messages **first**, which opens the 24-hour service window — so **every message in
+the conversation is free, with no cap**: the welcome, the questions, the slot offer, the
+confirmation. A visitor arriving from a Click-to-WhatsApp ad or a Page button opens a
+**72-hour** free entry-point window instead.
+
+**The whole booking conversation costs ₪0.** The only message that could ever be billed is a
+follow-up sent *outside* the window — "you didn't finish booking" the next day — which is one
+utility template and a few agorot, and worth it.
+
+### Meta's AI rule decides the architecture, and it decides it correctly
+
+**From 15 January 2026** (existing accounts; 15 October 2025 for new ones) Meta **bans
+general-purpose, open-ended AI assistants** from the WhatsApp Business Platform.
+**Structured bots for bookings and appointment management are explicitly permitted.**
+
+So this must be a **booking flow, not a chat assistant** — and that constraint is one the
+product should have chosen anyway:
+
+> **The model may phrase, and may interpret. It must never decide a fact.**
+> "בן 7" → age 7 is interpretation, and fine. The price, the age range, the address and the
+> time of the lesson come from rows — `price_plan`, `group.age_min/age_max`, `location`,
+> `session`. A model that invents a price to a prospective parent is worse than no bot, and
+> it is also now a policy violation.
+
+### What it asks, and what it actually creates
+
+The questions are not a design exercise — they are whatever a booking needs, and no more:
+
+1. **The child's name.**
+2. **The child's age** → this *picks the group*, because `group.age_min`/`age_max` already
+   says which group a seven-year-old belongs in.
+3. **Which slot** → `GET /public/groups/{id}/trial-slots` already returns the next bookable
+   sessions ([app/routers/public.py:492](../app/routers/public.py#L492)).
+4. **The parent's name.** The phone number needs no asking — it is the WhatsApp number.
+
+Then it calls **the existing `POST /trial-bookings/self`** — the same endpoint the landing
+page uses ([app/routers/trial_bookings.py:155](../app/routers/trial_bookings.py#L155)). A
+real `TrialBooking`, a real `Student`, a real `Guardian`, inside the tenant scope, with
+§5.4a's follow-up ladder already waiting for it. **Not a note for someone to retype.**
+
+### The one thing it cannot do, and why that is survivable
+
+**A health declaration needs a drawn signature** — `signature_image_base64`, and the
+accessibility statement is explicit that it is drawn with a finger or a mouse and no other
+way. **Nobody can sign inside a chat.**
+
+The booking does not require one. `TrialService` writes
+`health_status = "trial_signed" if declarations else "missing"`
+([app/services/people/trials.py:321](../app/services/people/trials.py#L321)) — so the bot
+books with no declaration, leaves the student `missing`, and
+[app/workers/health_reminders.py](../app/workers/health_reminders.py) **already chases
+exactly that state**. The machinery is built and running.
+
+So: **bot books → one link to the declaration → the existing worker chases it → and the
+child does not step onto the mat until it is signed.** That last clause is §5.5, and it is a
+safety rule rather than a paperwork one. The bot must never imply the booking is complete
+in a way that suggests the child can just turn up.
+
+### Privacy, which is not optional here
+
+The bot collects **a child's name and age from a stranger, over Meta's infrastructure**.
+That is personal data about a minor, arriving from a third party, before anyone at the club
+has agreed to receive it.
+
+`registration_request.payload_encrypted` exists for precisely this case — §4.3 calls it
+"the one table holding data nobody in the studio has yet agreed to receive, so it is the one
+that cannot sit in plaintext". The conversation's collected answers belong behind the same
+boundary. **G7 applies without exception: the message contents never reach a log**, and a
+lead that never books should be purgeable on §11.4's schedule like any other subject data.
+
+### What it costs
+
+| | |
+|---|---|
+| Messages | **₪0** — the lead opens the window and keeps it open |
+| The model | a few agorot per conversation; at four enquiries a month, unmeasurable |
+| Build | **~1 week**, on top of §20.5.3's WhatsApp half |
+| Blocked by | the same Business Portfolio, verification and number as §20.5.3 — it cannot ship first |
+
+### The honest caveat
+
+**At four enquiries a month, this bot will hold about four conversations.** Judged on
+today's numbers alone, a week of work for four conversations is not a good trade, and this
+document has cut other things for less.
+
+It earns its place on one condition: that the share button works and the funnel actually
+widens. That is why it is **last** in the order, why the share button is still the first
+thing to build, and why this should be reviewed against a real number — *how many strangers
+messaged the club's number last month* — rather than built on hope.
+
+---
+
 ## If you only ever build one thing
 
 **The share button.** One day, no vendor, no key, no approval, nothing to pay monthly, and
@@ -471,6 +590,7 @@ further eight or so, and worth it only in the order below.
 | Then | **§20.4 A + C** — the shot brief and the caption writer | ~4 days |
 | Then | **§20.5.3** — the approve/revise state machine, **over push first** | ~3 days |
 | Then | **§20.5.3** — the same loop over WhatsApp, once the Meta account exists | ~3 days + verification |
+| Then, **if the share button widens the funnel** | **§20.6** — the lead bot: welcome, ask, book a real trial | ~1 week |
 | Ten minutes, before estimating D | Try one real clip in one Hebrew captioning tool | — |
 | Then, only if that fails | **§20.4 D** — captions from speech, with RTL checked in a player | ~3 days |
 | Half a day, before estimating E | Prove the camera works in the installed app on a real iPhone **and** a real Android | — |
@@ -536,13 +656,18 @@ Answered in the third round, and each one closed something:
     it well enough that D is not worth building at all?*
 12. **How should approval work?** The system drafts, the manager approves in WhatsApp, and
     corrections go back the same way. §20.5.3 — and it reverses §20.2 for this one use.
+13. **Should the same number also handle strangers?** Yes — welcome them, ask what a
+    booking needs, book the trial. §20.6, which is free to run and is the same funnel the
+    share button feeds.
 
-Still open, and all three are cheap to close:
+Still open, and all four are cheap to close:
 
-13. **Which captioning tool, if any?** One real clip through one of the five. Ten minutes,
+14. **Which captioning tool, if any?** One real clip through one of the five. Ten minutes,
     and it decides three days of work.
-14. **Does the club want a Meta Business Portfolio?** Verification is 1–5 working days and
-    a dedicated number. Needed for WhatsApp, not for push — so the loop can ship before
-    this is answered.
-15. **Does the club accept photographs of children passing through Meta's servers?**
+15. **Does the club want a Meta Business Portfolio?** Verification is 1–5 working days and
+    a dedicated number. Needed for WhatsApp, not for push — so the approval loop can ship
+    before this is answered. **§20.6 cannot.**
+16. **Does the club accept photographs of children passing through Meta's servers?**
     §20.5.3's last paragraph. Probably yes, but it should be a decision.
+17. **How many strangers messaged the club's number last month?** The number that decides
+    whether §20.6 is worth a week. Nobody has counted, and it is countable.
