@@ -75,6 +75,16 @@ def email_configured() -> bool:
     return mail_configured()
 
 
+#: Role ids as a person would say them. Not from `web/packages/i18n` for the reason
+#: `render` gives: a server sending mail cannot read a TypeScript module.
+STAFF_ROLE_NAMES = {
+    "owner": "בעלים",
+    "manager": "מנהל/ת",
+    "lead_coach": "מאמן/ת ראשי/ת",
+    "assistant_coach": "מאמן/ת משנה",
+}
+
+
 def render(*, studio_name: str, invitation_url: str) -> tuple[str, str]:
     """Subject and plain-text body, in Hebrew.
 
@@ -127,6 +137,66 @@ def send_invitation_email(*, to_email: str, studio_name: str, invitation_url: st
     """Deliver one invitation email. Returns whether it actually went out. See `_send`
     for the guard, the swallow-and-log and the STARTTLS reasoning -- all unchanged."""
     subject, body = render(studio_name=studio_name, invitation_url=invitation_url)
+    return _send(to_email, subject, body)
+
+
+def render_staff_invitation(
+    *, studio_name: str, invitation_url: str | None, code: str, roles: list[str]
+) -> tuple[str, str]:
+    """Subject and plain-text body for an invited coach or manager, in Hebrew.
+
+    **Both the link and the code**, and that is not belt-and-braces. The staff app redeems
+    through `AccessGate`'s code field: an invited coach signs in, lands on `staff-no-match`
+    because no Person is bound to their identity yet, and types the code. The link carries
+    it as `?invite=` so the field arrives pre-filled and they press one button -- but a
+    mail client that mangles a long URL, or a coach reading this on a different device from
+    the one they will install on, still has the code in front of them.
+
+    Roles are named because "you have been added to the club" and "you have been made a
+    manager of the club" are different messages, and the recipient should be able to tell
+    which one they just got.
+    """
+    subject = f"הזמנה לצוות {studio_name}"
+    if roles:
+        described = ", ".join(STAFF_ROLE_NAMES.get(role, role) for role in roles)
+        opening = f'הוזמנתם לצוות "{studio_name}" בתפקיד: {described}.'
+    else:
+        opening = f'הוזמנתם לצוות "{studio_name}".'
+    lines = [
+        "שלום,",
+        "",
+        opening,
+        "",
+    ]
+    if invitation_url:
+        lines += [
+            "להצטרפות, היכנסו לקישור והתחברו עם חשבון Google:",
+            invitation_url,
+            "",
+        ]
+    lines += [
+        "קוד ההזמנה שלכם:",
+        code,
+        "",
+        "הקוד תקף לזמן מוגבל. אם פג תוקפו, בקשו מהמנהל/ת לשלוח הזמנה חדשה.",
+    ]
+    return subject, "\n".join(lines) + "\n"
+
+
+def send_staff_invitation_email(
+    *, to_email: str, studio_name: str, invitation_url: str | None, code: str, roles: list[str]
+) -> bool:
+    """Deliver one staff invitation. Returns whether it actually went out.
+
+    **New on 2026-09-14, and the reason it did not exist before is worth keeping.** Until
+    the day before, nothing in this product could send mail at all -- the host blocks every
+    outbound SMTP port -- so `create_staff_invitation`'s docstring said "the manager shares
+    the link, because no mailer exists anywhere in this product". That was true, and the
+    code a manager had to read down a phone was the whole delivery mechanism.
+    """
+    subject, body = render_staff_invitation(
+        studio_name=studio_name, invitation_url=invitation_url, code=code, roles=roles
+    )
     return _send(to_email, subject, body)
 
 

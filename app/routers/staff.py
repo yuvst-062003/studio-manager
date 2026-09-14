@@ -13,16 +13,22 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, HTTPException, Request, status
+from sqlalchemy.orm import Session
 
 from app.core.auth_context import ManagerOrOwner
 from app.core.clock import now
-from app.core.tenancy import TenantSessionDep
+from app.core.config import settings
+from app.core.cors import app_origin
+from app.core.tenancy import TenantSessionDep, require_current_studio_id
+from app.models.person import Invitation
+from app.models.studio import Studio
 from app.schemas.staff import (
     StaffInvitationIn,
     StaffInvitationOut,
     StaffListResponse,
     StaffRolesIn,
 )
+from app.services.people.invitations import email_configured, send_staff_invitation_email
 from app.services.structure import staff as staff_service
 
 router = APIRouter(tags=["staff"])
@@ -36,15 +42,52 @@ def list_staff(_: ManagerOrOwner, session: TenantSessionDep) -> StaffListRespons
     return StaffListResponse.model_validate(staff_service.list_staff(session, at=now()))
 
 
+def _invitation_out(
+    session: Session, invitation: Invitation, token: str, roles: list[str]
+) -> StaffInvitationOut:
+    """One shape for both the create and the resend route, because they answer the same
+    question: here is the code, here is the link, and here is whether the coach was
+    actually written to.
+
+    The send is swallowed inside `send_staff_invitation_email` exactly as the student
+    route's is: the invitation is already committed, so a provider outage must not read as
+    "no invitation was issued" when one plainly was.
+    """
+    origin = app_origin("staff", settings.ENV)
+    invitation_url = f"{origin}/?invite={token}" if origin else None
+    studio_row = session.get(Studio, require_current_studio_id())
+    sent = False
+    if invitation.email:
+        sent = send_staff_invitation_email(
+            to_email=invitation.email,
+            studio_name=studio_row.name if studio_row is not None else "",
+            invitation_url=invitation_url,
+            code=token,
+            roles=roles,
+        )
+    return StaffInvitationOut(
+        id=str(invitation.id),
+        email=invitation.email or "",
+        expires_at=invitation.expires_at.isoformat(),
+        token=token,
+        invitation_url=invitation_url,
+        email_configured=email_configured(),
+        email_sent=sent,
+    )
+
+
 @router.post(
     "/staff/invitations", response_model=StaffInvitationOut, status_code=status.HTTP_201_CREATED
 )
 def create_staff_invitation(
     _: ManagerOrOwner, body: StaffInvitationIn, request: Request, session: TenantSessionDep
 ) -> StaffInvitationOut:
-    """F5 — הוספת איש צוות. The token comes back once and never again; the manager
-    shares the link, because no mailer exists anywhere in this product (the platform's
-    owner invite and §5.4b's onboarding link both work the same way)."""
+    """F5 — הוספת איש צוות. The token comes back once and never again.
+
+    **It is emailed too, since 2026-09-14.** This used to say the manager shares the link
+    "because no mailer exists anywhere in this product" — true until the day before, when
+    mail moved off the SMTP the host blocks. The code on screen stays the channel that
+    always works; `email_sent` says whether the second one carried as well."""
     try:
         invitation, token = staff_service.invite_staff(
             session,
@@ -60,12 +103,7 @@ def create_staff_invitation(
     except staff_service.StaffError as exc:
         raise _staff_error(exc) from exc
     session.commit()
-    return StaffInvitationOut(
-        id=str(invitation.id),
-        email=invitation.email or "",
-        expires_at=invitation.expires_at.isoformat(),
-        token=token,
-    )
+    return _invitation_out(session, invitation, token, list(body.roles))
 
 
 @router.post("/staff/invitations/{invitation_id}/resend", response_model=StaffInvitationOut)
@@ -79,12 +117,7 @@ def resend_staff_invitation(
     except staff_service.StaffError as exc:
         raise _staff_error(exc) from exc
     session.commit()
-    return StaffInvitationOut(
-        id=str(invitation.id),
-        email=invitation.email or "",
-        expires_at=invitation.expires_at.isoformat(),
-        token=token,
-    )
+    return _invitation_out(session, invitation, token, [invitation.intended_role])
 
 
 @router.delete("/staff/invitations/{invitation_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -44,7 +44,17 @@ export function AccessGate({
   // arm was the whole journey's dead end: a link to the parent app and a sign-out button,
   // and nowhere to type the code the dashboard had just promised would work. The parent
   // app carries the same entry beneath its own refusal, for the same reason (2026-08-31).
-  const [code, setCode] = useState('')
+  // **Pre-filled from the invitation link.** The staff invitation is emailed since
+  // 2026-09-14 and the link carries the code as `?invite=` — without reading it here the
+  // "link" would only ever be a URL to a screen asking for something the recipient had to
+  // copy out of the same email by hand.
+  //
+  // Filled, not auto-redeemed. Redeeming binds this identity to a Person in that studio,
+  // and a link opened by the wrong person (a forwarded email, a shared laptop) would
+  // spend the invitation with nobody having agreed to anything. One deliberate press.
+  const [code, setCode] = useState(
+    () => new URLSearchParams(globalThis.location?.search ?? '').get('invite') ?? '',
+  )
   const redeem = (token: string) =>
     apiFetch('/api/v1/auth/accept-invitation', {
       method: 'POST',

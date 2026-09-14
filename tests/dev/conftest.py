@@ -57,6 +57,11 @@ RELOADABLE = (
     # 2026-08-30 -- the invitation LINK resolves the parent app's origin with
     # app_origin("parent", settings.ENV), same shape as orders.py above it.
     "app.routers.students",
+    # 2026-09-14 -- the staff invitation is emailed now, and its link resolves the STAFF
+    # app's origin with app_origin("staff", settings.ENV). Exactly the shape above it, for
+    # exactly the reason above it; the source-level gate in test_dev_router.py caught its
+    # absence on the first run.
+    "app.routers.staff",
     # 2026-08-30 -- the setup payload names the dashboard with
     # app_origin("dashboard", settings.ENV), for the staff wizard's unbuilt-step links.
     "app.services.structure.setup",

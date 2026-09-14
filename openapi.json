@@ -13769,11 +13769,21 @@
         "type": "object"
       },
       "StaffInvitationOut": {
-        "description": "The token, exactly once (F5, on the platform invite's pattern). Only its SHA-256\nis stored, and there is no mailer in this product: the link is the manager's to\nshare, like §5.4b's onboarding link.",
+        "description": "The token, exactly once (F5, on the platform invite's pattern). Only its SHA-256 is\nstored.\n\n**The manager is no longer the only delivery mechanism.** This used to say \"there is no\nmailer in this product: the link is the manager's to share\", which was true until\n2026-09-14 — the host blocks SMTP, so an invited coach was told their code down a phone.\nIt is emailed now, and `email_sent` says whether that actually happened, so the code on\nscreen stays the channel that always works rather than the one nobody mentions.",
         "properties": {
           "email": {
             "title": "Email",
             "type": "string"
+          },
+          "email_configured": {
+            "default": false,
+            "title": "Email Configured",
+            "type": "boolean"
+          },
+          "email_sent": {
+            "default": false,
+            "title": "Email Sent",
+            "type": "boolean"
           },
           "expires_at": {
             "title": "Expires At",
@@ -13782,6 +13792,17 @@
           "id": {
             "title": "Id",
             "type": "string"
+          },
+          "invitation_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invitation Url"
           },
           "token": {
             "title": "Token",
@@ -29878,7 +29899,7 @@
     },
     "/api/v1/staff/invitations": {
       "post": {
-        "description": "F5 — הוספת איש צוות. The token comes back once and never again; the manager\nshares the link, because no mailer exists anywhere in this product (the platform's\nowner invite and §5.4b's onboarding link both work the same way).",
+        "description": "F5 — הוספת איש צוות. The token comes back once and never again.\n\n**It is emailed too, since 2026-09-14.** This used to say the manager shares the link\n\"because no mailer exists anywhere in this product\" — true until the day before, when\nmail moved off the SMTP the host blocks. The code on screen stays the channel that\nalways works; `email_sent` says whether the second one carried as well.",
         "operationId": "create_staff_invitation_api_v1_staff_invitations_post",
         "requestBody": {
           "content": {

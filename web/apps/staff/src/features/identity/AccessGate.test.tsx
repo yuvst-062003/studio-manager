@@ -176,4 +176,57 @@ describe('the invited coach', () => {
     expect(s.reload).not.toHaveBeenCalled()
     expect(screen.getByLabelText(t('he', 'common.auth.inviteCodeLabel'))).toHaveValue('tok-bad')
   })
+
+  // -- the emailed invitation link (2026-09-14) -------------------------------
+  /**
+   * Staff invitations are emailed since 2026-09-14, and the link carries the code as
+   * `?invite=`. Without reading it here the "link" would only be a URL to a screen asking
+   * for something the coach had to copy out of the same email by hand.
+   */
+  it('pre-fills the code from the invitation link', async () => {
+    vi.stubGlobal('location', { search: '?invite=tok-from-the-email', href: '/' })
+    render(
+      <AccessGate session={session({ access: { staff: false, parent: false }, studios: [] })} locale="he">
+        {protectedContent}
+      </AccessGate>,
+    )
+
+    await waitFor(() => expect(screen.getByTestId('staff-refusal')).toBeInTheDocument())
+    expect(screen.getByLabelText(t('he', 'common.auth.inviteCodeLabel'))).toHaveValue(
+      'tok-from-the-email',
+    )
+  })
+
+  it('does not redeem on its own, even with a code in the link', async () => {
+    // Redeeming binds this identity to a Person in that studio. A link opened by the wrong
+    // person — a forwarded email, a shared laptop — would spend the invitation with nobody
+    // having agreed to anything. One deliberate press.
+    const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(
+      async () => new Response('{}', { status: 200 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    vi.stubGlobal('location', { search: '?invite=tok-from-the-email', href: '/' })
+    const s = session({ access: { staff: false, parent: false }, studios: [] })
+    render(
+      <AccessGate session={s} locale="he">
+        {protectedContent}
+      </AccessGate>,
+    )
+
+    await waitFor(() => expect(screen.getByTestId('staff-refusal')).toBeInTheDocument())
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(s.reload).not.toHaveBeenCalled()
+  })
+
+  it('leaves the field empty when the link carries no code', async () => {
+    vi.stubGlobal('location', { search: '', href: '/' })
+    render(
+      <AccessGate session={session({ access: { staff: false, parent: false }, studios: [] })} locale="he">
+        {protectedContent}
+      </AccessGate>,
+    )
+
+    await waitFor(() => expect(screen.getByTestId('staff-refusal')).toBeInTheDocument())
+    expect(screen.getByLabelText(t('he', 'common.auth.inviteCodeLabel'))).toHaveValue('')
+  })
 })

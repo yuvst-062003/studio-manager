@@ -5082,9 +5082,12 @@ export interface paths {
         put?: never;
         /**
          * Create Staff Invitation
-         * @description F5 — הוספת איש צוות. The token comes back once and never again; the manager
-         *     shares the link, because no mailer exists anywhere in this product (the platform's
-         *     owner invite and §5.4b's onboarding link both work the same way).
+         * @description F5 — הוספת איש צוות. The token comes back once and never again.
+         *
+         *     **It is emailed too, since 2026-09-14.** This used to say the manager shares the link
+         *     "because no mailer exists anywhere in this product" — true until the day before, when
+         *     mail moved off the SMTP the host blocks. The code on screen stays the channel that
+         *     always works; `email_sent` says whether the second one carried as well.
          */
         post: operations["create_staff_invitation_api_v1_staff_invitations_post"];
         delete?: never;
@@ -12554,17 +12557,34 @@ export interface components {
         };
         /**
          * StaffInvitationOut
-         * @description The token, exactly once (F5, on the platform invite's pattern). Only its SHA-256
-         *     is stored, and there is no mailer in this product: the link is the manager's to
-         *     share, like §5.4b's onboarding link.
+         * @description The token, exactly once (F5, on the platform invite's pattern). Only its SHA-256 is
+         *     stored.
+         *
+         *     **The manager is no longer the only delivery mechanism.** This used to say "there is no
+         *     mailer in this product: the link is the manager's to share", which was true until
+         *     2026-09-14 — the host blocks SMTP, so an invited coach was told their code down a phone.
+         *     It is emailed now, and `email_sent` says whether that actually happened, so the code on
+         *     screen stays the channel that always works rather than the one nobody mentions.
          */
         StaffInvitationOut: {
             /** Email */
             email: string;
+            /**
+             * Email Configured
+             * @default false
+             */
+            email_configured: boolean;
+            /**
+             * Email Sent
+             * @default false
+             */
+            email_sent: boolean;
             /** Expires At */
             expires_at: string;
             /** Id */
             id: string;
+            /** Invitation Url */
+            invitation_url?: string | null;
             /** Token */
             token: string;
         };

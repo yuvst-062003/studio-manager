@@ -87,14 +87,27 @@ class StaffInvitationIn(BaseModel):
 
 
 class StaffInvitationOut(BaseModel):
-    """The token, exactly once (F5, on the platform invite's pattern). Only its SHA-256
-    is stored, and there is no mailer in this product: the link is the manager's to
-    share, like §5.4b's onboarding link."""
+    """The token, exactly once (F5, on the platform invite's pattern). Only its SHA-256 is
+    stored.
+
+    **The manager is no longer the only delivery mechanism.** This used to say "there is no
+    mailer in this product: the link is the manager's to share", which was true until
+    2026-09-14 — the host blocks SMTP, so an invited coach was told their code down a phone.
+    It is emailed now, and `email_sent` says whether that actually happened, so the code on
+    screen stays the channel that always works rather than the one nobody mentions.
+    """
 
     id: str
     email: str
     expires_at: str
     token: str
+    #: The staff app carrying the code as `?invite=`, so `AccessGate` arrives pre-filled.
+    #: `None` when this environment's staff host is still a PENDING placeholder.
+    invitation_url: str | None = None
+    #: Whether this deployment can send mail at all — distinct from whether THIS message
+    #: went, so "nobody was emailed" never reads as "emailed and ignored".
+    email_configured: bool = False
+    email_sent: bool = False
 
 
 class StaffRolesIn(BaseModel):

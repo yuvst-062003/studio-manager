@@ -509,3 +509,144 @@ def test_editing_details_is_manager_only(client, as_lead_coach, app_session, stu
         headers=as_lead_coach.headers,
     )
     assert refused.status_code == 403
+
+
+# -- F5: the coach is actually written to (2026-09-14) ------------------------
+"""**Until 2026-09-14 an invited coach was told their code down a phone.**
+
+`create_staff_invitation`'s own docstring said the manager shares the link "because no
+mailer exists anywhere in this product", and that was true: the host blocks every outbound
+SMTP port, so nothing could be sent. Mail moved to HTTPS on 2026-09-13 and this is the
+half that uses it for staff.
+
+The code on screen stays the channel that always works. The email is the second one, and
+`email_sent` is reported separately from `email_configured` so "nobody was written to"
+never reads as "written to and ignored".
+"""
+
+
+def _mail(monkeypatch, *, key="re_test_key", sender="club@example.invalid"):
+    from pydantic import SecretStr
+
+    from app.core.config import settings as app_settings
+
+    monkeypatch.setattr(app_settings, "RESEND_API_KEY", SecretStr(key) if key else None)
+    monkeypatch.setattr(app_settings, "MAIL_FROM", sender)
+
+
+class _Recorder:
+    def __init__(self, status: int = 200) -> None:
+        self.status = status
+        self.calls: list[dict] = []
+
+    def __call__(self, url, *, headers=None, json=None, timeout=None):
+        from types import SimpleNamespace
+
+        self.calls.append({"json": json or {}})
+        return SimpleNamespace(status_code=self.status)
+
+
+def test_inviting_a_coach_emails_them_the_link_and_the_code(client, as_manager, monkeypatch):
+    import app.services.comms.mail_transport as mail_transport
+
+    _mail(monkeypatch)
+    recorder = _Recorder()
+    monkeypatch.setattr(mail_transport.httpx, "post", recorder)
+
+    created = client.post(
+        f"{STAFF}/invitations",
+        json={"email": "newcoach@example.invalid", "roles": ["lead_coach"], "first_name": "רון"},
+        headers=as_manager.headers,
+    )
+
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["email_configured"] is True
+    assert body["email_sent"] is True
+
+    (call,) = recorder.calls
+    assert call["json"]["to"] == ["newcoach@example.invalid"]
+    # Both channels in the message: the link so `AccessGate` arrives pre-filled, and the
+    # code for a mail client that mangles a long URL or a coach reading on another device.
+    assert body["token"] in call["json"]["text"]
+    if body["invitation_url"]:
+        assert body["invitation_url"] in call["json"]["text"]
+        assert body["invitation_url"].endswith(f"/?invite={body['token']}")
+    # The role is named: "added to the club" and "made a manager" are different messages.
+    assert "מאמן" in call["json"]["text"]
+
+
+def test_resending_a_staff_invitation_emails_the_new_code_not_the_old(
+    client, as_manager, monkeypatch
+):
+    import app.services.comms.mail_transport as mail_transport
+
+    _mail(monkeypatch)
+    recorder = _Recorder()
+    monkeypatch.setattr(mail_transport.httpx, "post", recorder)
+
+    created = client.post(
+        f"{STAFF}/invitations",
+        json={"email": "again@example.invalid", "roles": ["assistant_coach"]},
+        headers=as_manager.headers,
+    ).json()
+    resent = client.post(
+        f"{STAFF}/invitations/{created['id']}/resend", headers=as_manager.headers
+    ).json()
+
+    assert resent["token"] != created["token"]
+    assert resent["email_sent"] is True
+    # The second message carries the NEW code. The old one is dead the moment it is
+    # reissued, so an email repeating it would be an invitation that cannot be accepted.
+    second = recorder.calls[-1]["json"]["text"]
+    assert resent["token"] in second
+    assert created["token"] not in second
+
+
+def test_an_invitation_still_succeeds_when_the_mail_provider_is_down(
+    client, as_manager, monkeypatch
+):
+    """The invitation is already committed by the time anything is sent. A provider outage
+    must not read as "no invitation was issued" when one plainly was — the manager still
+    has the code on screen, which is the channel that always works."""
+    import app.services.comms.mail_transport as mail_transport
+
+    _mail(monkeypatch)
+
+    def boom(*args, **kwargs):
+        raise OSError("connection refused")
+
+    monkeypatch.setattr(mail_transport.httpx, "post", boom)
+
+    created = client.post(
+        f"{STAFF}/invitations",
+        json={"email": "outage@example.invalid", "roles": ["lead_coach"]},
+        headers=as_manager.headers,
+    )
+
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["token"], "the code must still be there to read out"
+    assert body["email_sent"] is False
+    assert body["email_configured"] is True
+
+
+def test_nothing_is_attempted_when_this_deployment_cannot_send(client, as_manager, monkeypatch):
+    import app.services.comms.mail_transport as mail_transport
+
+    _mail(monkeypatch, key=None)
+
+    def explode(*args, **kwargs):
+        raise AssertionError("the provider was contacted with no transport configured")
+
+    monkeypatch.setattr(mail_transport.httpx, "post", explode)
+
+    body = client.post(
+        f"{STAFF}/invitations",
+        json={"email": "quiet@example.invalid", "roles": ["lead_coach"]},
+        headers=as_manager.headers,
+    ).json()
+
+    assert body["email_configured"] is False
+    assert body["email_sent"] is False
+    assert body["token"]
