@@ -1,0 +1,898 @@
+<!--
+  §20 — the growth system, as a page. The visual companion to docs/growth-spec.md:
+  the spec carries the reasoning and the citations, this carries the shape of the thing.
+
+  **Published as a Claude artifact at**
+  https://claude.ai/code/artifact/1c60bbef-7df9-47f8-a1a0-7c34f978d379
+  — private to the owner unless shared from that page's own share menu. This file is the
+  SOURCE; republishing it to that URL is what updates the published page, so edit here
+  rather than anywhere else.
+
+  **It is a body fragment, not a document.** The artifact host wraps it in its own
+  <!doctype>/<head>/<body>, supplying the charset and viewport meta — which is why there
+  is no <html> element below and why opening this file straight off disk renders the
+  Hebrew as mojibake. To preview it locally, wrap it first:
+
+      python3 -c "import io,sys; s=io.open(sys.argv[1],encoding='utf-8').read(); \
+        io.open('/tmp/p.html','w',encoding='utf-8').write(
+          '<!doctype html><meta charset=utf-8>'+s)" docs/growth-plan.html
+
+  Two rendering notes worth keeping, both found by looking rather than reasoning:
+  every ₪ was removed because neither Archivo nor IBM Plex Mono carries the glyph and
+  system fallback could not be relied on (prices are words); and every LTR number inside
+  the Hebrew transcript is wrapped in <bdi dir="ltr"> or it renders reversed — "4–6"
+  became "6–4", which is a bug the real bot will have to avoid too.
+-->
+<title>Gladiator Growth System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500;600&family=Rubik:wght@400;500;700&display=swap">
+<style>
+  :root {
+    --navy: #003874;
+    --navy-lift: #1a4f95;
+    --ground: #f5f6f8;
+    --surface: #ffffff;
+    --surface-sunk: #eceff4;
+    --ink: #111927;
+    --ink-2: #4c586b;
+    --ink-3: #7a869a;
+    --rule: #d8dee8;
+    --rule-soft: #e7ebf1;
+    --free: #1f6f4e;
+    --free-bg: #e8f4ee;
+    --spend: #a0561b;
+    --spend-bg: #fbf0e4;
+    --cut: #a32222;
+    --cut-bg: #fbeaea;
+    --urgent: #8a1f1f;
+    --on-urgent: #ffffff;
+    --on-navy: #ffffff;
+
+    --stage-1: #1a4f95;
+    --stage-2: #2f6bb5;
+    --stage-3: #1f6f4e;
+    --stage-4: #a0561b;
+    --stage-5: #003874;
+
+    /* **Rubik carries the Hebrew.** Archivo and IBM Plex Mono have no Hebrew and no
+       shekel sign; `system-ui` could not be relied on for the shekel either, so prices are
+       written as words and every ₪ was removed from the page. The Hebrew in the WhatsApp
+       transcript is real text though, and Rubik is what sets it — per-glyph fallback means
+       it supplies only those glyphs and the Latin stays in the face it was set in. */
+    --f-display: "Archivo", "Rubik", "Helvetica Neue", Arial, sans-serif;
+    --f-body: "Source Serif 4", Georgia, "Rubik", "Times New Roman", serif;
+    --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, "Rubik", monospace;
+
+    --measure: 68ch;
+    --page: 1180px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --navy: #8fb5e6;
+      --navy-lift: #b4d0f2;
+      --ground: #0e1520;
+      --surface: #151e2b;
+      --surface-sunk: #1b2634;
+      --ink: #e8edf5;
+      --ink-2: #a8b4c6;
+      --ink-3: #7e8ca1;
+      --rule: #2c3a4c;
+      --rule-soft: #232f3f;
+      --free: #6cc79b;
+      --free-bg: #143024;
+      --spend: #e0a468;
+      --spend-bg: #33230f;
+      --cut: #e78d8d;
+      --cut-bg: #351718;
+      --urgent: #f0a0a0;
+      --on-urgent: #2a0f0f;
+      --on-navy: #0e1520;
+      --stage-1: #8fb5e6;
+      --stage-2: #a9c8ef;
+      --stage-3: #6cc79b;
+      --stage-4: #e0a468;
+      --stage-5: #b4d0f2;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --navy: #8fb5e6;
+    --navy-lift: #b4d0f2;
+    --ground: #0e1520;
+    --surface: #151e2b;
+    --surface-sunk: #1b2634;
+    --ink: #e8edf5;
+    --ink-2: #a8b4c6;
+    --ink-3: #7e8ca1;
+    --rule: #2c3a4c;
+    --rule-soft: #232f3f;
+    --free: #6cc79b;
+    --free-bg: #143024;
+    --spend: #e0a468;
+    --spend-bg: #33230f;
+    --cut: #e78d8d;
+    --cut-bg: #351718;
+    --urgent: #f0a0a0;
+    --on-urgent: #2a0f0f;
+    --on-navy: #0e1520;
+    --stage-1: #8fb5e6;
+    --stage-2: #a9c8ef;
+    --stage-3: #6cc79b;
+    --stage-4: #e0a468;
+    --stage-5: #b4d0f2;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--f-body);
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: var(--page); margin: 0 auto; padding: 0 28px 96px; }
+  .col { max-width: var(--measure); }
+
+  h1, h2, h3, h4, .eyebrow, th, .tag, .pill { font-family: var(--f-display); }
+
+  h1 {
+    font-size: clamp(2.5rem, 5.6vw, 4.1rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.0;
+    text-wrap: balance;
+    margin: 0 0 20px;
+  }
+  h2 {
+    font-size: clamp(1.5rem, 2.7vw, 2.05rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.14;
+    text-wrap: balance;
+    margin: 0 0 8px;
+  }
+  h3 { font-size: 1.12rem; font-weight: 700; letter-spacing: -0.008em; margin: 0 0 8px; }
+  p { margin: 0 0 15px; }
+
+  .eyebrow {
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--ink-3); margin: 0 0 10px;
+  }
+  .lede { font-size: 1.24rem; line-height: 1.48; color: var(--ink-2); }
+
+  header.mast { border-top: 5px solid var(--navy); padding: 44px 0 30px; }
+
+  .mast-meta {
+    display: flex; flex-wrap: wrap; gap: 10px 26px;
+    font-family: var(--f-mono); font-size: 0.74rem; letter-spacing: 0.03em;
+    color: var(--ink-3); margin-bottom: 30px;
+  }
+  .mast-meta b { color: var(--ink-2); font-weight: 500; }
+
+  /* ---- the four channels, as the thesis ---- */
+  .channels {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 1px; background: var(--rule-soft);
+    border: 1px solid var(--rule-soft); margin: 0 0 14px;
+  }
+  .channel { background: var(--surface); padding: 20px 22px 18px; }
+  .channel .n {
+    font-family: var(--f-mono); font-size: 0.68rem; letter-spacing: 0.1em;
+    color: var(--ink-3); display: block; margin-bottom: 9px;
+  }
+  .channel h3 { margin: 0 0 6px; font-size: 1.05rem; }
+  .channel p { margin: 0; font-size: 0.9rem; color: var(--ink-2); line-height: 1.45; }
+  .channel .bar { display: block; width: 30px; height: 3px; margin-bottom: 13px; }
+
+  section { padding-top: 60px; }
+  .sec-head { margin-bottom: 26px; }
+  .sec-head p { color: var(--ink-2); margin-bottom: 0; }
+
+  figure {
+    margin: 0 0 30px; background: var(--surface);
+    border: 1px solid var(--rule-soft); padding: 26px 26px 18px;
+  }
+  .svg-scroll { overflow-x: auto; }
+  figure svg { display: block; max-width: 100%; height: auto; min-width: 680px; color: var(--ink-2); }
+  figcaption {
+    font-size: 0.9rem; color: var(--ink-2); margin-top: 18px;
+    padding-top: 15px; border-top: 1px solid var(--rule-soft); max-width: 74ch;
+  }
+  figcaption b { color: var(--ink); font-weight: 600; }
+
+  /* ---- pillars ---- */
+  .pillar {
+    background: var(--surface); border: 1px solid var(--rule-soft);
+    border-inline-start: 4px solid var(--navy); padding: 24px 28px; margin-bottom: 16px;
+  }
+  .pillar-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px; margin-bottom: 4px; }
+  .pillar-top h3 { margin: 0; font-size: 1.22rem; }
+  .pillar > p { color: var(--ink-2); }
+  .pillar > p:last-child { margin-bottom: 0; }
+  .pillar ul { margin: 0 0 14px; padding-inline-start: 20px; color: var(--ink-2); font-size: 0.95rem; }
+  .pillar li { margin-bottom: 5px; }
+  .pillar li::marker { color: var(--ink-3); }
+
+  .tag {
+    font-family: var(--f-mono); font-size: 0.68rem; font-weight: 500;
+    letter-spacing: 0.04em; padding: 3px 8px; white-space: nowrap;
+    border: 1px solid transparent;
+  }
+  .t-free  { color: var(--free);  background: var(--free-bg);  border-color: color-mix(in srgb, var(--free) 25%, transparent); }
+  .t-spend { color: var(--spend); background: var(--spend-bg); border-color: color-mix(in srgb, var(--spend) 28%, transparent); }
+  .t-cut   { color: var(--cut);   background: var(--cut-bg);   border-color: color-mix(in srgb, var(--cut) 28%, transparent); }
+  .t-time  { color: var(--ink-2); background: var(--surface-sunk); border-color: var(--rule); }
+  .t-now   { color: var(--on-urgent); background: var(--urgent); border-color: var(--urgent); }
+  .t-live  { color: var(--on-navy); background: var(--free); border-color: var(--free); }
+
+  /* ---- the WhatsApp transcript ---- */
+  .chat-wrap { display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: 34px; align-items: start; }
+  @media (max-width: 860px) { .chat-wrap { grid-template-columns: 1fr; } }
+
+  .chat {
+    direction: rtl; background: var(--surface-sunk);
+    border: 1px solid var(--rule-soft); padding: 18px 16px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .turn { display: flex; flex-direction: column; gap: 6px; max-width: 86%; }
+  .turn--bot { align-self: flex-start; align-items: flex-start; }
+  .turn--them { align-self: flex-end; align-items: flex-end; }
+
+  .bubble {
+    font-family: var(--f-body); font-size: 0.9rem; line-height: 1.5;
+    padding: 9px 13px; border-radius: 12px; border: 1px solid var(--rule-soft);
+  }
+  .turn--bot .bubble { background: var(--surface); border-start-start-radius: 3px; }
+  .turn--them .bubble { background: var(--free-bg); border-color: color-mix(in srgb, var(--free) 25%, transparent); border-start-end-radius: 3px; }
+
+  .opts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .opt {
+    font-family: var(--f-body); font-size: 0.8rem; padding: 5px 11px;
+    background: var(--surface); border: 1px solid var(--navy-lift);
+    color: var(--navy); border-radius: 14px;
+  }
+  .sheet {
+    background: var(--surface); border: 1px solid var(--rule); width: 100%;
+    display: flex; flex-direction: column;
+  }
+  .sheet-top {
+    font-family: var(--f-mono); font-size: 0.64rem; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--ink-3);
+    padding: 7px 12px; border-bottom: 1px solid var(--rule-soft);
+  }
+  .sheet-row { padding: 7px 12px; border-bottom: 1px solid var(--rule-soft); font-size: 0.85rem; }
+  .sheet-row:last-child { border-bottom: none; }
+  .sheet-row span { display: block; font-size: 0.74rem; color: var(--ink-3); }
+  .typed { font-family: var(--f-mono); font-size: 0.66rem; color: var(--ink-3); letter-spacing: 0.04em; }
+
+  .qsteps { display: grid; gap: 1px; background: var(--rule-soft); border: 1px solid var(--rule-soft); }
+  .qstep { background: var(--surface); padding: 14px 18px; display: grid; grid-template-columns: 26px 1fr; gap: 4px 14px; }
+  .qstep .k { font-family: var(--f-mono); font-size: 0.72rem; color: var(--ink-3); }
+  .qstep h4 { margin: 0; font-size: 0.95rem; font-weight: 700; }
+  .qstep p { margin: 0; font-size: 0.89rem; color: var(--ink-2); grid-column: 2; }
+
+  /* ---- the three doors on the landing page ---- */
+  .doors { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1px; background: var(--rule-soft); border: 1px solid var(--rule-soft); margin-bottom: 30px; }
+  .door { background: var(--surface); padding: 20px 22px; display: flex; flex-direction: column; gap: 9px; }
+  .door-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .door h4 { margin: 0; font-size: 1rem; font-weight: 700; }
+  .door .who { font-family: var(--f-mono); font-size: 0.66rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-3); }
+  .door p { margin: 0; font-size: 0.89rem; color: var(--ink-2); line-height: 1.45; }
+
+  /* ---- setup checklist ---- */
+  .setup { display: grid; gap: 1px; background: var(--rule-soft); border: 1px solid var(--rule-soft); }
+  .setup-row {
+    background: var(--surface); padding: 15px 20px;
+    display: grid; grid-template-columns: 30px minmax(150px, 230px) 1fr; gap: 6px 18px; align-items: baseline;
+  }
+  .setup-row .k {
+    font-family: var(--f-mono); font-size: 0.72rem; color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .setup-row h4 { margin: 0; font-size: 0.97rem; font-weight: 700; }
+  .setup-row p { margin: 0; font-size: 0.91rem; color: var(--ink-2); }
+  @media (max-width: 660px) { .setup-row { grid-template-columns: 30px 1fr; } .setup-row p { grid-column: 2; } }
+
+  /* ---- tables ---- */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--rule-soft); background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 0.94rem; }
+  th, td { text-align: left; padding: 11px 18px; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  th {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-3); background: var(--surface-sunk); white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.price { font-family: var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 0.86rem; }
+  tr.total td { background: var(--surface-sunk); font-weight: 600; border-top: 2px solid var(--rule); }
+  tr.total td.price { color: var(--free); }
+  .note { font-size: 0.86rem; color: var(--ink-3); margin-top: 12px; }
+
+  code {
+    font-family: var(--f-mono); font-size: 0.85em; background: var(--surface-sunk);
+    padding: 1px 5px; border: 1px solid var(--rule-soft);
+  }
+  .he { direction: rtl; unicode-bidi: isolate; }
+
+  /* ---- free-now band ---- */
+  .band {
+    background: var(--free-bg);
+    border: 1px solid color-mix(in srgb, var(--free) 30%, transparent);
+    padding: 26px 30px; margin-top: 10px;
+  }
+  .band h2 { color: var(--free); }
+  .band .free-list { display: grid; gap: 1px; background: color-mix(in srgb, var(--free) 22%, transparent); margin-top: 20px; }
+  .band .free-row {
+    background: var(--surface); padding: 14px 18px;
+    display: grid; grid-template-columns: minmax(150px, 240px) 1fr auto; gap: 6px 18px; align-items: baseline;
+  }
+  .band .free-row h4 { margin: 0; font-size: 0.96rem; font-weight: 700; }
+  .band .free-row p { margin: 0; font-size: 0.9rem; color: var(--ink-2); }
+  @media (max-width: 700px) { .band .free-row { grid-template-columns: 1fr; } }
+
+  /* ---- risks ---- */
+  .risks { display: grid; gap: 1px; background: var(--rule-soft); border: 1px solid var(--rule-soft); }
+  .risk { background: var(--surface); padding: 16px 20px; display: grid; grid-template-columns: minmax(140px, 210px) 1fr; gap: 6px 22px; }
+  .risk h4 { margin: 0; font-size: 0.96rem; font-weight: 700; }
+  .risk p { margin: 0; font-size: 0.91rem; color: var(--ink-2); }
+  @media (max-width: 620px) { .risk { grid-template-columns: 1fr; } }
+
+  footer {
+    margin-top: 66px; padding-top: 22px; border-top: 1px solid var(--rule);
+    font-family: var(--f-mono); font-size: 0.74rem; color: var(--ink-3); line-height: 1.7;
+  }
+
+  :focus-visible { outline: 2px solid var(--navy-lift); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <p class="eyebrow">Gladiator Judo Club &middot; Growth &sect;20</p>
+    <h1>One system: content, channels, conversations, members</h1>
+    <p class="lede col">Facebook, Instagram, WhatsApp, and content the app writes <em>and narrates in your own voice</em> &mdash; built as a single loop rather than five features. The app already holds what none of those tools have &mdash; the club&rsquo;s real sessions, real ages, real events, and the record of who may be photographed. That is what makes this worth owning instead of renting.</p>
+  </header>
+
+  <div class="mast-meta">
+    <span>14 SEP 2026</span>
+    <span>FULL SPEC: <b>docs/growth-spec.md</b></span>
+    <span>TO BUILD: <b>~5 weeks</b></span>
+    <span>TO RUN: <b>~20 shekels / month, ~100 with voice</b></span>
+  </div>
+
+  <div class="channels">
+    <div class="channel">
+      <span class="bar" style="background:var(--stage-1)"></span>
+      <span class="n">01 &middot; CREATE</span>
+      <h3>AI content &amp; voice</h3>
+      <p>Posts, captions and shot briefs written from the club&rsquo;s own rows &mdash; then narrated in your own voice, so a clip needs no recording session.</p>
+    </div>
+    <div class="channel">
+      <span class="bar" style="background:var(--stage-2)"></span>
+      <span class="n">02 &middot; APPROVE</span>
+      <h3>WhatsApp</h3>
+      <p>Every draft goes to you first. Corrections go back the same way. Nothing publishes without a yes.</p>
+    </div>
+    <div class="channel">
+      <span class="bar" style="background:var(--stage-3)"></span>
+      <span class="n">03 &middot; PUBLISH</span>
+      <h3>Facebook + Instagram</h3>
+      <p>Posted to the club&rsquo;s Page and account on a schedule, with the club&rsquo;s photographs and the club&rsquo;s facts.</p>
+    </div>
+    <div class="channel">
+      <span class="bar" style="background:var(--stage-4)"></span>
+      <span class="n">04 &middot; CONVERT</span>
+      <h3>Lead capture</h3>
+      <p>A stranger taps through to WhatsApp, gets asked four questions, and walks out with a booked trial lesson.</p>
+    </div>
+  </div>
+
+  <!-- ============ THE LOOP ============ -->
+  <section id="loop" style="padding-top:34px">
+    <div class="sec-head col">
+      <p class="eyebrow">How it fits together</p>
+      <h2>The loop, end to end</h2>
+      <p>Each stage feeds the next, and the last one feeds the first. Built separately these are four half-features; built as a loop, each one makes the others worth more.</p>
+    </div>
+
+    <figure>
+      <div class="svg-scroll">
+      <svg viewBox="0 0 1000 400" role="img" aria-label="The growth loop: club data feeds AI drafting, the manager approves in WhatsApp, the post publishes to Facebook and Instagram, a stranger taps through to a WhatsApp bot that books a real trial, the trial becomes a member, and that member shares the club onward.">
+        <defs>
+          <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+          <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#1f6f4e"/>
+          </marker>
+        </defs>
+
+        <!-- stage 1 -->
+        <rect x="8" y="58" width="176" height="116" fill="none" stroke="#1a4f95" stroke-width="2"/>
+        <text x="96" y="46" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#1a4f95">01 · CREATE</text>
+        <text x="96" y="84" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="700" fill="currentColor">AI writes it</text>
+        <text x="96" y="102" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" opacity="0.72">from session, event,</text>
+        <text x="96" y="116" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" opacity="0.72">group and belt rows</text>
+        <text x="96" y="130" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="currentColor" opacity="0.5">never invented facts</text>
+        <line x1="26" y1="140" x2="166" y2="140" stroke="#1a4f95" stroke-width="1" opacity="0.35"/>
+        <text x="96" y="156" text-anchor="middle" font-family="Archivo, sans-serif" font-size="11.5" font-weight="700" fill="#1a4f95">…and reads it aloud</text>
+        <text x="96" y="168" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="currentColor" opacity="0.6">in your voice</text>
+
+        <line x1="184" y1="101" x2="232" y2="101" stroke="currentColor" stroke-width="1.5" marker-end="url(#a)"/>
+
+        <!-- stage 2 -->
+        <rect x="236" y="58" width="176" height="86" fill="none" stroke="#2f6bb5" stroke-width="2"/>
+        <text x="324" y="46" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#2f6bb5">02 · APPROVE</text>
+        <text x="324" y="86" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="700" fill="currentColor">You say yes</text>
+        <text x="324" y="106" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" opacity="0.72">in WhatsApp, where</text>
+        <text x="324" y="120" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" opacity="0.72">you already are</text>
+        <text x="324" y="136" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#1f6f4e" opacity="0.9">corrections are free</text>
+
+        <line x1="412" y1="101" x2="460" y2="101" stroke="currentColor" stroke-width="1.5" marker-end="url(#a)"/>
+
+        <!-- stage 3 -->
+        <rect x="464" y="58" width="176" height="86" fill="none" stroke="#1f6f4e" stroke-width="2"/>
+        <text x="552" y="46" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#1f6f4e">03 · PUBLISH</text>
+        <text x="552" y="86" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="700" fill="currentColor">Facebook + Instagram</text>
+        <text x="552" y="106" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" opacity="0.72">Page post, Reel, Story</text>
+        <text x="552" y="122" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="currentColor" opacity="0.5">only photos with consent</text>
+
+        <line x1="640" y1="101" x2="688" y2="101" stroke="currentColor" stroke-width="1.5" marker-end="url(#a)"/>
+
+        <!-- stranger -->
+        <rect x="692" y="58" width="176" height="86" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 3"/>
+        <text x="780" y="86" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="700" fill="currentColor">A parent sees it</text>
+        <text x="780" y="106" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" opacity="0.72">taps “שלחו הודעה”</text>
+        <text x="780" y="122" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#1f6f4e" opacity="0.9">72h free window opens</text>
+
+        <!-- down -->
+        <path d="M868,101 L940,101 L940,232 L868,232" fill="none" stroke="currentColor" stroke-width="1.5" marker-end="url(#a)"/>
+
+        <!-- stage 4 -->
+        <rect x="692" y="200" width="176" height="86" fill="none" stroke="#a0561b" stroke-width="2"/>
+        <text x="780" y="188" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#a0561b">04 · CONVERT</text>
+        <text x="780" y="228" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="700" fill="currentColor">The bot asks</text>
+        <text x="780" y="248" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" opacity="0.72">name · age · slot</text>
+        <text x="780" y="264" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="currentColor" opacity="0.5">age picks the group</text>
+
+        <line x1="692" y1="243" x2="644" y2="243" stroke="currentColor" stroke-width="1.5" marker-end="url(#a)"/>
+
+        <!-- booking -->
+        <rect x="464" y="200" width="176" height="86" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="5 3"/>
+        <text x="552" y="228" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="700" fill="currentColor">A real booking</text>
+        <text x="552" y="248" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" opacity="0.72">TrialBooking + Student</text>
+        <text x="552" y="264" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="currentColor" opacity="0.5">already built &amp; running</text>
+
+        <line x1="464" y1="243" x2="416" y2="243" stroke="currentColor" stroke-width="1.5" marker-end="url(#a)"/>
+
+        <!-- member -->
+        <rect x="236" y="196" width="176" height="94" fill="#003874" opacity="0.08"/>
+        <rect x="236" y="196" width="176" height="94" fill="none" stroke="#003874" stroke-width="2"/>
+        <text x="324" y="188" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#003874">05 · MEMBER</text>
+        <text x="324" y="228" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13.5" font-weight="700" fill="currentColor">Trial → joins</text>
+        <text x="324" y="248" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" opacity="0.72">day 1 / 3 / 7 follow-up</text>
+        <text x="324" y="264" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="currentColor" opacity="0.5">already built &amp; running</text>
+        <text x="324" y="281" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="currentColor" opacity="0.5">and a new photo subject</text>
+
+        <!-- the return loop -->
+        <path d="M236,243 L96,243 L96,182" fill="none" stroke="#1f6f4e" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#ag)"/>
+        <text x="166" y="330" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="700" fill="#1f6f4e">the loop closes</text>
+        <text x="166" y="350" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" opacity="0.72">a member shares the club,</text>
+        <text x="166" y="364" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" opacity="0.72">and their training is</text>
+        <text x="166" y="378" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" fill="currentColor" opacity="0.72">next week’s content</text>
+
+        <line x1="470" y1="320" x2="470" y2="372" stroke="currentColor" stroke-width="1" opacity="0.25"/>
+        <text x="500" y="330" font-family="Source Serif 4, Georgia, serif" font-size="12.5" fill="currentColor" opacity="0.82">Stages 04 and 05 already exist in the app — the trial endpoint, the funnel and the</text>
+        <text x="500" y="350" font-family="Source Serif 4, Georgia, serif" font-size="12.5" fill="currentColor" opacity="0.82">follow-up ladder all run today. What is missing is everything to the left of them:</text>
+        <text x="500" y="370" font-family="Source Serif 4, Georgia, serif" font-size="12.5" fill="currentColor" opacity="0.82">the content that gets a stranger to the door in the first place.</text>
+      </svg>
+      </div>
+      <figcaption><b>The right-hand half of this loop is built and running.</b> A trial booked by the bot is the same <code>TrialBooking</code> the landing page creates, dropped into the same funnel, chased by the same day-1/3/7 worker. The work is stages 01&ndash;03 &mdash; and the reason to own them rather than rent a scheduler is stage 01: no outside tool knows your Tuesday 17:00 group is 7&ndash;9 year-olds, or which children may appear in the photograph.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ============ PILLARS ============ -->
+  <section id="pillars">
+    <div class="sec-head col">
+      <p class="eyebrow">The four parts</p>
+      <h2>What each one actually does</h2>
+      <p>Costs are per unit and verified against the providers&rsquo; own rate cards. Build times assume the pieces before them exist.</p>
+    </div>
+
+    <div class="pillar" style="border-inline-start-color:var(--stage-1)">
+      <div class="pillar-top">
+        <h3>01 &middot; AI content</h3>
+        <span class="tag t-time">~6 days</span>
+        <span class="tag t-free">~2 shekels / month</span>
+      </div>
+      <p>The part that solves the real blocker. You don&rsquo;t post because you don&rsquo;t know <em>what</em> to post &mdash; not because writing takes too long. So this starts from something that actually happened and is already a row in the app.</p>
+      <ul>
+        <li><b>A post from an event.</b> A grading, a competition result, a new term &mdash; with the true date, the true age range and the true group name.</li>
+        <li><b>A caption from photographs.</b> Pick three shots, get Hebrew copy and hashtags back.</li>
+        <li><b>A shot brief.</b> Where to stand, what&rsquo;s in frame, how long, and a script to read &mdash; so a coach with a phone gets a usable clip on the first take.</li>
+        <li><b>Hebrew subtitles</b> from the clip&rsquo;s own audio, at about 2 agorot a minute.</li>
+      </ul>
+      <p>Everything lands in a box you edit. The model may phrase and interpret; it never decides a fact &mdash; prices, ages, times and addresses come from rows, always.</p>
+    </div>
+
+    <div class="pillar" style="border-inline-start-color:var(--stage-1)">
+      <div class="pillar-top">
+        <h3>01b &middot; The club&rsquo;s own voice</h3>
+        <span class="tag t-time">~3 days</span>
+        <span class="tag t-spend">$22 / month</span>
+      </div>
+      <p>You record about <b>thirty minutes</b> of yourself reading, once. After that the app can speak any script in your voice &mdash; so a Reel over Tuesday&rsquo;s training needs no recording session, no quiet room, and no second take because a child shouted.</p>
+      <p>This removes the barrier that sits right behind the blank page. Writing the script was never the hard part; sitting down to record it at nine at night is.</p>
+      <ul>
+        <li><b>The clone is one-time.</b> Thirty minutes of clean audio, then it is a voice the app can use indefinitely.</li>
+        <li><b>About a minute of speech per clip</b>, which is roughly 1,000 characters &mdash; well inside a &#36;22 plan that carries about two hours a month.</li>
+        <li><b>It is your voice and only yours.</b> Cloning a coach or a parent needs their written permission; the club should never hold a voice it was not given.</li>
+      </ul>
+      <p><b>Hebrew is where this gets tested, not assumed.</b> Hebrew text-to-speech is good enough to publish but still misplaces stress, and it struggles with exactly the thing Israeli speech does constantly: switching between Hebrew and English mid-sentence. A judo club adds a third layer &mdash; <span class="he">אוצ&rsquo;י-גארי</span>, <span class="he">איפון</span>, <span class="he">רנדורי</span> are Japanese words inside Hebrew sentences, which is the hardest case there is. <b>Record one real script with the technique names in it and listen before committing to the plan.</b></p>
+      <p><b>Two rules that are not negotiable.</b> It narrates content, never correspondence &mdash; nothing about a payment, a health declaration or a specific child is ever spoken by a machine wearing your voice. And when a clip is voiced rather than recorded, the club should be comfortable saying so if asked; parents know what you sound like, and a synthetic voice discovered is worse than one disclosed.</p>
+    </div>
+
+    <div class="pillar" style="border-inline-start-color:var(--stage-2)">
+      <div class="pillar-top">
+        <h3>02 &middot; WhatsApp approval</h3>
+        <span class="tag t-time">~6 days</span>
+        <span class="tag t-free">free to run</span>
+      </div>
+      <p>You ask for a post; the app drafts it and sends it to your WhatsApp; you reply <span class="he">&ldquo;קצר יותר&rdquo;</span> and get a revision; you reply <span class="he">&ldquo;אשר&rdquo;</span> and it goes out. Nothing is ever published without that yes.</p>
+      <p><b>Every message in that exchange is free, with no monthly cap</b>, because you started the conversation &mdash; which is also why the design makes you the one who starts it. Ships over push notifications first (working today, no Meta account needed), then WhatsApp as a second transport.</p>
+    </div>
+
+    <div class="pillar" style="border-inline-start-color:var(--stage-3)">
+      <div class="pillar-top">
+        <h3>03 &middot; Facebook + Instagram</h3>
+        <span class="tag t-time">~8 days</span>
+        <span class="tag t-spend">+ App Review</span>
+      </div>
+      <p>Approved content posts itself to the Page and the Instagram Business account &mdash; feed posts, Reels and Stories &mdash; and Meta&rsquo;s lead forms deliver enquiries straight into the app instead of sitting in Business Suite until somebody remembers to look.</p>
+      <ul>
+        <li><b>Publishing</b> is a two-step container upload per image or video. Tedious, well-documented, and it breaks on Meta&rsquo;s schedule rather than yours &mdash; so it needs a red light when a token expires, not silent failure.</li>
+        <li><b>Lead capture</b> needs five permissions and an App Review in which Meta&rsquo;s reviewers test your live webhook. Days to weeks, and it can be rejected and resubmitted.</li>
+        <li><b>Meta keeps lead data for 90 days only</b>, so an integration that stops quietly destroys leads rather than delaying them. That red light is not optional.</li>
+      </ul>
+    </div>
+
+    <div class="pillar" style="border-inline-start-color:var(--stage-4)">
+      <div class="pillar-top">
+        <h3>04 &middot; The lead bot</h3>
+        <span class="tag t-time">~5 days</span>
+        <span class="tag t-free">free to run</span>
+      </div>
+      <p><b>One script, two places.</b> The same four questions run as a chat on the landing page and as a WhatsApp conversation &mdash; written once, pointed at either transport, exactly as the approval loop is. A stranger gets a welcome, four questions, and a booked lesson. Their age picks the group, because <code>group.age_min</code> already says which; the slots come from the endpoint the landing page already uses; the booking is a real one.</p>
+      <p><b>Free to run</b>: they message first, so the whole conversation sits inside the free window. <b>Structured, not chatty</b> &mdash; Meta bans open-ended assistants on WhatsApp from 15 January 2026 but explicitly permits booking and appointment bots, which is what this is.</p>
+      <p><b>What WhatsApp adds over the page is the follow-up, not the widget.</b> A web visitor who abandons is gone and you have nothing. Someone who messaged you has already given you their number by the act of messaging, so a quiet lead can be nudged the next day for a few agorot. That is the entire difference, and it is the reason the bot&rsquo;s real home is WhatsApp even though the page can run the same script.</p>
+      <p>The health declaration follows by link in both places &mdash; not because a chat cannot take a signature (a trial is <em>declared</em>, not signed) but because a health template is more questions than any chat should ask. The existing reminder worker chases it, and the child is not on the mat until it is done.</p>
+    </div>
+  </section>
+
+  <!-- ============ THE CONVERSATION ============ -->
+  <section id="conversation">
+    <div class="sec-head col">
+      <p class="eyebrow">Stage 04, in full</p>
+      <h2>Three ways in, one conversation</h2>
+      <p>The landing page offers a choice rather than a single form, because &ldquo;ready to book&rdquo; and &ldquo;still deciding&rdquo; are different people. The same script runs behind two of them &mdash; written once, pointed at either transport.</p>
+    </div>
+
+    <div class="doors">
+      <div class="door">
+        <div class="door-head">
+          <h4><span class="he">קביעת שיעור ניסיון</span></h4>
+          <span class="tag t-live">EXISTS</span>
+        </div>
+        <span class="who">for the decided</span>
+        <p>The one-page form that is already there. Fastest route for someone who arrived intending to book, and it writes the lead under a single button.</p>
+      </div>
+      <div class="door">
+        <div class="door-head">
+          <h4><span class="he">עוזר הרשמה</span></h4>
+          <span class="tag t-time">~3 days</span>
+        </div>
+        <span class="who">for the unsure</span>
+        <p>The assistant, on the page. Asks the same four questions a chat at a time, for a parent who would bounce off a form with six fields in it.</p>
+      </div>
+      <div class="door">
+        <div class="door-head">
+          <h4><span class="he">וואטסאפ</span></h4>
+          <span class="tag t-live">WORKS TODAY</span>
+        </div>
+        <span class="who">for the hesitant</span>
+        <p><b>A plain <code>wa.me</code> link &mdash; no Meta account, no verification, nothing to build.</b> A person answers it now; the bot answers it once stage 04 ships.</p>
+      </div>
+    </div>
+
+    <div class="sec-head col" style="margin-top:8px">
+      <h3>The script, either way</h3>
+      <p>Four questions, and only two of them need typing. Everything else is a tap, because a parent enquiring at 21:40 with a child on their lap will not fill in a form. The groups, times and address below are the club&rsquo;s real ones.</p>
+    </div>
+
+    <div class="chat-wrap">
+      <div class="chat" data-testid="chat">
+        <div class="turn turn--them">
+          <div class="bubble">היי, ראיתי את הפוסט. אפשר פרטים על אימוני ג&rsquo;ודו לילדים?</div>
+        </div>
+
+        <div class="turn turn--bot">
+          <div class="bubble">שלום! 🥋 אני העוזר של מועדון גלדיאטור. אפשר לקבוע שיעור ניסיון חינם — לוקח פחות מדקה.</div>
+          <div class="opts">
+            <span class="opt">קביעת שיעור ניסיון</span>
+            <span class="opt">מחירים ושעות</span>
+            <span class="opt">לדבר עם מאמן</span>
+          </div>
+        </div>
+
+        <div class="turn turn--them">
+          <div class="bubble">קביעת שיעור ניסיון</div>
+        </div>
+
+        <div class="turn turn--bot">
+          <div class="bubble">מעולה. מה השם של הילד או הילדה?</div>
+        </div>
+
+        <div class="turn turn--them">
+          <div class="bubble">אורי</div>
+          <span class="typed">TYPED</span>
+        </div>
+
+        <div class="turn turn--bot">
+          <div class="bubble">בן כמה אורי?</div>
+          <div class="sheet">
+            <div class="sheet-top">בחירת גיל</div>
+            <div class="sheet-row"><bdi dir="ltr">4&ndash;6</bdi></div>
+            <div class="sheet-row"><bdi dir="ltr">7&ndash;9</bdi></div>
+            <div class="sheet-row"><bdi dir="ltr">9&ndash;10</bdi></div>
+            <div class="sheet-row"><bdi dir="ltr">10&ndash;12</bdi></div>
+            <div class="sheet-row">נוער ובוגרים</div>
+          </div>
+        </div>
+
+        <div class="turn turn--them">
+          <div class="bubble"><bdi dir="ltr">7&ndash;9</bdi></div>
+        </div>
+
+        <div class="turn turn--bot">
+          <div class="bubble">אורי מתאים ל<bdi>קבוצה 2</bdi>. מתי נוח לכם?</div>
+          <div class="sheet">
+            <div class="sheet-top">בחירת מועד</div>
+            <div class="sheet-row">יום ג&rsquo;, <bdi dir="ltr">16.9 &middot; 17:45</bdi><span>ששת הימים 4, נתניה &middot; 45 דקות</span></div>
+            <div class="sheet-row">יום ו&rsquo;, <bdi dir="ltr">19.9 &middot; 14:45</bdi><span>ששת הימים 4, נתניה &middot; 45 דקות</span></div>
+            <div class="sheet-row">יום ג&rsquo;, <bdi dir="ltr">23.9 &middot; 17:45</bdi><span>ששת הימים 4, נתניה &middot; 45 דקות</span></div>
+          </div>
+        </div>
+
+        <div class="turn turn--them">
+          <div class="bubble">יום ג&rsquo;, <bdi dir="ltr">16.9 &middot; 17:45</bdi></div>
+        </div>
+
+        <div class="turn turn--bot">
+          <div class="bubble">ואיך קוראים לך?</div>
+        </div>
+
+        <div class="turn turn--them">
+          <div class="bubble">מיכל</div>
+          <span class="typed">TYPED</span>
+        </div>
+
+        <div class="turn turn--bot">
+          <div class="bubble">נקבע! ✅ אורי מוזמן ליום ג&rsquo; 16.9 בשעה 17:45, ששת הימים 4 נתניה.<br><br>נשאר דבר אחד: הצהרת בריאות קצרה. חובה למלא אותה לפני הכניסה למזרן — לוקח שתי דקות.</div>
+          <div class="opts">
+            <span class="opt">מילוי הצהרת בריאות</span>
+            <span class="opt">ניווט למועדון</span>
+            <span class="opt">ביטול</span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h3>Why it is shaped like this</h3>
+        <div class="qsteps">
+          <div class="qstep">
+            <span class="k">Q1</span>
+            <h4>The child&rsquo;s name &mdash; typed</h4>
+            <p>No way around this one. It is also the only thing that makes every later message feel addressed to a person rather than a record.</p>
+          </div>
+          <div class="qstep">
+            <span class="k">Q2</span>
+            <h4>Age &mdash; a list of five</h4>
+            <p><b>This is why we ask age and not &ldquo;which group&rdquo;.</b> A parent outside the club has no idea what <bdi>קבוצה 2</bdi> is; the app does, from <code>group.age_min</code>. Five bands is too many for buttons &mdash; WhatsApp allows three &mdash; so it is a list.</p>
+          </div>
+          <div class="qstep">
+            <span class="k">Q3</span>
+            <h4>The slot &mdash; real sessions</h4>
+            <p>Rows come from the same trial-slots endpoint the landing page uses, so a full or cancelled lesson is never offered. Capped at ten by WhatsApp; the next three are enough.</p>
+          </div>
+          <div class="qstep">
+            <span class="k">Q4</span>
+            <h4>The parent&rsquo;s name &mdash; typed</h4>
+            <p>Asked last, once they are already committed. <b>The phone number is never asked</b> &mdash; it is the number they are messaging from.</p>
+          </div>
+        </div>
+
+        <h3 style="margin-top:26px">Three rules inside it</h3>
+        <ul class="pillar" style="border-inline-start-color:var(--stage-4); list-style:none; padding:20px 24px; margin:0">
+          <li style="margin-bottom:12px"><b>An escape hatch on the first message.</b> <span class="he">לדבר עם מאמן</span> hands the conversation to a human and stops the bot. A parent who wants a person and cannot find one is a parent who leaves.</li>
+          <li style="margin-bottom:12px"><b>It books, then says what is still missing.</b> The booking is real the moment the slot is tapped &mdash; the declaration does not gate it, and the reminder worker chases it. But the message says plainly that the mat needs it first, because that is a safety rule and not paperwork.</li>
+          <li style="margin-bottom:12px"><b>It writes as it goes, never at the end.</b> This is the one rule the on-page version must not break. The trial page was rebuilt on 8 September for exactly this: the booking used to be written last, so a parent who filled everything in and abandoned at the final step left the club <em>nothing</em> &mdash; no name, no number, no lead to ring. A chat is four steps, so it must create the lead the moment it has a name and a way to reach them, and enrich it afterwards.</li>
+          <li><b>It never quotes a price it was not given.</b> <span class="he">מחירים ושעות</span> answers from <code>price_plan</code> rows. A bot that invents 320 shekels to a prospective parent has done more damage than one that says nothing.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SWITCH-ON ============ -->
+  <section id="setup">
+    <div class="sec-head col">
+      <p class="eyebrow">Before any of 03 or 04 can run</p>
+      <h2>Switching Meta on</h2>
+      <p>None of this exists for the club yet, and all of it is administrative rather than difficult. Worth starting early, because the review queue is the long pole and it runs while the building happens.</p>
+    </div>
+
+    <div class="setup">
+      <div class="setup-row">
+        <span class="k">01</span>
+        <h4>Meta Business portfolio</h4>
+        <p>The container everything else hangs off. Free, about an hour.</p>
+      </div>
+      <div class="setup-row">
+        <span class="k">02</span>
+        <h4>Business verification</h4>
+        <p>Documents for <span class="he">בריין בילדינג (ע&quot;ר) 580647295</span>. <b>1&ndash;5 working days</b>, and the gate for almost everything else.</p>
+      </div>
+      <div class="setup-row">
+        <span class="k">03</span>
+        <h4>Facebook Page + Instagram Business</h4>
+        <p>The accounts exist; Instagram needs converting to a Business account and linking to the Page. An afternoon.</p>
+      </div>
+      <div class="setup-row">
+        <span class="k">04</span>
+        <h4>A dedicated WhatsApp number</h4>
+        <p>Not one already on consumer WhatsApp. <b>Coexistence</b> means the club keeps using the Business app on it &mdash; you do not lose a phone.</p>
+      </div>
+      <div class="setup-row">
+        <span class="k">05</span>
+        <h4>App Review</h4>
+        <p>Five permissions, a screencast, and reviewers testing the live webhook. <b>Days to weeks.</b> Start it the day the webhook first answers.</p>
+      </div>
+      <div class="setup-row">
+        <span class="k">06</span>
+        <h4>A privacy policy URL</h4>
+        <p><b>Already done</b> &mdash; reviewed and published, and Meta will ask for it.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PRICES ============ -->
+  <section id="prices">
+    <div class="sec-head col">
+      <p class="eyebrow">Prices</p>
+      <h2>What it costs to run</h2>
+      <p>The good news, and it is genuinely good: the AI is nearly free at this club&rsquo;s volume. The expense is building it, not running it.</p>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Unit</th><th>What it is</th><th>Price</th></tr></thead>
+        <tbody>
+          <tr><td>A written post</td><td>Hebrew copy from an event, Claude Haiku 4.5</td><td class="price" style="color:var(--free)">~0.5 agorot</td></tr>
+          <tr><td>A written post</td><td>Claude Opus 5, the better writer</td><td class="price" style="color:var(--free)">~3 agorot</td></tr>
+          <tr><td>Caption from photos</td><td>Opus 5, three images attached</td><td class="price" style="color:var(--free)">~7 agorot</td></tr>
+          <tr><td>Subtitles</td><td>Whisper, per minute of video</td><td class="price" style="color:var(--free)">~2 agorot</td></tr>
+          <tr><td>Your voice, the clone</td><td>One recording session, then reusable indefinitely</td><td class="price" style="color:var(--free)">one-time</td></tr>
+          <tr><td>Your voice, per clip</td><td>~1 minute of speech, inside the plan allowance</td><td class="price" style="color:var(--free)">~37 agorot</td></tr>
+          <tr><td>Voice plan</td><td>ElevenLabs Creator &mdash; unlocks the good clone, ~2 hours/month</td><td class="price" style="color:var(--spend)">$22 / mo</td></tr>
+          <tr><td>WhatsApp, in-window</td><td>Approvals, corrections, the whole lead conversation</td><td class="price" style="color:var(--free)">free</td></tr>
+          <tr><td>WhatsApp, out-of-window</td><td>A next-day nudge to someone who went quiet</td><td class="price" style="color:var(--spend)">a few agorot</td></tr>
+          <tr><td>Publishing to Meta</td><td>Graph API calls for a post, Reel or Story</td><td class="price" style="color:var(--free)">free</td></tr>
+          <tr><td>Meta lead forms</td><td>Webhook delivery of an enquiry</td><td class="price" style="color:var(--free)">free</td></tr>
+          <tr><td>Paid ads</td><td>Optional, and entirely your call</td><td class="price" style="color:var(--spend)">whatever you set</td></tr>
+          <tr class="total"><td>Everything above</td><td>A busy month: 20 posts, 10 captioned clips, a live bot</td><td class="price">under 20 shekels</td></tr>
+          <tr class="total"><td>&hellip; with the voice</td><td>The one real subscription in this plan</td><td class="price">about 100 shekels</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note col"><b>The voice is the only fixed monthly fee here, and it is most of the budget.</b> Everything else is fractions of a shekel. Worth starting on the &#36;6 tier with the quick clone to hear Hebrew for yourself before paying for the good one. Ads are the only line that can grow without limit, and nothing here spends a shekel on them without you setting a budget. <b>AI video generation stays out</b>: Veo runs 4.40&ndash;22 shekels for eight seconds, and it produces synthetic people &mdash; when the whole worth of a judo club&rsquo;s content is that the children in it are yours.</p>
+  </section>
+
+  <!-- ============ FREE NOW ============ -->
+  <section id="now">
+    <div class="band">
+      <p class="eyebrow" style="color:var(--free)">While the above is built</p>
+      <h2>What you can do this week, for nothing</h2>
+      <p class="col" style="margin-top:10px">None of this waits on Meta, a review queue or a line of code. The first two are done as of today.</p>
+
+      <div class="free-list">
+        <div class="free-row">
+          <h4>Photo consent at registration</h4>
+          <p>Asked at the signature, optional, revocable. Without it nothing in stage 03 can legally publish a child&rsquo;s face.</p>
+          <span class="tag t-live">SHIPPED TODAY</span>
+        </div>
+        <div class="free-row">
+          <h4><span class="he">שיתוף המועדון</span></h4>
+          <p>A share button on home and in the profile &mdash; opens WhatsApp with the club&rsquo;s page attached. This is the loop&rsquo;s return arrow.</p>
+          <span class="tag t-live">SHIPPED TODAY</span>
+        </div>
+        <div class="free-row">
+          <h4>Send the onboarding link</h4>
+          <p>One message to the club&rsquo;s WhatsApp groups moves 100+ families onto the app. Everything above is worth more once they are on it.</p>
+          <span class="tag t-now">THIS WEEK</span>
+        </div>
+        <div class="free-row">
+          <h4>Put a WhatsApp button on the landing page</h4>
+          <p>A plain <code>wa.me</code> link. No Meta account, no verification, no code beyond a href &mdash; and it captures a phone number from people who would have left without one. A person answers it until the bot can.</p>
+          <span class="tag t-free">FREE</span>
+        </div>
+        <div class="free-row">
+          <h4>Start Meta verification</h4>
+          <p>1&ndash;5 working days, and it blocks stages 03 and 04. Starting it now means it is done before the code needs it.</p>
+          <span class="tag t-now">THIS WEEK</span>
+        </div>
+        <div class="free-row">
+          <h4>Record thirty minutes of your voice</h4>
+          <p>The one input only you can give. Costs nothing, needs no account yet, and the clone cannot be built without it &mdash; so recording it early takes it off the critical path.</p>
+          <span class="tag t-free">FREE</span>
+        </div>
+        <div class="free-row">
+          <h4>Convert Instagram to Business</h4>
+          <p>An afternoon, and required before a single post can be published through the API.</p>
+          <span class="tag t-free">FREE</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ RISKS ============ -->
+  <section id="risks">
+    <div class="sec-head col">
+      <p class="eyebrow">Worth knowing</p>
+      <h2>The parts that can bite</h2>
+      <p>None of these stops the plan. Each one has cost somebody a month elsewhere, so they are named here rather than discovered later.</p>
+    </div>
+
+    <div class="risks">
+      <div class="risk">
+        <h4>Tokens expire quietly</h4>
+        <p>A Meta page token that lapses stops publishing and stops lead delivery with no error on screen &mdash; and leads are gone for good after 90 days. Needs a red light tied to &ldquo;last successful delivery&rdquo;, not a hope.</p>
+      </div>
+      <div class="risk">
+        <h4>App Review can be rejected</h4>
+        <p>It is a person watching a screencast. Budget for one resubmission and do not promise a date to anybody before it clears.</p>
+      </div>
+      <div class="risk">
+        <h4>Only consented faces</h4>
+        <p>Publishing is gated on the photo consent shipped today. A clip with an unconsented child in frame must be blocked at the point of posting, not caught afterwards.</p>
+      </div>
+      <div class="risk">
+        <h4>No broadcasts to parents</h4>
+        <p>Marketing templates to 100 families is per-message, unignorable, and gets a number reported. Club announcements already reach an app the family chose to install.</p>
+      </div>
+      <div class="risk">
+        <h4>The bot must stay structured</h4>
+        <p>Meta bans open-ended AI assistants on WhatsApp from 15 January 2026. A booking flow is explicitly fine; a chatty general assistant risks the number.</p>
+      </div>
+      <div class="risk">
+        <h4>Hebrew in a cloned voice</h4>
+        <p>Stress patterns and Hebrew-English switching are where Hebrew TTS still slips, and Japanese technique names inside Hebrew sentences are the worst case of it. One test script with <span class="he">אוצ&rsquo;י-גארי</span> in it settles whether this is usable, and it costs nothing to find out.</p>
+      </div>
+
+      <div class="risk">
+        <h4>Filming from inside the app</h4>
+        <p>This is a PWA, and iOS camera access in an installed web app has a long history of failing. Prove it on a real iPhone before anyone estimates it &mdash; the shot brief works without it.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>Gladiator Judo Club &middot; Growth &sect;20 &middot; 14 September 2026<br>
+    Full reasoning, with every claim traced to the file or rate card behind it, in <b>docs/growth-spec.md</b>.<br>
+    Provider prices verified on the date above and worth re-checking before they are spent against.</p>
+  </footer>
+
+</div>

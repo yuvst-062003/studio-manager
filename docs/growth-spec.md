@@ -1,5 +1,16 @@
 # §20 — Growth: what this club actually needs
 
+> **The visual companion to this file is [`growth-plan.html`](growth-plan.html)** — the
+> system as a page: the loop end to end, the WhatsApp booking script in full, the prices,
+> and what to switch on. Published privately at
+> `https://claude.ai/code/artifact/1c60bbef-7df9-47f8-a1a0-7c34f978d379`; that HTML file is
+> the source, so edit it there and republish rather than editing the published page.
+>
+> The two disagree in emphasis on purpose. This file was written to argue with the idea and
+> still reads as the sceptical case; the page was rewritten to present the system the owner
+> actually asked for. **Where they conflict, the page is the later thinking** — see §20.5
+> and §20.6 for the rounds that moved it.
+
 > Drafted 2026-09-14 from a one-line idea ("integrate Facebook, Instagram and WhatsApp,
 > manage the leads and the marketing; create fliers with AI; create content with AI").
 > **Rewritten the same day**, after an interview with the owner, a read of the code, and a
