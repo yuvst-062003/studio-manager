@@ -328,9 +328,21 @@ The machinery is already there and this is genuinely small:
 
 So this is one more key in a dict that is already being written. Perhaps a day.
 
+**It is not in the club's terms today, and it must never go in them.** Checked
+2026-09-14: `clubTerms.*` carries five clauses — cheque payment, cancellation by the 27th,
+the pro-rata calculation, the עמותה's name, and the refund route — and **no photo clause at
+all**, in the on-screen text or in the signed PDF copy in `club_terms.py`. So nothing in
+registration asks about photographs today; `photo_video` exists only as an opt-in toggle on
+the parent app's privacy screen, which almost nobody opens. That is the gap.
+
+The fix is **one signature, two records** — and folding the second into the first would be
+a bug, not a shortcut. `clubTerms.required` says *"יש לאשר את התקנון ותנאי התשלום כדי
+להמשיך"*: accepting the club's terms **blocks registration**. Photo consent written into
+that text becomes compulsory by construction.
+
 **The one rule that cannot be bent.** The club's own published privacy policy says, in
 Hebrew, that photo consent is entirely optional — *"הסכמה לפרסום תמונות היא רשות מלאה —
-סירוב אינו משפיע על ההשתתפות ואינו נרשם כהסכמה"*. So it is a **tick inside the signature,
+סירוב אינו משפיע על ההשתתפות ואינו נרשם כהסכמה"*. So it is a **tick beside the signature,
 never a condition of it**: registration must complete with the box unticked, refusal must
 change nothing, and an unanswered box must be recorded as **no**, not as silence. Getting
 this wrong makes the club's own policy text untrue — which is precisely the finding that
