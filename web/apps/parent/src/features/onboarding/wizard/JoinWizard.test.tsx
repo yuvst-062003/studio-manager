@@ -12,6 +12,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { LOCALE_STORAGE_KEY } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { BillingClient, ChargeOut } from '../../billing/billingClient'
 import type { MandateLink } from '../../billing/billingClient'
@@ -155,6 +156,9 @@ function renderWizard(
     prefillFirstRowName?: string
     seedStudents?: readonly StudentDraft[]
     settledStudentIds?: readonly string[]
+    /** §6.1's gate. Off by default here so the ~90 tests below open on step 1 rather than
+     *  on a modal; the gate's own behaviour is asserted in its describe at the foot. */
+    onChooseLocale?: (next: 'he' | 'en' | 'ru') => void
   } = {},
 ) {
   const billingClient = options.billingClient ?? billingClientStub()
@@ -171,6 +175,7 @@ function renderWizard(
       prefillFirstRowName={options.prefillFirstRowName}
       seedStudents={options.seedStudents}
       settledStudentIds={options.settledStudentIds}
+      onChooseLocale={options.onChooseLocale}
     />,
   )
   return { billingClient, standingOrderLinks, source, unmount: view.unmount }
@@ -1545,5 +1550,63 @@ describe('JoinWizard — a child the manager already took payment for', () => {
 
     await screen.findByTestId('join-family-step')
     expect(screen.getByText(/שלב 2 מתוך 3/)).toBeInTheDocument()
+  })
+})
+
+describe('§6.1 step 1 — the language gate, at the wizard’s door', () => {
+  //: **Why here and not on the shell.** It first shipped over every session state, which
+  //: put it in front of the SIGN-IN screen — a place nobody is being onboarded, and a
+  //: place a returning parent met it for nothing. The wizard is the onboarding moment, and
+  //: four different doors reach it, so the gate hangs off the wizard rather than off four
+  //: call sites that each have to remember.
+  beforeEach(() => {
+    globalThis.localStorage?.removeItem(LOCALE_STORAGE_KEY)
+  })
+
+  it('asks before the first step, in all three languages', async () => {
+    renderWizard({ onChooseLocale: vi.fn() })
+
+    expect(await screen.findByTestId('language-gate')).toBeInTheDocument()
+    expect(screen.getByText('Welcome')).toBeInTheDocument()
+    expect(screen.getByText('Добро пожаловать')).toBeInTheDocument()
+  })
+
+  it('does not ask a family who already chose', async () => {
+    globalThis.localStorage?.setItem(LOCALE_STORAGE_KEY, 'ru')
+
+    renderWizard({ onChooseLocale: vi.fn() })
+
+    await screen.findByTestId('join-welcome')
+    expect(screen.queryByTestId('language-gate')).not.toBeInTheDocument()
+  })
+
+  it('records the choice as it is tapped, before Continue', async () => {
+    //: The parent sees the wizard behind the modal change language as they tap. The choice
+    //: is already persisted at that moment, so abandoning here still remembers it.
+    const onChooseLocale = vi.fn()
+    renderWizard({ onChooseLocale })
+
+    await screen.findByTestId('language-gate')
+    fireEvent.click(screen.getByRole('radio', { name: 'Русский' }))
+
+    expect(onChooseLocale).toHaveBeenCalledWith('ru')
+  })
+
+  it('lets the wizard through once Continue is pressed', async () => {
+    renderWizard({ onChooseLocale: vi.fn() })
+
+    fireEvent.click(await screen.findByTestId('language-gate-continue'))
+
+    expect(screen.queryByTestId('language-gate')).not.toBeInTheDocument()
+    expect(await screen.findByTestId('join-welcome')).toBeInTheDocument()
+  })
+
+  it('never asks when the caller supplies no handler', async () => {
+    //: Door-level opt-out. A caller that has already asked — or a test — passes nothing and
+    //: gets the wizard, not a modal it cannot answer.
+    renderWizard()
+
+    await screen.findByTestId('join-welcome')
+    expect(screen.queryByTestId('language-gate')).not.toBeInTheDocument()
   })
 })

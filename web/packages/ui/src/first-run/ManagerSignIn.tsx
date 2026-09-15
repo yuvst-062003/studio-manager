@@ -54,8 +54,15 @@ export function ManagerSignIn({
   returnPath = '/',
 }: {
   locale: Locale
-  /** §6.1 step 1, in the footer the mock draws it in. */
-  onChooseLocale: (locale: Locale) => void
+  /** §6.1 step 1, in the footer the mock draws it in.
+   *
+   * **Optional since 2026-09-15, and the staff app no longer passes it.** The language
+   * question moved to a gate on the setup wizard, which is where somebody is actually
+   * being onboarded. A second picker on the sign-in screen asked the same question in a
+   * place nobody was answering it, and a control that changes a setting the next screen
+   * asks about again is noise. Left in the signature because the component is shared and
+   * a caller that still wants the row should keep getting it. */
+  onChooseLocale?: (locale: Locale) => void
   returnPath?: string
 }) {
   const providers = useAuthProviders()
@@ -113,20 +120,22 @@ export function ManagerSignIn({
         </main>
 
         <footer className="msignin__footer">
-          <div className="msignin__langs">
-            {LOCALES.map((option) => (
-              <button
-                key={option}
-                type="button"
-                lang={option}
-                className="msignin__lang"
-                aria-pressed={option === locale}
-                onClick={() => onChooseLocale(option)}
-              >
-                {ENDONYM[option]}
-              </button>
-            ))}
-          </div>
+          {onChooseLocale ? (
+            <div className="msignin__langs">
+              {LOCALES.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  lang={option}
+                  className="msignin__lang"
+                  aria-pressed={option === locale}
+                  onClick={() => onChooseLocale(option)}
+                >
+                  {ENDONYM[option]}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <div className="msignin__legal">
             <a href={TERMS_HASH}>{t(locale, 'common.auth.manager.terms')}</a>
             <span className="msignin__dot" aria-hidden="true">

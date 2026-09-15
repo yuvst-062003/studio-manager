@@ -128,6 +128,16 @@ export function LanguageGate({
     cardRef.current?.focus()
   }, [])
 
+  //: **No body-scroll lock here, and that is a decision rather than an omission.** One was
+  //: added on 2026-09-15 and removed the same hour. It went in because the gate LOOKED
+  //: clipped on the staff setup wizard at 414px; measuring it showed the scrim at x=0
+  //: width=414 and the card centred at x=17 width=380, with `visualViewport.offsetLeft`
+  //: zero — the offset was an artifact of capturing a screenshot of an RTL document that
+  //: overflows to x=-88 (the wizard is ~502px wide at that viewport, which is a real but
+  //: separate bug of its own). So the lock fixed nothing a user sees, and it broke the
+  //: staff install-banner test by leaving `body.style.overflow` set across tests. A
+  //: mitigation for a non-problem that costs a working test is a bad trade.
+
   return (
     <div style={scrim} data-testid="language-gate-scrim">
       <div

@@ -14,7 +14,8 @@
 // serve doors B, C and D. What each door reads and writes now lives there; what the wizard
 // draws, validates, persists and submits stays exactly here, unchanged.
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { apiFetch, refresh } from '@studio/core'
+import { apiFetch, readStoredLocale, refresh } from '@studio/core'
+import { LanguageGate } from '@studio/ui'
 import type { Locale } from '@studio/i18n'
 import type { BillingClient } from '../../billing/billingClient'
 import type { MandateLink } from '../../billing/billingClient'
@@ -149,10 +150,21 @@ export type JoinWizardProps = {
    *  another; restoring the first family's children into the second's wizard would be
    *  worse than losing them, so the draft records its scope and refuses a mismatch. */
   draftScope?: string
+  /** §6.1 step 1 — the language gate, asked at the wizard's door.
+   *
+   * **Why it lives here and not on the shell.** It first shipped over every session state,
+   * which put it in front of the sign-in screen — a place nobody is being onboarded, and a
+   * place a returning parent meets it for nothing. This wizard is the onboarding moment,
+   * and it is reached through four different doors; hanging the gate on the wizard covers
+   * all four without four call sites remembering to.
+   *
+   * Optional so a caller that has already asked (or a test) can leave it off entirely. */
+  onChooseLocale?: (next: Locale) => void
 }
 
 export function JoinWizard({
   locale,
+  onChooseLocale,
   source,
   billingClient,
   standingOrderLinks,
@@ -164,6 +176,9 @@ export function JoinWizard({
   settledStudentIds,
 }: JoinWizardProps) {
   const copy = wizardFlowCopy(locale)
+  //: Read once, on the first render, for the same reason the draft below is: deciding this
+  //: in an effect would paint the wizard and then drop a modal onto it.
+  const [languageGateOpen, setLanguageGateOpen] = useState(() => !readStoredLocale())
   const [studio, setStudio] = useState<StudioState>({ status: 'loading' })
   const [catalogue, setCatalogue] = useState<CatalogueState>({ status: 'loading' })
   //: **Read once, during the first render.** Restoring in an effect instead would paint an
@@ -463,6 +478,15 @@ export function JoinWizard({
 
   return (
     <div className="tw-scope min-h-[100dvh] bg-[var(--wz-ground)] text-[var(--wz-ink)] flex flex-col">
+      {/*: Before the first step, over the wizard's own chrome. `setLocale` persists on
+          every tap, so the answer is recorded before Continue ever closes it. */}
+      {languageGateOpen && onChooseLocale ? (
+        <LanguageGate
+          locale={locale}
+          onChoose={onChooseLocale}
+          onDone={() => setLanguageGateOpen(false)}
+        />
+      ) : null}
       <WizardHeader
         locale={locale}
         totalSteps={totalSteps}

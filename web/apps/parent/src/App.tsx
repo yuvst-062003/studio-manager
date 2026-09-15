@@ -24,7 +24,6 @@ import {
   InstallBanner,
   InstallWalkthrough,
   LanguageButton,
-  LanguageGate,
   LanguagePicker,
   SignIn,
   ThemeProvider,
@@ -365,11 +364,11 @@ async function loadStandingOrderLinks(): Promise<readonly MandateLink[]> {
 type JoinWallInfo = { studio_name: string; logo_url: string | null }
 
 function JoinShell({ token }: { token: string }) {
-  // §6.1 step 1 — the language choice, persisted and ASKED rather than defaulted. The
-  // `useState<Locale>('he')` this replaces meant a Russian-speaking parent read the whole
-  // wizard in Hebrew unless they found a floating button, and lost the choice on reload.
-  const { locale, setLocale, hasChosen } = useStoredLocale()
-  const [gateOpen, setGateOpen] = useState(!hasChosen)
+  // §6.1 step 1 — the language choice, persisted. The `useState<Locale>('he')` this
+  // replaces meant the default always won and the choice died on reload. The QUESTION is
+  // asked at the wizard's door (JoinWizard, StaffSetupWithLanguage), not here — a shell
+  // gate met a returning user on the sign-in screen for nothing.
+  const { locale, setLocale } = useStoredLocale()
   // The privacy client belonged to the old `JoinFlow`'s payment step and nothing in the
   // redesigned wizard consumes it, so it is not rebuilt here (task 1c's own note) -- an
   // unused fetch held open for a screen that never reads it is worse than not fetching.
@@ -453,12 +452,8 @@ function JoinShell({ token }: { token: string }) {
     <ThemeProvider>
       <AccessibilityMenu locale={locale} />
       <LanguageButton locale={locale} onChoose={setLocale} />
-      {/*: Before the wizard, never during it. `setLocale` persists on every tap, so the
-          choice is already recorded by the time Continue closes the gate. */}
-      {gateOpen ? (
-        <LanguageGate locale={locale} onChoose={setLocale} onDone={() => setGateOpen(false)} />
-      ) : null}
       <JoinWizard
+              onChooseLocale={setLocale}
         locale={locale}
         billingClient={billingClient}
         source={source}
@@ -489,11 +484,11 @@ function AuthedApp() {
   // `useDisplayMode()` is deliberately left alone: M8 reports install rates from it, and
   // a measurement that lies to make a dev tab convenient is worse than no banner.
   const installed = displayMode !== 'browser' || import.meta.env.MODE === 'development'
-  // §6.1 step 1 — the language choice, persisted and ASKED rather than defaulted. The
-  // `useState<Locale>('he')` this replaces meant a Russian-speaking parent read the whole
-  // app in Hebrew unless they found a floating button, and lost the choice on reload.
-  const { locale, setLocale, hasChosen } = useStoredLocale()
-  const [gateOpen, setGateOpen] = useState(!hasChosen)
+  // §6.1 step 1 — the language choice, persisted. The `useState<Locale>('he')` this
+  // replaces meant the default always won and the choice died on reload. The QUESTION is
+  // asked at the wizard's door (JoinWizard, StaffSetupWithLanguage), not here — a shell
+  // gate met a returning user on the sign-in screen for nothing.
+  const { locale, setLocale } = useStoredLocale()
   // `<html lang>` and `<html dir>` follow the choice. index.html ships `lang="he" dir="rtl"`
   // as a literal, so without this a parent who picks English or Russian reads LTR copy inside
   // an RTL document and hears it announced with a Hebrew voice.
@@ -882,13 +877,10 @@ function AuthedApp() {
       {session.status !== 'signed-in' ? <AccessibilityMenu locale={locale} /> : null}
       {/* New-build toast — floats over whatever is open, in every session state. */}
       <UpdateToast locale={locale} />
-      {/*: §6.1's ordering, made literal: the gate paints over EVERY session state, so it
-          is answered before the sign-in screen rather than after it. */}
-      {gateOpen ? (
-        <LanguageGate locale={locale} onChoose={setLocale} onDone={() => setGateOpen(false)} />
-      ) : null}
       {session.status === 'anonymous' ? (
-        // Language before login (§6.1) — the picker floats over the sign-in screen.
+        //: No language picker here since 2026-09-15 — the question moved to the wizard's
+        //: door, where somebody is actually being onboarded. Two controls asking the same
+        //: thing, one of them on a screen nobody answers it on, is noise.
         <SignIn
           locale={locale}
           app="parent"
@@ -900,7 +892,6 @@ function AuthedApp() {
               ? `/${globalThis.location.search}`
               : '/'
           }
-          languagePicker={<LanguagePicker locale={locale} onChoose={setLocale} />}
         />
       ) : null}
 
@@ -971,6 +962,7 @@ function AuthedApp() {
             // one once `POST /accept-invitation` has actually named a student, so there
             // is no separate in-flight state to track here (see that component's header).
             <JoinWizard
+              onChooseLocale={setLocale}
               locale={locale}
               billingClient={billingClient}
               onEnterApp={() => {
@@ -1010,6 +1002,7 @@ function AuthedApp() {
               // same three steps and same design as every other door now; the family's
               // existing children are seeded so it opens on them instead of blank.
               <JoinWizard
+              onChooseLocale={setLocale}
                 locale={locale}
                 billingClient={billingClient}
                 onEnterApp={() => setDeclarationsSigned((count) => count + 1)}
@@ -1134,6 +1127,7 @@ function AuthedApp() {
             // family's own gate to clear before adding a fourth child, not a wizard
             // Door D exists to route around.
             <JoinWizard
+              onChooseLocale={setLocale}
               locale={locale}
               billingClient={billingClient}
               onEnterApp={() => {

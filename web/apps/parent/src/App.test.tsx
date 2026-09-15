@@ -1483,49 +1483,60 @@ describe('no second payment question in front of the app', () => {
   })
 })
 
-describe('the first-run language gate (§6.1 step 1)', () => {
-  it('asks before anything else on a first visit, in all three languages', async () => {
-    //: The gate is the FIRST thing, ahead of every session state — §6.1's ordering exists
-    //: because a Russian-speaking parent cannot read a Hebrew consent screen, and a
-    //: question asked after login is asked too late.
+describe('§6.1 step 1 — where the language gate is NOT', () => {
+  //: It shipped over every session state on 2026-09-15 and that was wrong: it met a
+  //: returning parent on the sign-in screen, where nobody is being onboarded and nothing
+  //: follows from the answer. It lives at the wizard's door now — `JoinWizard.test.tsx`
+  //: holds that. These two hold the correction, so a future "make it unmissable" change
+  //: cannot quietly put it back in front of sign-in.
+  //: The file's default stub is a SIGNED-IN family, which never renders the sign-in
+  //: screen at all — so asserting "no gate" against it would pass without proving
+  //: anything. These two need a genuinely anonymous session.
+  const anonymous = () =>
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/auth/refresh')) return new Response('', { status: 401 })
+        if (url.includes('/auth/providers')) {
+          return new Response(
+            JSON.stringify({ items: [{ name: 'google', start_url: '/api/v1/auth/google/start' }] }),
+            { status: 200 },
+          )
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+
+  it('does not gate the sign-in screen', async () => {
     globalThis.localStorage?.clear()
+    anonymous()
     render(<App />)
 
-    expect(await screen.findByTestId('language-gate')).toBeInTheDocument()
-    expect(screen.getByText('Welcome')).toBeInTheDocument()
-    expect(screen.getByText('Добро пожаловать')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByTestId('sign-in')).toBeInTheDocument())
+    expect(screen.queryByTestId('language-gate')).not.toBeInTheDocument()
   })
 
-  it('does not ask a family who has already chosen', async () => {
+  it('leaves no language picker on the sign-in screen either', async () => {
+    //: Two controls asking the same question, one of them where nobody answers it. The
+    //: picker came off with the gate; the wizard asks once and the profile screen changes
+    //: it afterwards.
+    globalThis.localStorage?.clear()
+    anonymous()
+    render(<App />)
+
+    const signIn = await screen.findByTestId('sign-in')
+    expect(within(signIn).queryByText('Русский')).not.toBeInTheDocument()
+    expect(within(signIn).queryByText('English')).not.toBeInTheDocument()
+  })
+
+  it('still honours a stored choice everywhere', async () => {
+    //: Removing the question does not remove the answer: a family who chose Russian in the
+    //: wizard last week gets a Russian app today, sign-in screen included.
     globalThis.localStorage?.setItem(LOCALE_STORAGE_KEY, 'ru')
     render(<App />)
 
     await waitFor(() => expect(document.documentElement.lang).toBe('ru'))
-    expect(screen.queryByTestId('language-gate')).not.toBeInTheDocument()
-  })
-
-  it('carries the choice into the app, and into the next visit', async () => {
-    //: The seam this whole change exists for: choose → the document is in that language →
-    //: reload → still that language, no gate. `<html lang>`/`dir` is the assertion rather
-    //: than any one screen's copy, because it is what `useDocumentLocale` actually sets and
-    //: what a screen reader and the RTL stylesheet both read.
-    globalThis.localStorage?.clear()
-    const user = userEvent.setup()
-    const first = render(<App />)
-
-    await screen.findByTestId('language-gate')
-    await user.click(screen.getByRole('radio', { name: 'Русский' }))
-    await user.click(screen.getByTestId('language-gate-continue'))
-
-    await waitFor(() => expect(document.documentElement.lang).toBe('ru'))
     expect(document.documentElement.dir).toBe('ltr')
-    expect(globalThis.localStorage?.getItem(LOCALE_STORAGE_KEY)).toBe('ru')
-    expect(screen.queryByTestId('language-gate')).not.toBeInTheDocument()
-
-    //: And on the visit after that, with no gate at all.
-    first.unmount()
-    render(<App />)
-    await waitFor(() => expect(document.documentElement.lang).toBe('ru'))
-    expect(screen.queryByTestId('language-gate')).not.toBeInTheDocument()
   })
 })

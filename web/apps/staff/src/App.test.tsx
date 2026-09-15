@@ -356,9 +356,10 @@ describe('revision 0025 — the emergency-contact step is MOUNTED, and only for 
   })
 })
 
-describe('the first-run language gate (§6.1 step 1)', () => {
-  //: A local copy of the anonymous stub — the one above is scoped to its own describe, and
-  //: reaching across for it would couple two blocks that have no other relationship.
+describe('§6.1 step 1 — where the language gate is NOT', () => {
+  //: Same correction as the parent app. The gate belongs on the setup wizard, which is
+  //: this app's onboarding moment — not over the sign-in screen a coach meets every time
+  //: their session lapses.
   const anonymous = () =>
     vi.stubGlobal(
       'fetch',
@@ -375,27 +376,33 @@ describe('the first-run language gate (§6.1 step 1)', () => {
       }),
     )
 
-  it('asks a coach before the sign-in screen', async () => {
+  it('does not gate the sign-in screen', async () => {
     globalThis.localStorage?.clear()
     anonymous()
     render(<App />)
 
-    expect(await screen.findByTestId('language-gate')).toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.getByText(t('he', 'common.auth.manager.badge'))).toBeInTheDocument(),
+    )
+    expect(screen.queryByTestId('language-gate')).not.toBeInTheDocument()
   })
 
-  it('does not ask again once answered, and the app renders in that language', async () => {
+  it('leaves no language picker in the sign-in footer', async () => {
+    globalThis.localStorage?.clear()
+    anonymous()
+    render(<App />)
+
+    await waitFor(() =>
+      expect(screen.getByText(t('he', 'common.auth.manager.badge'))).toBeInTheDocument(),
+    )
+    expect(screen.queryByText('Русский')).not.toBeInTheDocument()
+  })
+
+  it('still honours a stored choice', async () => {
     globalThis.localStorage?.setItem(LOCALE_STORAGE_KEY, 'en')
     anonymous()
     render(<App />)
 
-    //: Wait for the sign-in screen the gate would have covered, then assert it is not
-    //: covered — rather than waiting on nothing and asserting into an empty tree.
-    await waitFor(() =>
-      expect(screen.getByText(t('en', 'common.auth.manager.badge'))).toBeInTheDocument(),
-    )
-    expect(screen.queryByTestId('language-gate')).not.toBeInTheDocument()
-    //: `useDocumentLocale` followed the stored choice — the half a unit test of the hook
-    //: cannot see.
-    expect(document.documentElement.lang).toBe('en')
+    await waitFor(() => expect(document.documentElement.lang).toBe('en'))
   })
 })

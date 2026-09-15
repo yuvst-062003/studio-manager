@@ -43,6 +43,7 @@ import {
 import { DevBar } from '@studio/ui/dev-bar'
 import type { InstallPromptEvent } from '@studio/ui'
 import { t } from '@studio/i18n'
+import type { Locale } from '@studio/i18n'
 import { LegalScreen } from './features/legal/LegalScreen'
 import { AccessGate } from './features/identity/AccessGate'
 import { Resolve } from './features/identity/Resolve'
@@ -104,6 +105,32 @@ import './features/attendance/attendance.css'
 // at module load so the slot is populated before anything renders, and `apiFetch` is
 // passed in because @studio/ui must not depend on @studio/core.
 registerM1WizardSteps(apiFetch)
+
+/** §6.1 step 1, asked where somebody is actually being onboarded.
+ *
+ * **Why the gate hangs off the WIZARD and not the shell.** It first shipped over every
+ * session state, which put it in front of the sign-in screen — a place nobody is being
+ * set up, and a place a returning manager meets it for no reason. The wizard is the
+ * onboarding moment in this app, so the question belongs at its door: asked once, before
+ * the first step, and never again once answered. */
+function StaffSetupWithLanguage({
+  client,
+  locale,
+}: {
+  client: Parameters<typeof SetupWizard>[0]['client']
+  locale: Locale
+}) {
+  const { setLocale, hasChosen } = useStoredLocale()
+  const [gateOpen, setGateOpen] = useState(!hasChosen)
+  return (
+    <>
+      {gateOpen ? (
+        <LanguageGate locale={locale} onChoose={setLocale} onDone={() => setGateOpen(false)} />
+      ) : null}
+      <SetupWizard client={client} locale={locale} />
+    </>
+  )
+}
 // The other three (2026-08-30): belts, prices and items lived in the DASHBOARD's feature
 // directories, so this app's wizard showed them as dead rail entries — the owner read
 // that as "payments and belts don't work". They live beside the container now, and both
@@ -181,11 +208,11 @@ export default function App() {
   // `useDisplayMode()` is deliberately left alone: M8 reports install rates from it, and
   // a measurement that lies to make a dev tab convenient is worse than no banner.
   const installed = displayMode !== 'browser' || import.meta.env.MODE === 'development'
-  // §6.1 step 1 — the language choice, persisted and ASKED rather than defaulted. The
-  // `useState<Locale>('he')` this replaces meant a Russian-speaking parent read the whole
-  // app in Hebrew unless they found a floating button, and lost the choice on reload.
-  const { locale, setLocale, hasChosen } = useStoredLocale()
-  const [gateOpen, setGateOpen] = useState(!hasChosen)
+  // §6.1 step 1 — the language choice, persisted. The `useState<Locale>('he')` this
+  // replaces meant the default always won and the choice died on reload. The QUESTION is
+  // asked at the wizard's door (JoinWizard, StaffSetupWithLanguage), not here — a shell
+  // gate met a returning user on the sign-in screen for nothing.
+  const { locale, setLocale } = useStoredLocale()
   // See the parent app's note: index.html's `dir="rtl"` is a literal, and the locale in
   // React state was never written back to the document.
   useDocumentLocale(locale)
@@ -408,11 +435,6 @@ export default function App() {
       {session.status !== 'signed-in' ? <AccessibilityMenu locale={locale} /> : null}
       {/* New-build toast — floats over whatever is open, in every session state. */}
       <UpdateToast locale={locale} />
-      {/*: §6.1's ordering. A coach signing in for the first time answers this before the
-          sign-in screen, for the same reason a parent does. */}
-      {gateOpen ? (
-        <LanguageGate locale={locale} onChoose={setLocale} onDone={() => setGateOpen(false)} />
-      ) : null}
       {session.status === 'anonymous' ? (
         // docs/design "Gladiator Manager Sign In" (2026-09-01) — this app's own face on the
         // flow. The other two apps keep `SignIn`'s split screen.
@@ -430,7 +452,7 @@ export default function App() {
         ) : onPrivacyPolicy ? (
           <LegalScreen locale={locale} doc="policy" />
         ) : (
-          <ManagerSignIn locale={locale} onChooseLocale={setLocale} />
+          <ManagerSignIn locale={locale} />
         )
       ) : null}
 
@@ -680,7 +702,7 @@ export default function App() {
               description={t(locale, 'common.permission.managerOnly')}
             />
           ) : session.access.staff && viewerIsManager && onSetup ? (
-            <SetupWizard client={setupClient} locale={locale} />
+            <StaffSetupWithLanguage client={setupClient} locale={locale} />
           ) : session.access.staff && viewerIsManager && onCash ? (
             <PaymentPromisesSection locale={locale} />
           ) : session.access.staff && viewerIsManager && onJoinLink ? (
@@ -732,7 +754,7 @@ export default function App() {
               />
               <Resolve
                 session={session}
-                wizard={<SetupWizard client={setupClient} locale={locale} />}
+                wizard={<StaffSetupWithLanguage client={setupClient} locale={locale} />}
               />
             </>
           )}
