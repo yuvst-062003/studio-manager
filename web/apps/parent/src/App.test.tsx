@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { LOCALE_STORAGE_KEY } from '@studio/core'
 import { t } from '@studio/i18n'
 import App from './App'
 import type { OnboardingStatus } from './features/onboarding/doorSteps'
@@ -105,6 +106,12 @@ function stubAuthed(extra: (url: string, init?: RequestInit) => Response | null)
 
 beforeEach(() => {
   globalThis.localStorage?.clear()
+  //: The first-run language gate (2026-09-15) paints over every session state until a
+  //: locale is chosen, so a cleared store would open a modal in front of every test in
+  //: this file. These tests are about somebody who has already answered it; the gate's own
+  //: first-run behaviour is asserted directly, below. Seeded through the storage key the
+  //: hook actually reads, so a test cannot pass against a hook that stopped working.
+  globalThis.localStorage?.setItem(LOCALE_STORAGE_KEY, 'he')
   globalThis.location.hash = ''
   vi.stubGlobal('fetch', stubAuthed(() => null))
 })
@@ -1473,5 +1480,52 @@ describe('no second payment question in front of the app', () => {
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('tab-bar')).toBeInTheDocument())
     expect(screen.queryByText('איך תשלמו?')).toBeNull()
+  })
+})
+
+describe('the first-run language gate (§6.1 step 1)', () => {
+  it('asks before anything else on a first visit, in all three languages', async () => {
+    //: The gate is the FIRST thing, ahead of every session state — §6.1's ordering exists
+    //: because a Russian-speaking parent cannot read a Hebrew consent screen, and a
+    //: question asked after login is asked too late.
+    globalThis.localStorage?.clear()
+    render(<App />)
+
+    expect(await screen.findByTestId('language-gate')).toBeInTheDocument()
+    expect(screen.getByText('Welcome')).toBeInTheDocument()
+    expect(screen.getByText('Добро пожаловать')).toBeInTheDocument()
+  })
+
+  it('does not ask a family who has already chosen', async () => {
+    globalThis.localStorage?.setItem(LOCALE_STORAGE_KEY, 'ru')
+    render(<App />)
+
+    await waitFor(() => expect(document.documentElement.lang).toBe('ru'))
+    expect(screen.queryByTestId('language-gate')).not.toBeInTheDocument()
+  })
+
+  it('carries the choice into the app, and into the next visit', async () => {
+    //: The seam this whole change exists for: choose → the document is in that language →
+    //: reload → still that language, no gate. `<html lang>`/`dir` is the assertion rather
+    //: than any one screen's copy, because it is what `useDocumentLocale` actually sets and
+    //: what a screen reader and the RTL stylesheet both read.
+    globalThis.localStorage?.clear()
+    const user = userEvent.setup()
+    const first = render(<App />)
+
+    await screen.findByTestId('language-gate')
+    await user.click(screen.getByRole('radio', { name: 'Русский' }))
+    await user.click(screen.getByTestId('language-gate-continue'))
+
+    await waitFor(() => expect(document.documentElement.lang).toBe('ru'))
+    expect(document.documentElement.dir).toBe('ltr')
+    expect(globalThis.localStorage?.getItem(LOCALE_STORAGE_KEY)).toBe('ru')
+    expect(screen.queryByTestId('language-gate')).not.toBeInTheDocument()
+
+    //: And on the visit after that, with no gate at all.
+    first.unmount()
+    render(<App />)
+    await waitFor(() => expect(document.documentElement.lang).toBe('ru'))
+    expect(screen.queryByTestId('language-gate')).not.toBeInTheDocument()
   })
 })

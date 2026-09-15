@@ -56,6 +56,8 @@ export {
   weekdayInitials,
 } from './datetime'
 export type { Locale } from './datetime'
+// §6.1 step 1's choice, persisted — see locale.ts's header for why it is per-device.
+export { LOCALE_STORAGE_KEY, readStoredLocale, storeLocale, useStoredLocale } from './locale'
 export { appendPage, hasNextPage, mergeCursorPages } from './pagination'
 export { downloadFile } from './download'
 export type { CursorPage } from './pagination'

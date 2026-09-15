@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { LOCALE_STORAGE_KEY } from '@studio/core'
 import { t } from '@studio/i18n'
 import App from './App'
 
@@ -37,6 +38,12 @@ const SIGNED_IN_BODY = {
 
 beforeEach(() => {
   globalThis.localStorage?.clear()
+  //: The first-run language gate (2026-09-15) paints over every session state until a
+  //: locale is chosen, so a cleared store would open a modal in front of every test in
+  //: this file. These tests are about somebody who has already answered it; the gate's own
+  //: first-run behaviour is asserted directly, below. Seeded through the storage key the
+  //: hook actually reads, so a test cannot pass against a hook that stopped working.
+  globalThis.localStorage?.setItem(LOCALE_STORAGE_KEY, 'he')
   globalThis.location.hash = ''
   vi.stubGlobal(
     'fetch',
@@ -346,5 +353,49 @@ describe('revision 0025 — the emergency-contact step is MOUNTED, and only for 
     await userEvent.click(screen.getByTestId('emergency-skip'))
 
     await waitFor(() => expect(screen.getByTestId('tab-bar')).toBeInTheDocument())
+  })
+})
+
+describe('the first-run language gate (§6.1 step 1)', () => {
+  //: A local copy of the anonymous stub — the one above is scoped to its own describe, and
+  //: reaching across for it would couple two blocks that have no other relationship.
+  const anonymous = () =>
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/auth/refresh')) return new Response('', { status: 401 })
+        if (url.includes('/auth/providers')) {
+          return new Response(
+            JSON.stringify({ items: [{ name: 'google', start_url: '/api/v1/auth/google/start' }] }),
+            { status: 200 },
+          )
+        }
+        return new Response(JSON.stringify({ items: [] }), { status: 200 })
+      }),
+    )
+
+  it('asks a coach before the sign-in screen', async () => {
+    globalThis.localStorage?.clear()
+    anonymous()
+    render(<App />)
+
+    expect(await screen.findByTestId('language-gate')).toBeInTheDocument()
+  })
+
+  it('does not ask again once answered, and the app renders in that language', async () => {
+    globalThis.localStorage?.setItem(LOCALE_STORAGE_KEY, 'en')
+    anonymous()
+    render(<App />)
+
+    //: Wait for the sign-in screen the gate would have covered, then assert it is not
+    //: covered — rather than waiting on nothing and asserting into an empty tree.
+    await waitFor(() =>
+      expect(screen.getByText(t('en', 'common.auth.manager.badge'))).toBeInTheDocument(),
+    )
+    expect(screen.queryByTestId('language-gate')).not.toBeInTheDocument()
+    //: `useDocumentLocale` followed the stored choice — the half a unit test of the hook
+    //: cannot see.
+    expect(document.documentElement.lang).toBe('en')
   })
 })

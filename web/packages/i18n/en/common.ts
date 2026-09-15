@@ -113,6 +113,10 @@ export const common: Bundle = {
   'language.short.en': 'EN',
   'language.short.ru': 'RU',
   'language.title': 'language',
+  'language.gate.welcome': 'Welcome',
+  'language.gate.choose': 'Choose a language',
+  'language.gate.continue': 'Continue',
+  'language.gate.later': 'You can change this later in settings',
   // -- the parent app's sign-in face (owner's Stitch design, 2026-09-01) ---------
   'auth.parentHint': 'Sign in with Google to reach the training schedule, belts and competitions.',
   'auth.signInWithGoogle': 'Sign in with Google',

@@ -121,6 +121,10 @@ export const common: Bundle = {
   'language.short.en': 'EN',
   'language.short.ru': 'RU',
   'language.title': 'язык',
+  'language.gate.welcome': 'Добро пожаловать',
+  'language.gate.choose': 'Выберите язык',
+  'language.gate.continue': 'Продолжить',
+  'language.gate.later': 'Это можно изменить позже в настройках',
   // -- the parent app's sign-in face (owner's Stitch design, 2026-09-01) ---------
   'auth.parentHint': 'Войдите через Google, чтобы открыть расписание тренировок, пояса и соревнования.',
   'auth.signInWithGoogle': 'Войти через Google',

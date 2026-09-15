@@ -17,12 +17,14 @@ import {
   useScrollMemory,
   useSession,
   switchStudio,
+  useStoredLocale,
 } from '@studio/core'
 import {
   AccessibilityMenu,
   InstallBanner,
   InstallWalkthrough,
   LanguageButton,
+  LanguageGate,
   LanguagePicker,
   SignIn,
   ThemeProvider,
@@ -202,7 +204,10 @@ export default function App() {
  * a copy of that machinery.
  */
 function LandingShell({ route }: { route: LandingRoute }) {
-  const [locale, setLocale] = useState<Locale>('he')
+  //: Reads a stored choice but never GATES: a stranger who followed an ad to the club's
+  //: shop window must not meet a modal before they have seen anything. The floating
+  //: `LanguagePicker` is still there for them.
+  const { locale, setLocale } = useStoredLocale()
   useDocumentLocale(locale)
   const landingClient = useMemo(() => makeLandingClient(apiFetch), [])
   // §5.4a step 1 → step 2. The OAuth callback appends `signed_in=1` to its redirect, and
@@ -360,7 +365,11 @@ async function loadStandingOrderLinks(): Promise<readonly MandateLink[]> {
 type JoinWallInfo = { studio_name: string; logo_url: string | null }
 
 function JoinShell({ token }: { token: string }) {
-  const [locale, setLocale] = useState<Locale>('he')
+  // §6.1 step 1 — the language choice, persisted and ASKED rather than defaulted. The
+  // `useState<Locale>('he')` this replaces meant a Russian-speaking parent read the whole
+  // wizard in Hebrew unless they found a floating button, and lost the choice on reload.
+  const { locale, setLocale, hasChosen } = useStoredLocale()
+  const [gateOpen, setGateOpen] = useState(!hasChosen)
   // The privacy client belonged to the old `JoinFlow`'s payment step and nothing in the
   // redesigned wizard consumes it, so it is not rebuilt here (task 1c's own note) -- an
   // unused fetch held open for a screen that never reads it is worse than not fetching.
@@ -444,6 +453,11 @@ function JoinShell({ token }: { token: string }) {
     <ThemeProvider>
       <AccessibilityMenu locale={locale} />
       <LanguageButton locale={locale} onChoose={setLocale} />
+      {/*: Before the wizard, never during it. `setLocale` persists on every tap, so the
+          choice is already recorded by the time Continue closes the gate. */}
+      {gateOpen ? (
+        <LanguageGate locale={locale} onChoose={setLocale} onDone={() => setGateOpen(false)} />
+      ) : null}
       <JoinWizard
         locale={locale}
         billingClient={billingClient}
@@ -475,7 +489,11 @@ function AuthedApp() {
   // `useDisplayMode()` is deliberately left alone: M8 reports install rates from it, and
   // a measurement that lies to make a dev tab convenient is worse than no banner.
   const installed = displayMode !== 'browser' || import.meta.env.MODE === 'development'
-  const [locale, setLocale] = useState<Locale>('he')
+  // §6.1 step 1 — the language choice, persisted and ASKED rather than defaulted. The
+  // `useState<Locale>('he')` this replaces meant a Russian-speaking parent read the whole
+  // app in Hebrew unless they found a floating button, and lost the choice on reload.
+  const { locale, setLocale, hasChosen } = useStoredLocale()
+  const [gateOpen, setGateOpen] = useState(!hasChosen)
   // `<html lang>` and `<html dir>` follow the choice. index.html ships `lang="he" dir="rtl"`
   // as a literal, so without this a parent who picks English or Russian reads LTR copy inside
   // an RTL document and hears it announced with a Hebrew voice.
@@ -864,6 +882,11 @@ function AuthedApp() {
       {session.status !== 'signed-in' ? <AccessibilityMenu locale={locale} /> : null}
       {/* New-build toast — floats over whatever is open, in every session state. */}
       <UpdateToast locale={locale} />
+      {/*: §6.1's ordering, made literal: the gate paints over EVERY session state, so it
+          is answered before the sign-in screen rather than after it. */}
+      {gateOpen ? (
+        <LanguageGate locale={locale} onChoose={setLocale} onDone={() => setGateOpen(false)} />
+      ) : null}
       {session.status === 'anonymous' ? (
         // Language before login (§6.1) — the picker floats over the sign-in screen.
         <SignIn

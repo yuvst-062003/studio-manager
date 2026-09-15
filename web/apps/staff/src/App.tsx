@@ -9,7 +9,14 @@
 // installed — which is why the nudge names what installing buys, but it is a pitch now,
 // not a gate.
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { apiFetch, useDisplayMode, useScrollMemory, useSession, switchStudio } from '@studio/core'
+import {
+  apiFetch,
+  switchStudio,
+  useDisplayMode,
+  useScrollMemory,
+  useSession,
+  useStoredLocale,
+} from '@studio/core'
 import {
   AccessibilityMenu,
   EmptyState,
@@ -30,12 +37,12 @@ import {
   registerBeltsWizardStep,
   registerItemsWizardStep,
   registerPricesWizardStep,
+  LanguageGate,
   useDocumentLocale,
 } from '@studio/ui'
 import { DevBar } from '@studio/ui/dev-bar'
 import type { InstallPromptEvent } from '@studio/ui'
 import { t } from '@studio/i18n'
-import type { Locale } from '@studio/i18n'
 import { LegalScreen } from './features/legal/LegalScreen'
 import { AccessGate } from './features/identity/AccessGate'
 import { Resolve } from './features/identity/Resolve'
@@ -174,7 +181,11 @@ export default function App() {
   // `useDisplayMode()` is deliberately left alone: M8 reports install rates from it, and
   // a measurement that lies to make a dev tab convenient is worse than no banner.
   const installed = displayMode !== 'browser' || import.meta.env.MODE === 'development'
-  const [locale, setLocale] = useState<Locale>('he')
+  // §6.1 step 1 — the language choice, persisted and ASKED rather than defaulted. The
+  // `useState<Locale>('he')` this replaces meant a Russian-speaking parent read the whole
+  // app in Hebrew unless they found a floating button, and lost the choice on reload.
+  const { locale, setLocale, hasChosen } = useStoredLocale()
+  const [gateOpen, setGateOpen] = useState(!hasChosen)
   // See the parent app's note: index.html's `dir="rtl"` is a literal, and the locale in
   // React state was never written back to the document.
   useDocumentLocale(locale)
@@ -397,6 +408,11 @@ export default function App() {
       {session.status !== 'signed-in' ? <AccessibilityMenu locale={locale} /> : null}
       {/* New-build toast — floats over whatever is open, in every session state. */}
       <UpdateToast locale={locale} />
+      {/*: §6.1's ordering. A coach signing in for the first time answers this before the
+          sign-in screen, for the same reason a parent does. */}
+      {gateOpen ? (
+        <LanguageGate locale={locale} onChoose={setLocale} onDone={() => setGateOpen(false)} />
+      ) : null}
       {session.status === 'anonymous' ? (
         // docs/design "Gladiator Manager Sign In" (2026-09-01) — this app's own face on the
         // flow. The other two apps keep `SignIn`'s split screen.

@@ -124,6 +124,16 @@ export const common: Bundle = {
   'language.short.en': 'EN',
   'language.short.ru': 'RU',
   'language.title': 'שפה',
+  // -- the first-run language gate (2026-09-15) --------------------------------
+  // §6.1 step 1 again, as a gate rather than a control: "language BEFORE login, because a
+  // Russian-speaking parent cannot read a Hebrew consent screen." The welcome and the
+  // instruction are rendered in ALL THREE locales at once, side by side, so that whoever
+  // opens the app can read at least one of them — which is the whole point and the reason
+  // these keys are read with an explicit locale rather than the active one.
+  'language.gate.welcome': 'ברוכים הבאים',
+  'language.gate.choose': 'בחרו שפה',
+  'language.gate.continue': 'המשך',
+  'language.gate.later': 'תמיד אפשר לשנות בהגדרות',
   // -- the parent app's sign-in face (owner's Stitch design, 2026-09-01) ---------
   'auth.parentHint': 'הזדהו עם חשבון Google כדי להיכנס ליומן האימונים, החגורות והתחרויות.',
   'auth.signInWithGoogle': 'התחברות עם Google',
