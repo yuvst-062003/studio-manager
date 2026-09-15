@@ -1,0 +1,828 @@
+<!--
+  §20 — how the growth system is actually built, step by step. The detailed companion to
+  growth-plan.html (the system as a thesis) and to the implementation plan at
+  docs/superpowers/plans/2026-09-14-growth-system.md (the task-level plan an agent executes).
+
+  **This file is the SOURCE for the page's structure and copy.** Republishing it to the
+  artifact URL is what updates the published page, so edit here.
+
+  **The published page also writes to itself** (the `artifact` capability) to keep tick state
+  on the account steps and the stored values. Editing here and republishing therefore RESETS
+  those ticks. Written down so it is not discovered.
+
+  **It is a body fragment.** The artifact host wraps it in its own doctype/head/body. When
+  the page republishes ITSELF it emits a complete document — see buildDocument below.
+
+  Rendering notes inherited from growth-plan.html: neither Archivo nor IBM Plex Mono carries
+  the shekel sign, so prices are words; Rubik supplies the Hebrew, because Archivo has none;
+  and LTR runs inside Hebrew need <bdi dir="ltr"> or they render reversed.
+-->
+<title>Gladiator Growth Build</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500;600&family=Rubik:wght@400;500;700&display=swap">
+<style id="app-css">
+  :root {
+    --navy: #003874; --navy-lift: #1a4f95;
+    --ground: #f5f6f8; --surface: #ffffff; --surface-sunk: #eceff4;
+    --ink: #111927; --ink-2: #4c586b; --ink-3: #7a869a;
+    --rule: #d8dee8; --rule-soft: #e7ebf1;
+    --done: #1f6f4e; --done-bg: #e8f4ee;
+    --queue: #a0561b; --queue-bg: #fbf0e4;
+    --risk: #a32222; --risk-bg: #fbeaea;
+    --on-navy: #ffffff;
+    --f-display: "Archivo", "Rubik", "Helvetica Neue", Arial, sans-serif;
+    --f-body: "Source Serif 4", Georgia, "Rubik", "Times New Roman", serif;
+    --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, "Rubik", monospace;
+    --measure: 68ch; --page: 1120px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --navy: #8fb5e6; --navy-lift: #b4d0f2;
+      --ground: #0e1520; --surface: #151e2b; --surface-sunk: #1b2634;
+      --ink: #e8edf5; --ink-2: #a8b4c6; --ink-3: #7e8ca1;
+      --rule: #2c3a4c; --rule-soft: #232f3f;
+      --done: #6cc79b; --done-bg: #143024;
+      --queue: #e0a468; --queue-bg: #33230f;
+      --risk: #e78d8d; --risk-bg: #351718;
+      --on-navy: #0e1520;
+    }
+  }
+  :root[data-theme="dark"] {
+    --navy: #8fb5e6; --navy-lift: #b4d0f2;
+    --ground: #0e1520; --surface: #151e2b; --surface-sunk: #1b2634;
+    --ink: #e8edf5; --ink-2: #a8b4c6; --ink-3: #7e8ca1;
+    --rule: #2c3a4c; --rule-soft: #232f3f;
+    --done: #6cc79b; --done-bg: #143024;
+    --queue: #e0a468; --queue-bg: #33230f;
+    --risk: #e78d8d; --risk-bg: #351718;
+    --on-navy: #0e1520;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--ground); color: var(--ink); font-family: var(--f-body);
+    font-size: 16.5px; line-height: 1.6; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: var(--page); margin: 0 auto; padding: 0 26px 88px; }
+  .col { max-width: var(--measure); }
+
+  h1, h2, h3, h4, .eyebrow, th, .chip, .num, .dur, .partno { font-family: var(--f-display); }
+  h1 { font-size: clamp(2.2rem, 4.6vw, 3.4rem); font-weight: 800; letter-spacing: -0.03em;
+       line-height: 1.02; text-wrap: balance; margin: 0 0 16px; }
+  h2 { font-size: clamp(1.4rem, 2.4vw, 1.95rem); font-weight: 700; letter-spacing: -0.02em;
+       line-height: 1.14; text-wrap: balance; margin: 0 0 8px; }
+  h3 { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.006em; margin: 0 0 6px; }
+  h4 { font-size: 0.94rem; font-weight: 700; margin: 0 0 5px; }
+  p { margin: 0 0 14px; }
+  code { font-family: var(--f-mono); font-size: 0.86em; color: var(--navy); word-break: break-word; }
+
+  .eyebrow { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase;
+             color: var(--ink-3); margin: 0 0 9px; }
+  .lede { font-size: 1.16rem; line-height: 1.46; color: var(--ink-2); }
+
+  header.mast { border-top: 5px solid var(--navy); padding: 40px 0 26px; }
+  .mast-meta { display: flex; flex-wrap: wrap; gap: 8px 24px; font-family: var(--f-mono);
+               font-size: 0.72rem; letter-spacing: 0.03em; color: var(--ink-3); margin-bottom: 24px; }
+  .mast-meta b { color: var(--ink-2); font-weight: 500; }
+
+  /* contents: four parts, so the reader can jump rather than scroll */
+  .toc { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1px;
+         background: var(--rule-soft); border: 1px solid var(--rule-soft); margin: 26px 0 0; }
+  .toc a { background: var(--surface); padding: 15px 17px; text-decoration: none; color: inherit;
+           display: block; border-bottom: 3px solid transparent; }
+  .toc a:hover, .toc a:focus-visible { border-bottom-color: var(--navy); outline: none; }
+  .toc .partno { display: block; font-family: var(--f-mono); font-size: 0.66rem; letter-spacing: 0.1em;
+                 color: var(--ink-3); margin-bottom: 6px; }
+  .toc strong { font-family: var(--f-display); font-size: 0.98rem; font-weight: 700; display: block;
+                margin-bottom: 3px; letter-spacing: -0.008em; }
+  .toc span.s { font-size: 0.83rem; color: var(--ink-2); line-height: 1.4; }
+
+  section { padding-top: 58px; }
+  .part-head { border-top: 2px solid var(--navy); padding-top: 18px; margin-bottom: 24px; }
+  .sec-head { margin-bottom: 20px; }
+  .sec-head p { color: var(--ink-2); margin-bottom: 0; }
+
+  /* the numbered implementation step — one object, repeated */
+  .impl { border: 1px solid var(--rule-soft); background: var(--rule-soft); display: grid; gap: 1px; margin: 0 0 24px; }
+  .istep { background: var(--surface); display: grid; grid-template-columns: 40px 1fr; gap: 0 15px;
+           padding: 16px 20px 16px 15px; align-items: start; }
+  .istep .n { font-family: var(--f-mono); font-size: 0.8rem; font-weight: 600; color: var(--navy);
+              padding-top: 1px; font-variant-numeric: tabular-nums; }
+  .istep p { margin: 0 0 9px; font-size: 0.95rem; color: var(--ink-2); max-width: 64ch; }
+  .istep p:last-child { margin-bottom: 0; }
+  .istep .who { display: inline-block; font-family: var(--f-display); font-size: 0.64rem; font-weight: 700;
+                letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 7px; margin-inline-start: 8px;
+                vertical-align: 2px; border: 1px solid currentColor; }
+  .who.you { color: var(--navy); background: var(--surface-sunk); }
+  .who.club { color: var(--queue); background: var(--queue-bg); }
+  .who.meta { color: var(--ink-3); }
+
+  pre { margin: 9px 0 0; padding: 11px 13px; background: var(--surface-sunk); border: 1px solid var(--rule-soft);
+        overflow-x: auto; font-family: var(--f-mono); font-size: 0.78rem; line-height: 1.55; color: var(--ink); }
+  pre code { color: inherit; font-size: inherit; }
+
+  .note { border: 1px solid var(--rule); border-inline-start: 3px solid var(--navy); background: var(--surface);
+          padding: 15px 18px; margin: 0 0 22px; }
+  .note.warn { border-inline-start-color: var(--risk); }
+  .note.warn .eyebrow { color: var(--risk); }
+  .note p:last-child { margin-bottom: 0; }
+  .note .eyebrow { color: var(--navy); }
+
+  .gotcha { margin-top: 10px; padding: 9px 12px; background: var(--risk-bg);
+            border-inline-start: 3px solid var(--risk); font-size: 0.88rem; line-height: 1.48; color: var(--ink); }
+  .gotcha b { font-family: var(--f-display); font-weight: 700; }
+
+  .table-scroll { overflow-x: auto; border: 1px solid var(--rule-soft); background: var(--surface); margin-bottom: 22px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+  th, td { text-align: start; padding: 9px 16px; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  th { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+       color: var(--ink-3); background: var(--surface-sunk); white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  td.k { font-family: var(--f-mono); font-size: 0.8rem; color: var(--navy); white-space: nowrap; }
+  .heb { font-family: "Rubik", var(--f-body); }
+
+  /* the bot script, as a conversation */
+  .chat { background: var(--surface); border: 1px solid var(--rule-soft); padding: 18px; margin-bottom: 22px;
+          display: flex; flex-direction: column; gap: 9px; max-width: 560px; }
+  .msg { padding: 9px 13px; font-size: 0.9rem; line-height: 1.5; max-width: 84%; }
+  .msg.them { background: var(--surface-sunk); align-self: flex-start; }
+  .msg.us { background: var(--done-bg); align-self: flex-end; }
+  .msg .rowlist { display: block; margin-top: 7px; border-top: 1px solid var(--rule); padding-top: 7px;
+                  font-family: var(--f-mono); font-size: 0.78rem; color: var(--ink-2); }
+  .msg .rowlist i { display: block; font-style: normal; padding: 2px 0; }
+  .tag { font-family: var(--f-mono); font-size: 0.62rem; letter-spacing: 0.08em; color: var(--ink-3);
+         text-transform: uppercase; align-self: flex-start; }
+  .tag.r { align-self: flex-end; }
+
+  /* the tickable account steps */
+  .ledger { border: 1px solid var(--rule-soft); background: var(--rule-soft); display: grid; gap: 1px; }
+  .step { background: var(--surface); display: grid; grid-template-columns: 44px 1fr; gap: 0 16px;
+          padding: 15px 20px 15px 14px; align-items: start; }
+  .step.is-done { background: var(--done-bg); }
+  .step .gutter { display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 2px; }
+  .num { font-family: var(--f-mono); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.06em; color: var(--ink-3); }
+  .step.is-done .num { color: var(--done); }
+  .step-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px 12px; margin-bottom: 3px; }
+  .step-head h3 { margin: 0; }
+  .dur { font-family: var(--f-mono); font-size: 0.72rem; font-weight: 500; color: var(--ink-2); white-space: nowrap; }
+  .step p { margin: 0; font-size: 0.93rem; color: var(--ink-2); max-width: 64ch; }
+
+  .tick { width: 22px; height: 22px; border: 1.5px solid var(--rule); background: var(--surface);
+          cursor: pointer; padding: 0; display: grid; place-items: center; color: transparent;
+          font-size: 13px; line-height: 1; transition: border-color .12s, color .12s, background .12s; }
+  .tick:hover:not(:disabled) { border-color: var(--navy); }
+  .tick:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+  .tick[aria-pressed="true"] { background: var(--done); border-color: var(--done); color: var(--on-navy); }
+  .tick:disabled { cursor: not-allowed; opacity: .45; }
+
+  .progress { display: flex; align-items: baseline; gap: 14px; margin: 22px 0 0; }
+  .progress .count { font-family: var(--f-display); font-size: 1.4rem; font-weight: 800;
+                     letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .progress .of { font-family: var(--f-mono); font-size: 0.74rem; color: var(--ink-3); }
+  .track { flex: 1; height: 6px; background: var(--surface-sunk); border: 1px solid var(--rule-soft);
+           overflow: hidden; min-width: 110px; }
+  .track i { display: block; height: 100%; background: var(--navy); transition: width .25s ease; }
+
+  .vars { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 1px;
+          background: var(--rule-soft); border: 1px solid var(--rule-soft); }
+  .var { background: var(--surface); padding: 12px 14px; display: flex; gap: 11px; align-items: flex-start; }
+  .var.is-done { background: var(--done-bg); }
+  .var .k { font-family: var(--f-mono); font-size: 0.76rem; color: var(--navy); word-break: break-all; line-height: 1.4; }
+  .var .w { font-size: 0.8rem; color: var(--ink-3); display: block; margin-top: 2px; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); gap: 1px;
+           background: var(--rule-soft); border: 1px solid var(--rule-soft); margin-bottom: 22px; }
+  .card { background: var(--surface); padding: 17px 19px; }
+  .card p { font-size: 0.89rem; color: var(--ink-2); margin: 0; line-height: 1.5; }
+  .card.bad h3 { color: var(--risk); }
+
+  .status { font-family: var(--f-mono); font-size: 0.7rem; letter-spacing: 0.03em; color: var(--ink-3);
+            margin-top: 10px; min-height: 1.2em; }
+  .status[data-tone="err"] { color: var(--risk); }
+
+  footer.foot { margin-top: 62px; padding-top: 18px; border-top: 1px solid var(--rule);
+                font-size: 0.82rem; color: var(--ink-3); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  @media (max-width: 560px) {
+    .wrap { padding: 0 18px 64px; }
+    .istep { grid-template-columns: 30px 1fr; gap: 0 11px; padding: 14px 14px 14px 11px; }
+    .step { grid-template-columns: 34px 1fr; padding: 14px 14px 14px 10px; gap: 0 12px; }
+    .msg { max-width: 94%; }
+  }
+</style>
+
+<div id="root"></div>
+
+<script id="state" type="application/json">
+{"done":{},"vars":{}}
+</script>
+
+<script id="app-js">
+(function () {
+  'use strict';
+
+  var FONTS =
+    '<link rel="preconnect" href="https://fonts.googleapis.com">' +
+    '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
+    '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500;600&family=Rubik:wght@400;500;700&display=swap">';
+
+  // ═══ PART 1 ═══ provisioning a studio's WhatsApp, so the club only presses pay ═══
+  var PROVISION = [
+    { who: 'you', t: 'Register once as a Meta Tech Provider',
+      b: 'One-time, for your company — not per club. This is what lets your app create WhatsApp accounts on behalf of other businesses and hold a token for each. Everything below is impossible without it, and it is the only step that is not per-customer.' },
+
+    { who: 'club', t: 'The club presses Enable and pays',
+      b: 'In the Marketing tab. This is the club’s first action and, if the rest works, very nearly their last. Everything before this point in your own setup costs them nothing.' },
+
+    { who: 'you', t: 'Your backend buys a phone number by API',
+      b: 'From a telecom provider — Twilio, Telnyx or Vonage. A few shekels a month, bought programmatically, appearing in your account seconds later. No SIM, no shop, no human. You hold a pool and assign one per club.',
+      code: 'POST /2010-04-01/Accounts/{sid}/IncomingPhoneNumbers.json\n  → { "phone_number": "+972...", "sid": "PN..." }\n\n# store it against the studio, unregistered, until step 6 completes' },
+
+    { who: 'club', t: 'Embedded Signup opens in a popup',
+      b: 'Meta’s own flow, launched from your dashboard. The club owner logs in with Facebook, confirms the business is theirs, and the number you bought in step 3 is pre-filled by you. They are clicking through Meta’s screens, not yours.' },
+
+    { who: 'meta', t: 'Meta sends one verification code to the number',
+      b: 'By SMS or voice call. <strong>Because you own the number, the code arrives at your telecom provider</strong>, not on anyone’s phone — so your backend can read it from the provider’s webhook and fill it in. This is the step that turns a five-minute wait into a spinner.',
+      code: '# your provider posts the inbound SMS to you\nPOST /webhooks/sms  { "To": "+972...", "Body": "Your WhatsApp code is 123-456" }\n\n# extract, submit to the signup flow, done' },
+
+    { who: 'meta', t: 'The popup closes and hands you three values',
+      b: 'The <code>waba_id</code>, the <code>phone_number_id</code>, and an access token scoped to that one client. This is the whole payload — everything the system needs to send and receive for that club.' },
+
+    { who: 'you', t: 'Write one row and the bot is live',
+      b: 'Into <code>whatsapp_number</code>, which is per-studio and already exists in the design. Nothing else in the system changes — the webhook, the bot and the approval loop all read this row and do not care how it got there.',
+      code: 'whatsapp_number\n  studio_id        ← this club\n  phone_number_id  ← from step 6   (GLOBALLY unique)\n  waba_id          ← from step 6\n  display_number   ← from step 3\n  status           active' }
+  ];
+
+  var CANNOT = [
+    ['A Facebook login', 'Meta requires a real person to consent that this business is theirs. You cannot click it for them, and no provider can.'],
+    ['The club’s own business identity', 'The display name parents see is reviewed and must be the club’s. You cannot show your company’s name on their messages — and you would not want to.'],
+    ['Business verification, eventually', 'Needed for higher sending limits, using the club’s own documents. But they can start sending on lower limits <strong>before</strong> verifying — which is what makes "press pay and it works today" nearly true.']
+  ];
+
+  var WHY_PER_STUDIO = [
+    ['The webhook only tells you the number', 'When a message arrives, Meta says which number it was sent to — not which club. <code>phone_number_id</code> is how the app resolves the tenant. One shared number means a stranger’s message cannot be attributed to any club at all.'],
+    ['One number shows one name', 'A parent asking about Gladiator must see the club’s name, not your platform’s. Meta does not let a number vary its display name per conversation.'],
+    ['Quality is shared fate', 'A number has one quality rating. One club’s messages getting reported throttles the number — and every club on it stops working at once.'],
+    ['Sending limits are per number', 'Meta caps how many people you may message per 24 hours per number. Ten clubs on one number hit the ceiling ten times faster.']
+  ];
+
+  // The manual path — what you do for club number one, before any of the above is built.
+  var ACCOUNT_STEPS = [
+    { id: 'M1', name: 'Meta Business portfolio', dur: 'about an hour',
+      b: 'Created at business.facebook.com by the account that will own it. Name it the legal entity name, not the brand. <strong>Add a second admin immediately</strong> — one person with one Facebook account is how clubs lose their Page.' },
+    { id: 'M5', name: 'A number that can take one call', dur: 'start today — it has a lead time',
+      b: 'Not on consumer WhatsApp, and not anyone’s personal phone. A landline works (Meta verifies by voice call) and is free if the club has one. Otherwise a cloud number from Twilio or Telnyx — no SIM, bought online.' },
+    { id: 'M2', name: 'Business verification', dur: '1–5 working days',
+      b: 'The <span class="heb">עמותה</span> documents: <span class="heb">בריין בילדינג (ע"ר)</span>, registration <code>580647295</code>. Legal name, never the brand name — that is the most common rejection. Blocks M6, M7 and M9.' },
+    { id: 'M3', name: 'Claim the Facebook Page', dur: 'an afternoon',
+      b: 'Claim it, do not <em>request access</em> — request access is for an agency working on somebody else’s Page. Runs while M2 sits in the queue.' },
+    { id: 'M4', name: 'Instagram → Business, linked to the Page', dur: 'an afternoon',
+      b: '<strong>Business, not Creator</strong> — the Content Publishing API is unavailable to Creator accounts and nothing says so until a publish fails. Then check <code>instagram_business_account</code> appears on the Page, or the link did not take.' },
+    { id: 'M10', name: 'The ads account', dur: 'about an hour',
+      b: 'Free to create; money is only spent by a campaign with a budget. Currency ILS and time zone Asia/Jerusalem — <strong>neither can be changed later</strong>. Set an account spending limit before the first campaign.' },
+    { id: 'M6', name: 'WhatsApp Business Account + display name', dur: 'after M2',
+      b: 'Add M5’s number, verify it, set the name parents see. <span class="heb">מועדון ג׳ודו גלדיאטור</span> passes review; <span class="heb">הרשמה</span> does not. Record the phone number id and WABA id — numeric, and neither is the phone number.' },
+    { id: 'M7', name: 'App, system user, permanent token', dur: 'an afternoon',
+      b: 'A <strong>system user</strong> token, never a user token. A user token expires after sixty days and takes publishing and lead delivery down silently — the single most common way a working Meta integration dies.' },
+    { id: 'M8', name: 'Webhook', dur: 'an hour',
+      b: 'Subscribe to <code>messages</code> on WhatsApp and <code>leadgen</code> on the Page. <strong>Set the verify token in Railway before pressing Verify</strong>, or the handshake fails and the subscription silently does not save.' },
+    { id: 'M9', name: 'App Review', dur: 'days to weeks',
+      b: 'Eleven permissions, a written use case each, a screencast, and reviewers testing the live webhook. Submit the day the webhook first answers. Budget one resubmission and promise nobody a date.' },
+    { id: 'M11', name: 'First Click-to-WhatsApp campaign', dur: 'seven days of spend',
+      b: 'A click opens a <strong>72-hour</strong> free window instead of the usual 24. Twenty to thirty shekels a day; below twenty the campaign cannot leave the learning phase. Decide the stop rule before the money.' }
+  ];
+
+  var VARS = [
+    ['META_APP_ID', 'M7'], ['META_APP_SECRET', 'M7 — also the signature key'],
+    ['META_PAGE_ID', 'M3'], ['META_IG_USER_ID', 'M4'],
+    ['META_SYSTEM_USER_TOKEN', 'M7 — permanent, never a user token'],
+    ['WHATSAPP_PHONE_NUMBER_ID', 'M6 — not the phone number'],
+    ['WHATSAPP_WABA_ID', 'M6'],
+    ['WHATSAPP_VERIFY_TOKEN', 'M8 — invented by us, set before Verify'],
+    ['WHATSAPP_API_VERSION', 'defaults to v21.0']
+  ];
+
+  // ═══ PART 2 ═══ the trial bot ═══
+  var BOT_IMPL = [
+    { t: 'Resolve the studio from the number, never from the sender',
+      b: 'The webhook payload carries <code>phone_number_id</code>. Look it up in <code>whatsapp_number</code> and open a tenant session for that studio. It <strong>fails closed</strong> — an unknown number gets no studio and the request is refused rather than guessed at.',
+      code: 'POST /webhooks/whatsapp\n  entry[].changes[].value.metadata.phone_number_id  → studio\n  entry[].changes[].value.messages[0].from          → the parent’s number' },
+
+    { t: 'Deduplicate on the message id before doing anything',
+      b: 'Meta retries any delivery it did not get a 200 for. Without a unique index on <code>wamid</code>, a retry is a second answer to the same question — and a parent reading the same sentence twice. <strong>The insert is the deduplication</strong>; there is no "have we seen this?" query to race against.',
+      code: 'whatsapp_message\n  wamid  varchar(128)  UNIQUE   ← the retry guard\n  body_encrypted  EncryptedBytes ← never plaintext at rest' },
+
+    { t: 'Ask the child’s name, and write the lead the moment you have it',
+      b: 'This is the one rule that must not bend. The trial page was rebuilt on 8 September for exactly this: the booking used to be written last, so a parent who filled everything in and abandoned at the final step left the club <em>nothing</em>. A chat is four steps — <strong>create the lead as soon as you have a name and a way to reach them</strong>, and enrich it afterwards. You already have the phone number: it is the number they are messaging from.' },
+
+    { t: 'Ask the age — and let the age pick the group',
+      b: 'Not "which group". A parent outside the club has no idea what <span class="heb">קבוצה 2</span> means; the app does, because every group stores <code>age_min</code> and <code>age_max</code>. Five bands is too many for WhatsApp buttons (three maximum), so it is a list.' },
+
+    { t: 'Offer real lessons, with the class name on each row',
+      b: 'A studio has several classes, and each class has several groups. The age narrows the groups <em>across every class at once</em> — so the class is a label on each option, not an extra question. One question instead of two, which matters at 21:40 with a child on a lap.',
+      code: 'GET /public/groups/{id}/trial-slots     ← the same endpoint the landing page uses\n\n<span class="heb">יום ג׳, 16.9 · 17:45</span> — <b>ג’ודו</b>\n<span class="heb">יום ד׳, 17.9 · 17:00</span> — <b>קראטה</b>' },
+
+    { t: 'Only offer groups a stranger may actually join',
+      b: 'Four conditions, and they already exist in <code>LandingService.public_groups</code>: the class is active, the group is active, <code>kind == \'base\'</code> (not an <code>extra</code> supplementary session, not a <code>private</code> lesson), and not <code>is_invite_only</code>. Reuse that query rather than writing a second one — the day someone marks the competition squad invite-only, the bot stops offering it with no code change.' },
+
+    { t: 'Ask the parent’s name last, then call the existing endpoint',
+      b: 'Asked once they are already committed. Then <code>POST /trial-bookings/self</code> — the same endpoint the landing page uses. A real <code>TrialBooking</code>, a real <code>Student</code>, a real <code>Guardian</code>, inside the tenant scope, dropped into the funnel the day-1/3/7 worker already watches. Not a note for someone to retype.' },
+
+    { t: 'Send the health declaration as a link, and say why',
+      b: 'Nobody can sign in a chat — a declaration needs a drawn signature. The booking does not require one: <code>TrialService</code> writes <code>health_status = "missing"</code> and <code>app/workers/health_reminders.py</code> already chases exactly that state. So the bot books, links, and says plainly that the mat needs it first. <strong>That is a safety rule, not paperwork</strong>, and the message must never imply the child can just turn up.' },
+
+    { t: 'Give it an escape hatch on the first message',
+      b: '<span class="heb">לדבר עם מאמן</span> hands the conversation to a human and stops the bot. A parent who wants a person and cannot find one is a parent who leaves.' },
+
+    { t: 'Never quote a price it was not given',
+      b: '<span class="heb">מחירים ושעות</span> answers from <code>price_plan</code> rows, converted to shekels at the boundary. A bot that invents 320 shekels to a prospective parent has done more damage than one that says nothing — and since 15 January 2026 an open-ended assistant is also a <strong>policy violation</strong>. Meta bans general AI assistants on WhatsApp and explicitly permits booking flows. The model may phrase and interpret; it must never decide a fact.' }
+  ];
+
+  var BOT_SCRIPT = [
+    ['them', '<span class="heb">היי, ראיתי את הפוסט. אפשר פרטים על אימוני ג’ודו לילדים?</span>', null],
+    ['us', '<span class="heb">שלום! 🥋 אני העוזר של מועדון גלדיאטור. אפשר לקבוע שיעור ניסיון חינם — לוקח פחות מדקה.</span>',
+      ['<span class="heb">קביעת שיעור ניסיון</span>', '<span class="heb">מחירים ושעות</span>', '<span class="heb">לדבר עם מאמן</span>']],
+    ['us', '<span class="heb">מה השם של הילד או הילדה?</span>', null],
+    ['them', '<span class="heb">אורי</span>', null],
+    ['us', '<span class="heb">בן כמה אורי?</span>', ['<bdi dir="ltr">4–6</bdi>', '<bdi dir="ltr">7–9</bdi>', '<bdi dir="ltr">10–12</bdi>', '<span class="heb">נוער ובוגרים</span>']],
+    ['them', '<bdi dir="ltr">7–9</bdi>', null],
+    ['us', '<span class="heb">מתי נוח לכם?</span>', ['<span class="heb">יום ג׳ 16.9 · 17:45 — ג’ודו</span>', '<span class="heb">יום ו׳ 19.9 · 14:45 — ג’ודו</span>']],
+    ['them', '<span class="heb">יום ג׳ 16.9 · 17:45</span>', null],
+    ['us', '<span class="heb">ואיך קוראים לך?</span>', null],
+    ['them', '<span class="heb">מיכל</span>', null],
+    ['us', '<span class="heb">נקבע! ✅ אורי מוזמן ליום ג׳ 16.9 בשעה 17:45.<br>נשאר דבר אחד: הצהרת בריאות קצרה. חובה למלא אותה לפני הכניסה למזרן.</span>',
+      ['<span class="heb">מילוי הצהרת בריאות</span>', '<span class="heb">ניווט למועדון</span>']]
+  ];
+
+  // ═══ PART 3 ═══ the manager's AI content and the approval flow ═══
+  var CONTENT_IMPL = [
+    { t: 'Build the consent check first, before anything writes a word',
+      b: 'The one capability no outside tool has. <code>consent_record</code> already carries <code>photo_video</code>, versioned and revocable, and since 14 September the registration signature asks for it. One query over the roster the app already builds, plus one consent lookup the privacy service already answers.',
+      code: 'GET /api/v1/content/filmability/{session_id}   ← open to coaches; they hold the phone\n\n→ { total: 8, filmable: 6, blocked: [\n     { display_name: "אורי",  reason: "declined"    },\n     { display_name: "נועם", reason: "never_asked" } ] }' },
+
+    { t: 'Keep "nobody asked" apart from "the parent said no"',
+      b: 'Three states, all of them facts: <code>true</code> is consent, <code>false</code> is asked and declined, <code>null</code> is <em>not asked</em> — which is every family who registered before the tick existed. The club’s published policy says a refusal <span class="heb">"אינו נרשם כהסכמה"</span>, so a screen that renders silence as a refusal makes the club’s own policy text untrue.' },
+
+    { t: 'Fail closed, and require every answerer to agree',
+      b: 'A child is filmable only when <em>every</em> guardian on file holds a current grant, and there is at least one. Two guardians, one yes and one no, is a <strong>no</strong> — a child’s image is not a majority vote. No guardian on file falls back to the student’s own person row, which is how an adult student answers for themselves.' },
+
+    { t: 'The shot brief: club data, no model call, nothing to run',
+      b: 'Four shot types, each answering the same four questions — where to stand, what is in frame, how long, what to say — rendered around the real lesson’s group name, time and address. Costs nothing, and it answers the thing that actually stops the owner posting: <strong>not knowing what to post</strong>, which was never a shortage of minutes.' },
+
+    { t: 'The writer: one file talks to the model, and it is handed facts',
+      b: 'Every number, name, time and address comes in through a <code>facts</code> dict built from rows. The fee crosses that boundary <strong>in shekels</strong>, never agorot — handing a writer <code>32000</code> invites it to publish that figure to a parent. The module records which fact <em>keys</em> it was given, never their values, so "where did that price come from" is answerable.',
+      code: 'ContentModel(session).write(\n    task="event_post",\n    facts={"event_title": ..., "starts_at_local": ..., "fee_shekels": 120},\n    instruction="כתוב פוסט קצר לפייסבוק ולאינסטגרם",\n)  →  Generation(body_he, hashtags, cost_agorot, failure)' },
+
+    { t: 'Make "the model never sees a child" an import test',
+      b: 'The strongest form of that rule is a module with no way to obtain a child’s name. A test parses the writer’s imports and fails the build if it can reach the people, health, or consent modules. A comment does not fail on the commit that breaks it; this does.' },
+
+    { t: 'Check the spend cap before the call, not after',
+      b: 'Integer agorot, rounded up, so a call costing a fraction still counts as one. The cap is a <strong>guard, not a budget</strong> — at about three agorot a caption the club’s whole month is under two shekels, and this exists so a retry loop with a bug cannot spend real money overnight. A cap checked afterwards has already paid.' },
+
+    { t: 'An unset API key is a feature that is off, not a crash',
+      b: 'With no key the writer falls back to a template built from the same facts, every screen still works, and the row records <code>failure=\'no_api_key\'</code>. Same shape as the SMTP and VAPID settings. <strong>A template the owner can fix beats a blank page</strong> — which is the whole problem this feature exists to solve.' },
+
+    { t: 'One writer for the draft’s status, and a graph written down',
+      b: 'No router assigns a status; a status set in a router is a status nothing audits. Every transition is audited with the actor — and never with the body, because a diff is read by people and this one would carry a paragraph on every generation.',
+      code: 'draft ──submit──▶ pending_approval ──approve──▶ approved\n  │                    │   ▲                         │\n  │                    │   └──── send_back ───────────┘\n  └──discard──▶ discarded ◀──discard──┘' },
+
+    { t: 'Ship the loop over push first, WhatsApp second',
+      b: 'The expensive half is the state machine, not the transport. Push has been live since 13 September, so the machine plus an approve screen <strong>works today, costs nothing, and needs no Meta account at all</strong>. Put the transport behind a one-method interface and WhatsApp later becomes a transport rather than a rebuild.',
+      code: 'class ApprovalTransport(Protocol):\n    def request(self, draft, *, recipients) -> None: ...\n\nPushApprovalTransport   ← today\nWhatsAppApprovalTransport ← once the number exists' },
+
+    { t: 'A coach may write and submit. Only a manager may approve.',
+      b: 'Two different questions, so two different routes rather than one with a permission fork inside it. <code>/drafts</code> asks who may spend the club’s model allowance (manager or owner). <code>/drafts/manual</code> asks who may write (any staff). Only <strong>approve</strong> asks who is accountable for what the club publishes — and that has to be the person who can answer the consent question.' },
+
+    { t: 'Notify every manager, and make the notification ungovernable',
+      b: 'On submit, enqueue to every un-revoked owner and manager. The kind is <code>content.pending_approval</code> — an unmapped prefix, so it is <strong>ungoverned rather than muted</strong>. Giving a manager a switch whose only effect is hiding their own queue from themselves would be a bug with a settings screen.' },
+
+    { t: 'Carry an id in the push, never the copy',
+      b: 'A push payload travels to a browser’s push service. It carries the draft id to open. The club’s unpublished words stay on the club’s own server.' }
+  ];
+
+  // ═══ PART 4 ═══ posting, marketing, and proving it worked ═══
+  var PUBLISH_IMPL = [
+    { t: 'Publishing is a two-step container upload, per image or video',
+      b: 'Create a media container, then publish it. Tedious, well documented, and it breaks on Meta’s schedule rather than yours. A Reel and a Story are the same two steps with a different media type.',
+      code: 'POST /{ig-user-id}/media           → { "id": "&lt;creation_id&gt;" }\nPOST /{ig-user-id}/media_publish   { creation_id }  → live\n\nPOST /{page-id}/photos             ← the Page, same idea' },
+
+    { t: 'Hard-gate the publish on consent — at the point of posting',
+      b: 'The transition <code>approved → published</code> refuses when the draft’s session has a blocked child and the manager has not attested that none of them appear in the media. <strong>A clip with an unconsented child must be stopped before it goes out, not caught afterwards</strong> — that is the same finding that took five photographs off the landing page on 8 September.' },
+
+    { t: 'Put a red light on last successful delivery',
+      b: 'A lapsed page token stops publishing and stops lead delivery <strong>with no error on any screen</strong>. And Meta keeps lead data for ninety days only — so an integration that stops quietly does not delay leads, it destroys them. The signal must read "when did this last succeed", never "did the last call throw".' },
+
+    { t: 'Deliver lead forms into the funnel that already exists',
+      b: 'A <code>leadgen</code> webhook becomes a <code>Student</code> with <code>status=\'lead\'</code>, through the same service the landing page uses. It then enters §5.4a’s funnel and the day-1/3/7 ladder with nothing special-cased for having come from Meta.' },
+
+    { t: 'Run the ad as a messaging campaign, not a traffic one',
+      b: 'Objective Engagement → Messaging → WhatsApp. A click opens a <strong>72-hour</strong> free window instead of the ordinary 24, so the whole booking conversation and a next-day follow-up cost nothing. Set the pre-filled first message to something the bot can route.' },
+
+    { t: 'Never send marketing templates to parents',
+      b: 'Per-message, unignorable, and it gets a number reported — which throttles everything on it. Club announcements already reach an app the family chose to install, for free. The same logic applies to "how was the session": <strong>that is push, not WhatsApp.</strong>' }
+  ];
+
+  var VALIDATE_BEFORE = [
+    ['Every fact traces to a row', 'The writer only ever sees a <code>facts</code> dict built from the database, and the recorded <code>fact_keys</code> prove which ones. A price it was not given is a price it cannot print.'],
+    ['No unconsented face', 'The filmability report is attached to the draft when it is written, and re-checked at the publish transition. Two checks, because the photographs are chosen between them.'],
+    ['A person said yes', 'Nothing leaves <code>pending_approval</code> without a manager, and the approver is stored on the row. "Who published this?" always answers with a person, never with the AI.'],
+    ['The month has budget left', 'Checked before the model call, in integer agorot, rounded up.'],
+    ['The token still works', 'The red light reads last successful delivery. A publish attempted through a dead token fails loudly instead of vanishing.']
+  ];
+
+  var VALIDATE_AFTER = [
+    ['Did it produce a conversation?', 'Count inbound messages against the day the post went out. This is the only number that tells you whether the content was worth writing.'],
+    ['Did the conversation produce a booking?', 'The bot writes a real <code>TrialBooking</code>, so this is a query and not a guess.'],
+    ['Did the booking produce a member?', '<code>student_status_history</code> already records <code>lead → trial → active</code>. The funnel has sliced by <code>Student.source</code> since §5.4a — the column exists, so attribution is a filter rather than a feature.'],
+    ['And then the loop closes', 'A new member is a new photo subject, whose training is next week’s content — which is the whole argument for building these four parts as one loop instead of four half-features.']
+  ];
+
+  var UNEQUAL = [
+    ['ok', 'The trial path, and adding kids', 'The parent messages <strong>first</strong>, which opens a free window. No templates, no per-message cost, and Meta explicitly permits booking bots. <strong>Build this one.</strong>'],
+    ['bad', '"How was the session?"', 'You message them first. Needs a pre-approved template, costs money per message, and lands in a personal inbox where people report businesses. <strong>Push already does this for free.</strong>'],
+    ['bad', 'Announcements', 'Same problem, multiplied by a hundred families. Marketing templates to parents are how a number gets reported and throttled. <strong>The app already reaches them.</strong>']
+  ];
+
+
+  // ═══ PART 5 ═══ the tools: what to build, what to rent, what to avoid ═══
+  // Researched 2026-09-15. Prices and Hebrew behaviour change; re-check before spending.
+  var PIPELINE = [
+    ['1', 'The idea — what to post', 'OURS', 'A model with the club’s own rows: the real grading, the real age band, the real group name. <strong>No outside tool can do this</strong>, because none of them know your Tuesday 17:00 is the 7–9s. This is the part that solves the blank page.'],
+    ['2', 'The style — how it should feel', 'OURS', 'A short list of presets the manager picks from — <em>proud moment</em>, <em>come and try</em>, <em>technique of the week</em> — which sets the tone, the length and the shot type. One tap, not a prompt to write.'],
+    ['3', 'The shot — where to stand', 'OURS', 'The brief: framing, duration, orientation, a line to say. Plus the consent check, which is the only part of this whole pipeline no competitor can copy.'],
+    ['4', 'The filming', 'THE PHONE', 'The ordinary camera app. The app does <strong>not</strong> own the lens — iOS camera access in an installed PWA has a long history of failing, and the brief works without it.'],
+    ['5', 'The cut', 'RENTED', 'Opus Clip turns one long video into short vertical clips; CapCut does it by hand for free. Do not rebuild this — it is a solved, crowded, free-at-the-bottom market.'],
+    ['6', 'The captions', 'RENTED — CAREFULLY', 'This is where Hebrew breaks. See the warning below before picking one.'],
+    ['7', 'The approval', 'OURS', 'The draft goes to the manager, corrections come back, nothing publishes without a yes. Part 3.'],
+    ['8', 'The posting', 'OURS, THEN MAYBE RENTED', 'Meta’s Graph API directly while there is one club. A posting API once there are many — see the build-or-rent table.']
+  ];
+
+  var HEBREW_TRAP = [
+    ['Submagic', 'Best-looking captions in the category, 123 languages, claims 99% accuracy', '<strong>Hebrew rendering is effectively broken</strong> — reversed text and disconnected letters, per 2026 reviews. Do not use it for Hebrew.'],
+    ['Opus Clip', 'The best long-to-short clipper; claims 95% transcription', 'Transcription is accurate; <strong>the on-screen word order comes out reversed</strong>. Users have an open feature request for Hebrew/RTL. Use it to cut, never to caption.'],
+    ['Sonix', 'Transcription-first, 85–99% on Hebrew depending on audio', 'Good for the transcript. Check the burned-in result in a player before trusting it.'],
+    ['Simplified', 'Subtitle generator', '<strong>Documents full RTL support for Hebrew.</strong> The most promising of the group on the axis that actually breaks.'],
+    ['The app itself', 'Whisper at about two agorot a minute', 'Cheapest, no second account, and no video of children uploaded to a third party. Needs explicit Unicode RTL embedding in the .srt or it has the same bug as everyone else.']
+  ];
+
+  var BUILD_RENT = [
+    ['Write the copy', 'BUILD', 'Claude, from the club’s rows. About three agorot a caption. Nothing rented can see your data.'],
+    ['Cut the video', 'RENT', 'Opus Clip or CapCut. Two to three weeks to build badly what is free to use well.'],
+    ['Caption it', 'RENT OR BUILD', 'One test clip decides it. If a free editor does Hebrew RTL correctly, three days of building buys nothing.'],
+    ['Design a poster', 'RENT', 'Canva. The club has never made a flyer; do not build a templating system for a job nobody does.'],
+    ['Generate video with AI', 'AVOID', 'Higgsfield, Veo, Sora, Kling — all excellent, all wrong here. They produce <strong>synthetic people</strong>, and a judo club’s content is worth something precisely because the children in it are the club’s real children. Also four to twenty-two shekels per eight seconds.'],
+    ['Post to Facebook and Instagram', 'BUILD, FOR NOW', 'The Graph API directly is free. Ayrshare starts at $149/month for one profile — more than this club’s entire running cost. Revisit past roughly thirty clubs, where its per-profile price drops and maintaining Meta integrations yourself stops being free.'],
+    ['Self-host a posting layer', 'CONSIDER LATER', 'Postiz and Mixpost are open source and self-hostable, covering many networks. A middle path between the raw Graph API and a per-profile bill.']
+  ];
+
+  var HIGGSFIELD = [
+    ['What it is', 'A cinematic AI video platform that puts several leading models — Sora 2, Veo 3.1, Kling 3.0, Seedance 2.0, Wan 2.7 — behind one workspace, with a Cinema Studio that simulates real optical physics: virtual camera body, lens, focal length, depth of field, and characters locked across shots.'],
+    ['Why it is genuinely impressive', 'It is the closest thing to directing rather than prompting. Camera control is the thing most video models are worst at, and that is its whole point.'],
+    ['Why it is wrong for this club', 'It generates people who do not exist. The entire value of a judo club’s content is that the children in it are <em>yours</em> — a parent recognises their kid’s friend in the frame. A synthetic child is not merely worse here, it is the opposite of the point.'],
+    ['The one part worth watching', 'Video-to-video restyling — taking <em>real</em> footage and changing its look without a reshoot. That respects the constraint above. Worth a look once the club is actually producing footage, and not before.']
+  ];
+
+  // ═══ PART 6 ═══ the schedule ═══
+  var SCHEDULE_IMPL = [
+    { t: 'Two jobs, never one',
+      b: 'This is the whole design. One job <strong>proposes</strong> on a cadence so the manager always has something waiting; a second job <strong>publishes</strong> what a human already approved, at the time it was scheduled for. A single job that writes and posts is an unattended machine speaking in the club’s voice to its parents — which is the one thing §20 never allows.',
+      code: 'content-propose    weekly    → writes drafts, notifies the manager\ncontent-publish    */15 * * * *  → posts only what is already `approved`\n                                   and whose publish_at has arrived' },
+
+    { t: 'Add a publish_at column, and let approval set it',
+      b: 'Approving does not mean "post now". The manager approves on Sunday evening and the post goes out Tuesday at 17:00 when parents are actually looking. One nullable timestamp on <code>content_draft</code> carries that, and a null means post at the next drain.',
+      code: 'content_draft\n  publish_at  timestamptz  null   ← UTC, like everything else\n  status      approved → published' },
+
+    { t: 'Declare both jobs in infra/railway/jobs.json, with a why',
+      b: 'A job outside that registry is a job nothing monitors. Each entry carries <code>max_silence_minutes</code> — how long it may go without a successful run before the ops check calls it overdue.' },
+
+    { t: 'Remember the cron is UTC',
+      b: '<strong>This has already bitten this codebase.</strong> Railway reads the five cron fields as UTC, and four production jobs still fire three hours later than their own documentation argues for. A post meant for 17:00 Jerusalem is <code>0 14 * * *</code> during daylight time. Write the Jerusalem hour in the <code>why</code> and the shifted hour in the schedule.' },
+
+    { t: 'Enforce Instagram’s publishing limit yourself',
+      b: 'Meta caps API publishing at <strong>50 posts per rolling 24 hours</strong> (its own docs say 100 elsewhere — treat 50 as the number). It is a <em>moving</em> window: capacity frees 24 hours after each publish, not at midnight. Meta explicitly tells scheduling apps to enforce this themselves, because a queue that exceeds it simply fails to publish.',
+      code: 'GET /{ig-user-id}/content_publishing_limit\n  → how much of the window this account has already used\n\n# check before draining the queue, not after a failure' },
+
+    { t: 'Propose weekly. Do not post daily.',
+      b: 'The 2026 data is consistent: <strong>three to five feed or Reels posts a week</strong>, plus a few Stories, is the sustainable band for a small business — and quality beats volume every time. A club with four enquiries a month posting daily produces filler that trains parents to scroll past. The job’s job is to make sure the manager is never staring at nothing, not to fill a calendar.' },
+
+    { t: 'Seed the proposals from what actually happened',
+      b: 'The weekly run reads the coming and recent weeks: a grading, a competition result, a new term, a belt awarded, a session with a photogenic milestone. <strong>No event, no proposal</strong> — an agent that invents an occasion to post about is how the feed fills with nothing.' },
+
+    { t: 'Make the queue inert, and let a bad week be silence',
+      b: 'Nothing is sent at draft time. An agent behaving badly produces a queue nobody approves — the blast radius of a bug is wasted reading, not a message to a hundred families. If the manager approves nothing this week, nothing goes out, and that is a working system rather than a broken one.' }
+  ];
+
+  var CADENCE = [
+    ['Feed posts and Reels', '3–5 per week', 'The sustainable band for a small business in 2026. Below this you are invisible; above it, quality falls before reach rises.'],
+    ['Stories', '4–7 per week', 'Cheaper to make and lower stakes. This is where a phone clip with no editing belongs.'],
+    ['What the job proposes', 'weekly, 2–3 drafts', 'Enough that the manager always has something to approve, few enough that approving is a five-minute job on a Sunday.'],
+    ['Hard ceiling', '50 API posts / 24h', 'Meta’s limit, on a moving window. Nowhere near reachable at this club’s volume — enforce it anyway, because the day it is hit the failure is silent.']
+  ];
+
+  // ---- state -------------------------------------------------------------
+  var state = { done: {}, vars: {} };
+  try {
+    var parsed = JSON.parse(document.getElementById('state').textContent);
+    if (parsed && typeof parsed === 'object') {
+      state.done = parsed.done || {};
+      state.vars = parsed.vars || {};
+    }
+  } catch (e) { /* a malformed block renders an empty checklist, never a blank page */ }
+
+  var artifact = null, writable = true, saving = false, pending = null;
+
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  // ---- shared renderers: one object, repeated ----------------------------
+  function implList(items) {
+    var h = '<div class="impl">';
+    items.forEach(function (it, i) {
+      h += '<div class="istep"><span class="n">' + String(i + 1).padStart(2, '0') + '</span><div>' +
+        '<h3>' + it.t + (it.who ? '<span class="who ' + it.who + '">' +
+          (it.who === 'you' ? 'you' : it.who === 'club' ? 'the club' : 'meta') + '</span>' : '') + '</h3>' +
+        '<p>' + it.b + '</p>' +
+        (it.code ? '<pre><code>' + it.code + '</code></pre>' : '') +
+        (it.gotcha ? '<div class="gotcha">' + it.gotcha + '</div>' : '') +
+        '</div></div>';
+    });
+    return h + '</div>';
+  }
+
+  function cardList(items, cls) {
+    var h = '<div class="cards">';
+    items.forEach(function (c) {
+      h += '<div class="card' + (cls || '') + '"><h3>' + c[0] + '</h3><p>' + c[1] + '</p></div>';
+    });
+    return h + '</div>';
+  }
+
+  function kvTable(rows, head) {
+    var h = '<div class="table-scroll"><table>';
+    if (head) h += '<thead><tr><th>' + head[0] + '</th><th>' + head[1] + '</th></tr></thead>';
+    h += '<tbody>';
+    rows.forEach(function (r) { h += '<tr><th scope="row">' + r[0] + '</th><td>' + r[1] + '</td></tr>'; });
+    return h + '</tbody></table></div>';
+  }
+
+  function wideTable(rows, head) {
+    var h = '<div class="table-scroll"><table><thead><tr>';
+    head.forEach(function (c) { h += '<th>' + c + '</th>'; });
+    h += '</tr></thead><tbody>';
+    rows.forEach(function (r) {
+      h += '<tr>';
+      r.forEach(function (c, i) { h += i === 0 ? '<th scope="row">' + c + '</th>' : '<td>' + c + '</td>'; });
+      h += '</tr>';
+    });
+    return h + '</tbody></table></div>';
+  }
+
+  function partHead(no, title, lede) {
+    return '<div class="part-head"><p class="eyebrow">Part ' + no + '</p><h2>' + title + '</h2>' +
+      '<p class="col" style="color:var(--ink-2);margin:8px 0 0">' + lede + '</p></div>';
+  }
+
+  // ---- render ------------------------------------------------------------
+  function render() {
+    var doneCount = ACCOUNT_STEPS.filter(function (s) { return state.done[s.id]; }).length;
+    var pct = Math.round((doneCount / ACCOUNT_STEPS.length) * 100);
+    var vDone = VARS.filter(function (v) { return state.vars[v[0]]; }).length;
+
+    var h = '<div class="wrap">';
+
+    // ── masthead ──
+    h += '<header class="mast">' +
+      '<p class="eyebrow">Gladiator Judo Club · Growth §20 · how it is built</p>' +
+      '<h1>Turning the growth system on</h1>' +
+      '<p class="lede col">Four parts, in the order a club meets them: give a studio its own WhatsApp, let a bot book trials into it, let the app write the content and the manager approve it, then publish and find out whether any of it worked. The detail here is the mechanism — the dashboard around it is a separate question.</p>' +
+      '<div class="mast-meta">' +
+      '<span><b>PLAN</b> docs/superpowers/plans/2026-09-14-growth-system.md</span>' +
+      '<span><b>SPEC</b> docs/growth-spec.md</span>' +
+      '<span><b>RUNS AT</b> under twenty shekels a month</span>' +
+      '</div>' +
+      '<div class="toc">' +
+      '<a href="#p1"><span class="partno">PART 1</span><strong>The number</strong><span class="s">Giving one studio its own WhatsApp — automatically, so the club only presses pay</span></a>' +
+      '<a href="#p2"><span class="partno">PART 2</span><strong>The trial bot</strong><span class="s">A stranger messages and walks out with a booked lesson</span></a>' +
+      '<a href="#p3"><span class="partno">PART 3</span><strong>Content and approval</strong><span class="s">The app writes it from real rows; the manager says yes</span></a>' +
+      '<a href="#p4"><span class="partno">PART 4</span><strong>Publish and prove it</strong><span class="s">Posting, the ad, and whether any of it produced a member</span></a>' +
+      '<a href="#p5"><span class="partno">PART 5</span><strong>The tools</strong><span class="s">What to build, what to rent, what to avoid — and where Hebrew breaks</span></a>' +
+      '<a href="#p6"><span class="partno">PART 6</span><strong>The schedule</strong><span class="s">Posting on a cadence without an unattended machine speaking for the club</span></a>' +
+      '</div>' +
+      '<p class="status" id="status" data-tone=""></p>' +
+      '</header>';
+
+    // ── build order note ──
+    h += '<section><div class="note"><p class="eyebrow">Reading order is not build order</p>' +
+      '<p>This page runs in the order a club experiences the system. <strong>The build order is different</strong>, and it matters: Part 3 needs no Meta account at all, so it ships first and is useful on its own. Parts 1, 2 and 4 wait on a review queue nobody controls. Build the content studio and the approval loop while verification sits in Meta’s queue — otherwise the code waits on the paperwork.</p></div></section>';
+
+    // ══ PART 1 ══
+    h += '<section id="p1">' + partHead(1, 'Giving a studio its own WhatsApp',
+      'The club presses pay. Everything else is yours to automate — and most of it can be.');
+
+    h += '<div class="sec-head col"><p class="eyebrow">First</p><h3 style="font-size:1.2rem">Not every use is equal</h3>' +
+      '<p>Three things get asked for together and they have completely different costs. This decides what to build before any of the plumbing does.</p></div>';
+    h += '<div class="cards">';
+    UNEQUAL.forEach(function (u) {
+      h += '<div class="card' + (u[0] === 'bad' ? ' bad' : '') + '"><h3>' + u[1] + '</h3><p>' + u[2] + '</p></div>';
+    });
+    h += '</div>';
+
+    h += '<div class="sec-head col"><p class="eyebrow">The constraint everything hangs off</p>' +
+      '<h3 style="font-size:1.2rem">One number per studio. Zero per manager.</h3>' +
+      '<p>A manager needs no number — they receive approval drafts on their own personal WhatsApp, from the club’s number, and because they reply every message in that exchange is free. The number belongs to the <em>club</em>, and it cannot be shared between clubs for four reasons.</p></div>';
+    h += kvTable(WHY_PER_STUDIO);
+
+    h += '<div class="sec-head col"><p class="eyebrow">The mechanism</p>' +
+      '<h3 style="font-size:1.2rem">Seven steps, and the club does two of them</h3>' +
+      '<p>This is the path every WhatsApp SaaS takes, and it is built for exactly this case.</p></div>';
+    h += implList(PROVISION);
+
+    h += '<div class="note warn"><p class="eyebrow">Check this before planning around it</p>' +
+      '<p>The shape above — Tech Provider, Embedded Signup, numbers bought by API, one WhatsApp account per client — is how this is done and is stable. <strong>Meta’s current Tech Provider requirements are not</strong>; they have been tightened more than once. Verify them against Meta’s own documentation before this becomes load-bearing.</p></div>';
+
+    h += '<div class="sec-head col"><p class="eyebrow">Walls, not friction</p>' +
+      '<h3 style="font-size:1.2rem">Three things you cannot remove</h3></div>';
+    h += kvTable(CANNOT);
+
+    h += '<div class="sec-head col"><p class="eyebrow">Meanwhile, for club number one</p>' +
+      '<h3 style="font-size:1.2rem">The manual path</h3>' +
+      '<p>You have one club. Do this by hand now, prove the bot is worth having, and automate when a second club is waiting. It costs nothing later: <strong>the row these steps fill in is the same row Embedded Signup fills in</strong>, so automating it is a new way of writing the same three values — not a rewrite.</p></div>';
+    h += '<div class="progress"><span class="count">' + doneCount + '</span>' +
+      '<span class="of">of ' + ACCOUNT_STEPS.length + ' done</span>' +
+      '<span class="track"><i style="width:' + pct + '%"></i></span></div>';
+    h += '<div class="ledger" style="margin-top:16px">';
+    ACCOUNT_STEPS.forEach(function (step) {
+      var on = !!state.done[step.id];
+      h += '<div class="step' + (on ? ' is-done' : '') + '"><div class="gutter">' +
+        '<button class="tick" type="button" data-step="' + step.id + '" aria-pressed="' + on + '"' +
+        (writable ? '' : ' disabled') + ' aria-label="' + esc(step.id + ' ' + step.name) + '">✓</button>' +
+        '<span class="num">' + step.id + '</span></div><div>' +
+        '<div class="step-head"><h3>' + esc(step.name) + '</h3><span class="dur">' + step.dur + '</span></div>' +
+        '<p>' + step.b + '</p></div></div>';
+    });
+    h += '</div>';
+
+    h += '<div class="sec-head col" style="margin-top:34px"><p class="eyebrow">What the manual path hands back</p>' +
+      '<h3 style="font-size:1.2rem">Nine values, and none of them typed here</h3>' +
+      '<p>Every one is unset today, and every feature that reads one switches itself <em>off</em> when it is missing rather than crashing. Tick a value once it is in Railway’s secrets on the <code>api</code> service.</p></div>' +
+      '<div class="note"><p class="eyebrow">Why there is no field to type into</p>' +
+      '<p>Three of these are secrets. A published page is stored and readable by everyone it is shared with, so this page records <strong>whether</strong> a value exists and never the value itself.</p></div><div class="vars">';
+    VARS.forEach(function (v) {
+      var on = !!state.vars[v[0]];
+      h += '<div class="var' + (on ? ' is-done' : '') + '">' +
+        '<button class="tick" type="button" data-var="' + v[0] + '" aria-pressed="' + on + '"' +
+        (writable ? '' : ' disabled') + ' aria-label="' + esc(v[0]) + '">✓</button>' +
+        '<span><span class="k">' + v[0] + '</span><span class="w">' + v[1] + '</span></span></div>';
+    });
+    h += '</div><p class="status">' + vDone + ' of ' + VARS.length + ' recorded.</p></section>';
+
+    // ══ PART 2 ══
+    h += '<section id="p2">' + partHead(2, 'The trial bot',
+      'A stranger messages the club and walks out with a real booking. Free to run, because they message first — and the only one of the three uses that Meta explicitly permits.');
+    h += implList(BOT_IMPL);
+
+    h += '<div class="sec-head col"><p class="eyebrow">The script, end to end</p>' +
+      '<h3 style="font-size:1.2rem">Four questions, two of them typed</h3>' +
+      '<p>Everything else is a tap. The groups, times and class names below come from rows — the model phrases, it never decides.</p></div><div class="chat">';
+    BOT_SCRIPT.forEach(function (m) {
+      h += '<div class="msg ' + m[0] + '">' + m[1];
+      if (m[2]) {
+        h += '<span class="rowlist">';
+        m[2].forEach(function (r) { h += '<i>' + r + '</i>'; });
+        h += '</span>';
+      }
+      h += '</div>';
+    });
+    h += '</div>';
+
+    h += '<div class="sec-head col"><p class="eyebrow">How it finds the right lesson</p>' +
+      '<h3 style="font-size:1.2rem">The number picks the club, the conversation picks the rest</h3></div>' +
+      '<pre style="max-width:640px"><code>the number  →  which club      (whatsapp_number.phone_number_id)\nthe age     →  which group     (group.age_min / age_max, across every class)\nthe choice  →  which lesson    (class name · day · time, on each row)</code></pre>' +
+      '<p class="col" style="margin-top:14px">A studio has several classes and each class has several groups — but the number of phone numbers never grows with them. One club with twenty groups is still one number. Ask about the class explicitly <strong>only</strong> when the age-filtered list overflows WhatsApp’s ten-row cap, which most clubs never hit.</p>';
+    h += '</section>';
+
+    // ══ PART 3 ══
+    h += '<section id="p3">' + partHead(3, 'Content, and the manager’s yes',
+      'The part that solves the real blocker. The owner does not post because they do not know what to post — not because writing takes too long. So this starts from something that actually happened and is already a row.');
+    h += implList(CONTENT_IMPL);
+    h += '</section>';
+
+    // ══ PART 4 ══
+    h += '<section id="p4">' + partHead(4, 'Publishing, the ad, and proving it worked',
+      'Approval finally does something. And then the harder question: did any of it bring a child through the door?');
+    h += implList(PUBLISH_IMPL);
+
+    h += '<div class="sec-head col"><p class="eyebrow">Self-validation, before it goes out</p>' +
+      '<h3 style="font-size:1.2rem">Five checks the system runs on its own output</h3>' +
+      '<p>None of these is a human remembering. Each is a gate in code, and each one has a failure it was written after.</p></div>';
+    h += kvTable(VALIDATE_BEFORE);
+
+    h += '<div class="sec-head col"><p class="eyebrow">Self-validation, afterwards</p>' +
+      '<h3 style="font-size:1.2rem">Four questions the database can already answer</h3>' +
+      '<p>This is the half that decides whether to keep doing it — and it needs no new tables.</p></div>';
+    h += kvTable(VALIDATE_AFTER);
+    h += '</section>';
+
+    // ══ PART 5 ══
+    h += '<section id="p5">' + partHead(5, 'The tools',
+      'Researched 15 September 2026. The market is crowded and most of it is a solved problem you should rent — but the two things that matter most for this club are the two nobody sells.');
+
+    h += '<div class="sec-head col"><p class="eyebrow">The whole pipeline</p>' +
+      '<h3 style="font-size:1.2rem">Eight stages, and you build four of them</h3>' +
+      '<p>Idea, style, shot, film, cut, caption, approve, post. The ones marked OURS are ours because no outside tool can see the club’s data or its consent ledger. The rest are crowded markets with free options at the bottom.</p></div>';
+    h += wideTable(PIPELINE, ['#', 'Stage', 'Whose', 'What that means']);
+
+    h += '<div class="note warn"><p class="eyebrow">The finding that matters most</p>' +
+      '<p><strong>The best-known caption tools render Hebrew backwards.</strong> Submagic — the category leader for captions, 123 languages, claiming 99% accuracy — has Hebrew rendering that 2026 reviews describe as effectively broken: reversed text, disconnected letters. Opus Clip transcribes Hebrew accurately and then draws the words in the wrong order; its users have an open request for RTL support.</p>' +
+      '<p>This is the trap the spec predicted and could not yet name: <strong>the problem is never accuracy, it is direction.</strong> Judge any caption tool by looking at the burned-in Hebrew <em>in a player</em> — never at the transcript, and never at the .srt in a text editor. An .srt that reads correctly in code is the single most likely way to ship broken Hebrew subtitles.</p></div>';
+    h += wideTable(HEBREW_TRAP, ['Tool', 'What it is good at', 'What it does to Hebrew']);
+
+    h += '<div class="sec-head col" style="margin-top:30px"><p class="eyebrow">The decision, per job</p>' +
+      '<h3 style="font-size:1.2rem">Build, rent, or avoid</h3></div>';
+    h += wideTable(BUILD_RENT, ['The job', 'Verdict', 'Why']);
+
+    h += '<div class="sec-head col" style="margin-top:30px"><p class="eyebrow">Asked directly</p>' +
+      '<h3 style="font-size:1.2rem">Higgsfield, and AI-generated video</h3></div>';
+    h += kvTable(HIGGSFIELD);
+    h += '</section>';
+
+    // ══ PART 6 ══
+    h += '<section id="p6">' + partHead(6, 'Posting on a schedule',
+      'Every N days, without ever letting an unattended machine speak in the club’s voice to its parents.');
+    h += implList(SCHEDULE_IMPL);
+
+    h += '<div class="sec-head col"><p class="eyebrow">How often, actually</p>' +
+      '<h3 style="font-size:1.2rem">The cadence, and the ceiling</h3>' +
+      '<p>The 2026 consensus is consistent and slightly disappointing to anyone hoping automation means volume: the gains come from moving off near-zero to a steady rhythm, and then stop.</p></div>';
+    h += wideTable(CADENCE, ['What', 'How often', 'Why that number']);
+    h += '</section>';
+
+    h += '<footer class="foot">Gladiator Judo Club · Growth §20 · the detailed companion to the growth system page and the implementation plan. ' +
+      'Meta’s menu labels move every few months; the permissions, the documents and the queues do not.</footer></div>';
+
+    document.getElementById('root').innerHTML = h;
+
+    document.getElementById('root').querySelectorAll('.tick').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var step = btn.getAttribute('data-step'), v = btn.getAttribute('data-var');
+        if (step) { state.done[step] = !state.done[step]; }
+        else if (v) { state.vars[v] = !state.vars[v]; }
+        render();
+        save();
+      });
+    });
+    if (!writable) { say('This view is read-only — ticks are disabled.'); }
+  }
+
+  function say(text, tone) {
+    var el = document.getElementById('status');
+    if (!el) return;
+    el.textContent = text || '';
+    el.setAttribute('data-tone', tone || '');
+  }
+
+  // ---- publishing: rebuild the whole document with the new state block ----
+  function buildDocument() {
+    var css = document.getElementById('app-css').textContent;
+    var js = document.getElementById('app-js').textContent;
+    return '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+      '<title>Gladiator Growth Build</title>' + FONTS +
+      '<style id="app-css">' + css + '</style></head><body>' +
+      '<div id="root"></div>' +
+      '<script id="state" type="application/json">' + JSON.stringify(state) + '<\/script>' +
+      '<script id="app-js">' + js + '<\/script></body></html>';
+  }
+
+  function save() {
+    if (!artifact || !writable) return;
+    say('Saving…');
+    clearTimeout(pending);
+    pending = setTimeout(function () {
+      if (saving) { save(); return; }
+      saving = true;
+      artifact.publish(buildDocument()).then(function () {
+        saving = false; say('Saved.');
+      }).catch(function (err) {
+        saving = false;
+        var code = err && err.code;
+        if (code === 'conflict') { return; }
+        if (code === 'not_writer' || code === 'not_granted' || code === 'not_declared' || code === 'capability_disabled') {
+          writable = false; render(); return;
+        }
+        if (code === 'rate_limited') { say('Too many changes at once — waiting a moment.', 'err'); return; }
+        say('Not saved. Tick it again, or note it elsewhere.', 'err');
+      });
+    }, 700);
+  }
+
+  render();
+
+  if (window.claude && typeof window.claude.use === 'function') {
+    window.claude.use('artifact').then(function (ns) {
+      if (ns) { artifact = ns; }
+    }).catch(function () { /* design for absence */ });
+  }
+})();
+</script>
