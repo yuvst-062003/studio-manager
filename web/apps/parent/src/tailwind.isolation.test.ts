@@ -190,3 +190,46 @@ const PORTED_ELEMENTS = new Set([
   'h4',
   'table',
 ])
+
+// ---------------------------------------------------------------------------------
+// THE THIRD DIRECTION, found on the landing page (2026-09-16).
+//
+// Excluding `.tw-scope` from a bare-element rule is the right idea, but `:not()` takes
+// the specificity of its ARGUMENT: `a:not(.tw-scope a)` is (0,1,2), no longer the (0,0,1)
+// the audit wrote — so it started beating every single-class rule in the system that
+// colours a link, outside the scope as well as in. `.gl-btn--navy` lost, and the landing
+// page's "join now" was navy text on a navy block; `.gl-btn--red` lost, and in dark mode
+// the trial button was pale blue on salmon. Neither test nor diff showed it: the rule's
+// text changed by one word and no screenshot re-ran.
+//
+// `:where()` is the exclusion that costs nothing — its whole argument counts for zero —
+// so `a:where(:not(.tw-scope a))` is still (0,0,1), still excluded, and once again below
+// every class rule the design system wrote against a bare `a`.
+describe('§9, the third direction — an exclusion adds no specificity', () => {
+  /** Top-level selectors in primitives.css that carry the scope exclusion. */
+  const excluded = [...primitives.matchAll(/(^|\n)([^{}@\n][^{}]*)\{/g)]
+    .flatMap((match) => match[2]!.split(','))
+    .map((selector) => selector.trim())
+    .filter((selector) => selector.includes('.tw-scope'))
+
+  it('at least one rule is excluded — otherwise this block guards nothing', () => {
+    expect(excluded.length).toBeGreaterThan(0)
+  })
+
+  it.each(excluded)('`%s` is a bare element selector once every :where() is removed', (selector) => {
+    // Strip each `:where(...)` group with its parentheses balanced — the argument nests
+    // `:not(...)` — then insist nothing that carries specificity is left: no class, id,
+    // attribute or pseudo-class.
+    let bare = selector
+    for (let start = bare.indexOf(':where('); start !== -1; start = bare.indexOf(':where(')) {
+      let depth = 0
+      let end = start + ':where'.length
+      for (; end < bare.length; end += 1) {
+        if (bare[end] === '(') depth += 1
+        if (bare[end] === ')' && (depth -= 1) === 0) break
+      }
+      bare = bare.slice(0, start) + bare.slice(end + 1)
+    }
+    expect(bare, `${selector} outranks a single-class rule`).not.toMatch(/[.#[:]/)
+  })
+})

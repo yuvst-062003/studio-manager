@@ -482,7 +482,7 @@ export function UpdatesFeed({
                           /* `no-underline` is not decoration: this is an `<a>` drawn as a
                              primary button, and the app's link styling is an unlayered rule
                              that outranks every Tailwind layer. It is written
-                             `a:not(.tw-scope a)`, so inside the shell `text-white` wins and
+                             `a:where(:not(.tw-scope a))`, so inside the shell `text-white` wins and
                              the colour needs no help — measured, after an inline
                              `color: #fff` here was found to change nothing. Outside the
                              scope it would, which is what a bare preview of this screen

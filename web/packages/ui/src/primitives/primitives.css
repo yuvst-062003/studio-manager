@@ -947,8 +947,16 @@ button.studio-row:focus-visible {
  * now has a test that fails if another appears.
  *
  * A no-op for staff and dashboard, which have no `.tw-scope`, and for every parent screen
- * that is still design-system styled. */
-a:not(.tw-scope a) {
+ * that is still design-system styled.
+ *
+ * The exclusion is wrapped in `:where()` because `:not()` takes the specificity of its
+ * argument. Written `a:not(.tw-scope a)` this rule was (0,1,2) — no longer the bare
+ * (0,0,1) the audit wrote — and it silently outranked every single-class rule that colours
+ * a link: the landing page's `.gl-btn--navy` became navy text on a navy block, `.gl-btn--red`
+ * became pale blue on salmon in dark mode (2026-09-16). `:where()` counts for zero, so the
+ * rule keeps its exclusion and returns to the bottom of the cascade, where `.studio-*` and
+ * `.gl-*` class rules beat it as they always did. tailwind.isolation.test.ts holds the guard. */
+a:where(:not(.tw-scope a)) {
   color: var(--accent);
 }
 
@@ -1899,7 +1907,7 @@ a.studio-stat-tile:focus-visible {
 }
 
 /* stylelint-disable-next-line no-descending-specificity --
- * The rule this is "out of order" with is `a:not(.tw-scope a)` at line ~950, and the two
+ * The rule this is "out of order" with is `a:where(:not(.tw-scope a))` at line ~950, and the two
  * set DIFFERENT properties — that one `color`, this one `text-decoration`. The lint is a
  * heuristic for a cascade conflict, and there is none to have: no declaration here can be
  * overridden by that one, in either order. The accessibility preference deliberately still

@@ -848,7 +848,16 @@
   text-align: center;
 }
 
+/* The footer keeps the navy in dark rather than taking the dark `--gl-primary` (#aac7ff,
+ * a pale blue band across the bottom of a dark page). Re-pointing the ground alone was the
+ * bug (2026-09-16): `.gl-footer` inks with `--gl-on-primary`, which in dark is #0e2a52 —
+ * the very navy this rule paints — so the brand, the offer and the copyright were navy on
+ * navy, and the links were readable only because an over-specific link rule happened to
+ * paint them. The ink is re-pointed WITH the ground, as the variable every footer rule
+ * reads, so the phone link, the nav and the hairline follow without their own overrides. */
 [data-theme='dark'] .landing-root .gl-footer {
+  --gl-on-primary: #d6e3ff;
+
   background: #0e2a52;
 }
 
@@ -1040,4 +1049,30 @@
 
 .gl-theme-toggle:hover {
   background: var(--gl-surface-low);
+}
+
+/* -- the emblem on the dark ground (owner's choice, 2026-09-16). The club's logo is a black
+ * ring with its lettering, on a transparent surround: on the light page the ring is the
+ * badge, on the dark page it is the same colour as the ground and the badge reads as a
+ * different logo — a flag and two fighters with no ring. A halo was offered and turned
+ * down; the owner wants the emblem to look the SAME in both modes, so in dark it sits on
+ * its own light disc — the light page's ground, carried onto the dark one. Padding is a
+ * fixed size per crop, never a percentage: percentage padding resolves against the
+ * CONTAINING block, and 3% of the header was wider than the 3rem logo it was meant to rim.
+ * `aspect-ratio: 1` + `contain` keeps the disc a true circle whatever the file's box.
+ * Last in the file because it overrides three base rules spread across it, and
+ * stylelint wants the more specific selector after every one of them. */
+[data-theme='dark'] .landing-root .gl-logo,
+[data-theme='dark'] .landing-root .gl-hero-visual img,
+[data-theme='dark'] .landing-root .gl-footer-logo {
+  aspect-ratio: 1;
+  background: #fcf9f8;
+  border-radius: 50%;
+  box-sizing: border-box;
+  object-fit: contain;
+  padding: 0.2rem;
+}
+
+[data-theme='dark'] .landing-root .gl-hero-visual img {
+  padding: 0.75rem;
 }
