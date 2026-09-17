@@ -34,6 +34,8 @@ import { DevBar } from '@studio/ui/dev-bar'
 import type { InstallPromptEvent } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { LaunchCover, LaunchScreen, launchReady } from './features/shell/LaunchScreen'
+import type { LaunchPhase } from './features/shell/LaunchScreen'
 import { ParentShell } from './features/shell/ParentShell'
 import type { ParentTab } from './features/shell/ParentTabBar'
 import { AccessGate } from './features/identity/AccessGate'
@@ -565,6 +567,10 @@ function AuthedApp() {
   // a network blip locking a family out of the cached PWA would punish exactly the
   // parent §6.5 worked hardest to keep.
   const [gatedChildren, setGatedChildren] = useState<readonly GatedStudent[] | null>(null)
+  // The launch cover (see `LaunchScreen`'s header): up, lifting, gone. The home reads it
+  // to time its entrance; `gone` is when the cover stops rendering — and it never renders
+  // again, whatever the session does later.
+  const [launch, setLaunch] = useState<LaunchPhase>('up')
   /** The family's children, by first name — read once beside the gate's own read and used
    *  by `UpdatesScreen` to say who a notification is about. Named for the payment-setup
    *  screen it used to feed until that was removed (2026-09-07). */
@@ -867,6 +873,18 @@ function AuthedApp() {
   // install wall between the tap and the form is where a migration cohort evaporates.
   return (
     <ThemeProvider>
+      <LaunchCover.Provider value={launch}>
+      {/* The launch cover, over everything below until the first real screen is under it.
+          Rendered FIRST so it is in the tree from the same render as the rest, and never
+          again once gone. */}
+      {launch === 'gone' ? null : (
+        <LaunchScreen
+          locale={locale}
+          ready={launchReady(session, gatedChildren, invitedStudent, consentStatus)}
+          onUncover={() => setLaunch('lifting')}
+          onGone={() => setLaunch('gone')}
+        />
+      )}
       {/* נגישות, SIGNED OUT ONLY (owner review, 2026-09-06). The floating button is right on
           a public page and wrong behind the tab bar: at phone widths it came to rest ON TOP
           of the בית tab, so Home could not be pressed from the bar at all — `.studio-a11y__fab`
@@ -1207,6 +1225,7 @@ function AuthedApp() {
         </ParentShell>
         </AccessGate>
       ) : null}
+      </LaunchCover.Provider>
     </ThemeProvider>
   )
 }

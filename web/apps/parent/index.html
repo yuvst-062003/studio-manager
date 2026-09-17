@@ -36,8 +36,49 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="הורים" />
     <title>Gladiator</title>
+    <!-- The launch pre-paint. iOS holds the navy launch image until the browser's first
+         paint, and the first paint is this document — which used to be the cream ground
+         with nothing on it, for the ~100ms until React mounted. This draws the same navy
+         and the same mark as `LaunchScreen` (which removes it in a layout effect, the same
+         frame it first paints its own), so nothing is seen to change hands. The ground is
+         the literal `generate-splash.mjs` paints the image with, not the brand token, for
+         the reason given there: the token flips in dark mode and the image does not. -->
+    <style>
+      #launch {
+        position: fixed;
+        inset: 0;
+        z-index: 2000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.5rem;
+        background: #001849;
+        color: #fff;
+        direction: ltr;
+        font-size: clamp(1.75rem, 9vw, 2.75rem);
+      }
+      #launch > div {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.35em;
+      }
+      #launch b {
+        font: 800 1em / 1 Archivo, 'Rubik Variable', sans-serif;
+        letter-spacing: 0.18em;
+        margin-inline-end: -0.18em;
+      }
+      #launch small {
+        font: 600 0.42em / 1 Archivo, 'Rubik Variable', sans-serif;
+        letter-spacing: 0.32em;
+        margin-inline-end: -0.32em;
+        opacity: 0.7;
+      }
+    </style>
   </head>
   <body>
+    <div id="launch" aria-hidden="true"><div><b>GLADIATOR</b><small>CLUB</small></div></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

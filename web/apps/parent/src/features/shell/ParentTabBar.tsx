@@ -73,6 +73,7 @@ import type { Locale } from '@studio/i18n'
 // grade. It takes the same props a lucide glyph takes, so it styles from the same
 // className below; `features/techniques/icon.tsx` says why it lives with its feature.
 import { TechniqueIcon } from '../techniques/icon'
+import { useLaunchEntrance } from './LaunchScreen'
 
 export type ParentTab = 'home' | 'shop' | 'updates' | 'techniques' | 'profile'
 
@@ -148,6 +149,9 @@ export function ParentTabBar({
   // already allowed. The capsule is not rendered at all then, rather than parked under
   // the first tab claiming a page nobody is on.
   const activeIndex = active === null ? -1 : ORDER.indexOf(active)
+  // The launch entrance: the bar rises from under the screen edge as the cover lifts, last
+  // of the home's blocks. Arrived from the start anywhere but the launch.
+  const entered = useLaunchEntrance()
 
   return (
     // THE HOME INDICATOR'S CLEARANCE.
@@ -171,6 +175,13 @@ export function ParentTabBar({
     <nav
       aria-label={t(locale, 'common.tabs.parentBarLabel')}
       data-testid="tab-bar"
+      data-entered={entered ? 'true' : 'false'}
+      style={{
+        transform: entered ? undefined : 'translateY(calc(100% + 1.5rem))',
+        // Restates `transition-colors` — an inline transition replaces the class's, not adds.
+        transition:
+          'transform 480ms var(--ease-standard) 240ms, color 150ms, background-color 150ms, border-color 150ms',
+      }}
       // FLOATING, AND THE CLEARANCE THAT MAKES IT SAFE.
       //
       // `bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))]` — the 12px gap is what

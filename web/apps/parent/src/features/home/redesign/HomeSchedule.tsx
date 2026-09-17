@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { fill, weekdayInitials } from '@studio/core'
 import { t } from '@studio/i18n'
+import { riseStyle } from '../../shell/LaunchScreen'
 import { resolveLoadFailedText } from '../../shell/loadFailed'
 import type { Locale } from '@studio/i18n'
 import type { HomeSession, StripDay } from './types'
@@ -42,6 +43,7 @@ export function HomeSchedule({
   onReportAbsenceRange,
   timeLabel,
   durationMinutes,
+  entered = true,
 }: {
   days: readonly StripDay[]
   locale: Locale
@@ -63,6 +65,9 @@ export function HomeSchedule({
   timeLabel: (session: HomeSession) => string
   /** e.g. 75. `null` when the session has no end time. */
   durationMinutes: (session: HomeSession) => number | null
+  /** The launch entrance (see `LaunchScreen`): the strip and the list rise once the cover
+   *  lifts. Defaults to arrived, so every other caller renders as it always has. */
+  entered?: boolean
 }) {
   // `Intl`'s own initials, Sunday first — the order is `group_schedule_rule.weekday`'s and
   // deliberately not the locale's first-day-of-week, which is Monday for ru and would
@@ -80,6 +85,8 @@ export function HomeSchedule({
       {/* Weekly Calendar Strip Container */}
       <div
         data-testid="home-week-strip"
+        data-entered={entered ? 'true' : 'false'}
+        style={riseStyle(entered, 90)}
         className="bg-white dark:bg-slate-900 rounded-3xl p-2.5 shadow-xs border border-slate-100 dark:border-slate-800 flex items-center justify-between gap-1"
       >
         {/* Monthly Trigger Button */}
@@ -179,7 +186,12 @@ export function HomeSchedule({
       </div>
 
       {/* BEGIN: Main Content */}
-      <main className="px-4 flex-1">
+      <main
+        className="px-4 flex-1"
+        data-testid="home-block"
+        data-entered={entered ? 'true' : 'false'}
+        style={riseStyle(entered, 180)}
+      >
         {/* Date Headline & Schedule Count */}
         <div className="flex items-center justify-between mb-3 px-1 mt-1">
           <div className="text-start">
@@ -418,7 +430,12 @@ export function HomeSchedule({
           added to it (2026-09-06). So this button sat ~20px BEHIND the bar and read as
           missing. The clearance now grows with the bar instead of being a number that was
           true on the day it was written. */}
-      <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] end-4 z-30">
+      <div
+        className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] end-4 z-30"
+        // Rises with the tab bar. The transform sits on the fixed element itself, not on an
+        // ancestor, so it does not re-parent the positioning.
+        style={riseStyle(entered, 240)}
+      >
         <button
           type="button"
           onClick={onReportAbsenceRange}
