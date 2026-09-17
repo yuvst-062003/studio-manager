@@ -364,18 +364,16 @@ export function RosterScreen({
       />
 
       {/* The prototype's quick-action strip. Only its "mark all" half is drawn — see this
-          file's own header note on why "reset" has nothing behind it. */}
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5">
-        {/* `9f` finding 1 — "if the action skips pre-reported marks, **the button's own copy
-            should say so**." Unconditional, and not only when a parent has reported: a coach
-            decides whether to tap this before knowing whether anybody reported, and a
-            reassurance that appears only sometimes is one nobody learns to rely on. The
-            dashboard's `1e` copy says the same thing beside the same button. */}
-        <p className="text-xs font-medium text-[var(--text-muted)]" data-testid="roster-bulk-hint">
-          {t(locale, 'attendance.roster.markAllPresentHint')}
-        </p>
+          file's own header note on why "reset" has nothing behind it.
+
+          No note beside the button (owner, 2026-09-17). `9f` finding 1 had put "will not
+          overwrite a parent report" here, unconditionally; the owner took it off — the
+          roster is read on the mat, and the strip is the button. The rule itself stands
+          (`bulkPresent` still skips pre-reported marks) and the dashboard's quick view
+          still says so beside its own copy of the button. */}
+      <div className="flex items-center rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-2">
         <button
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-3.5 py-2 text-xs font-bold text-[var(--paid)] shadow-2xs transition-all active:scale-95 hover:bg-[var(--paid-tint)]"
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-3.5 py-2.5 text-sm font-bold text-[var(--paid)] shadow-2xs transition-all active:scale-[0.98] hover:bg-[var(--paid-tint)]"
           onClick={() => {
             void bulkPresent()
           }}

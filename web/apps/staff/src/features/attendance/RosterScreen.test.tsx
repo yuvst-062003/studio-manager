@@ -260,14 +260,13 @@ describe('§5.7 — the bulk rule, and the artboard that gets it wrong', () => {
     })
   })
 
-  it('says on the button itself that it will not overwrite a parent report', async () => {
-    // `9f` finding 1 — "the button's own copy should say so", unconditionally. A coach
-    // decides whether to tap before knowing whether anybody reported, and a reassurance
-    // that appears only sometimes is one nobody learns to rely on.
+  it('carries no note beside the mark-all button', async () => {
+    // `9f` finding 1 put "will not overwrite a parent report" beside the button; the owner
+    // took it off on 2026-09-17 — the roster is read on the mat, and the strip is the
+    // button. The behaviour the note described is unchanged and asserted above.
     renderScreen()
-    expect(await screen.findByTestId('roster-bulk-hint')).toHaveTextContent(
-      'לא ידרוס דיווחי הורים או סימונים קיימים',
-    )
+    await screen.findByTestId('roster-list')
+    expect(screen.queryByTestId('roster-bulk-hint')).toBeNull()
   })
 
   it('shows the advance-notice hint when a parent has reported', async () => {
