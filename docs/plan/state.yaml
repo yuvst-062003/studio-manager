@@ -1522,6 +1522,45 @@ waves:
           Until then the paid row is in exactly the state D6 specified as the default: the
           typed receipt number as plain text, and no control beside it.
 holdbacks:
+  - id: HB-students-import
+    kind: carried
+    title: The file import was a CSV afterthought — rebuilt as the club-migration door
+    why: >-
+      The 2026-08-30 import lived at the foot of הוספת חניכים: seven English CSV headers,
+      one sample row, a native file input, and a table that said "נכשל" with no reason. It
+      could not read what a Hebrew Excel saves (Windows-1255, 12/04/2018), created leads only
+      — a hundred imported trainees all "טרם שויך", each to be converted by hand — and knew
+      nothing of adults, duplicates, or the family a row belongs to. For a club arriving with
+      its roster in a spreadsheet, that is the one door that has to work.
+
+      CLOSED 2026-09-18, designed with the owner on a Claude Design canvas round by round
+      (Stitch timed out; the canvas is at claude.ai/code/artifact/2602474e-…). Decisions
+      taken there: trainee first, names split; only first name and email required; a blank
+      parent means an adult with their own account; the column is הסדר תשלום מראש, not
+      "שולם ב"; entry from the students screen header beside הוספת חניך, never a panel at
+      the foot of the add screen; two steps, not three — review and import are one screen,
+      the button runs the import in place and each row shows its outcome; no invitation
+      links to copy — the server emails each family on create as it always has, and the
+      screen says per family whether it went; the template is ONE sheet, headers only, with
+      Excel's own strict list validation on קבוצה/חגורה/מסלול/הסדר תשלום fed from hidden
+      columns of the club's real names, a date rule on the birthdate, and an input tooltip
+      on every column — no example rows in the file, because a forgotten one imports a fake
+      family. web/apps/dashboard/src/features/people/import/: columns (the contract), parse
+      (.xlsx via ExcelJS loaded on demand, .csv with UTF-8/cp1255 detection, day-first
+      dates, Excel serials, hyperlinked emails, the leading zero Excel strips from a phone),
+      review (pure rules: name→id matching forgiving the Hebrew apostrophe, twelve problem
+      kinds, duplicate = same name and birthdate or no birthdate to tell apart, override
+      allowed), template, run (the by-hand screen's own three calls, sequential so siblings
+      land on one parent; started_on is always today because a past date raises back
+      charges), and the screen. 47 tests on the seam. ExcelJS is the dashboard's one new
+      dependency; SheetJS cannot write validations in its free edition.
+    blocks: §5.4(a) at volume — the Gladiator migration (HB-parents)
+    status: closed
+    opened: 2026-09-18
+    closed: 2026-09-18
+    source: >-
+      web/apps/dashboard/src/features/people/import/ · owner review 2026-09-18 ·
+      supersedes the CSV panel of f1089d88 (2026-08-30)
   - id: HB-upay-receipt-link
     kind: carried
     title: D6's receipt button needs one real uPay transaction to settle it

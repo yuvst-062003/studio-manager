@@ -39,7 +39,6 @@ import type { IconName } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { CopyButton } from './SharingCards'
-import { ImportStudentsPanel } from './ImportStudentsPanel'
 import type { DashboardPeopleClient, GroupOption } from './peopleClient'
 
 /** The three arrangements a human settles, and the only ones offerable here.
@@ -1044,10 +1043,6 @@ export function AddStudentScreen({
       </section>
 
       {sheetView()}
-
-      {/* Owner request 2026-08-30 — 'can import a file'. The same screen, because it is the
-          same question ("get these families in") answered at a different volume. */}
-      <ImportStudentsPanel locale={locale} client={client} onImported={onCreated} />
     </>
   )
 }

@@ -41,6 +41,10 @@ export type StudentFilters = {
   class_id?: string
   health_status?: string
   after?: string
+  /** Page size, as the query string carries it. The import walks the whole roster to
+   *  check for duplicates and asks for the server's maximum rather than eight small
+   *  pages. */
+  limit?: string
 }
 
 export function makeDashboardPeopleClient(fetcher: Fetcher) {
@@ -156,9 +160,9 @@ export function makeDashboardPeopleClient(fetcher: Fetcher) {
       guardian: {
         //: Optional (decision 20, 2026-09-03 onboarding doors spec) — the dashboard's
         //: 3-field add-student form sends a guardian email with no name at all;
-        //: `GuardianCreate` (`app/schemas/people.py`) accepts that. Every existing
-        //: caller (`ImportStudentsPanel`) still sends both, so this widening is
-        //: backward compatible.
+        //: `GuardianCreate` (`app/schemas/people.py`) accepts that. The file import
+        //: (`import/run.ts`) sends whichever names the file carried, so this widening
+        //: is what lets a blank parent-name cell through.
         first_name?: string
         last_name?: string
         email?: string | null

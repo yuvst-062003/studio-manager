@@ -1,5 +1,6 @@
 export { StudentsScreen, chipToneFor, documentLabelKey } from './StudentsScreen'
 export { AddStudentScreen } from './AddStudentScreen'
+export { ImportStudentsScreen } from './import/ImportStudentsScreen'
 export { StudentDetailScreen } from './StudentDetailScreen'
 export { AlertCentre, AlertSections } from './AlertCentre'
 export type { AlertSectionProps } from './AlertCentre'

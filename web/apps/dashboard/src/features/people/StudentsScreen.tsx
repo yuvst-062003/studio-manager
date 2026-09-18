@@ -291,14 +291,27 @@ export function StudentsScreen({
           // 3c's entry point. The add-student screen shipped reachable only by TYPING
           // #/students/new — a screen with no inbound link is a screen that does not
           // exist to the person the audit calls "a human at 2am".
-          <a
-            className="studio-btn"
-            data-variant="primary"
-            href="#/students/new"
-            data-testid="students-add"
-          >
-            {t(locale, 'people.student.add')}
-          </a>
+          //
+          // Two doors, side by side (owner, 2026-09-18): one family by hand, or the whole
+          // club from a file. The import used to hide at the foot of the add screen.
+          <>
+            <a
+              className="studio-btn"
+              data-variant="ghost"
+              href="#/students/import"
+              data-testid="students-import"
+            >
+              {t(locale, 'people.import.entry')}
+            </a>
+            <a
+              className="studio-btn"
+              data-variant="primary"
+              href="#/students/new"
+              data-testid="students-add"
+            >
+              {t(locale, 'people.student.add')}
+            </a>
+          </>
         }
         subtitle={
           // Gated on the same `baselineCount` latch as the filter row's result count,
