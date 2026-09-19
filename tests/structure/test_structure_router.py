@@ -7,6 +7,8 @@ which is a privilege-escalation path no amount of tenancy filtering closes.
 
 from __future__ import annotations
 
+from app.models.structure import Group
+
 
 # -- 3.2's matrix -------------------------------------------------------------
 def test_a_manager_creates_a_class(client, as_manager):
@@ -105,6 +107,20 @@ def test_an_inverted_age_range_is_refused(client, as_manager, a_class):
         headers=as_manager.headers,
     )
     assert response.status_code == 422
+
+
+def test_a_group_says_what_kind_it_is(client, as_manager, app_session, studio, a_class, a_group):
+    """The dashboard's file import offers ONE base group per trainee and nothing else
+    (owner, 2026-09-18) -- so the list has to say which groups are base. `kind` was on the
+    model since the training plans and never on the wire; a client cannot filter on a
+    field it is not sent."""
+    extra = Group(studio_id=studio.id, class_id=a_class, name="נבחרת", kind="extra")
+    app_session.add(extra)
+    app_session.commit()
+    rows = client.get("/api/v1/groups", headers=as_manager.headers).json()["items"]
+    kinds = {row["name"]: row["kind"] for row in rows}
+    assert kinds["מתחילים"] == "base"
+    assert kinds["נבחרת"] == "extra"
 
 
 # -- coach assignment ---------------------------------------------------------

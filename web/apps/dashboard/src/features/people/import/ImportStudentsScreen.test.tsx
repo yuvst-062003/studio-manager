@@ -24,9 +24,13 @@ function fakeClient(over: Partial<DashboardPeopleClient> = {}) {
   const client = {
     groups: vi.fn(async () => ({
       items: [
-        { id: 'g-kids', name: 'ג׳ודו ילדים א׳', class_id: 'c-judo' },
-        { id: 'g-teens', name: 'ג׳ודו נוער', class_id: 'c-judo' },
-        { id: 'g-adults', name: 'בוגרים', class_id: 'c-judo' },
+        { id: 'g-kids', name: 'ג׳ודו ילדים א׳', class_id: 'c-judo', kind: 'base', is_active: true },
+        { id: 'g-teens', name: 'ג׳ודו נוער', class_id: 'c-judo', kind: 'base', is_active: true },
+        { id: 'g-adults', name: 'בוגרים', class_id: 'c-judo', kind: 'base', is_active: true },
+        // Not offered: an extra, a private lesson, a retired base group.
+        { id: 'g-team', name: 'נבחרת', class_id: 'c-judo', kind: 'extra', is_active: true },
+        { id: 'g-private', name: 'אימון אישי', class_id: 'c-judo', kind: 'private', is_active: true },
+        { id: 'g-old', name: 'קבוצה ישנה', class_id: 'c-judo', kind: 'base', is_active: false },
       ],
     })),
     pricePlans: vi.fn(async () => ({
@@ -110,6 +114,13 @@ describe('ImportStudentsScreen — step 2', () => {
     expect(within(danaRow).getByTestId(/^import-group-/)).toHaveValue('g-kids')
     expect(within(danaRow).getByTestId(/^import-belt-/)).toHaveValue('b-yellow')
     expect(within(danaRow).getByTestId(/^import-payment-/)).toHaveValue('standing_order')
+    // Only active BASE groups are offered — the extra, the private lesson and the retired
+    // group are not in the dropdown (owner, 2026-09-18).
+    const options = within(danaRow).getAllByRole('option').map((option) => option.textContent)
+    expect(options).toEqual(expect.arrayContaining(['ג׳ודו ילדים א׳', 'ג׳ודו נוער', 'בוגרים']))
+    expect(options).not.toContain('נבחרת')
+    expect(options).not.toContain('אימון אישי')
+    expect(options).not.toContain('קבוצה ישנה')
     // ...and an unmatched one is a named problem, with the fix on the cell.
     const mizrahi = screen.getByTestId('import-family-avi.m@example.com')
     expect(mizrahi).toHaveTextContent(t('he', 'people.import.problem.unknown_group'))

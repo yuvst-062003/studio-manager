@@ -1821,7 +1821,7 @@ export interface paths {
          *     process alive", and a database it cannot reach does not make it dead. Letting the
          *     failure propagate would turn every database blip into a page.
          */
-        get: operations["read_health_api_v1_health_get"];
+        get: operations["read_health_api_v1_health_head"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1834,7 +1834,7 @@ export interface paths {
          *     process alive", and a database it cannot reach does not make it dead. Letting the
          *     failure propagate would turn every database blip into a page.
          */
-        head: operations["read_health_api_v1_health_get"];
+        head: operations["read_health_api_v1_health_head"];
         patch?: never;
         trace?: never;
     };
@@ -7495,6 +7495,8 @@ export interface components {
         ClubTermsIn: {
             /** Accepted */
             accepted: boolean;
+            /** Photo Video */
+            photo_video?: boolean | null;
             /** Version */
             version: number;
         };
@@ -7632,6 +7634,8 @@ export interface components {
          *     text lands. The banner is data.
          */
         ConsentStateOut: {
+            /** Club Terms Version */
+            club_terms_version: number;
             /** Outstanding */
             outstanding: string[];
             /** Policy Is Draft */
@@ -8702,6 +8706,8 @@ export interface components {
             id: string;
             /** Is Active */
             is_active: boolean;
+            /** Kind */
+            kind: string;
             /** Name */
             name: string;
         };
@@ -10250,6 +10256,8 @@ export interface components {
             other_parent?: components["schemas"]["OnboardingOtherParentIn"] | null;
             /** Phone */
             phone?: string | null;
+            /** Photo Video */
+            photo_video?: boolean | null;
             /** Pickup Contacts */
             pickup_contacts?: components["schemas"]["OnboardingPickupIn"][];
             signer?: components["schemas"]["OnboardingSignerIn"] | null;
@@ -17091,7 +17099,7 @@ export interface operations {
             };
         };
     };
-    read_health_api_v1_health_get: {
+    read_health_api_v1_health_head: {
         parameters: {
             query?: never;
             header?: never;
@@ -17111,7 +17119,7 @@ export interface operations {
             };
         };
     };
-    read_health_api_v1_health_get: {
+    read_health_api_v1_health_head: {
         parameters: {
             query?: never;
             header?: never;

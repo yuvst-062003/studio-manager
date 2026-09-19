@@ -266,7 +266,10 @@ function useLists(client: DashboardPeopleClient): Lists | null {
         client.groups().catch(() => ({ items: [] })),
         client.pricePlans().catch(() => ({ items: [] })),
       ])
-      const groups = groupsPage.items
+      // Base groups only (owner, 2026-09-18): the file assigns each trainee the ONE group
+      // a plan always includes. Extras and private lessons are chosen in the app later,
+      // and a retired group is not offered to anyone new.
+      const groups = groupsPage.items.filter((group) => group.is_active !== false && (group.kind ?? 'base') === 'base')
       const classIds = [...new Set(groups.map((group) => group.class_id).filter((id): id is string => Boolean(id)))]
       const ladders = await Promise.all(
         classIds.map((classId) => client.beltRanks(classId).then((page) => [classId, page.items] as const).catch(() => [classId, []] as const)),

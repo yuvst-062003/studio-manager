@@ -20,7 +20,15 @@ export type AttendanceMarkRow = components['schemas']['AttendanceOut']
 /** `class_id` is here because the BELT LADDER hangs off the class, not off the group
  *  (§5.9): the add-students screen can only offer a belt once a group has been chosen,
  *  and it is this field that tells it which ladder to load. */
-export type GroupOption = { id: string; name: string; class_id?: string | null }
+export type GroupOption = {
+  id: string
+  name: string
+  class_id?: string | null
+  /** `base` / `extra` / `private`. The file import offers base groups only — the one
+   *  group a trainee is assigned; extras are chosen in the app afterwards. */
+  kind?: string
+  is_active?: boolean
+}
 
 export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
 

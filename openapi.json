@@ -2608,6 +2608,17 @@
             "title": "Accepted",
             "type": "boolean"
           },
+          "photo_video": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Video"
+          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -2878,6 +2889,10 @@
       "ConsentStateOut": {
         "description": "What §6.1 step 5's gate reads, and what the privacy screen renders.\n\n`policy_is_draft` and `policy_version_label` are on the wire rather than hardcoded in\nthe client so the draft banner cannot be left behind on a screen after the reviewed\ntext lands. The banner is data.",
         "properties": {
+          "club_terms_version": {
+            "title": "Club Terms Version",
+            "type": "integer"
+          },
           "outstanding": {
             "items": {
               "type": "string"
@@ -2916,6 +2931,7 @@
           "policy_version",
           "policy_version_label",
           "policy_is_draft",
+          "club_terms_version",
           "required",
           "outstanding",
           "records"
@@ -5435,6 +5451,10 @@
             "title": "Is Active",
             "type": "boolean"
           },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -5447,7 +5467,8 @@
           "description",
           "age_min",
           "age_max",
-          "is_active"
+          "is_active",
+          "kind"
         ],
         "title": "GroupOut",
         "type": "object"
@@ -8887,6 +8908,17 @@
               }
             ],
             "title": "Phone"
+          },
+          "photo_video": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Video"
           },
           "pickup_contacts": {
             "items": {
@@ -22483,7 +22515,7 @@
     "/api/v1/health": {
       "get": {
         "description": "Liveness. Deliberately carries no tenant data and needs no auth.\n\n`revision` is best-effort and never affects `status`: this endpoint answers \"is this\nprocess alive\", and a database it cannot reach does not make it dead. Letting the\nfailure propagate would turn every database blip into a page.",
-        "operationId": "read_health_api_v1_health_get",
+        "operationId": "read_health_api_v1_health_head",
         "responses": {
           "200": {
             "content": {
@@ -22503,7 +22535,7 @@
       },
       "head": {
         "description": "Liveness. Deliberately carries no tenant data and needs no auth.\n\n`revision` is best-effort and never affects `status`: this endpoint answers \"is this\nprocess alive\", and a database it cannot reach does not make it dead. Letting the\nfailure propagate would turn every database blip into a page.",
-        "operationId": "read_health_api_v1_health_get",
+        "operationId": "read_health_api_v1_health_head",
         "responses": {
           "200": {
             "content": {

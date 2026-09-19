@@ -18,6 +18,7 @@ const SIGNED: ConsentState = {
   policy_version: 2,
   policy_version_label: '2',
   policy_is_draft: false,
+  club_terms_version: 1,
   required: ['terms', 'privacy'],
   outstanding: [],
   records: [],
