@@ -135,7 +135,10 @@ export async function runImport(
             group_id: draft.group_id,
             started_on: opts.today,
             price_plan_id: draft.plan_id || null,
-            payment_received: draft.payment || null,
+            // `none` is an ANSWER, not a method: the manager said the first month is not
+            // in hand yet, which reaches the server as no payment at all — the same request
+            // a blank used to make, now deliberate rather than defaulted.
+            payment_received: draft.payment === 'none' ? null : draft.payment || null,
           })
           if (!converted.ok) outcome.problem = 'convert'
         }

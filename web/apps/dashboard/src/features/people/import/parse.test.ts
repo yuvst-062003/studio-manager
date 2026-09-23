@@ -9,8 +9,8 @@ import { HEBREW_HEADERS } from './columns'
 describe('rowsFromGrid — the header row is the contract', () => {
   it('maps the Hebrew headers in any column order and ignores columns it does not know', () => {
     const parsed = rowsFromGrid([
-      ['הערות', 'אימייל', 'שם פרטי', 'קבוצה', 'מסלול'],
-      ['x', 'ruth@example.com', 'דנה', 'ג׳ודו ילדים א׳', 'מנוי חודשי'],
+      ['הערות', 'אימייל', 'שם פרטי', 'קבוצה', 'מסלול', 'הסדר תשלום מראש'],
+      ['x', 'ruth@example.com', 'דנה', 'ג׳ודו ילדים א׳', 'מנוי חודשי', 'עדיין לא'],
     ])
     expect(parsed.ok).toBe(true)
     if (!parsed.ok) return
@@ -26,8 +26,8 @@ describe('rowsFromGrid — the header row is the contract', () => {
 
   it('still reads the old English header NAMES — they are aliases, not a second contract', () => {
     const parsed = rowsFromGrid([
-      ['parent_first', 'parent_last', 'email', 'phone', 'child_first', 'child_last', 'birthdate', 'group', 'plan'],
-      ['רות', 'כהן', 'ruth@example.com', '050', 'דנה', 'כהן', '2018-04-12', 'ג׳ודו ילדים א׳', 'מנוי חודשי'],
+      ['parent_first', 'parent_last', 'email', 'phone', 'child_first', 'child_last', 'birthdate', 'group', 'plan', 'payment'],
+      ['רות', 'כהן', 'ruth@example.com', '050', 'דנה', 'כהן', '2018-04-12', 'ג׳ודו ילדים א׳', 'מנוי חודשי', 'עדיין לא'],
     ])
     expect(parsed.ok).toBe(true)
     if (!parsed.ok) return
@@ -63,7 +63,11 @@ describe('rowsFromGrid — the header row is the contract', () => {
 
   it('skips blank rows and refuses a file with only a header', () => {
     expect(
-      rowsFromGrid([['שם פרטי', 'אימייל', 'קבוצה', 'מסלול'], ['', '', '', ''], ['   ', '', '', '']]),
+      rowsFromGrid([
+        ['שם פרטי', 'אימייל', 'קבוצה', 'מסלול', 'הסדר תשלום מראש'],
+        ['', '', '', '', ''],
+        ['   ', '', '', '', ''],
+      ]),
     ).toEqual({
       ok: false,
       error: 'empty',
@@ -72,8 +76,8 @@ describe('rowsFromGrid — the header row is the contract', () => {
 
   it('refuses more than 500 rows rather than sending a thousand requests', () => {
     const grid = [
-      ['שם פרטי', 'אימייל', 'קבוצה', 'מסלול'],
-      ...Array.from({ length: 501 }, (_, i) => [`ילד${i}`, 'a@b.c', 'ג׳ודו ילדים א׳', 'מנוי חודשי']),
+      ['שם פרטי', 'אימייל', 'קבוצה', 'מסלול', 'הסדר תשלום מראש'],
+      ...Array.from({ length: 501 }, (_, i) => [`ילד${i}`, 'a@b.c', 'ג׳ודו ילדים א׳', 'מנוי חודשי', 'עדיין לא']),
     ]
     expect(rowsFromGrid(grid)).toEqual({ ok: false, error: 'too_many_rows' })
   })
@@ -102,7 +106,7 @@ describe('normalizeDate — whatever Excel hands over becomes an ISO day', () =>
 describe('CSV', () => {
   it('parses a UTF-8 file with a BOM and quoted commas', () => {
     const parsed = parseCsvText(
-      '\uFEFFשם פרטי,שם משפחה,אימייל,קבוצה,מסלול\n"כהן, דנה",כהן,r@x.com,נוער,מנוי חודשי\n',
+      '\uFEFFשם פרטי,שם משפחה,אימייל,קבוצה,מסלול,הסדר תשלום מראש\n"כהן, דנה",כהן,r@x.com,נוער,מנוי חודשי,עדיין לא\n',
     )
     expect(parsed.ok).toBe(true)
     if (parsed.ok) expect(parsed.rows[0]!.first_name).toBe('כהן, דנה')

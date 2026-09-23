@@ -3,7 +3,8 @@
 import { describe, expect, it } from 'vitest'
 import type { RawRow } from './columns'
 import type { Lists } from './review'
-import { beltIdInGroup, draftsFromRows, familiesOf, isAdult, problemsOf, readyDrafts } from './review'
+import { t } from '@studio/i18n'
+import { beltIdInGroup, draftsFromRows, familiesOf, isAdult, paymentFromText, problemsOf, readyDrafts } from './review'
 
 const LISTS: Lists = {
   groups: [
@@ -205,5 +206,21 @@ describe('beltIdInGroup — the belt survives a group change', () => {
     expect(beltIdInGroup(LISTS, 'g-kids', 'סגול')).toBe('')
     expect(beltIdInGroup(LISTS, '', 'צהוב')).toBe('')
     expect(beltIdInGroup(LISTS, 'g-kids', '')).toBe('')
+  })
+})
+
+describe('the template writes only words the reader can name back', () => {
+  it('round-trips every prepaid label, in every locale the template is offered in', () => {
+    // The downloaded file carries its list in the manager's own language and Excel refuses
+    // anything off it — so a label the parser cannot read is a cell he is FORCED to write
+    // and the import then rejects. Found on 2026-09-23: the column became required, the
+    // template started writing "עדיין לא שילמו", and `PAYMENT_WORDS` knew only "עדיין לא".
+    const PAYMENTS = ['none', 'cash', 'cheque', 'standing_order'] as const
+    for (const locale of ['he', 'en', 'ru'] as const) {
+      for (const payment of PAYMENTS) {
+        const written = t(locale, `people.import.payment.${payment}`)
+        expect(paymentFromText(written), `${locale}/${payment} → "${written}"`).toBe(payment)
+      }
+    }
   })
 })

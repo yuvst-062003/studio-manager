@@ -9,7 +9,12 @@
 import type { RawRow } from './columns'
 import { normalizeName } from './columns'
 
-export type Payment = '' | 'cash' | 'cheque' | 'standing_order'
+/** `''` is "the manager has not answered", NOT "they have not paid" — those were the same
+ *  value until 2026-09-23, when the column became required and the difference started to
+ *  matter. `none` is the answer "not yet", chosen deliberately; it reaches the server as no
+ *  `payment_received` at all, exactly as a blank used to. Without it, required would have
+ *  made the cell unanswerable for every family that genuinely owes the first month. */
+export type Payment = '' | 'none' | 'cash' | 'cheque' | 'standing_order'
 
 export type Draft = {
   /** Local only — the server's id does not exist until the button. */
@@ -61,6 +66,7 @@ export type Problem =
   | 'belt_without_group'
   | 'missing_plan'
   | 'unknown_plan'
+  | 'missing_payment'
   | 'bad_payment'
   | 'card_payment'
   | 'minor_without_parent'
@@ -82,18 +88,34 @@ const ADULT_AGE = 18
  *  and a word processor produce. `card` is recognised only to be refused: a card payment
  *  arrives through uPay and closes its own charge, so there is nothing to mark here. */
 const PAYMENT_WORDS: Record<string, Payment | 'card'> = {
+  //: **Every word the TEMPLATE writes has to appear here**, in all three locales. The file
+  //: the manager downloads carries its list in his own language and Excel refuses anything
+  //: else, so a label the reader cannot name back is a cell he is forced to write and the
+  //: import then rejects. `tests`'s round-trip case is what keeps the two in step.
+  'עדיין לא שילמו': 'none',
+  'עדיין לא': 'none',
+  'לא שילמו': 'none',
+  'לא': 'none',
+  'not paid yet': 'none',
+  'not yet': 'none',
+  'none': 'none',
+  'ещё не платили': 'none',
+  'еще не платили': 'none',
   'מזומן': 'cash',
   'cash': 'cash',
+  'наличные': 'cash',
   "צ'ק": 'cheque',
   "צ'קים": 'cheque',
   'צקים': 'cheque',
   'cheque': 'cheque',
   'check': 'cheque',
   'cheques': 'cheque',
+  'чеки': 'cheque',
   'הוראת קבע': 'standing_order',
   'הו"ק': 'standing_order',
   'standing_order': 'standing_order',
   'standing order': 'standing_order',
+  'постоянное поручение': 'standing_order',
   'אשראי': 'card',
   'כרטיס אשראי': 'card',
   'card': 'card',
@@ -231,8 +253,13 @@ export function problemsOf(draft: Draft, lists: Lists, today: string): Problem[]
   if (draft.plan_id === '' && draft.plan_name.trim() !== '') problems.push('unknown_plan')
   else if (draft.plan_id === '') problems.push('missing_plan')
 
-  if (draft.payment === '' && draft.payment_text.trim() !== '') {
-    problems.push(paymentFromText(draft.payment_text) === 'card' ? 'card_payment' : 'bad_payment')
+  // Required since 2026-09-23. The club knows, family by family, whether the first month is
+  // already in hand and by which route — it is the reason the office keeps the spreadsheet
+  // at all — and a blank cell was indistinguishable from "nobody looked". `none` is how the
+  // manager says "not yet", so the question is always answered rather than defaulted.
+  if (draft.payment === '') {
+    if (draft.payment_text.trim() === '') problems.push('missing_payment')
+    else problems.push(paymentFromText(draft.payment_text) === 'card' ? 'card_payment' : 'bad_payment')
   }
 
   if (isAdult(draft)) {

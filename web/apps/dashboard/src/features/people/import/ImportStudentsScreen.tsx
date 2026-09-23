@@ -53,7 +53,9 @@ type Props = {
 type FileError = ParseError | 'unsupported'
 
 const today = () => new Date().toISOString().slice(0, 10)
-const PAYMENTS: readonly Exclude<Payment, ''>[] = ['cash', 'cheque', 'standing_order']
+//: `none` first, because "not yet" is the commonest answer for a club mid-season and the
+//: manager should not have to hunt past three methods to say it.
+const PAYMENTS: readonly Exclude<Payment, ''>[] = ['none', 'cash', 'cheque', 'standing_order']
 
 /** A choice cell shows what the FILE said when nothing matched — and that display must not
  *  sit on the EMPTY value, or the empty choice becomes unreachable. A `<select>` fires no
@@ -1158,7 +1160,7 @@ function DraftRow({
           {draft.payment_text && !draft.payment ? (
             <option value={UNMATCHED}>{fill(t(locale, 'people.import.ph.wasWritten'), { text: draft.payment_text })}</option>
           ) : null}
-          <option value="">{t(locale, 'people.import.ph.notPaid')}</option>
+          <option value="">{t(locale, 'people.import.ph.choose')}</option>
           {PAYMENTS.map((payment) => (
             <option key={payment} value={payment}>{t(locale, `people.import.payment.${payment}`)}</option>
           ))}

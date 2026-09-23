@@ -1613,6 +1613,17 @@ holdbacks:
       absent, which retires the 2026-08-30 sample's seven-column shape: every row it produced
       would be flagged, so naming the missing columns once beats a hundred identical red rows.
       The English header names stay as aliases.
+
+      **הסדר תשלום מראש joined them**, which took one addition to be answerable at all: a
+      blank meant "not paid yet" AND "nobody looked", and required cannot be asked of a
+      column whose commonest honest answer is empty. `Payment` gained `none` — the manager's
+      deliberate "עדיין לא שילמו" — which reaches the server as no `payment_received`,
+      exactly as a blank used to. The template's own list carries it, first, and a
+      round-trip test now asserts that every word the template WRITES, in each of the three
+      locales, is one `PAYMENT_WORDS` can read back: the list is generated in the manager's
+      language and Excel refuses anything off it, so a label the reader cannot name is a
+      cell he is forced to write and the import then rejects. The Russian spellings were
+      missing for all four values, not only the new one.
     blocks: nothing — the Gladiator migration (HB-parents) can run without touching a parent
     status: closed
     opened: 2026-09-23

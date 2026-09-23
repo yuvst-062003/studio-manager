@@ -63,6 +63,7 @@ describe('buildTemplate', () => {
     expect(String(header.getCell(7).value)).not.toContain('*')
     expect(String(header.getCell(8).value)).toContain('*') // קבוצה
     expect(String(header.getCell(10).value)).toContain('*') // מסלול
+    expect(String(header.getCell(11).value)).toContain('*') // הסדר תשלום מראש
     expect(ws.getRow(2).getCell(1).value).toBeNull()
   })
 
@@ -114,8 +115,11 @@ describe('what a row cannot do without', () => {
     // are silent everywhere downstream.
     expect(mandatoryOf('group')).toBe('always')
     expect(mandatoryOf('plan')).toBe('always')
+    // And the prepaid arrangement, which is a QUESTION rather than a value: "not paid yet"
+    // is one of its answers, so required never leaves a family with nothing to choose.
+    expect(mandatoryOf('payment')).toBe('always')
     // Everything the review lets through empty.
-    for (const key of ['last_name', 'birthdate', 'parent_first', 'belt', 'payment'] as const) {
+    for (const key of ['last_name', 'birthdate', 'parent_first', 'belt'] as const) {
       expect(mandatoryOf(key)).toBe('optional')
     }
   })

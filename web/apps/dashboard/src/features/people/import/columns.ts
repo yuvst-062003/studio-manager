@@ -45,7 +45,7 @@ export const IMPORT_COLUMNS: readonly ImportColumn[] = [
   { key: 'group', he: 'קבוצה', aliases: ['group'], kind: 'list', required: true },
   { key: 'belt', he: 'חגורה', aliases: ['belt'], kind: 'list', required: false },
   { key: 'plan', he: 'מסלול', aliases: ['plan', 'price_plan', 'מסלול מחיר'], kind: 'list', required: true },
-  { key: 'payment', he: 'הסדר תשלום מראש', aliases: ['payment', 'paid_by', 'payment_received', 'הסדר תשלום'], kind: 'list', required: false },
+  { key: 'payment', he: 'הסדר תשלום מראש', aliases: ['payment', 'paid_by', 'payment_received', 'הסדר תשלום'], kind: 'list', required: true },
 ]
 
 export const HEBREW_HEADERS: readonly string[] = IMPORT_COLUMNS.map((column) => column.he)
@@ -71,7 +71,7 @@ export function mandatoryOf(key: ColumnKey): Mandatory {
   //: trainees with no enrollment, invisible on every roster and every register, and a
   //: hundred with no price, invisible to billing. Neither shows as an error anywhere —
   //: which is why the file has to refuse them rather than the manager having to notice.
-  if (key === 'first_name' || key === 'group' || key === 'plan') return 'always'
+  if (key === 'first_name' || key === 'group' || key === 'plan' || key === 'payment') return 'always'
   return key === 'email' || key === 'phone' ? 'contact' : 'optional'
 }
 

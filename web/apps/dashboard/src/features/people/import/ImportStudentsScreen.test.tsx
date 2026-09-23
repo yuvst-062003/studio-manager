@@ -12,9 +12,9 @@ const CSV = [
   'שם פרטי,שם משפחה,תאריך לידה,שם פרטי ההורה,שם משפחה ההורה,אימייל,טלפון,קבוצה,חגורה,מסלול,הסדר תשלום מראש',
   'דנה,כהן,12/04/2018,רות,כהן,ruth@example.com,050-1234567,ג׳ודו ילדים א׳,צהוב,מנוי חודשי,הוראת קבע',
   'יוסי,כהן,03/01/2020,רות,כהן,ruth@example.com,050-1234567,ג׳ודו ילדים א׳,לבן,מנוי חודשי,הוראת קבע',
-  'עומר,לוי,30/11/1999,,,omer@example.com,054-7654321,בוגרים,,מנוי חודשי,',
+  'עומר,לוי,30/11/1999,,,omer@example.com,054-7654321,בוגרים,,מנוי חודשי,עדיין לא',
   'נועם,מזרחי,22/06/2016,אבי,מזרחי,avi.m@example.com,,נוער ב׳,,מנוי חודשי,מזומן',
-  'אלון,ביטון,12/03/2017,שרה,ביטון,sara.b@example.com,,ג׳ודו ילדים א׳,,מנוי חודשי,',
+  'אלון,ביטון,12/03/2017,שרה,ביטון,sara.b@example.com,,ג׳ודו ילדים א׳,,מנוי חודשי,עדיין לא',
 ].join('\n')
 
 const json = (body: unknown, status = 200) =>
@@ -219,7 +219,7 @@ describe('a flagged cell can always be answered', () => {
     const cells = {
       first: 'דנה', last: 'כהן', birthdate: '12/04/2018', pfirst: 'רות', plast: 'כהן',
       email: 'ruth@example.com', phone: '050-1234567', group: 'ג׳ודו ילדים א׳',
-      belt: 'צהוב', plan: 'מנוי חודשי', payment: '', ...over,
+      belt: 'צהוב', plan: 'מנוי חודשי', payment: 'עדיין לא', ...over,
     }
     return [
       'שם פרטי,שם משפחה,תאריך לידה,שם פרטי ההורה,שם משפחה ההורה,אימייל,טלפון,קבוצה,חגורה,מסלול,הסדר תשלום מראש',
@@ -237,11 +237,24 @@ describe('a flagged cell can always be answered', () => {
     const select = screen.getByTestId(/^import-payment-/) as HTMLSelectElement
     expect(screen.getByTestId(/^import-state-/)).toHaveTextContent(t('he', 'people.import.problem.card_payment'))
 
+    // "not paid yet" is a REAL option now, distinct both from the unmatched display and
+    // from the blank the required rule refuses — so the row always has an answer to give.
     const values = [...select.options].map((o) => o.value)
-    expect(values).toContain('')
-    expect(select.value).not.toBe('')
+    expect(values).toContain('none')
+    expect(select.value).not.toBe('none')
 
-    await userEvent.selectOptions(select, '')
+    await userEvent.selectOptions(select, 'none')
+    expect(screen.getByTestId(/^import-state-/)).toHaveTextContent(t('he', 'people.import.state.ready'))
+  })
+
+  it('a blank prepaid arrangement is refused — the question has to be answered', async () => {
+    // Blank used to mean "not yet". It now means "nobody looked", which is a different
+    // thing and the reason the column became required (owner, 2026-09-23).
+    render(<ImportStudentsScreen locale="he" client={fakeClient()} />)
+    await uploadCsv(ONE({ payment: '' }))
+    expect(screen.getByTestId(/^import-state-/)).toHaveTextContent(t('he', 'people.import.problem.missing_payment'))
+
+    await userEvent.selectOptions(screen.getByTestId(/^import-payment-/), 'none')
     expect(screen.getByTestId(/^import-state-/)).toHaveTextContent(t('he', 'people.import.state.ready'))
   })
 
