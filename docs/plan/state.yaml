@@ -1522,6 +1522,133 @@ waves:
           Until then the paid row is in exactly the state D6 specified as the default: the
           typed receipt number as plain text, and no control beside it.
 holdbacks:
+  - id: HB-students-import
+    kind: carried
+    title: The file import was a CSV afterthought — rebuilt as the club-migration door
+    why: >-
+      The 2026-08-30 import lived at the foot of הוספת חניכים: seven English CSV headers,
+      one sample row, a native file input, and a table that said "נכשל" with no reason. It
+      could not read what a Hebrew Excel saves (Windows-1255, 12/04/2018), created leads only
+      — a hundred imported trainees all "טרם שויך", each to be converted by hand — and knew
+      nothing of adults, duplicates, or the family a row belongs to. For a club arriving with
+      its roster in a spreadsheet, that is the one door that has to work.
+
+      CLOSED 2026-09-18, designed with the owner on a Claude Design canvas round by round
+      (Stitch timed out; the canvas is at claude.ai/code/artifact/2602474e-…). Decisions
+      taken there: trainee first, names split; only first name and email required; a blank
+      parent means an adult with their own account; the column is הסדר תשלום מראש, not
+      "שולם ב"; entry from the students screen header beside הוספת חניך, never a panel at
+      the foot of the add screen; two steps, not three — review and import are one screen,
+      the button runs the import in place and each row shows its outcome; no invitation
+      links to copy — the server emails each family on create as it always has, and the
+      screen says per family whether it went; the template is ONE sheet, headers only, with
+      Excel's own strict list validation on קבוצה/חגורה/מסלול/הסדר תשלום fed from hidden
+      columns of the club's real names, a date rule on the birthdate, and an input tooltip
+      on every column — no example rows in the file, because a forgotten one imports a fake
+      family. web/apps/dashboard/src/features/people/import/: columns (the contract), parse
+      (.xlsx via ExcelJS loaded on demand, .csv with UTF-8/cp1255 detection, day-first
+      dates, Excel serials, hyperlinked emails, the leading zero Excel strips from a phone),
+      review (pure rules: name→id matching forgiving the Hebrew apostrophe, twelve problem
+      kinds, duplicate = same name and birthdate or no birthdate to tell apart, override
+      allowed), template, run (the by-hand screen's own three calls, sequential so siblings
+      land on one parent; started_on is always today because a past date raises back
+      charges), and the screen. 47 tests on the seam. ExcelJS is the dashboard's one new
+      dependency; SheetJS cannot write validations in its free edition.
+    blocks: §5.4(a) at volume — the Gladiator migration (HB-parents)
+    status: closed
+    opened: 2026-09-18
+    closed: 2026-09-18
+    source: >-
+      web/apps/dashboard/src/features/people/import/ · owner review 2026-09-18 ·
+      supersedes the CSV panel of f1089d88 (2026-08-30)
+  - id: HB-import-sends-nothing
+    kind: carried
+    title: The club is loaded in silence, and its parents are invited weeks later
+    why: >-
+      HB-students-import closed on the opposite decision — "the server emails each family on
+      create as it always has, and the screen says per family whether it went". The owner
+      reversed it on 2026-09-23: the manager fills the template from the office's own records
+      and wants the staff and dashboard apps loaded with the real club to test against, weeks
+      before the families are told the app exists. An import that mails a hundred invitations
+      that afternoon is the one outcome he asked could not happen.
+
+      `StudentCreate.send_invitation` (default true, so the by-hand form and §5.4a's trial
+      booking are untouched) gates the send in `POST /students` and nothing else: the token is
+      still minted and `invitation_url` still returned, so a family standing at the desk can
+      still be handed their link. Nothing else in the product reaches a guardian by email —
+      billing chasers, health reminders and at-risk alerts are all push, and a parent who never
+      signed in has no device token — so suppressing that one call suppresses everything.
+
+      Two further owner decisions of the same day. The email is no longer required per row:
+      the review asks for an email OR a phone, which is exactly what `GuardianCreate` and
+      `invitation`'s CHECK already required, and a club that has run on WhatsApp for years
+      reaches half its families by phone. And the families are invited later from the students
+      screen: `guardian_invite_state` on every row (signed_in / ready / no_email), a filter that
+      narrows in SQL because the list is cursor-paginated, and a bulk action that loops the
+      existing per-student resend so it paces itself under the mail provider rather than timing
+      out halfway through a hundred sends. One predicate — `invite_state` — decides both what
+      the list publishes and what the resend refuses, so the bulk action can never select a
+      family the send will then reject.
+
+      Four things were wrong on the screen and none of them were wrong in a test. They were
+      found the same day by filling a file with one of every defect, uploading it, and
+      looking: three screens still promised an email the import no longer sends; a flagged
+      choice cell could not be answered "none", because the unmatched display sat on the
+      empty value and a `<select>` fires no change when you pick what is already selected —
+      which made a card payment, whose own advice is "leave it empty", a dead end; choosing
+      a group re-asked for a belt the new ladder already had, and silently dropped one that
+      had matched; and a family reachable only by phone was offered a "send now" that
+      `reinvite_guardian` can only refuse. The column table also still said אימייל was
+      mandatory while the review asked for email OR phone, so `mandatoryOf` now names the
+      cell-level rule apart from `required`, which stays the header contract.
+
+      **קבוצה and מסלול became required the same day**, at the owner's word. Both were
+      optional because §5.4a lets a manager create a lead and price them later — true of the
+      phone enquiry the by-hand form was built for, and wrong for this door: a club arrives
+      with its roster in a spreadsheet and the office already knows the group and the plan, so
+      a blank there is a typo. Left optional they produced the two failures the import exists
+      to prevent, both of them silent — a hundred trainees with no enrollment, on no register,
+      and a hundred with no price, invisible to billing. The file now refuses the row rather
+      than the manager having to notice. It also refuses the whole FILE when either column is
+      absent, which retires the 2026-08-30 sample's seven-column shape: every row it produced
+      would be flagged, so naming the missing columns once beats a hundred identical red rows.
+      The English header names stay as aliases.
+
+      **הסדר תשלום מראש joined them**, which took one addition to be answerable at all: a
+      blank meant "not paid yet" AND "nobody looked", and required cannot be asked of a
+      column whose commonest honest answer is empty. `Payment` gained `none` — the manager's
+      deliberate "עדיין לא שילמו" — which reaches the server as no `payment_received`,
+      exactly as a blank used to. The template's own list carries it, first, and a
+      round-trip test now asserts that every word the template WRITES, in each of the three
+      locales, is one `PAYMENT_WORDS` can read back: the list is generated in the manager's
+      language and Excel refuses anything off it, so a label the reader cannot name is a
+      cell he is forced to write and the import then rejects. The Russian spellings were
+      missing for all four values, not only the new one.
+
+      **The by-hand door was then read beside the file**, and had drifted three ways. It
+      caught no duplicate at all — `duplicate_student` guards the PARENT's `add_child` and
+      the onboarding link, never the manager's create — so the same manager making the same
+      mistake was stopped at one door and not the other, and two records for one child is
+      something only the office can untangle. It asked for no phone, removed on 2026-09-12
+      because "there is no SMS integration and none is planned": true, and never the reason
+      the field matters, so a family reached by phone alone could be imported and not added
+      by hand. And it emailed its invitation on the spot, the one remaining way a parent
+      heard from the club mid-migration.
+
+      All three now match the file: a name already in the club warns with an "add anyway"
+      (a warning, not a refusal — this screen asks an AGE, so it cannot narrow on birthdate
+      the way the server does and a namesake will sometimes match), a phone stands in for
+      the address, and the invitation is held with a deliberate send per family. The GROUP
+      became required here too, at the owner's word; the plan and the prepaid arrangement
+      did NOT, because this door is §5.4a's phone enquiry, where the price genuinely has not
+      been agreed — the file requires them because the office already knows.
+    blocks: nothing — the Gladiator migration (HB-parents) can run without touching a parent
+    status: closed
+    opened: 2026-09-23
+    closed: 2026-09-23
+    source: >-
+      owner, 2026-09-23 · app/routers/students.py · app/services/people/students.py ·
+      web/apps/dashboard/src/features/people/import/ · StudentsScreen.tsx
   - id: HB-upay-receipt-link
     kind: carried
     title: D6's receipt button needs one real uPay transaction to settle it

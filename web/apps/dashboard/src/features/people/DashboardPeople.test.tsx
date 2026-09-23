@@ -185,6 +185,7 @@ function makeClient(over: Partial<DashboardPeopleClient> = {}): DashboardPeopleC
       ],
     })),
     awardBelt: vi.fn(async () => new Response(null, { status: 201 })),
+    resendInvitation: vi.fn(async () => new Response('{}', { status: 200 })),
     createStudent: vi.fn(() =>
       Promise.resolve(
         new Response(
@@ -681,18 +682,49 @@ describe('AddStudentScreen — the family roster (2026-09-13)', () => {
     const email = screen.getByTestId('trainee-email')
     await user.clear(email)
     await user.type(email, trainee.email)
-    if (trainee.group) await user.selectOptions(screen.getByTestId('trainee-group'), trainee.group)
+    // A group became required on 2026-09-23, so every trainee gets one unless the test is
+    // about what happens without it.
+    await user.selectOptions(screen.getByTestId('trainee-group'), trainee.group ?? 'g1')
     if (trainee.plan) await user.selectOptions(screen.getByTestId('trainee-plan'), trainee.plan)
     if (trainee.paid) await user.selectOptions(screen.getByTestId('trainee-paid'), trainee.paid)
     await user.click(screen.getByTestId('trainee-save'))
   }
 
-  it('asks for no phone at all — the app sends no SMS and never will', async () => {
+  it('asks for a phone again — not to send to, but to reach the family by', async () => {
+    // It was removed on 2026-09-12 because "there is no SMS integration and none is
+    // planned". True then and still true; it was never the reason the field matters. A
+    // phone is a CONTACT: `GuardianCreate` accepts a guardian carrying one and no address,
+    // `pending_guardian` matches siblings on it, and the file import takes a family reached
+    // by phone alone. Without it here, such a family could be imported and never added by
+    // hand (owner, 2026-09-23).
+    const user = userEvent.setup()
     render(<AddStudentScreen locale="he" client={makeClient()} />)
-    expect(screen.queryByLabelText(t('he', 'people.student.guardianPhone'))).toBeNull()
-    expect(screen.queryByTestId('add-student-guardian-phone')).toBeNull()
-    // And the WhatsApp affordance that only existed to use it.
+    await user.click(screen.getByTestId('add-trainee'))
+    expect(screen.getByTestId('trainee-phone')).toBeInTheDocument()
+    // The WhatsApp affordance stays gone — nothing here sends anywhere.
     expect(screen.queryByTestId('add-student-invite-whatsapp')).toBeNull()
+  })
+
+  it('takes a phone INSTEAD of an email, the same rule the server and the file follow', async () => {
+    const user = userEvent.setup()
+    const client = makeClient()
+    render(<AddStudentScreen locale="he" client={client} />)
+    await user.click(screen.getByTestId('add-trainee'))
+    await user.type(screen.getByTestId('trainee-name'), 'דנה כהן')
+    await user.type(screen.getByTestId('trainee-age'), '8')
+    await user.selectOptions(screen.getByTestId('trainee-group'), 'g1')
+    // No address at all: still refused, because a guardian needs one of the two.
+    expect(screen.getByTestId('trainee-save')).toBeDisabled()
+
+    await user.type(screen.getByTestId('trainee-phone'), '050-1234567')
+    expect(screen.getByTestId('trainee-save')).toBeEnabled()
+    await user.click(screen.getByTestId('trainee-save'))
+    await user.click(screen.getByTestId('add-students-continue'))
+    await user.click(screen.getByTestId('add-students-create'))
+
+    await waitFor(() => expect(client.createStudent).toHaveBeenCalled())
+    const body = vi.mocked(client.createStudent).mock.calls[0]![0]
+    expect(body.guardian).toMatchObject({ email: null, phone: '050-1234567', relation: 'parent' })
   })
 
   it('asks an AGE rather than a boolean, and the age relabels the email beside it', async () => {
@@ -794,10 +826,15 @@ describe('AddStudentScreen — the family roster (2026-09-13)', () => {
     expect(screen.getAllByTestId('add-student-invite-url')).toHaveLength(2)
   })
 
-  it('converts only the trainees given a group, and carries plan and payment with it', async () => {
+  it('converts every trainee, and carries plan and payment with the one that has them', async () => {
     // `POST /students` is sent WITHOUT the group on purpose: creating with one enrols them,
     // and `convert` would then refuse with `already enrolled` — but the conversion is what
     // sets the price and records the payment, so it has to be the call that names the group.
+    //
+    // EVERY trainee converts since 2026-09-23, because a group is required: the case this
+    // used to cover — a saved trainee with no group — can no longer be reached from the
+    // sheet. The plan and the prepaid arrangement stay optional, and the second trainee is
+    // what proves a conversion still happens without them.
     const user = userEvent.setup()
     const client = makeClient()
     render(<AddStudentScreen locale="he" client={client} />)
@@ -816,8 +853,13 @@ describe('AddStudentScreen — the family roster (2026-09-13)', () => {
 
     await screen.findByTestId('add-student-done')
     expect(vi.mocked(client.createStudent).mock.calls[0]![0]).not.toHaveProperty('group_id', 'g1')
-    // One conversion, for the one trainee who has a group.
-    expect(client.convert).toHaveBeenCalledTimes(1)
+    expect(client.convert).toHaveBeenCalledTimes(2)
+    // The second carries the group it was given and nothing else — unpriced is legal here.
+    expect(vi.mocked(client.convert).mock.calls[1]![1]).toMatchObject({
+      group_id: 'g1',
+      price_plan_id: null,
+      payment_received: null,
+    })
     expect(vi.mocked(client.convert).mock.calls[0]![1]).toMatchObject({
       group_id: 'g1',
       price_plan_id: 'plan-1',
@@ -908,6 +950,49 @@ describe('AddStudentScreen — the family roster (2026-09-13)', () => {
     await user.type(screen.getByTestId('trainee-age'), '8')
     // Saving is refused too — the sheet is where the address is asked for.
     expect(screen.getByTestId('trainee-save')).toBeDisabled()
+  })
+
+  it('warns when the club already has a trainee of that name, and lets the manager say otherwise', async () => {
+    // The file import has refused a duplicate since it was built; this screen never did,
+    // and neither does `POST /students` — `duplicate_student` guards the PARENT's own
+    // `add_child` and the onboarding link, not the manager's create. The same manager
+    // making the same mistake was caught at one door and not the other (2026-09-23).
+    //
+    // A WARNING rather than a refusal, because this screen asks an age and not a birthdate,
+    // so it cannot narrow the way the server does and a namesake will sometimes match.
+    const user = userEvent.setup()
+    render(<AddStudentScreen locale="he" client={makeClient()} />)
+    await user.click(screen.getByTestId('add-trainee'))
+    await user.type(screen.getByTestId('trainee-name'), 'דנה כהן') // the fixture's own student
+    await user.type(screen.getByTestId('trainee-age'), '8')
+    await user.type(screen.getByTestId('trainee-email'), 'dana@example.invalid')
+    await user.selectOptions(screen.getByTestId('trainee-group'), 'g1')
+
+    const warning = await screen.findByTestId('trainee-duplicate')
+    expect(warning).toHaveTextContent('דנה כהן')
+    // Saving is still possible — two children really can share a name.
+    await user.click(screen.getByTestId('trainee-duplicate-force'))
+    expect(screen.queryByTestId('trainee-duplicate')).toBeNull()
+    expect(screen.getByTestId('trainee-save')).toBeEnabled()
+  })
+
+  it('sends no invitation email, and offers a deliberate send per family', async () => {
+    // The same promise the file import makes: the club is loaded before its parents are
+    // told the app exists. The token is still minted, so the link is copyable and one
+    // family can be sent theirs on purpose.
+    const user = userEvent.setup()
+    const client = makeClient()
+    render(<AddStudentScreen locale="he" client={client} />)
+    await addTrainee(user, { name: 'נועם לוי', age: '9', email: 'noam@example.invalid' })
+    await user.click(screen.getByTestId('add-students-continue'))
+    await user.click(await screen.findByTestId('add-students-create'))
+    await screen.findByTestId('add-student-done')
+
+    for (const [body] of vi.mocked(client.createStudent).mock.calls) {
+      expect(body.send_invitation).toBe(false)
+    }
+    await user.click(screen.getByTestId('add-student-send-noam@example.invalid'))
+    await waitFor(() => expect(client.resendInvitation).toHaveBeenCalledTimes(1))
   })
 
   it('renders no price on the roster itself', () => {
@@ -1631,5 +1716,97 @@ describe('resending a family’s invitation', () => {
     await userEvent.click(await screen.findByTestId('detail-resend-invitation'))
 
     expect(await screen.findByTestId('detail-resend-failed')).toHaveTextContent('email address')
+  })
+})
+
+// The other half of an import that emailed nobody (owner, 2026-09-23): the club is loaded
+// in silence, and weeks later the office invites the families it chooses.
+describe('the bulk invite', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('asks the server for the families still waiting, rather than filtering the page on screen', async () => {
+    const students = vi.fn(async () => ({ items: [summary()], next_cursor: null, has_more: false }))
+    render(<StudentsScreen locale="he" client={makeClient({ students })} />)
+    await screen.findByTestId('students-table')
+
+    await userEvent.selectOptions(screen.getByTestId('students-invite-filter'), 'ready')
+
+    // The list is cursor-paginated, so the narrowing has to reach the server or the
+    // families on page two are invisible to "invite everyone still waiting".
+    await waitFor(() =>
+      expect(students).toHaveBeenLastCalledWith(expect.objectContaining({ invite_state: 'ready' })),
+    )
+  })
+
+  it('sends one invitation per selected family, through the per-student route', async () => {
+    // Declared with the url parameter it is read back through: a bare `async () =>` gives
+    // `mock.calls` an empty-tuple element type, and destructuring the url off it does not
+    // compile.
+    const fetchMock = vi.fn(async (url: string) =>
+      url.includes('/invitation/resend')
+        ? new Response('{}', { status: 200 })
+        : new Response(JSON.stringify({ items: [] }), { status: 200 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const client = makeClient({
+      students: vi.fn(async () => ({
+        items: [summary(), summary({ id: 'st2', first_name: 'יוסי' })],
+        next_cursor: null,
+        has_more: false,
+      })),
+    })
+    render(<StudentsScreen locale="he" client={client} />)
+    await screen.findByTestId('students-table')
+
+    await userEvent.click(await screen.findByTestId('select-st1'))
+    await userEvent.click(screen.getByTestId('select-st2'))
+    await userEvent.click(screen.getByTestId('bulk-invite'))
+    await userEvent.click(await screen.findByTestId('confirm-bulk-confirm'))
+
+    await waitFor(() => expect(screen.getByTestId('bulk-outcome')).toBeInTheDocument())
+    const invited = fetchMock.mock.calls
+      .map(([url]) => String(url))
+      .filter((url) => url.includes('/invitation/resend'))
+    expect(invited).toEqual([
+      '/api/v1/students/st1/invitation/resend',
+      '/api/v1/students/st2/invitation/resend',
+    ])
+    expect(screen.getByTestId('bulk-outcome')).toHaveTextContent(
+      t('he', 'people.bulk.applied').replace('{n}', '2'),
+    )
+  })
+
+  it('a family that cannot be invited is named on its row, not counted as a failure', async () => {
+    // 422 is `reinvite_guardian` refusing: they already signed in, or no guardian has an
+    // address. Both are ordinary states the list itself can show, so the row says which
+    // rather than reading as "something went wrong, try again".
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        String(url).includes('/st2/')
+          ? new Response('{}', { status: 422 })
+          : new Response(JSON.stringify({ items: [] }), { status: 200 }),
+      ),
+    )
+    const client = makeClient({
+      students: vi.fn(async () => ({
+        items: [summary(), summary({ id: 'st2', first_name: 'יוסי' })],
+        next_cursor: null,
+        has_more: false,
+      })),
+    })
+    render(<StudentsScreen locale="he" client={client} />)
+    await screen.findByTestId('students-table')
+
+    await userEvent.click(await screen.findByTestId('select-st1'))
+    await userEvent.click(screen.getByTestId('select-st2'))
+    await userEvent.click(screen.getByTestId('bulk-invite'))
+    await userEvent.click(await screen.findByTestId('confirm-bulk-confirm'))
+
+    const outcome = await screen.findByTestId('bulk-outcome')
+    expect(outcome).toHaveTextContent(t('he', 'people.bulk.applied').replace('{n}', '1'))
+    expect(screen.getByTestId('bulk-refused-st2')).toHaveTextContent(
+      t('he', 'people.bulk.refused.not_invitable'),
+    )
   })
 })

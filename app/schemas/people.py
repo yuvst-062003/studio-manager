@@ -146,6 +146,18 @@ class StudentCreate(BaseModel):
     #: `StudentCreate` for its `children[]` and supplies the parent once for the whole
     #: submission. `POST /students` rejects an absent guardian at the router.
     guardian: GuardianCreate | None = None
+    #: Whether the invitation email actually LEAVES. The token is minted either way -- this
+    #: is about the send, not the credential, so a family imported today still has a
+    #: copyable link the moment anybody wants one, and `invitation_url` comes back as
+    #: usual.
+    #:
+    #: Exists for the bulk import (2026-09-23). The club is loaded from the office's own
+    #: spreadsheet weeks before the parents are told the app exists, and a hundred
+    #: invitations landing the afternoon the manager imports his own data is the one thing
+    #: the owner said must not happen. Defaulting to True leaves every existing caller --
+    #: the by-hand form, and §5.4a's trial booking, which never sets it -- sending exactly
+    #: as before.
+    send_invitation: bool = True
 
 
 class StudentUpdate(BaseModel):
@@ -434,6 +446,14 @@ class StudentSummaryOut(BaseModel):
     #: open-ended freeze, which is a real state a manager sets deliberately.
     frozen_until: date | None = None
     guardian_display_names: list[str] = Field(default_factory=list)
+    #: `signed_in` / `ready` / `no_email` — whether this family can be sent an invitation,
+    #: and the column the bulk invite selects on (2026-09-23). Decided by
+    #: `app.services.people.students.invite_state`, the same predicate `/invitation/resend`
+    #: refuses on, so a row this says is `ready` is a row the send will accept.
+    #:
+    #: Coach-reachable like the rest of this shape, and safely so: it says whether a parent
+    #: has a login and an address on file, which is neither health nor money.
+    guardian_invite_state: str = "no_email"
     #: Where the student came from — 'onboarding_link' rows get 3b's chip so a manager
     #: can spot self-registered families that still need a look (feature pass 2026-08-27).
     source: str | None = None

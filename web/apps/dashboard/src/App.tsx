@@ -60,6 +60,7 @@ import { SettingsScreen } from './features/settings/SettingsScreen'
 import {
   AddStudentScreen,
   AlertCentre,
+  ImportStudentsScreen,
   AlertSections,
   SharingCards,
   StudentDetailScreen,
@@ -319,7 +320,8 @@ export function eventDateFrom(hash: string): string | null {
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null
 }
 
-/** `#/students/<id>` → the card; `#/students/new` → 3c; bare `#/students` → the table. */
+/** `#/students/<id>` → the card; `#/students/new` → 3c; `#/students/import` → the file
+ *  import; bare `#/students` → the table. */
 export function studentRouteFrom(hash: string): string {
   return hash.replace(/^#\/?students\/?/, '')
 }
@@ -925,6 +927,12 @@ export default function App() {
           {route === 'students' && studentRoute === 'new' ? (
             <AddStudentScreen locale={locale} client={peopleClient} />
           ) : null}
+          {/* §5.4(a) at volume — the file import (owner, 2026-09-18). Its own route beside
+              `new`, reached from the students screen's header, because a hundred families
+              is the same question as one family answered at a different volume. */}
+          {route === 'students' && studentRoute === 'import' ? (
+            <ImportStudentsScreen locale={locale} client={peopleClient} />
+          ) : null}
           {/* The list stays mounted and the card slides in OVER it — the prototype opens a
               side popup, not a second screen, and that is the design.
 
@@ -932,7 +940,7 @@ export default function App() {
               card, so a pasted link opens the list with the card already open. The
               prototype cannot do that — it has no routing at all — and a drawer that
               cannot be linked to is a drawer a manager cannot send to anyone. */}
-          {route === 'students' && studentRoute !== 'new' ? (
+          {route === 'students' && studentRoute !== 'new' && studentRoute !== 'import' ? (
             <>
               {/* §5.4b + §5.4a — the two links a club shares, where people are managed. */}
               {canSeeMoney ? <SharingCards locale={locale} /> : null}

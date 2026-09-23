@@ -1140,3 +1140,90 @@ def test_the_guardian_list_reports_whether_they_can_actually_sign_in(client, as_
     assert rows["items"], "fixture: no guardian was created"
     assert rows["items"][0]["has_login"] is False
     assert rows["items"][0]["display_name"], "the name is present; the login is not"
+
+
+# -- the bulk invite: who is still waiting, and does the send agree ------------------------
+
+
+def _sign_in(app_session, guardian_person_id: str) -> None:
+    """Give a pre-created guardian the login `accept_invitation` would have given them."""
+    from app.models.identity import AuthIdentity
+    from app.models.person import Person
+
+    identity = AuthIdentity(
+        provider="google", provider_subject=f"g-{uuid.uuid4()}", email_verified=True
+    )
+    app_session.add(identity)
+    app_session.flush()
+    app_session.get(Person, uuid.UUID(guardian_person_id)).auth_identity_id = identity.id
+    app_session.commit()
+
+
+def _row(client, caller, student_id: str) -> dict:
+    page = client.get("/api/v1/students", headers=caller.headers).json()
+    return next(item for item in page["items"] if item["id"] == student_id)
+
+
+def test_the_list_says_which_families_are_still_waiting_for_an_invitation(
+    client, as_manager, app_session
+):
+    """The column the bulk invite selects on. A family imported in silence is `ready`; one
+    that has signed in has nothing to be sent; one reachable only by phone needs an address
+    before anything can go out."""
+    held = _create(client, as_manager, {**_payload(), "send_invitation": False})["student"]["id"]
+    assert _row(client, as_manager, held)["guardian_invite_state"] == "ready"
+
+    signed = _create(client, as_manager)["student"]["id"]
+    _sign_in(app_session, _guardian_person_id(client, as_manager, signed))
+    assert _row(client, as_manager, signed)["guardian_invite_state"] == "signed_in"
+
+    by_phone = _payload()
+    by_phone["guardian"] = {**by_phone["guardian"], "email": None, "phone": "050-7654321"}
+    phoned = _create(client, as_manager, by_phone)["student"]["id"]
+    assert _row(client, as_manager, phoned)["guardian_invite_state"] == "no_email"
+
+
+def test_the_invite_state_filter_narrows_across_pages_not_within_one(
+    client, as_manager, app_session
+):
+    """Filtered in SQL, because the list is cursor-paginated: narrowing the fetched page
+    would hide the families on the next one, and "invite everyone still waiting" is a
+    question about the whole club."""
+    held = _create(client, as_manager, {**_payload(), "send_invitation": False})["student"]["id"]
+    signed = _create(client, as_manager)["student"]["id"]
+    _sign_in(app_session, _guardian_person_id(client, as_manager, signed))
+
+    ready = client.get("/api/v1/students?invite_state=ready", headers=as_manager.headers).json()
+    ids = [item["id"] for item in ready["items"]]
+    assert held in ids
+    assert signed not in ids
+    assert {item["guardian_invite_state"] for item in ready["items"]} == {"ready"}
+
+    already = client.get(
+        "/api/v1/students?invite_state=signed_in", headers=as_manager.headers
+    ).json()
+    assert [item["id"] for item in already["items"]] == [signed]
+
+
+def test_every_family_the_list_calls_ready_is_one_the_resend_accepts(
+    client, as_manager, app_session
+):
+    """**The seam, asserted rather than assumed.** A list that offered a send the send then
+    refused is the dead end a 422 is supposed to prevent: the manager selects forty
+    families, presses send, and reads forty-two refusals. One predicate decides both
+    (`app.services.people.students.invite_state`), and this is what proves it stayed that
+    way."""
+    _create(client, as_manager, {**_payload(), "send_invitation": False})
+    by_phone = _payload()
+    by_phone["guardian"] = {**by_phone["guardian"], "email": None, "phone": "050-1230000"}
+    _create(client, as_manager, by_phone)
+    signed = _create(client, as_manager)["student"]["id"]
+    _sign_in(app_session, _guardian_person_id(client, as_manager, signed))
+
+    page = client.get("/api/v1/students?invite_state=ready", headers=as_manager.headers).json()
+    assert page["items"], "fixture: expected at least one family waiting"
+    for item in page["items"]:
+        response = client.post(
+            f"/api/v1/students/{item['id']}/invitation/resend", headers=as_manager.headers
+        )
+        assert response.status_code == 200, f"{item['id']}: {response.text}"

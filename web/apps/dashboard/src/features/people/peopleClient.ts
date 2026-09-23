@@ -20,7 +20,15 @@ export type AttendanceMarkRow = components['schemas']['AttendanceOut']
 /** `class_id` is here because the BELT LADDER hangs off the class, not off the group
  *  (§5.9): the add-students screen can only offer a belt once a group has been chosen,
  *  and it is this field that tells it which ladder to load. */
-export type GroupOption = { id: string; name: string; class_id?: string | null }
+export type GroupOption = {
+  id: string
+  name: string
+  class_id?: string | null
+  /** `base` / `extra` / `private`. The file import offers base groups only — the one
+   *  group a trainee is assigned; extras are chosen in the app afterwards. */
+  kind?: string
+  is_active?: boolean
+}
 
 export type Fetcher = (path: string, init?: RequestInit) => Promise<Response>
 
@@ -40,7 +48,15 @@ export type StudentFilters = {
    *  would drop the children who live on a later page. */
   class_id?: string
   health_status?: string
+  /** `ready` / `no_email` / `signed_in` — whose family can still be sent an invitation.
+   *  Server-side for the same reason `class_id` is: the list is cursor-paginated, and the
+   *  bulk invite asks about the whole club rather than the page on screen. */
+  invite_state?: string
   after?: string
+  /** Page size, as the query string carries it. The import walks the whole roster to
+   *  check for duplicates and asks for the server's maximum rather than eight small
+   *  pages. */
+  limit?: string
 }
 
 export function makeDashboardPeopleClient(fetcher: Fetcher) {
@@ -156,15 +172,22 @@ export function makeDashboardPeopleClient(fetcher: Fetcher) {
       guardian: {
         //: Optional (decision 20, 2026-09-03 onboarding doors spec) — the dashboard's
         //: 3-field add-student form sends a guardian email with no name at all;
-        //: `GuardianCreate` (`app/schemas/people.py`) accepts that. Every existing
-        //: caller (`ImportStudentsPanel`) still sends both, so this widening is
-        //: backward compatible.
+        //: `GuardianCreate` (`app/schemas/people.py`) accepts that. The file import
+        //: (`import/run.ts`) sends whichever names the file carried, so this widening
+        //: is what lets a blank parent-name cell through.
         first_name?: string
         last_name?: string
         email?: string | null
         phone?: string | null
         relation?: string
       }
+      /** Whether the server actually MAILS the invitation. The token is minted either
+       *  way, so `invitation_url` comes back regardless and the family can be invited
+       *  whenever the club is ready. Omitted by the by-hand form, which still sends on
+       *  the spot; the file import (`import/run.ts`) sends `false`, because a club is
+       *  loaded from the office's spreadsheet weeks before its parents are told the app
+       *  exists. */
+      send_invitation?: boolean
     }) =>
       fetcher('/api/v1/students', {
         method: 'POST',

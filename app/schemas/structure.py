@@ -97,6 +97,10 @@ class GroupOut(BaseModel):
     age_min: int | None
     age_max: int | None
     is_active: bool
+    #: `base` / `extra` / `private` (GROUP_KINDS). On the model since the training plans,
+    #: on the wire since the file import (2026-09-18), which offers a trainee ONE base
+    #: group and nothing else -- a client cannot filter on a field it is not sent.
+    kind: str
 
 
 class GroupListResponse(BaseModel):

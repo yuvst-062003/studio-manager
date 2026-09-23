@@ -192,3 +192,74 @@ def test_the_invitation_token_never_reaches_a_log_record(client, as_manager, mon
             rendered = str(value)
             assert token not in rendered
             assert url not in rendered
+
+
+# -- 6. send_invitation=False -> the token is minted and NOTHING leaves --------------------
+
+
+def test_send_invitation_false_mints_the_token_and_sends_nothing(client, as_manager, monkeypatch):
+    """The bulk import's whole requirement (2026-09-23).
+
+    Mail is fully configured here and the transport would RAISE if it were touched, so
+    "nothing was sent" is proven rather than merely unobserved -- the same standard the
+    unconfigured case above is held to.
+
+    `invitation_email_configured` stays True on purpose. The dashboard tells "held back on
+    purpose" apart from "this deployment cannot send mail" by exactly that field, and
+    collapsing the two would put a broken-mail warning on a hundred families the manager
+    deliberately held.
+    """
+    _configure_mail(monkeypatch)
+    monkeypatch.setattr(mail_transport.httpx, "post", ExplodingMailApi())
+
+    payload = _payload()
+    payload["send_invitation"] = False
+    body = _create(client, as_manager, payload)
+
+    assert body["invitation_email_sent"] is False
+    assert body["invitation_email_configured"] is True
+    # The credential is unaffected: a family imported today is one the manager can still
+    # hand a link to across the desk, and the resend below is what finally mails it.
+    assert body["invitation_token"]
+    assert body["invitation_url"].endswith(f"/?invite={body['invitation_token']}")
+
+
+def test_a_held_invitation_is_still_sendable_later(client, as_manager, monkeypatch):
+    """The other half of the import: load the club in silence now, invite the families
+    weeks later. The resend re-issues the token and refreshes the expiry, so the thirty
+    days that pass in between cost nothing."""
+    _configure_mail(monkeypatch)
+    monkeypatch.setattr(mail_transport.httpx, "post", ExplodingMailApi())
+
+    payload = _payload()
+    payload["send_invitation"] = False
+    created = _create(client, as_manager, payload)
+    student_id = created["student"]["id"]
+
+    # Only now does a transport that can actually send appear.
+    fake = FakeMailApi()
+    monkeypatch.setattr(mail_transport.httpx, "post", fake)
+    response = client.post(
+        f"/api/v1/students/{student_id}/invitation/resend", headers=as_manager.headers
+    )
+
+    assert response.status_code == 200, response.text
+    resent = response.json()
+    assert resent["email_sent"] is True
+    assert len(fake.requests) == 1
+    assert fake.requests[0]["json"]["to"] == [payload["guardian"]["email"]]
+
+
+def test_the_default_still_sends(client, as_manager, monkeypatch):
+    """Every existing caller omits the field -- the by-hand form and §5.4a's trial booking
+    among them -- and must keep sending exactly as before."""
+    _configure_mail(monkeypatch)
+    fake = FakeMailApi()
+    monkeypatch.setattr(mail_transport.httpx, "post", fake)
+
+    payload = _payload()
+    assert "send_invitation" not in payload
+    body = _create(client, as_manager, payload)
+
+    assert body["invitation_email_sent"] is True
+    assert len(fake.requests) == 1

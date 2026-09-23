@@ -6,13 +6,19 @@
 // alerted and the charges are NOT settled. The parent was told nothing and shown nothing.
 // The frame is the only moment they are looking.
 //
-// **A success is a MOMENT, not a screen.** Full-bleed, carrying the club's own ground and
-// the same crest the app paints while it boots, and it leaves on its own after
-// `SETTLED_CLOSE_MS`. No button, because there is nothing to decide — the payment
-// happened. That is how Apple Pay, bit and the banking apps treat this instant. The design
-// came back from Stitch as a screen with actions and a receipt link; the owner corrected it
-// to a two-to-three second moment, and the receipt link is impossible anyway (checkpoint 19
-// — uPay issues a קבלה and never tells us where it is).
+// **A success is a MOMENT, not a screen.** Full-bleed, carrying the club's own ground, and
+// it leaves on its own after `SETTLED_CLOSE_MS`. No button, because there is nothing to
+// decide — the payment happened. That is how Apple Pay, bit and the banking apps treat this
+// instant. The design came back from Stitch as a screen with actions and a receipt link;
+// the owner corrected it to a two-to-three second moment, and the receipt link is
+// impossible anyway (checkpoint 19 — uPay issues a קבלה and never tells us where it is).
+//
+// **The payment is shown, then said** (2026-09-17). What used to be the club crest under a
+// ripple is now `PayingScene`: a card terminal, the club card sliding onto its reader, a
+// check on the terminal's screen — and only then the words. The owner brought a reference
+// clip of a card-ordering app and asked for that beat; it turns "שולם" from a label into
+// the end of something the parent watched happen. The moment grew by about a second to
+// make room, and stayed a moment.
 //
 // **Everything that is NOT a success stays put.** A mismatch, a decline and an expiry each
 // have to be read, so those keep a card, an explanation and a button somebody presses. A
@@ -28,17 +34,16 @@ import { fill, formatAgorot } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { PaymentOrderOut } from './billingClient'
+import { PayingScene, SCENE_TOTAL_MS } from './PayingScene'
 import type { SettledFor } from './redesign/pay'
 
-/** The club's own mark — the one the app paints while it boots. Served from the parent
- *  app's own `public/`, so it needs no object store and no second origin. */
-const CREST = '/clubs/gladiator-logo.png'
-
-/** Entry, hold, exit — the whole moment, two and a third seconds end to end. Long enough to
- *  read one word and one number; short enough that nobody reaches for a control that is not
- *  there. Exported so the overlay and the tests agree on one set of numbers. */
-export const SETTLED_ENTER_MS = 700
-export const SETTLED_HOLD_MS = 1200
+/** Entry, hold, exit — the whole moment, three and two-thirds seconds end to end. The entry
+ *  is the scene's three beats plus the words rising after them; the hold is long enough to
+ *  read one word, one number and one line; and the whole is still short enough that nobody
+ *  reaches for a control that is not there. Exported so the overlay and the tests agree on
+ *  one set of numbers. */
+export const SETTLED_ENTER_MS = SCENE_TOTAL_MS + 50
+export const SETTLED_HOLD_MS = 1800
 export const SETTLED_EXIT_MS = 400
 export const SETTLED_CLOSE_MS = SETTLED_ENTER_MS + SETTLED_HOLD_MS + SETTLED_EXIT_MS
 
@@ -130,14 +135,14 @@ export function PaymentSettled({ locale, order, settled, onDismiss }: PaymentSet
     )
   }
 
-  const spring = still ? 'none' : `transform ${SETTLED_ENTER_MS}ms cubic-bezier(.2,.9,.3,1.2)`
-  const fade = still ? 'none' : `opacity ${SETTLED_ENTER_MS}ms var(--ease-standard)`
+  // The words wait for the scene: each delay is measured from the check landing, so the
+  // first thing a parent reads is the outcome of what they just watched.
   const rise = (delay: number): CSSProperties => ({
     opacity: entered ? 1 : 0,
     transform: entered ? 'translateY(0)' : 'translateY(8px)',
     transition: still
       ? 'none'
-      : `opacity 420ms var(--ease-standard) ${delay}ms, transform 420ms var(--ease-standard) ${delay}ms`,
+      : `opacity 420ms var(--ease-standard) ${SCENE_TOTAL_MS + delay}ms, transform 420ms var(--ease-standard) ${SCENE_TOTAL_MS + delay}ms`,
   })
 
   return (
@@ -146,28 +151,14 @@ export function PaymentSettled({ locale, order, settled, onDismiss }: PaymentSet
       data-testid="payment-settled"
       data-status={order.status}
     >
-      <div style={crestWrapStyle}>
-        {/* Two rings: a standing glow that stays, and one ripple that expands and goes.
-            Both decorative — the chip below carries the meaning in words. */}
-        <span aria-hidden="true" style={glowStyle(entered, still)} />
-        {still ? null : <span aria-hidden="true" style={haloStyle(entered)} />}
-        <img
-          alt=""
-          src={CREST}
-          style={{
-            ...crestStyle,
-            opacity: entered ? 1 : 0,
-            transform: entered ? 'scale(1)' : 'scale(0.92)',
-            transition: `${spring}, ${fade}`,
-          }}
-        />
-      </div>
+      {/* Decorative in the strict sense — the chip below carries the meaning in words. */}
+      <PayingScene entered={entered} still={still} />
 
       {/* The confirmation chip. A light `--paid-tint` ground with `--paid` text, which is
           the semantic pair the ledger already uses for a settled charge — and the only way
           to put green on this navy at a contrast ratio that passes. Never colour alone:
           the words are the status and the tick is beside them. */}
-      <p data-testid="settled-paid" style={{ ...chipStyle, ...rise(120) }}>
+      <p data-testid="settled-paid" style={{ ...chipStyle, ...rise(60) }}>
         <svg aria-hidden="true" style={tickStyle} viewBox="0 0 20 20">
           <path
             d="M5 10.5 L8.5 14 L15 6.5"
@@ -181,15 +172,15 @@ export function PaymentSettled({ locale, order, settled, onDismiss }: PaymentSet
         {t(locale, 'billing.order.paidConfirmed')}
       </p>
 
-      <p style={{ ...headlineStyle, ...rise(200) }}>{t(locale, 'billing.order.status.paid')}</p>
+      <p style={{ ...headlineStyle, ...rise(140) }}>{t(locale, 'billing.order.status.paid')}</p>
       {/* One non-breaking unit, so the symbol and the number can never drift apart. */}
-      <p style={{ ...amountStyle, ...rise(280) }}>
+      <p style={{ ...amountStyle, ...rise(220) }}>
         <bdi>{formatAgorot(order.expected_amount_agorot)}</bdi>
       </p>
       {/* What the money was for. A parent shown only "שולם" and a number has been told the
           least useful half of what just happened (owner, 2026-09-11). */}
       {settled === null || settled === undefined ? null : (
-        <p style={{ ...captionStyle, ...rise(360) }} data-testid="settled-for">
+        <p style={{ ...captionStyle, ...rise(300) }} data-testid="settled-for">
           {[
             settled.note ?? t(locale, `billing.charge.kind.${settled.kind}`),
             settled.students.join(', '),
@@ -236,45 +227,6 @@ const restingStyle: CSSProperties = {
   blockSize: '100%',
   textAlign: 'center',
 }
-
-const crestWrapStyle: CSSProperties = {
-  position: 'relative',
-  display: 'grid',
-  placeItems: 'center',
-  inlineSize: '7rem',
-  blockSize: '7rem',
-  marginBlockEnd: 'var(--space-2)',
-}
-
-const crestStyle: CSSProperties = {
-  inlineSize: '7rem',
-  blockSize: '7rem',
-  borderRadius: 'var(--radius-circle)',
-  objectFit: 'contain',
-}
-
-const haloStyle = (entered: boolean): CSSProperties => ({
-  position: 'absolute',
-  inset: 0,
-  borderRadius: 'var(--radius-circle)',
-  border: '1px solid color-mix(in srgb, var(--brand-on-primary) 45%, transparent)',
-  opacity: entered ? 0 : 0.8,
-  transform: entered ? 'scale(1.6)' : 'scale(0.85)',
-  transition: `transform ${SETTLED_ENTER_MS + 200}ms ease-out, opacity ${SETTLED_ENTER_MS + 200}ms ease-out`,
-})
-
-/** The standing glow behind the crest. Stays for the whole moment, unlike the ripple —
- *  it is what lifts the mark off a ground of nearly the same colour, which a frozen frame
- *  of the first build showed it needed. */
-const glowStyle = (entered: boolean, still: boolean): CSSProperties => ({
-  position: 'absolute',
-  inset: '-18%',
-  borderRadius: 'var(--radius-circle)',
-  background:
-    'radial-gradient(circle, color-mix(in srgb, var(--brand-on-primary) 22%, transparent) 0%, transparent 68%)',
-  opacity: entered ? 1 : 0,
-  transition: still ? 'none' : `opacity ${SETTLED_ENTER_MS}ms var(--ease-standard)`,
-})
 
 const chipStyle: CSSProperties = {
   margin: 0,

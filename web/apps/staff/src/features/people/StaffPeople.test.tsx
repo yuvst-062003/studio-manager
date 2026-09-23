@@ -477,9 +477,9 @@ describe('StudentsSearch — S11 recovery', () => {
 
 describe('StudentsSearch — S8', () => {
   const GROUPS = [
-    { id: 'g1', class_id: 'c1', name: 'מתחילים', description: null, age_min: null, age_max: null, is_active: true },
-    { id: 'g2', class_id: 'c1', name: 'נבחרת', description: null, age_min: null, age_max: null, is_active: true },
-    { id: 'g3', class_id: 'c1', name: 'ישן', description: null, age_min: null, age_max: null, is_active: false },
+    { id: 'g1', class_id: 'c1', name: 'מתחילים', description: null, age_min: null, age_max: null, is_active: true, kind: 'base' },
+    { id: 'g2', class_id: 'c1', name: 'נבחרת', description: null, age_min: null, age_max: null, is_active: true, kind: 'extra' },
+    { id: 'g3', class_id: 'c1', name: 'ישן', description: null, age_min: null, age_max: null, is_active: false, kind: 'base' },
   ]
 
   it('renders a tab per ACTIVE class and re-asks the server when one is chosen', async () => {
@@ -554,8 +554,8 @@ describe('StudentsSearch — S8', () => {
 
 describe('StudentsSearch — the attendance sort toggle (C4)', () => {
   const GROUPS = [
-    { id: 'g1', class_id: 'c1', name: 'מתחילים', description: null, age_min: null, age_max: null, is_active: true },
-    { id: 'g2', class_id: 'c1', name: 'נבחרת', description: null, age_min: null, age_max: null, is_active: true },
+    { id: 'g1', class_id: 'c1', name: 'מתחילים', description: null, age_min: null, age_max: null, is_active: true, kind: 'base' },
+    { id: 'g2', class_id: 'c1', name: 'נבחרת', description: null, age_min: null, age_max: null, is_active: true, kind: 'extra' },
   ]
 
   it('defaults to the existing class grouping — nothing changes for a caller that never flips it', async () => {

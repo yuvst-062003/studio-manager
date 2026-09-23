@@ -44,6 +44,7 @@ import {
 } from './derive'
 import type { FamilyEvent, Intents, Lesson } from './derive'
 import type { HomeChild, HomePlanRow, HomeSession } from './types'
+import { riseStyle, useLaunchEntrance } from '../../shell/LaunchScreen'
 
 /** The writes בית makes. One narrow interface so the screen can be tested without a fetch. */
 export type HomeWriter = {
@@ -110,6 +111,9 @@ export function HomeScreen({
 }) {
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null)
   const [selectedDayKey, setSelectedDayKey] = useState<string>(todayKey)
+  // The launch entrance: the header, the strip and the list rise in turn as the cover
+  // lifts, once. See `LaunchScreen`'s header for the rule.
+  const entered = useLaunchEntrance()
 
   /**
    * The header pill's plan.
@@ -441,23 +445,26 @@ export function HomeScreen({
     // one that an unknown hash still lands on home — and both are about ROUTING, not about
     // which arrangement of home won. A fragment here would have quietly made them vacuous.
     <section aria-label={t(locale, 'common.home.title')} data-testid="parent-home">
-      <HomeTop
-        locale={locale}
-        clubName={clubName}
-        familyName={familyName}
-        childList={childList ?? []}
-        selectedChildId={selectedChildId}
-        plan={planPill}
-        onSelectChild={setSelectedChildId}
-        onOpenNotifications={() => {
-          // The prototype opens a coach-notifications modal. This product has one inbox and
-          // it is a whole tab (§4), so the bell goes there rather than to a second, emptier
-          // copy of it. Flagged at the checkpoint.
-          globalThis.location.hash = '#/announcements'
-        }}
-      />
+      <div data-testid="home-block" data-entered={entered ? 'true' : 'false'} style={riseStyle(entered, 0)}>
+        <HomeTop
+          locale={locale}
+          clubName={clubName}
+          familyName={familyName}
+          childList={childList ?? []}
+          selectedChildId={selectedChildId}
+          plan={planPill}
+          onSelectChild={setSelectedChildId}
+          onOpenNotifications={() => {
+            // The prototype opens a coach-notifications modal. This product has one inbox and
+            // it is a whole tab (§4), so the bell goes there rather than to a second, emptier
+            // copy of it. Flagged at the checkpoint.
+            globalThis.location.hash = '#/announcements'
+          }}
+        />
+      </div>
 
       <HomeSchedule
+        entered={entered}
         locale={locale}
         days={strip}
         selectedDayKey={selectedDayKey}

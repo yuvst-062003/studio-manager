@@ -23,6 +23,7 @@ const DRAFT: ConsentState = {
   policy_version: 0,
   policy_version_label: '0.1-draft',
   policy_is_draft: true,
+  club_terms_version: 1,
   required: ['terms', 'privacy'],
   outstanding: ['terms', 'privacy'],
   records: [],
