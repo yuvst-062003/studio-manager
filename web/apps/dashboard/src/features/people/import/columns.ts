@@ -50,6 +50,22 @@ export const IMPORT_COLUMNS: readonly ImportColumn[] = [
 
 export const HEBREW_HEADERS: readonly string[] = IMPORT_COLUMNS.map((column) => column.he)
 
+/** What a ROW cannot do without — which is NOT what `required` above says. That one is the
+ *  header contract: `parse.ts` refuses a file whose first row is missing those columns, and
+ *  the template always ships both, so it stays as it is.
+ *
+ *  This is the rule the manager reads and the row is judged by: a first name always, and
+ *  ONE of email or phone (owner, 2026-09-23 — a club that has run on WhatsApp for years
+ *  reaches half its families by phone). Marking אימייל with an asterisk in Excel and "חובה"
+ *  on the column table said something the review no longer enforces, which is the kind of
+ *  wrong that makes a manager invent an address rather than leave a cell blank. */
+export type Mandatory = 'always' | 'contact' | 'optional'
+
+export function mandatoryOf(key: ColumnKey): Mandatory {
+  if (key === 'first_name') return 'always'
+  return key === 'email' || key === 'phone' ? 'contact' : 'optional'
+}
+
 /** One row of the file, every column as the text that was in the cell (dates already
  *  normalised to ISO by the parser, or `'invalid'`), plus the 1-based line it came from so
  *  a problem can be pointed back at the spreadsheet. */

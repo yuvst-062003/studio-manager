@@ -3,7 +3,7 @@
 // not a note asking nicely.
 import ExcelJS from 'exceljs'
 import { describe, expect, it } from 'vitest'
-import { HEBREW_HEADERS } from './columns'
+import { HEBREW_HEADERS, IMPORT_COLUMNS, mandatoryOf } from './columns'
 import { buildTemplate, LIST_ROWS, TEMPLATE_ROWS, type TemplateText } from './template'
 
 const TEXT: TemplateText = {
@@ -26,6 +26,7 @@ const TEXT: TemplateText = {
   dateErrorTitle: 'לא תאריך',
   dateError: 'כתבו תאריך, למשל 12/04/2018.',
   required: 'חובה',
+  contactRequired: 'אימייל או טלפון',
 }
 
 const LISTS = {
@@ -53,9 +54,13 @@ describe('buildTemplate', () => {
     HEBREW_HEADERS.forEach((label, index) => {
       expect(String(header.getCell(index + 1).value)).toContain(label)
     })
-    // Required columns are marked in the header; nothing below the header is filled.
+    // The asterisk marks what a ROW cannot do without, and that is the first name alone.
+    // אימייל carried one until 2026-09-23, when email-or-phone replaced email-always; a
+    // manager reading a star over an optional column invents an address rather than leaving
+    // the cell blank, which is the expensive direction to be wrong in.
     expect(String(header.getCell(1).value)).toContain('*')
-    expect(String(header.getCell(6).value)).toContain('*')
+    expect(String(header.getCell(6).value)).not.toContain('*')
+    expect(String(header.getCell(7).value)).not.toContain('*')
     expect(ws.getRow(2).getCell(1).value).toBeNull()
   })
 
@@ -93,5 +98,27 @@ describe('buildTemplate', () => {
     const ws = wb.worksheets[0]!
     expect(ws.getCell('I2').dataValidation?.type ?? 'none').not.toBe('list')
     expect(ws.getCell('H2').dataValidation.type).toBe('list')
+  })
+})
+
+
+describe('what a row cannot do without', () => {
+  it('is the first name always, and one of email or phone', () => {
+    expect(mandatoryOf('first_name')).toBe('always')
+    expect(mandatoryOf('email')).toBe('contact')
+    expect(mandatoryOf('phone')).toBe('contact')
+    // Everything the review lets through empty.
+    for (const key of ['last_name', 'birthdate', 'parent_first', 'group', 'belt', 'plan', 'payment'] as const) {
+      expect(mandatoryOf(key)).toBe('optional')
+    }
+  })
+
+  it('is NOT the header contract — the file must still carry both columns', () => {
+    // `required` on the column stays true for אימייל: `parse.ts` refuses a file whose first
+    // row is missing it, and the template always ships it. The two rules answer different
+    // questions and are deliberately kept apart.
+    const email = IMPORT_COLUMNS.find((column) => column.key === 'email')!
+    expect(email.required).toBe(true)
+    expect(mandatoryOf('email')).toBe('contact')
   })
 })

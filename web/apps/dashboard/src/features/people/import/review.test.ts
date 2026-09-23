@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import type { RawRow } from './columns'
 import type { Lists } from './review'
-import { draftsFromRows, familiesOf, isAdult, problemsOf, readyDrafts } from './review'
+import { beltIdInGroup, draftsFromRows, familiesOf, isAdult, problemsOf, readyDrafts } from './review'
 
 const LISTS: Lists = {
   groups: [
@@ -176,5 +176,25 @@ describe('readyDrafts — what the button will send', () => {
   it('counts rows with no problems and skips removed ones', () => {
     const drafts = draftsFromRows([row({ line: 2 }), row({ line: 3, first_name: '' }), row({ line: 4, first_name: 'יוסי' })], LISTS)
     expect(readyDrafts(drafts, LISTS, TODAY).map((draft) => draft.line)).toEqual([2, 4])
+  })
+})
+
+describe('beltIdInGroup — the belt survives a group change', () => {
+  it('resolves the name the file wrote against the chosen group’s ladder', () => {
+    // Choosing a group used to force the manager to pick the belt again on every row whose
+    // group needed fixing, because §5.9's ladders hang off the class and the row's belt is
+    // re-asked then. Re-asking the LISTS instead is the whole point of this helper.
+    expect(beltIdInGroup(LISTS, 'g-kids', 'צהוב')).toBe('b-yellow')
+    expect(beltIdInGroup(LISTS, 'g-teens', 'לבן')).toBe('b-white')
+  })
+
+  it('is forgiving about spacing and the Hebrew apostrophe, like every other name match', () => {
+    expect(beltIdInGroup(LISTS, 'g-kids', '  צהוב ')).toBe('b-yellow')
+  })
+
+  it("answers '' when the ladder does not have it, or when no group was chosen", () => {
+    expect(beltIdInGroup(LISTS, 'g-kids', 'סגול')).toBe('')
+    expect(beltIdInGroup(LISTS, '', 'צהוב')).toBe('')
+    expect(beltIdInGroup(LISTS, 'g-kids', '')).toBe('')
   })
 })

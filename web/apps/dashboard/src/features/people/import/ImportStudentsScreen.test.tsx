@@ -211,3 +211,73 @@ describe('ImportStudentsScreen — step 2', () => {
     expect(client.resendInvitation).toHaveBeenCalledTimes(1)
   })
 })
+
+// Three dead ends found on 2026-09-23 by filling a file with bad data and looking at the
+// screen, rather than by a test that constructed the props it wanted.
+describe('a flagged cell can always be answered', () => {
+  const ONE = (over: Record<string, string> = {}) => {
+    const cells = {
+      first: 'דנה', last: 'כהן', birthdate: '12/04/2018', pfirst: 'רות', plast: 'כהן',
+      email: 'ruth@example.com', phone: '050-1234567', group: 'ג׳ודו ילדים א׳',
+      belt: 'צהוב', plan: 'מנוי חודשי', payment: '', ...over,
+    }
+    return [
+      'שם פרטי,שם משפחה,תאריך לידה,שם פרטי ההורה,שם משפחה ההורה,אימייל,טלפון,קבוצה,חגורה,מסלול,הסדר תשלום מראש',
+      [cells.first, cells.last, cells.birthdate, cells.pfirst, cells.plast, cells.email,
+       cells.phone, cells.group, cells.belt, cells.plan, cells.payment].join(','),
+    ].join('\n')
+  }
+
+  it('a card payment can be cleared — the empty choice is a REAL option, not the one already selected', async () => {
+    // A <select> fires no change when you pick the option that is already selected, and the
+    // empty option's label had been replaced by "in the file: אשראי". The row's own advice
+    // is "leave it empty", and empty was the one answer the manager could not give.
+    render(<ImportStudentsScreen locale="he" client={fakeClient()} />)
+    await uploadCsv(ONE({ payment: 'אשראי' }))
+    const select = screen.getByTestId(/^import-payment-/) as HTMLSelectElement
+    expect(screen.getByTestId(/^import-state-/)).toHaveTextContent(t('he', 'people.import.problem.card_payment'))
+
+    const values = [...select.options].map((o) => o.value)
+    expect(values).toContain('')
+    expect(select.value).not.toBe('')
+
+    await userEvent.selectOptions(select, '')
+    expect(screen.getByTestId(/^import-state-/)).toHaveTextContent(t('he', 'people.import.state.ready'))
+  })
+
+  it('a group with no match can still be answered "no group at all"', async () => {
+    render(<ImportStudentsScreen locale="he" client={fakeClient()} />)
+    await uploadCsv(ONE({ group: 'קבוצת על', belt: '' }))
+    const select = screen.getByTestId(/^import-group-/) as HTMLSelectElement
+    expect([...select.options].map((o) => o.value)).toContain('')
+    expect(select.value).not.toBe('')
+
+    await userEvent.selectOptions(select, '')
+    expect(screen.getByTestId(/^import-state-/)).toHaveTextContent(t('he', 'people.import.state.ready'))
+  })
+
+  it('choosing a group keeps the belt the file named when the new ladder still has it', async () => {
+    // Otherwise every row whose group needed fixing asked for its belt a second time — and
+    // a belt that had already matched was dropped silently, since the row keeps no name for
+    // one that matched.
+    render(<ImportStudentsScreen locale="he" client={fakeClient()} />)
+    await uploadCsv(ONE({ group: 'קבוצת על', belt: 'צהוב' }))
+    const group = screen.getByTestId(/^import-group-/) as HTMLSelectElement
+    await userEvent.selectOptions(group, 'g-teens')
+
+    const belt = screen.getByTestId(/^import-belt-/) as HTMLSelectElement
+    expect(belt.value).toBe('b-yellow')
+    expect(screen.getByTestId(/^import-state-/)).toHaveTextContent(t('he', 'people.import.state.ready'))
+  })
+
+  it('offers no "send now" to a family the club can only phone', async () => {
+    // `reinvite_guardian` refuses a guardian with no email, so the button could only 422.
+    render(<ImportStudentsScreen locale="he" client={fakeClient()} />)
+    await uploadCsv(ONE({ email: '', phone: '052-3334444' }))
+    await userEvent.click(screen.getByTestId('import-run'))
+    await waitFor(() => expect(screen.getByTestId('import-done')).toBeInTheDocument())
+
+    expect(screen.getByTestId(/^import-invite-/)).toHaveTextContent(t('he', 'people.import.invite.held'))
+    expect(screen.queryByTestId(/^import-resend-/)).not.toBeInTheDocument()
+  })
+})

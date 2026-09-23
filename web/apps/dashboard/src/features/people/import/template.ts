@@ -11,7 +11,7 @@
 // No example rows. A row the manager forgets to delete would import a fake family; the
 // worked example lives on the screen beside the download button instead.
 import type { ColumnKey } from './columns'
-import { IMPORT_COLUMNS } from './columns'
+import { IMPORT_COLUMNS, mandatoryOf } from './columns'
 
 export type TemplateLists = {
   groups: readonly string[]
@@ -28,8 +28,10 @@ export type TemplateText = {
   listError: string
   dateErrorTitle: string
   dateError: string
-  /** Suffix word for the two required headers' tooltip. */
+  /** Suffix word for the tooltip of the column a row cannot do without. */
   required: string
+  /** Suffix for אימייל and טלפון — one of the two, not both. */
+  contactRequired: string
 }
 
 /** How many rows below the header carry validation. A club of 500 is the same cap the
@@ -84,7 +86,7 @@ export async function buildTemplate(lists: TemplateLists, text: TemplateText): P
   // ── the header row ──────────────────────────────────────────────────────────────────
   IMPORT_COLUMNS.forEach((column, index) => {
     const cell = sheet.getCell(1, index + 1)
-    cell.value = column.required ? `${column.he} *` : column.he
+    cell.value = mandatoryOf(column.key) === 'always' ? `${column.he} *` : column.he
     cell.font = { bold: true }
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL } }
     cell.border = { bottom: { style: 'thin' } }
@@ -122,7 +124,10 @@ export async function buildTemplate(lists: TemplateLists, text: TemplateText): P
   sheet.getColumn(birthdateIndex).numFmt = 'dd/mm/yyyy'
 
   IMPORT_COLUMNS.forEach((column, index) => {
-    const promptTitle = column.required ? `${column.he} (${text.required})` : column.he
+    const mandatory = mandatoryOf(column.key)
+    const suffix =
+      mandatory === 'always' ? text.required : mandatory === 'contact' ? text.contactRequired : ''
+    const promptTitle = suffix ? `${column.he} (${suffix})` : column.he
     const prompt = text.prompts[column.key]
     const shared = { allowBlank: true, showInputMessage: prompt !== '', promptTitle, prompt }
     const listRange = listRanges.get(column.key)

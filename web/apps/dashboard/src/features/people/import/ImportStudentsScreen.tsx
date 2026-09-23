@@ -34,11 +34,11 @@ import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import type { DashboardPeopleClient } from '../peopleClient'
 import type { ColumnKey } from './columns'
-import { IMPORT_COLUMNS } from './columns'
+import { IMPORT_COLUMNS, mandatoryOf } from './columns'
 import type { ParseError } from './parse'
 import { parseImportFile } from './parse'
 import type { Draft, Family, Lists, Payment, Problem } from './review'
-import { beltsForGroup, draftsFromRows, familiesOf, problemsOf } from './review'
+import { beltIdInGroup, beltsForGroup, draftsFromRows, familiesOf, problemsOf } from './review'
 import type { FamilyOutcome, ImportResult, InvitationOutcome, RowOutcome, RowState } from './run'
 import { runImport } from './run'
 import { buildTemplate } from './template'
@@ -54,6 +54,39 @@ type FileError = ParseError | 'unsupported'
 
 const today = () => new Date().toISOString().slice(0, 10)
 const PAYMENTS: readonly Exclude<Payment, ''>[] = ['cash', 'cheque', 'standing_order']
+
+/** A choice cell shows what the FILE said when nothing matched — and that display must not
+ *  sit on the EMPTY value, or the empty choice becomes unreachable. A `<select>` fires no
+ *  change event when you pick the option that is already selected, so with the two sharing
+ *  a value there was no way to answer "no group" or "not paid yet" once the file had
+ *  written something unmatched. For קבוצה/חגורה/מסלול that only hid a legitimate answer;
+ *  for הסדר תשלום it was a dead end, because the row's own advice for a card is "leave it
+ *  empty" and empty was the one thing the manager could not choose (found 2026-09-23 by
+ *  filling a file with bad data and looking at the screen).
+ *
+ *  So the unmatched display gets a value of its own, and the real empty option is always
+ *  rendered beside it. */
+const UNMATCHED = '__unmatched__'
+const unmatchedValue = (id: string, fromFile: string) => id || (fromFile ? UNMATCHED : '')
+const chosen = (value: string) => (value === UNMATCHED ? '' : value)
+
+/** Choosing a group, and what it does to the belt beside it. The ladder hangs off the
+ *  class, so the belt must be re-asked — but of the LISTS, not of the manager: the row
+ *  carries the belt by name (the file's word when it did not match, the resolved belt's own
+ *  name when it did), and whatever the new ladder still has is kept. */
+function regroup(draft: Draft, lists: Lists, groupId: string): Partial<Draft> {
+  const carried =
+    draft.belt_name ||
+    beltsForGroup(lists, draft.group_id).find((belt) => belt.id === draft.belt_rank_id)?.name ||
+    ''
+  const resolved = beltIdInGroup(lists, groupId, carried)
+  return {
+    group_id: groupId,
+    group_name: '',
+    belt_rank_id: resolved,
+    belt_name: resolved ? '' : carried,
+  }
+}
 
 // ── styles ──────────────────────────────────────────────────────────────────────────
 // Inline objects, for the reason the add-students screen already gives: every value is a
@@ -350,6 +383,7 @@ export function ImportStudentsScreen({ locale, client, onImported }: Props) {
           dateErrorTitle: t(locale, 'people.import.tpl.dateErrorTitle'),
           dateError: t(locale, 'people.import.tpl.dateError'),
           required: t(locale, 'people.import.tpl.required'),
+          contactRequired: t(locale, 'people.import.tpl.contactRequired'),
         },
       )
       downloadBlob(blob, t(locale, 'people.import.template.fileName'))
@@ -775,7 +809,13 @@ function FileStep({
               {IMPORT_COLUMNS.map((c) => (
                 <tr key={c.key}>
                   <td style={{ ...td, fontWeight: 600 }}>{c.he}</td>
-                  <td style={td}>{c.required ? <Chip tone="ok">{t(locale, 'people.import.columns.yes')}</Chip> : <span style={hint}>{t(locale, 'people.import.columns.no')}</span>}</td>
+                  <td style={td}>{
+                    mandatoryOf(c.key) === 'always'
+                      ? <Chip tone="ok">{t(locale, 'people.import.columns.yes')}</Chip>
+                      : mandatoryOf(c.key) === 'contact'
+                        ? <Chip tone="info">{t(locale, 'people.import.columns.either')}</Chip>
+                        : <span style={hint}>{t(locale, 'people.import.columns.no')}</span>
+                  }</td>
                   <td style={td}>
                     {c.kind === 'list' ? (
                       <Chip tone="ok"><Icon name="chevronDown" size={12} />{t(locale, 'people.import.kind.list')}</Chip>
@@ -916,7 +956,11 @@ function FamilyCard({
           {outcome ? (
             <>
               {invitationChip(outcome.invitation)}
-              {outcome.invitation === 'held' && outcome.studentId ? (
+              {/* Only when there is an address to send to. `reinvite_guardian` refuses a
+                  guardian with no email, so offering the button to a family the file
+                  reached by phone alone is a click that can only 422 — the same dead end
+                  the students screen's invite filter exists to avoid. */}
+              {outcome.invitation === 'held' && outcome.studentId && family.email ? (
                 <Button variant="ghost" onClick={() => onResend(outcome.studentId!)} disabled={resend === 'sending' || resend === 'sent'} data-testid={`import-resend-${family.key}`} style={{ minBlockSize: '32px', padding: '6px 12px', fontSize: '13px' }}>
                   {resend === 'sent' ? t(locale, 'people.import.invite.sentNow') : resend === 'failed' ? t(locale, 'people.import.invite.sendFailed') : t(locale, 'people.import.invite.sendNow')}
                 </Button>
@@ -1077,32 +1121,44 @@ function DraftRow({
         />
       </td>
       <td style={td}>
-        <select className="studio-field__input studio-field__input--select" style={{ ...cellInput, ...flagged('group') }} aria-label={`${t(locale, 'people.import.th.group')} · ${lineLabel}`} value={draft.group_id} onChange={(e) => onPatch({ group_id: e.target.value, group_name: '', belt_rank_id: '', belt_name: draft.belt_name })} data-testid={`import-group-${draft.id}`}>
-          <option value="">{draft.group_name && !draft.group_id ? fill(t(locale, 'people.import.ph.wasWritten'), { text: draft.group_name }) : t(locale, 'people.import.ph.noGroup')}</option>
+        <select className="studio-field__input studio-field__input--select" style={{ ...cellInput, ...flagged('group') }} aria-label={`${t(locale, 'people.import.th.group')} · ${lineLabel}`} value={unmatchedValue(draft.group_id, draft.group_name)} onChange={(e) => onPatch(regroup(draft, lists, chosen(e.target.value)))} data-testid={`import-group-${draft.id}`}>
+          {draft.group_name && !draft.group_id ? (
+            <option value={UNMATCHED}>{fill(t(locale, 'people.import.ph.wasWritten'), { text: draft.group_name })}</option>
+          ) : null}
+          <option value="">{t(locale, 'people.import.ph.noGroup')}</option>
           {lists.groups.map((group) => (
             <option key={group.id} value={group.id}>{group.name}</option>
           ))}
         </select>
       </td>
       <td style={td}>
-        <select className="studio-field__input studio-field__input--select" style={{ ...cellInput, ...flagged('belt') }} aria-label={`${t(locale, 'people.import.th.belt')} · ${lineLabel}`} value={draft.belt_rank_id} onChange={(e) => onPatch({ belt_rank_id: e.target.value, belt_name: '' })} disabled={belts.length === 0} data-testid={`import-belt-${draft.id}`}>
-          <option value="">{draft.belt_name && !draft.belt_rank_id ? fill(t(locale, 'people.import.ph.wasWritten'), { text: draft.belt_name }) : t(locale, 'people.import.ph.none')}</option>
+        <select className="studio-field__input studio-field__input--select" style={{ ...cellInput, ...flagged('belt') }} aria-label={`${t(locale, 'people.import.th.belt')} · ${lineLabel}`} value={unmatchedValue(draft.belt_rank_id, draft.belt_name)} onChange={(e) => onPatch({ belt_rank_id: chosen(e.target.value), belt_name: '' })} disabled={belts.length === 0} data-testid={`import-belt-${draft.id}`}>
+          {draft.belt_name && !draft.belt_rank_id ? (
+            <option value={UNMATCHED}>{fill(t(locale, 'people.import.ph.wasWritten'), { text: draft.belt_name })}</option>
+          ) : null}
+          <option value="">{t(locale, 'people.import.ph.none')}</option>
           {belts.map((belt) => (
             <option key={belt.id} value={belt.id}>{belt.name}</option>
           ))}
         </select>
       </td>
       <td style={td}>
-        <select className="studio-field__input studio-field__input--select" style={{ ...cellInput, ...flagged('plan') }} aria-label={`${t(locale, 'people.import.th.plan')} · ${lineLabel}`} value={draft.plan_id} onChange={(e) => onPatch({ plan_id: e.target.value, plan_name: '' })} data-testid={`import-plan-${draft.id}`}>
-          <option value="">{draft.plan_name && !draft.plan_id ? fill(t(locale, 'people.import.ph.wasWritten'), { text: draft.plan_name }) : t(locale, 'people.import.ph.none')}</option>
+        <select className="studio-field__input studio-field__input--select" style={{ ...cellInput, ...flagged('plan') }} aria-label={`${t(locale, 'people.import.th.plan')} · ${lineLabel}`} value={unmatchedValue(draft.plan_id, draft.plan_name)} onChange={(e) => onPatch({ plan_id: chosen(e.target.value), plan_name: '' })} data-testid={`import-plan-${draft.id}`}>
+          {draft.plan_name && !draft.plan_id ? (
+            <option value={UNMATCHED}>{fill(t(locale, 'people.import.ph.wasWritten'), { text: draft.plan_name })}</option>
+          ) : null}
+          <option value="">{t(locale, 'people.import.ph.none')}</option>
           {lists.plans.map((plan) => (
             <option key={plan.id} value={plan.id}>{plan.name}</option>
           ))}
         </select>
       </td>
       <td style={td}>
-        <select className="studio-field__input studio-field__input--select" style={{ ...cellInput, ...flagged('payment') }} aria-label={`${t(locale, 'people.import.th.payment')} · ${lineLabel}`} value={draft.payment} onChange={(e) => onPatch({ payment: e.target.value as Payment, payment_text: '' })} data-testid={`import-payment-${draft.id}`}>
-          <option value="">{draft.payment_text && !draft.payment ? fill(t(locale, 'people.import.ph.wasWritten'), { text: draft.payment_text }) : t(locale, 'people.import.ph.notPaid')}</option>
+        <select className="studio-field__input studio-field__input--select" style={{ ...cellInput, ...flagged('payment') }} aria-label={`${t(locale, 'people.import.th.payment')} · ${lineLabel}`} value={unmatchedValue(draft.payment, draft.payment_text)} onChange={(e) => onPatch({ payment: chosen(e.target.value) as Payment, payment_text: '' })} data-testid={`import-payment-${draft.id}`}>
+          {draft.payment_text && !draft.payment ? (
+            <option value={UNMATCHED}>{fill(t(locale, 'people.import.ph.wasWritten'), { text: draft.payment_text })}</option>
+          ) : null}
+          <option value="">{t(locale, 'people.import.ph.notPaid')}</option>
           {PAYMENTS.map((payment) => (
             <option key={payment} value={payment}>{t(locale, `people.import.payment.${payment}`)}</option>
           ))}

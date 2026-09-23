@@ -1589,6 +1589,18 @@ holdbacks:
       out halfway through a hundred sends. One predicate — `invite_state` — decides both what
       the list publishes and what the resend refuses, so the bulk action can never select a
       family the send will then reject.
+
+      Four things were wrong on the screen and none of them were wrong in a test. They were
+      found the same day by filling a file with one of every defect, uploading it, and
+      looking: three screens still promised an email the import no longer sends; a flagged
+      choice cell could not be answered "none", because the unmatched display sat on the
+      empty value and a `<select>` fires no change when you pick what is already selected —
+      which made a card payment, whose own advice is "leave it empty", a dead end; choosing
+      a group re-asked for a belt the new ladder already had, and silently dropped one that
+      had matched; and a family reachable only by phone was offered a "send now" that
+      `reinvite_guardian` can only refuse. The column table also still said אימייל was
+      mandatory while the review asked for email OR phone, so `mandatoryOf` now names the
+      cell-level rule apart from `required`, which stays the header contract.
     blocks: nothing — the Gladiator migration (HB-parents) can run without touching a parent
     status: closed
     opened: 2026-09-23

@@ -118,6 +118,19 @@ export function beltsForGroup(lists: Lists, groupId: string): readonly { id: str
   return classId ? (lists.beltsByClass[classId] ?? []) : []
 }
 
+/** The belt a NAME refers to inside a group's ladder, or `''` — the same forgiving
+ *  comparison `draftsFromRows` matches with.
+ *
+ *  Exported for the one moment the answer can change: choosing a group. §5.9's ladders hang
+ *  off the CLASS, so the row's belt has to be re-asked then — and re-asking the MANAGER was
+ *  wrong twice over. A belt the file named and the new ladder has was flagged again on every
+ *  row whose group needed fixing, which across a club is a great deal of clicking; and a belt
+ *  that had already matched was dropped silently, because the row keeps no name for one that
+ *  matched. Re-resolving by name fixes both. */
+export function beltIdInGroup(lists: Lists, groupId: string, name: string): string {
+  return findByName(beltsForGroup(lists, groupId), name)?.id ?? ''
+}
+
 let nextId = 1
 const draftId = () => `d${nextId++}`
 
