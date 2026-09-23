@@ -1624,6 +1624,24 @@ holdbacks:
       language and Excel refuses anything off it, so a label the reader cannot name is a
       cell he is forced to write and the import then rejects. The Russian spellings were
       missing for all four values, not only the new one.
+
+      **The by-hand door was then read beside the file**, and had drifted three ways. It
+      caught no duplicate at all — `duplicate_student` guards the PARENT's `add_child` and
+      the onboarding link, never the manager's create — so the same manager making the same
+      mistake was stopped at one door and not the other, and two records for one child is
+      something only the office can untangle. It asked for no phone, removed on 2026-09-12
+      because "there is no SMS integration and none is planned": true, and never the reason
+      the field matters, so a family reached by phone alone could be imported and not added
+      by hand. And it emailed its invitation on the spot, the one remaining way a parent
+      heard from the club mid-migration.
+
+      All three now match the file: a name already in the club warns with an "add anyway"
+      (a warning, not a refusal — this screen asks an AGE, so it cannot narrow on birthdate
+      the way the server does and a namesake will sometimes match), a phone stands in for
+      the address, and the invitation is held with a deliberate send per family. The GROUP
+      became required here too, at the owner's word; the plan and the prepaid arrangement
+      did NOT, because this door is §5.4a's phone enquiry, where the price genuinely has not
+      been agreed — the file requires them because the office already knows.
     blocks: nothing — the Gladiator migration (HB-parents) can run without touching a parent
     status: closed
     opened: 2026-09-23

@@ -36,6 +36,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Alert, Button, Icon } from '@studio/ui'
 import type { IconName } from '@studio/ui'
+import { fill } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import { CopyButton } from './SharingCards'
@@ -55,10 +56,19 @@ type Trainee = {
   name: string
   age: string
   email: string
+  /** Restored 2026-09-23. It was removed on 2026-09-12 because "there is no SMS
+   *  integration and none is planned", which was true and is no longer the reason it
+   *  matters: a phone is now a contact in its OWN right — `GuardianCreate` accepts a
+   *  guardian carrying one and no address, `pending_guardian` matches siblings on it, and
+   *  the file import takes a family reached by phone alone. Leaving it out here meant a
+   *  club could import such a family but never add one by hand. */
+  phone: string
   beltRankId: string
   groupId: string
   planId: string
   paidBy: PaidBy | ''
+  /** A same-named student the club already has, that the manager chose to add anyway. */
+  force: boolean
 }
 
 type Outcome = {
@@ -75,8 +85,8 @@ type Outcome = {
 const ADULT_AGE = 18
 const isAdultAge = (age: string) => Number(age) >= ADULT_AGE
 
-function emptyTrainee(key: string, email: string): Trainee {
-  return { key, name: '', age: '', email, beltRankId: '', groupId: '', planId: '', paidBy: '' }
+function emptyTrainee(key: string, email: string, phone: string): Trainee {
+  return { key, name: '', age: '', email, phone, beltRankId: '', groupId: '', planId: '', paidBy: '', force: false }
 }
 
 /** Splits a typed full name on the FIRST whitespace — everything after it is the last
@@ -292,6 +302,14 @@ export function AddStudentScreen({
   const [outcomes, setOutcomes] = useState<readonly Outcome[]>([])
   const [emailConfigured, setEmailConfigured] = useState<boolean | undefined>(undefined)
   const [nextKey, setNextKey] = useState(1)
+  const [sent, setSent] = useState<Record<string, 'sending' | 'sent' | 'failed'>>({})
+  //: Every student the club already has, by name, for the duplicate warning below. The
+  //: file import has checked this since it was built; this screen never did, and
+  //: `POST /students` does not either — `duplicate_student` guards the PARENT's own
+  //: `add_child` and the onboarding link, not the manager's create. So the same manager
+  //: making the same mistake was caught at one door and not the other, and two records for
+  //: one child is something only the office can untangle (2026-09-23).
+  const [existing, setExisting] = useState<readonly { first_name: string; last_name: string }[]>([])
 
   useEffect(() => {
     let alive = true
@@ -305,10 +323,52 @@ export function AddStudentScreen({
       //: today — the same filter the convert step on the student's own card applies.
       .then((page) => alive && setPlans(page.items.filter((plan) => plan.active_to === null)))
       .catch(() => alive && setPlans([]))
+    //: Every page, not the first: a duplicate on page three is still a duplicate. Same walk
+    //: the import makes, and it never blocks the form — the warning simply appears once the
+    //: roster has arrived.
+    void (async () => {
+      const rows: { first_name: string; last_name: string }[] = []
+      let after: string | undefined
+      for (let guard = 0; guard < 50; guard++) {
+        const page = await client.students({ after, limit: '200' }).catch(() => null)
+        if (!page) break
+        rows.push(...page.items)
+        if (!page.has_more || !page.next_cursor) break
+        after = page.next_cursor
+      }
+      if (alive) setExisting(rows)
+    })()
     return () => {
       alive = false
     }
   }, [client])
+
+  /** The student this trainee would duplicate, or null. Name only, because this screen asks
+   *  an AGE rather than a birthdate (inventing a date from an age would put a wrong one in
+   *  a medical record) — so it cannot narrow the way `duplicate_student` does on the
+   *  server, and a namesake will sometimes match. That is why it warns and offers "add
+   *  anyway" instead of refusing: the cost of a false positive is one click, and the cost of
+   *  a missed duplicate is two records for one child. */
+  const sendInvitation = async (email: string, studentId: string) => {
+    setSent((current) => ({ ...current, [email]: 'sending' }))
+    try {
+      const response = await client.resendInvitation(studentId)
+      setSent((current) => ({ ...current, [email]: response.ok ? 'sent' : 'failed' }))
+    } catch {
+      setSent((current) => ({ ...current, [email]: 'failed' }))
+    }
+  }
+
+  const duplicateOf = (trainee: Trainee): string | null => {
+    if (trainee.force) return null
+    const { first_name, last_name } = splitFullName(trainee.name)
+    const wanted = `${first_name} ${last_name}`.replace(/\s+/g, ' ').trim().toLowerCase()
+    if (!wanted) return null
+    const hit = existing.find(
+      (row) => `${row.first_name} ${row.last_name}`.replace(/\s+/g, ' ').trim().toLowerCase() === wanted,
+    )
+    return hit ? `${hit.first_name} ${hit.last_name}`.trim() : null
+  }
 
   //: §5.9's ladder hangs off the CLASS, not off the group, so the belt list can only be
   //: loaded once a group is chosen — and it is reloaded when the chosen group changes
@@ -352,11 +412,23 @@ export function AddStudentScreen({
     return out
   }, [trainees])
 
-  const ready = trainees.length > 0 && trainees.every((row) => row.email.includes('@'))
+  /** What every trainee needs before the roster may be reviewed. An email OR a phone,
+   *  which is the server's own rule (`GuardianCreate`), and a group — owner, 2026-09-23:
+   *  a trainee with no group is enrolled nowhere and shows on no register, and nothing
+   *  downstream ever says so. The plan and the prepaid arrangement stay optional here, and
+   *  deliberately: this door is the phone enquiry §5.4a calls a lead, where the price has
+   *  genuinely not been agreed. The FILE requires both, because the office already knows. */
+  const traineeReady = (row: Trainee) =>
+    row.name.trim() !== '' &&
+    row.age !== '' &&
+    (row.email.includes('@') || row.phone.trim() !== '') &&
+    row.groupId !== ''
+  const ready = trainees.length > 0 && trainees.every(traineeReady)
   const lastEmail = trainees.filter((row) => row.email).at(-1)?.email ?? ''
+  const lastPhone = trainees.filter((row) => row.phone).at(-1)?.phone ?? ''
 
   const openAdd = () => {
-    setSheet({ index: null, draft: emptyTrainee(`t${nextKey}`, lastEmail) })
+    setSheet({ index: null, draft: emptyTrainee(`t${nextKey}`, lastEmail, lastPhone) })
     setNextKey((n) => n + 1)
   }
 
@@ -410,15 +482,20 @@ export function AddStudentScreen({
           first_name,
           last_name,
           birthdate: null,
+          //: Nothing is emailed from here either (owner, 2026-09-23). The token is still
+          //: minted and the link still comes back, so the summary below can offer both a
+          //: copyable link and a deliberate "send now" per family — which is the whole of
+          //: how a parent hears from this club while the office is still loading it.
+          send_invitation: false,
           guardian: adult
             ? //: "18 ומעלה means self-guarding: the student IS the guardian and the email
               //: is theirs." Their own split name is reused rather than asked twice — and
               //: this branch is what stops an adult becoming two Person rows.
-              { first_name, last_name, email: trainee.email, relation: 'self' }
+              { first_name, last_name, email: trainee.email || null, phone: trainee.phone || null, relation: 'self' }
             : //: `GuardianCreate` accepts an email with no names, which is this form's whole
               //: bargain: the manager types almost nothing and the parent fills the rest in
-              //: the wizard they land in.
-              { email: trainee.email, relation: 'parent' },
+              //: the wizard they land in. Either contact will do; one of them must be there.
+              { email: trainee.email || null, phone: trainee.phone || null, relation: 'parent' },
         })
         if (!response.ok) {
           outcome.problem = 'create'
@@ -592,6 +669,45 @@ export function AddStudentScreen({
               </p>
             </div>
 
+            <div>
+              <label style={fieldLabel} htmlFor="trainee-phone">
+                {adult
+                  ? t(locale, 'people.addStudents.phoneSelf')
+                  : t(locale, 'people.addStudents.phoneParent')}
+              </label>
+              <input
+                id="trainee-phone"
+                data-testid="trainee-phone"
+                type="tel"
+                dir="ltr"
+                style={control}
+                value={draft.phone}
+                onChange={(event) => set({ phone: event.target.value })}
+              />
+              {/* Not "instead of the email" and not "as well as" — either one reaches the
+                  family, and only an email can carry an invitation. Said plainly, because a
+                  manager who leaves both blank gets a disabled button and no reason. */}
+              <p style={hint} data-testid="trainee-phone-hint">
+                {t(locale, 'people.addStudents.phoneHint')}
+              </p>
+            </div>
+
+            {duplicateOf(draft) ? (
+              <Alert tone="pending" iconLabel={t(locale, 'people.addStudents.duplicateTitle')}>
+                <span data-testid="trainee-duplicate">
+                  {fill(t(locale, 'people.addStudents.duplicate'), { name: duplicateOf(draft)! })}
+                </span>{' '}
+                <Button
+                  variant="ghost"
+                  data-testid="trainee-duplicate-force"
+                  onClick={() => set({ force: true })}
+                  style={{ minBlockSize: '32px', padding: '4px 10px', fontSize: '13px' }}
+                >
+                  {t(locale, 'people.addStudents.duplicateAnyway')}
+                </Button>
+              </Alert>
+            ) : null}
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(12rem, 1fr))', gap: 'var(--space-3)' }}>
               <div>
                 <label style={fieldLabel} htmlFor="trainee-group">
@@ -611,6 +727,14 @@ export function AddStudentScreen({
                     </option>
                   ))}
                 </select>
+                {/* A disabled save button with no reason is its own bug. The group became
+                    required on 2026-09-23 and it is the likeliest field to be left alone,
+                    so the sheet says why before the button goes grey. */}
+                {!draft.groupId ? (
+                  <p style={hint} data-testid="trainee-group-required">
+                    {t(locale, 'people.addStudents.groupRequired')}
+                  </p>
+                ) : null}
               </div>
               <div>
                 <label style={fieldLabel} htmlFor="trainee-belt">
@@ -712,7 +836,7 @@ export function AddStudentScreen({
             </Button>
             <Button
               data-testid="trainee-save"
-              disabled={!draft.name.trim() || !draft.age || !draft.email.includes('@')}
+              disabled={!traineeReady(draft)}
               onClick={saveSheet}
             >
               {t(locale, 'people.addStudents.save')}
@@ -853,6 +977,25 @@ export function AddStudentScreen({
                   {group.members[0].invitationUrl}
                 </bdi>
                 <CopyButton locale={locale} value={group.members[0].invitationUrl!} />
+                {/* The invitation is minted and held, exactly as the file import holds it.
+                    An email leaves this screen only when the manager asks for one, and only
+                    to a family there is an address for — `reinvite_guardian` refuses the
+                    rest, so the button is not offered where it could only fail. */}
+                {group.email.includes('@') && group.members[0].studentId ? (
+                  <Button
+                    variant="ghost"
+                    data-testid={`add-student-send-${group.email}`}
+                    disabled={sent[group.email] === 'sending' || sent[group.email] === 'sent'}
+                    onClick={() => void sendInvitation(group.email, group.members[0]!.studentId!)}
+                    style={{ minBlockSize: '32px', padding: '6px 12px', fontSize: '13px' }}
+                  >
+                    {sent[group.email] === 'sent'
+                      ? t(locale, 'people.import.invite.sentNow')
+                      : sent[group.email] === 'failed'
+                        ? t(locale, 'people.import.invite.sendFailed')
+                        : t(locale, 'people.import.invite.sendNow')}
+                  </Button>
+                ) : null}
               </p>
             ) : (
               //: A matched parent already has a login. §5.4a: "No second invitation, no
