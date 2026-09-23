@@ -29,7 +29,7 @@ from __future__ import annotations
 import uuid
 from datetime import date
 from enum import Enum
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
@@ -253,6 +253,11 @@ def list_students(
     class_id: uuid.UUID | None = None,
     health_status: str | None = None,
     q: str | None = Query(default=None, max_length=100),
+    #: Who can still be invited. The bulk invite (dashboard `3b`) narrows to `ready` and
+    #: then sends to what it selected; `signed_in` and `no_email` are the two ways a family
+    #: is NOT invitable, kept apart because they need different things done about them —
+    #: nothing, and an address.
+    invite_state: Literal["signed_in", "ready", "no_email"] | None = None,
     after: uuid.UUID | None = None,
     limit: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> StudentSummaryPage:
@@ -265,6 +270,7 @@ def list_students(
         class_id=class_id,
         health_status=health_status,
         q=q,
+        invite_state_is=invite_state,
         after=after,
         limit=limit,
     )
@@ -399,8 +405,14 @@ def create_student(
     # committed, so a send that fails here must not turn into a failed request — it is
     # caught and swallowed inside `send_invitation_email`, same as
     # `app/services/ops/alerts.py`'s `send()`.
+    #
+    # `send_invitation=False` suppresses THIS and nothing else (2026-09-23): the token is
+    # already minted above and `invitation_url` still goes back, so the bulk import can
+    # load a whole club without a single parent hearing about it, and the same families are
+    # invited later through `/invitation/resend` -- which re-issues the token and refreshes
+    # the expiry, so the thirty days that pass in between cost nothing.
     invitation_email_sent = False
-    if invitation_url and body.guardian.email:
+    if invitation_url and body.guardian.email and body.send_invitation:
         studio_row = session.get(Studio, require_current_studio_id())
         invitation_email_sent = send_invitation_email(
             to_email=body.guardian.email,

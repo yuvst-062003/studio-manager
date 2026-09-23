@@ -444,10 +444,12 @@ export function ImportStudentsScreen({ locale, client, onImported }: Props) {
   const addedCount = drafts.filter(added).length
   const familyOutcomes = result?.families ?? new Map<string, FamilyOutcome>()
   const familiesAdded = families.filter((family) => family.members.some(added)).length
-  const invitesSent = [...familyOutcomes.values()].filter((outcome) => outcome.invitation === 'sent').length
+  // No `sent` and no `mailFailed` any more: the import never asks the server to send, so
+  // the only outcomes it can produce are a credential waiting (`held`) and a guardian who
+  // already has an account (`not_needed`). What replaced the mail counters is the count of
+  // invitations now sitting ready, which is what the manager comes back for.
+  const invitesHeld = [...familyOutcomes.values()].filter((outcome) => outcome.invitation === 'held').length
   const invitesNotNeeded = [...familyOutcomes.values()].filter((outcome) => outcome.invitation === 'not_needed').length
-  const mailFailed = [...familyOutcomes.values()].filter((outcome) => outcome.invitation === 'failed').length
-  const unconfigured = [...familyOutcomes.values()].some((outcome) => outcome.invitation === 'unconfigured')
 
   const shown = filter === 'problems' ? families.filter((family) => family.members.some((member) => withProblems.includes(member))) : families
   const runLabel =
@@ -472,10 +474,8 @@ export function ImportStudentsScreen({ locale, client, onImported }: Props) {
             <div style={{ fontSize: '18px', fontWeight: 700 }}>{fill(t(locale, 'people.import.done.title'), { trainees: addedCount, families: familiesAdded })}</div>
             <div style={{ ...hint, color: 'var(--text-secondary)', marginBlockStart: '2px' }}>
               {[
-                invitesSent > 0 ? fill(t(locale, 'people.import.done.sent'), { n: invitesSent }) : null,
+                invitesHeld > 0 ? fill(t(locale, 'people.import.done.held'), { n: invitesHeld }) : null,
                 invitesNotNeeded > 0 ? fill(t(locale, 'people.import.done.notNeeded'), { n: invitesNotNeeded }) : null,
-                mailFailed > 0 ? fill(t(locale, 'people.import.done.mailFailed'), { n: mailFailed }) : null,
-                unconfigured ? t(locale, 'people.import.done.unconfigured') : null,
                 withProblems.length > 0 ? fill(t(locale, 'people.import.done.left'), { n: withProblems.length }) : null,
               ]
                 .filter(Boolean)
@@ -511,8 +511,8 @@ export function ImportStudentsScreen({ locale, client, onImported }: Props) {
             <>
               <Stat n={familiesAdded} label={t(locale, 'people.import.stat.families')} color="var(--emphasis)" />
               <Stat n={addedCount} label={t(locale, 'people.import.stat.added')} color="var(--paid)" />
-              <Stat n={invitesSent} label={t(locale, 'people.import.stat.invited')} color="var(--paid)" />
-              <Stat n={mailFailed} label={t(locale, 'people.import.stat.mailFailed')} color="var(--pending)" />
+              <Stat n={invitesHeld} label={t(locale, 'people.import.stat.held')} color="var(--emphasis)" />
+              <Stat n={withProblems.length} label={t(locale, 'people.import.stat.problems')} color="var(--pending)" />
             </>
           ) : (
             <>
@@ -883,9 +883,11 @@ function FamilyCard({
     .join(' · ')
   const th: CSSProperties = { fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textAlign: 'start', padding: '8px 12px', borderBlockEnd: '1px solid var(--border)', whiteSpace: 'nowrap' }
   const first = family.members[0]!
+  // Deliberately no mail icon on `held`: the row must not read as "an email went out",
+  // which is the single thing this import promises never happened.
   const invitationChip = (kind: InvitationOutcome) => {
-    const tone: Tone = kind === 'sent' ? 'ok' : kind === 'not_needed' ? 'info' : kind === 'none' ? 'neutral' : 'danger'
-    return <Chip tone={tone} icon={kind === 'sent' ? 'mail' : kind === 'failed' ? 'warning' : undefined} testId={`import-invite-${family.key}`}>{t(locale, `people.import.invite.${kind}`)}</Chip>
+    const tone: Tone = kind === 'not_needed' ? 'info' : 'neutral'
+    return <Chip tone={tone} testId={`import-invite-${family.key}`}>{t(locale, `people.import.invite.${kind}`)}</Chip>
   }
 
   return (
@@ -914,16 +916,16 @@ function FamilyCard({
           {outcome ? (
             <>
               {invitationChip(outcome.invitation)}
-              {outcome.invitation === 'failed' && outcome.studentId ? (
+              {outcome.invitation === 'held' && outcome.studentId ? (
                 <Button variant="ghost" onClick={() => onResend(outcome.studentId!)} disabled={resend === 'sending' || resend === 'sent'} data-testid={`import-resend-${family.key}`} style={{ minBlockSize: '32px', padding: '6px 12px', fontSize: '13px' }}>
-                  {resend === 'sent' ? t(locale, 'people.import.invite.resent') : resend === 'failed' ? t(locale, 'people.import.invite.resendFailed') : t(locale, 'people.import.invite.resend')}
+                  {resend === 'sent' ? t(locale, 'people.import.invite.sentNow') : resend === 'failed' ? t(locale, 'people.import.invite.sendFailed') : t(locale, 'people.import.invite.sendNow')}
                 </Button>
               ) : null}
             </>
           ) : (
             <>
               <Chip tone="neutral">{family.members.length === 1 ? t(locale, 'people.import.family.one') : fill(t(locale, 'people.import.family.many'), { n: family.members.length })}</Chip>
-              {family.email ? <Chip tone="neutral" icon="mail">{t(locale, 'people.import.family.invitation')}</Chip> : null}
+              {family.email ? <Chip tone="neutral">{t(locale, 'people.import.family.invitation')}</Chip> : null}
             </>
           )}
           {anyAdded ? null : (

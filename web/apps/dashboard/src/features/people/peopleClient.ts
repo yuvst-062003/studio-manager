@@ -48,6 +48,10 @@ export type StudentFilters = {
    *  would drop the children who live on a later page. */
   class_id?: string
   health_status?: string
+  /** `ready` / `no_email` / `signed_in` — whose family can still be sent an invitation.
+   *  Server-side for the same reason `class_id` is: the list is cursor-paginated, and the
+   *  bulk invite asks about the whole club rather than the page on screen. */
+  invite_state?: string
   after?: string
   /** Page size, as the query string carries it. The import walks the whole roster to
    *  check for duplicates and asks for the server's maximum rather than eight small
@@ -177,6 +181,13 @@ export function makeDashboardPeopleClient(fetcher: Fetcher) {
         phone?: string | null
         relation?: string
       }
+      /** Whether the server actually MAILS the invitation. The token is minted either
+       *  way, so `invitation_url` comes back regardless and the family can be invited
+       *  whenever the club is ready. Omitted by the by-hand form, which still sends on
+       *  the spot; the file import (`import/run.ts`) sends `false`, because a club is
+       *  loaded from the office's spreadsheet weeks before its parents are told the app
+       *  exists. */
+      send_invitation?: boolean
     }) =>
       fetcher('/api/v1/students', {
         method: 'POST',

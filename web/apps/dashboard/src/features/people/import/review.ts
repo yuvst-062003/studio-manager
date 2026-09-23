@@ -52,7 +52,7 @@ export type Lists = {
 
 export type Problem =
   | 'missing_first_name'
-  | 'missing_email'
+  | 'missing_contact'
   | 'bad_email'
   | 'bad_birthdate'
   | 'unknown_group'
@@ -181,8 +181,16 @@ export function isDuplicate(draft: Draft, lists: Lists): boolean {
 export function problemsOf(draft: Draft, lists: Lists, today: string): Problem[] {
   const problems: Problem[] = []
   if (draft.first_name.trim() === '') problems.push('missing_first_name')
-  if (draft.email.trim() === '') problems.push('missing_email')
-  else if (!EMAIL.test(draft.email.trim())) problems.push('bad_email')
+  // Email OR phone, which is exactly what the server asks for — `GuardianCreate`'s own
+  // validator refuses a guardian carrying neither, and `invitation`'s CHECK says the same
+  // thing in the database. Requiring the EMAIL here was stricter than both, and it kept a
+  // club that has run on WhatsApp for years from importing the families it reaches by
+  // phone (owner, 2026-09-23). Those families simply cannot be emailed an invitation
+  // later — a visible gap on the students screen, rather than a red row that stops the
+  // whole migration.
+  if (draft.email.trim() === '') {
+    if (normalizePhone(draft.phone) === '') problems.push('missing_contact')
+  } else if (!EMAIL.test(draft.email.trim())) problems.push('bad_email')
   if (draft.birthdate === 'invalid') problems.push('bad_birthdate')
 
   const groupUnknown = draft.group_id === '' && draft.group_name.trim() !== ''
@@ -207,14 +215,32 @@ export function problemsOf(draft: Draft, lists: Lists, today: string): Problem[]
   return problems
 }
 
-const familyKey = (email: string) => email.trim().toLowerCase()
+/** Digits only, in E.164 without the plus — the same shape `normalize_phone` in
+ *  `app/services/people/matching.py` reduces to, so `050-123-4567` here and `0501234567`
+ *  on a Person already in the database are one number. Israel is the club's country, so a
+ *  leading 0 means +972. `''` when this is not a phone number at all. */
+export function normalizePhone(raw: string): string {
+  const trimmed = raw.trim()
+  let digits = trimmed.replace(/\D+/g, '')
+  if (!digits) return ''
+  if (!trimmed.startsWith('+') && digits.startsWith('0')) digits = `972${digits.slice(1)}`
+  return digits.length >= 7 && digits.length <= 15 ? digits : ''
+}
+
+/** What makes two rows one family. The email first, because that is what the server
+ *  matches a guardian on; the phone second, so the siblings of a family reached only by
+ *  phone land on ONE card instead of one each. The server agrees either way —
+ *  `pending_guardian` matches a normalized phone too — but a review that split them would
+ *  tell the manager he was creating two parents when he was not. */
+const familyKey = (email: string, phone: string) =>
+  email.trim().toLowerCase() || (normalizePhone(phone) && `phone:${normalizePhone(phone)}`) || ''
 
 /** One card per account: siblings share their parent's email, an adult is alone on
  *  theirs. First-seen order, so the review reads in the file's order. */
 export function familiesOf(drafts: readonly Draft[]): Family[] {
   const families: Family[] = []
   for (const draft of drafts) {
-    const key = familyKey(draft.email) || `line-${draft.line}`
+    const key = familyKey(draft.email, draft.phone) || `line-${draft.line}`
     let family = families.find((row) => row.key === key)
     if (!family) {
       const adult = isAdult(draft)

@@ -12877,6 +12877,11 @@ export interface components {
             last_name: string;
             /** Phone */
             phone?: string | null;
+            /**
+             * Send Invitation
+             * @default true
+             */
+            send_invitation: boolean;
         };
         /**
          * StudentCreateResult
@@ -13206,6 +13211,11 @@ export interface components {
             group_names?: string[];
             /** Guardian Display Names */
             guardian_display_names?: string[];
+            /**
+             * Guardian Invite State
+             * @default no_email
+             */
+            guardian_invite_state: string;
             /** Health Status */
             health_status: string;
             /**
@@ -13609,6 +13619,11 @@ export interface components {
             last_name: string;
             /** Phone */
             phone?: string | null;
+            /**
+             * Send Invitation
+             * @default true
+             */
+            send_invitation: boolean;
             /** Session Id */
             session_id?: string | null;
         };
@@ -21849,6 +21864,7 @@ export interface operations {
                 class_id?: string | null;
                 health_status?: string | null;
                 q?: string | null;
+                invite_state?: ("signed_in" | "ready" | "no_email") | null;
                 after?: string | null;
                 limit?: number;
             };

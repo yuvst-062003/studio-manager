@@ -14607,6 +14607,11 @@
               }
             ],
             "title": "Phone"
+          },
+          "send_invitation": {
+            "default": true,
+            "title": "Send Invitation",
+            "type": "boolean"
           }
         },
         "required": [
@@ -15376,6 +15381,11 @@
             },
             "title": "Guardian Display Names",
             "type": "array"
+          },
+          "guardian_invite_state": {
+            "default": "no_email",
+            "title": "Guardian Invite State",
+            "type": "string"
           },
           "health_status": {
             "pattern": "^(missing|trial_signed|signed)$",
@@ -16380,6 +16390,11 @@
               }
             ],
             "title": "Phone"
+          },
+          "send_invitation": {
+            "default": true,
+            "title": "Send Invitation",
+            "type": "boolean"
           },
           "session_id": {
             "anyOf": [
@@ -30219,6 +30234,27 @@
                 }
               ],
               "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "invite_state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "signed_in",
+                    "ready",
+                    "no_email"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Invite State"
             }
           },
           {

@@ -1561,6 +1561,41 @@ holdbacks:
     source: >-
       web/apps/dashboard/src/features/people/import/ · owner review 2026-09-18 ·
       supersedes the CSV panel of f1089d88 (2026-08-30)
+  - id: HB-import-sends-nothing
+    kind: carried
+    title: The club is loaded in silence, and its parents are invited weeks later
+    why: >-
+      HB-students-import closed on the opposite decision — "the server emails each family on
+      create as it always has, and the screen says per family whether it went". The owner
+      reversed it on 2026-09-23: the manager fills the template from the office's own records
+      and wants the staff and dashboard apps loaded with the real club to test against, weeks
+      before the families are told the app exists. An import that mails a hundred invitations
+      that afternoon is the one outcome he asked could not happen.
+
+      `StudentCreate.send_invitation` (default true, so the by-hand form and §5.4a's trial
+      booking are untouched) gates the send in `POST /students` and nothing else: the token is
+      still minted and `invitation_url` still returned, so a family standing at the desk can
+      still be handed their link. Nothing else in the product reaches a guardian by email —
+      billing chasers, health reminders and at-risk alerts are all push, and a parent who never
+      signed in has no device token — so suppressing that one call suppresses everything.
+
+      Two further owner decisions of the same day. The email is no longer required per row:
+      the review asks for an email OR a phone, which is exactly what `GuardianCreate` and
+      `invitation`'s CHECK already required, and a club that has run on WhatsApp for years
+      reaches half its families by phone. And the families are invited later from the students
+      screen: `guardian_invite_state` on every row (signed_in / ready / no_email), a filter that
+      narrows in SQL because the list is cursor-paginated, and a bulk action that loops the
+      existing per-student resend so it paces itself under the mail provider rather than timing
+      out halfway through a hundred sends. One predicate — `invite_state` — decides both what
+      the list publishes and what the resend refuses, so the bulk action can never select a
+      family the send will then reject.
+    blocks: nothing — the Gladiator migration (HB-parents) can run without touching a parent
+    status: closed
+    opened: 2026-09-23
+    closed: 2026-09-23
+    source: >-
+      owner, 2026-09-23 · app/routers/students.py · app/services/people/students.py ·
+      web/apps/dashboard/src/features/people/import/ · StudentsScreen.tsx
   - id: HB-upay-receipt-link
     kind: carried
     title: D6's receipt button needs one real uPay transaction to settle it

@@ -80,6 +80,8 @@ function studentSummary(overrides: Partial<StudentSummary> = {}): StudentSummary
     joined_on: null,
     left_on: null,
     status: 'active',
+    // Always sent by the server (it carries a default), so the generated type requires it.
+    guardian_invite_state: 'no_email',
     ...overrides,
   }
 }

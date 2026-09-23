@@ -1633,3 +1633,95 @@ describe('resending a family’s invitation', () => {
     expect(await screen.findByTestId('detail-resend-failed')).toHaveTextContent('email address')
   })
 })
+
+// The other half of an import that emailed nobody (owner, 2026-09-23): the club is loaded
+// in silence, and weeks later the office invites the families it chooses.
+describe('the bulk invite', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('asks the server for the families still waiting, rather than filtering the page on screen', async () => {
+    const students = vi.fn(async () => ({ items: [summary()], next_cursor: null, has_more: false }))
+    render(<StudentsScreen locale="he" client={makeClient({ students })} />)
+    await screen.findByTestId('students-table')
+
+    await userEvent.selectOptions(screen.getByTestId('students-invite-filter'), 'ready')
+
+    // The list is cursor-paginated, so the narrowing has to reach the server or the
+    // families on page two are invisible to "invite everyone still waiting".
+    await waitFor(() =>
+      expect(students).toHaveBeenLastCalledWith(expect.objectContaining({ invite_state: 'ready' })),
+    )
+  })
+
+  it('sends one invitation per selected family, through the per-student route', async () => {
+    // Declared with the url parameter it is read back through: a bare `async () =>` gives
+    // `mock.calls` an empty-tuple element type, and destructuring the url off it does not
+    // compile.
+    const fetchMock = vi.fn(async (url: string) =>
+      url.includes('/invitation/resend')
+        ? new Response('{}', { status: 200 })
+        : new Response(JSON.stringify({ items: [] }), { status: 200 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const client = makeClient({
+      students: vi.fn(async () => ({
+        items: [summary(), summary({ id: 'st2', first_name: 'יוסי' })],
+        next_cursor: null,
+        has_more: false,
+      })),
+    })
+    render(<StudentsScreen locale="he" client={client} />)
+    await screen.findByTestId('students-table')
+
+    await userEvent.click(await screen.findByTestId('select-st1'))
+    await userEvent.click(screen.getByTestId('select-st2'))
+    await userEvent.click(screen.getByTestId('bulk-invite'))
+    await userEvent.click(await screen.findByTestId('confirm-bulk-confirm'))
+
+    await waitFor(() => expect(screen.getByTestId('bulk-outcome')).toBeInTheDocument())
+    const invited = fetchMock.mock.calls
+      .map(([url]) => String(url))
+      .filter((url) => url.includes('/invitation/resend'))
+    expect(invited).toEqual([
+      '/api/v1/students/st1/invitation/resend',
+      '/api/v1/students/st2/invitation/resend',
+    ])
+    expect(screen.getByTestId('bulk-outcome')).toHaveTextContent(
+      t('he', 'people.bulk.applied').replace('{n}', '2'),
+    )
+  })
+
+  it('a family that cannot be invited is named on its row, not counted as a failure', async () => {
+    // 422 is `reinvite_guardian` refusing: they already signed in, or no guardian has an
+    // address. Both are ordinary states the list itself can show, so the row says which
+    // rather than reading as "something went wrong, try again".
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        String(url).includes('/st2/')
+          ? new Response('{}', { status: 422 })
+          : new Response(JSON.stringify({ items: [] }), { status: 200 }),
+      ),
+    )
+    const client = makeClient({
+      students: vi.fn(async () => ({
+        items: [summary(), summary({ id: 'st2', first_name: 'יוסי' })],
+        next_cursor: null,
+        has_more: false,
+      })),
+    })
+    render(<StudentsScreen locale="he" client={client} />)
+    await screen.findByTestId('students-table')
+
+    await userEvent.click(await screen.findByTestId('select-st1'))
+    await userEvent.click(screen.getByTestId('select-st2'))
+    await userEvent.click(screen.getByTestId('bulk-invite'))
+    await userEvent.click(await screen.findByTestId('confirm-bulk-confirm'))
+
+    const outcome = await screen.findByTestId('bulk-outcome')
+    expect(outcome).toHaveTextContent(t('he', 'people.bulk.applied').replace('{n}', '1'))
+    expect(screen.getByTestId('bulk-refused-st2')).toHaveTextContent(
+      t('he', 'people.bulk.refused.not_invitable'),
+    )
+  })
+})

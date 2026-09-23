@@ -37,6 +37,25 @@ const STATUSES = [
   'lost',
 ] as const
 
+/** `StudentSummaryOut.guardian_invite_state`, in the order the filter offers them: the
+ *  families still waiting first, because that is the list the bulk invite is opened to
+ *  find. Decided server-side by `app.services.people.students.invite_state`, the same
+ *  predicate `/invitation/resend` refuses on — so `ready` here is a send that will be
+ *  accepted, not one that will 422. */
+const INVITE_STATES = ['ready', 'no_email', 'signed_in'] as const
+
+const BULK_LABEL = {
+  move: 'people.bulk.move',
+  leave: 'people.bulk.leave',
+  invite: 'people.bulk.invite',
+} as const
+
+const BULK_CONFIRM = {
+  move: 'people.bulk.moveConfirm',
+  leave: 'people.bulk.leaveConfirm',
+  invite: 'people.bulk.inviteConfirm',
+} as const
+
 type StudentPage = CursorPage<StudentSummary>
 
 export function chipToneFor(status: string): 'paid' | 'pending' | 'cancelled' | 'planned' {
@@ -125,7 +144,7 @@ export function StudentsScreen({
   const [selected, setSelected] = useState<string[]>([])
   const [bulkGroup, setBulkGroup] = useState('')
   const [bulkGroups, setBulkGroups] = useState<{ id: string; name: string }[]>([])
-  const [confirmingBulk, setConfirmingBulk] = useState<'move' | 'leave' | null>(null)
+  const [confirmingBulk, setConfirmingBulk] = useState<'move' | 'leave' | 'invite' | null>(null)
   const [bulkOutcome, setBulkOutcome] = useState<{
     applied: number
     refused: { id: string; reason: string }[]
@@ -184,12 +203,45 @@ export function StudentsScreen({
     setSelected([])
     reload()
   }
+
+  /** Invite the selected families — the other half of an import that sent nothing.
+   *
+   *  Sequential, through the SAME per-student route the by-hand screen and the import's
+   *  send-now button use, for the reason `bulkLeave` above is: no second implementation to
+   *  drift, and a per-row answer instead of one number. It also paces itself, which a
+   *  server-side loop over a hundred families would not — every send is an HTTPS call to
+   *  the mail provider, and a hundred of them inside one request is a request that times
+   *  out halfway with no record of where it stopped.
+   *
+   *  A 422 is not a failure: `reinvite_guardian` refuses a guardian who already signed in
+   *  and one with no address, and both are ordinary states this list can show. They are
+   *  named on their row rather than counted as errors. */
+  async function bulkInvite() {
+    setConfirmingBulk(null)
+    const refused: { id: string; reason: string }[] = []
+    let applied = 0
+    for (const studentId of selected) {
+      const response = await apiFetch(`/api/v1/students/${studentId}/invitation/resend`, {
+        method: 'POST',
+      })
+      if (response.ok) applied += 1
+      else refused.push({ id: studentId, reason: response.status === 422 ? 'not_invitable' : 'failed' })
+    }
+    setBulkOutcome({ applied, refused })
+    setSelected([])
+    reload()
+  }
+
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('')
   //: Which class the roster is narrowed to, '' for all of them. Owner, 2026-09-09:
   //: "Students — filter by class." Sent to the server rather than applied here: the list is
   //: cursor-paginated, so filtering a fetched page would hide the children on the next one.
   const [classId, setClassId] = useState('')
+  //: Who has still to be invited. Server-side like `classId`, and for the same reason: the
+  //: list is cursor-paginated, and "invite everyone still waiting" is a question about the
+  //: whole club rather than about the page on screen.
+  const [inviteState, setInviteState] = useState('')
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([])
   // Which query the page in state answers. Derived rather than a `loading` flag set
   // synchronously in the effect body: that is a cascading render, and eslint's
@@ -201,7 +253,7 @@ export function StudentsScreen({
   // `status` does: leave it out and `loaded` compares the answer to a question that was
   // not asked, so the count and the empty-state never render again after the first
   // class is chosen.
-  const asked = `${query}\u0000${status}\u0000${classId}\u0000${version}`
+  const asked = `${query}\u0000${status}\u0000${classId}\u0000${inviteState}\u0000${version}`
   const loaded = answered === asked
 
   // B2.1's subtitle and B2.2's "{{count}} מתוך {{total}}" both need a real total, and
@@ -245,9 +297,9 @@ export function StudentsScreen({
 
   useEffect(() => {
     let live = true
-    const key = `${query}\u0000${status}\u0000${classId}\u0000${version}`
+    const key = `${query}\u0000${status}\u0000${classId}\u0000${inviteState}\u0000${version}`
     client
-      .students({ q: query, status, class_id: classId || undefined })
+      .students({ q: query, status, class_id: classId || undefined, invite_state: inviteState || undefined })
       .then((fresh) => {
         if (!live) return
         setPage(fresh)
@@ -255,7 +307,7 @@ export function StudentsScreen({
         setBaselineCount((current) =>
           // The baseline is only the baseline when NOTHING is filtered -- a count taken
           // while a class filter was on would make every later "3 of 12" wrong.
-          current === null && !query && !status && !classId && !fresh.has_more
+          current === null && !query && !status && !classId && !inviteState && !fresh.has_more
             ? fresh.items.length
             : current,
         )
@@ -264,7 +316,7 @@ export function StudentsScreen({
     return () => {
       live = false
     }
-  }, [client, query, status, classId, version])
+  }, [client, query, status, classId, inviteState, version])
 
   const nameOfStudent = (id: string) => {
     const row = page.items.find((student) => student.id === id)
@@ -405,6 +457,19 @@ export function StudentsScreen({
             </option>
           ))}
         </SelectField>
+        <SelectField
+          data-testid="students-invite-filter"
+          label={t(locale, 'people.invite.filter')}
+          onChange={(event) => setInviteState(event.target.value)}
+          value={inviteState}
+        >
+          <option value="">{t(locale, 'people.invite.any')}</option>
+          {INVITE_STATES.map((value) => (
+            <option key={value} value={value}>
+              {t(locale, `people.invite.${value}`)}
+            </option>
+          ))}
+        </SelectField>
         {loaded ? (
           <span className="people-filter-result" data-testid="students-result-count">
             {baselineCount !== null
@@ -421,7 +486,9 @@ export function StudentsScreen({
         <EmptyState
           title={t(
             locale,
-            query || status ? 'people.student.emptyFiltered' : 'people.student.empty',
+            query || status || inviteState
+              ? 'people.student.emptyFiltered'
+              : 'people.student.empty',
           )}
         />
       ) : (
@@ -456,6 +523,9 @@ export function StudentsScreen({
             >
               {t(locale, 'people.bulk.move')}
             </Button>
+            <Button data-testid="bulk-invite" onClick={() => setConfirmingBulk('invite')}>
+              {t(locale, 'people.bulk.invite')}
+            </Button>
             <Button
               data-testid="bulk-leave"
               onClick={() => setConfirmingBulk('leave')}
@@ -467,22 +537,19 @@ export function StudentsScreen({
         ) : null}
         {confirmingBulk ? (
           <ConfirmDialog
-            body={t(
-              locale,
-              confirmingBulk === 'move' ? 'people.bulk.moveConfirm' : 'people.bulk.leaveConfirm',
-            )}
-            confirmLabel={t(
-              locale,
-              confirmingBulk === 'move' ? 'people.bulk.move' : 'people.bulk.leave',
-            )}
+            body={t(locale, BULK_CONFIRM[confirmingBulk])}
+            confirmLabel={t(locale, BULK_LABEL[confirmingBulk])}
             locale={locale}
             onCancel={() => setConfirmingBulk(null)}
-            onConfirm={() => void (confirmingBulk === 'move' ? bulkMove() : bulkLeave())}
+            onConfirm={() =>
+              void (confirmingBulk === 'move'
+                ? bulkMove()
+                : confirmingBulk === 'leave'
+                  ? bulkLeave()
+                  : bulkInvite())
+            }
             testId="confirm-bulk"
-            title={t(
-              locale,
-              confirmingBulk === 'move' ? 'people.bulk.move' : 'people.bulk.leave',
-            )}
+            title={t(locale, BULK_LABEL[confirmingBulk])}
             titleId="confirm-bulk-title"
           />
         ) : null}

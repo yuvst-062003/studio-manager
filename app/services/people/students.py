@@ -25,6 +25,7 @@ import hashlib
 import logging
 import secrets
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
@@ -54,6 +55,33 @@ from app.services.people.status import StudentStatusService
 #: §5.3's invitation. Thirty days matches the refresh-token window and is long enough that
 #: a parent who is away for a fortnight is not locked out of their own children.
 INVITATION_TTL_DAYS = 30
+
+#: Whether a student's family can be sent an invitation, decided in ONE place because two
+#: screens ask it: `_project` puts it on every row of the students list, and
+#: `reinvite_guardian` refuses on exactly these grounds. A list that offered a send the send
+#: would then refuse is the dead end §5.4a's refusal rule exists to prevent — the manager
+#: selects forty families, presses send, and reads forty-two 422s.
+#:
+#: Added for the bulk invite (2026-09-23): a club imported in silence is invited weeks
+#: later, and "who has not been invited yet" is the question that screen is built around.
+INVITE_SIGNED_IN = "signed_in"
+INVITE_READY = "ready"
+INVITE_NO_EMAIL = "no_email"
+
+
+def invite_state(guardians: Iterable[tuple[uuid.UUID | None, str | None]]) -> str:
+    """`(auth_identity_id, email)` per guardian -> one of the three states above.
+
+    Signed in wins over addressed: `accept_invitation` binds a login to a Person once and
+    matches only on `auth_identity_id IS NULL`, so a token minted for a family who already
+    signed in is a link that silently fails. A student with no guardian at all answers
+    `no_email`, which is true in the only sense the screen cares about — there is nobody to
+    send to.
+    """
+    pairs = list(guardians)
+    if any(auth_identity_id is not None for auth_identity_id, _ in pairs):
+        return INVITE_SIGNED_IN
+    return INVITE_READY if any(email for _, email in pairs) else INVITE_NO_EMAIL
 
 
 logger = logging.getLogger(__name__)
@@ -96,6 +124,8 @@ class StudentRow:
     guardian_display_names: list[str]
     #: 9h — present / (present + absent) over marked sessions; None until anything was.
     attendance_percent: int | None = None
+    #: One of `INVITE_SIGNED_IN` / `INVITE_READY` / `INVITE_NO_EMAIL`. See `invite_state`.
+    guardian_invite_state: str = INVITE_NO_EMAIL
 
 
 class StudentService:
@@ -374,14 +404,17 @@ class StudentService:
         if not guardians:
             raise RefusedError("this student has no guardian to invite")
 
-        signed_in = [person for _, person in guardians if person.auth_identity_id is not None]
-        if signed_in:
+        # The SAME predicate the students list publishes as `guardian_invite_state`, so the
+        # bulk invite can never select a family this method will then refuse.
+        state = invite_state((person.auth_identity_id, person.email) for _, person in guardians)
+        if state == INVITE_SIGNED_IN:
             raise RefusedError("this guardian already has a login")
-
-        addressed = next((person for _, person in guardians if person.email), None)
-        if addressed is None or not addressed.email:
+        if state == INVITE_NO_EMAIL:
             raise RefusedError("no guardian on this student has an email address")
+
+        addressed = next(person for _, person in guardians if person.email)
         email = addressed.email
+        assert email is not None  # INVITE_READY is exactly "some guardian has an email"
 
         pending = (
             session.execute(
@@ -452,6 +485,7 @@ class StudentService:
         class_id: uuid.UUID | None = None,
         health_status: str | None = None,
         q: str | None = None,
+        invite_state_is: str | None = None,
         after: uuid.UUID | None = None,
         limit: int = 50,
     ) -> tuple[list[StudentRow], uuid.UUID | None]:
@@ -515,6 +549,26 @@ class StudentService:
                     Student.id.in_(guardian_match),
                 )
             )
+        if invite_state_is:
+            # Filtered in SQL rather than over the fetched page: the list is cursor
+            # paginated, so narrowing a page here would hide the families on the next one —
+            # and "invite everyone still waiting" is a question about the whole club.
+            #
+            # Aliased for the reason the `q` filter above is: `Person` in the base query IS
+            # the student, and a guardian is a different Person.
+            guardian_person = aliased(Person)
+            of_guardians = select(Guardian.student_id).join(
+                guardian_person, guardian_person.id == Guardian.person_id
+            )
+            has_login = of_guardians.where(guardian_person.auth_identity_id.is_not(None))
+            has_email = of_guardians.where(guardian_person.email.is_not(None))
+            if invite_state_is == INVITE_SIGNED_IN:
+                stmt = stmt.where(Student.id.in_(has_login))
+            elif invite_state_is == INVITE_READY:
+                stmt = stmt.where(Student.id.not_in(has_login), Student.id.in_(has_email))
+            elif invite_state_is == INVITE_NO_EMAIL:
+                stmt = stmt.where(Student.id.not_in(has_login), Student.id.not_in(has_email))
+
         if after is not None:
             stmt = stmt.where(Student.id > after)
 
@@ -535,9 +589,11 @@ class StudentService:
                 .order_by(Group.name)
             ).scalars()
         )
+        # `auth_identity_id` and `email` ride along on the join this row already needed —
+        # the invitation state is two more columns, not a second query per student.
         guardians = list(
             session.execute(
-                select(Person.first_name, Person.last_name)
+                select(Person.first_name, Person.last_name, Person.auth_identity_id, Person.email)
                 .join(Guardian, Guardian.person_id == Person.id)
                 .where(Guardian.student_id == student.id)
                 .order_by(Guardian.is_primary.desc(), Person.first_name)
@@ -575,7 +631,12 @@ class StudentService:
             current_belt_id=student.current_belt_id,
             group_names=group_names,
             frozen_until=frozen_until,
-            guardian_display_names=[format_person_name(first, last) for first, last in guardians],
+            guardian_display_names=[
+                format_person_name(first, last) for first, last, _, _ in guardians
+            ],
+            guardian_invite_state=invite_state(
+                (auth_identity_id, email) for _, _, auth_identity_id, email in guardians
+            ),
             # Excluding unmarked from BOTH halves, like the student-card strip: an
             # unmarked register says nothing about the child (§5.14).
             attendance_percent=(

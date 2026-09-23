@@ -13,9 +13,15 @@
 // needs the first sibling's guardian committed before the second arrives. Parallel writes
 // would race that match into duplicate people.
 //
-// No second create path exists on the server, so nothing here can drift from the form. The
-// server also sends the family's invitation email on create, exactly as it does for the
-// form (decision 21) — this runner only READS what it said about that, per family.
+// No second create path exists on the server, so nothing here can drift from the form.
+//
+// **Nothing is emailed.** Every create carries `send_invitation: false` (owner, 2026-09-23):
+// a club is loaded from the office's own spreadsheet weeks before its parents are told the
+// app exists, and a hundred invitations landing that afternoon is the one outcome nobody
+// wanted. The token is still minted and `invitation_url` still comes back, so a family can
+// be handed their link across the desk today and the whole club can be invited later
+// through `/invitation/resend` — which re-issues the token and refreshes its expiry, so the
+// weeks in between cost nothing.
 import type { DashboardPeopleClient } from '../peopleClient'
 import type { Draft, Family } from './review'
 import { isAdult } from './review'
@@ -31,14 +37,15 @@ export type RowOutcome = {
   problem: 'create' | 'convert' | 'belt' | null
 }
 
-/** What the server said about the family's invitation, read off the first member that
- *  was created — siblings match onto that guardian and mint nothing new.
- *  - `sent`: the email was handed to the SMTP server.
- *  - `not_needed`: the email matched an account that already exists; they sign in as usual.
- *  - `unconfigured`: this deployment cannot send mail at all (`SMTP_PASSWORD` unset).
- *  - `failed`: mail is configured and this one did not go — resend is the remedy.
+/** What became of the family's invitation, read off the first member that was created —
+ *  siblings match onto that guardian and mint nothing new.
+ *  - `held`: the token is minted and waiting, and nothing was sent. The normal outcome of
+ *    an import, and the reason this type no longer has `sent`, `failed` or `unconfigured`:
+ *    the runner never asks for a send, so none of the three can happen here.
+ *  - `not_needed`: the guardian matched an account that already exists; they sign in as
+ *    usual and there is nothing to invite them to.
  *  - `none`: no member of the family was created. */
-export type InvitationOutcome = 'sent' | 'not_needed' | 'unconfigured' | 'failed' | 'none'
+export type InvitationOutcome = 'held' | 'not_needed' | 'none'
 
 export type FamilyOutcome = { invitation: InvitationOutcome; studentId: string | null }
 
@@ -49,12 +56,13 @@ export type ImportResult = {
 
 type CreateBody = Parameters<DashboardPeopleClient['createStudent']>[0]
 
+/** Only the parts this runner reads. The server also answers with
+ *  `invitation_email_configured` and `invitation_email_sent`, and both are omitted on
+ *  purpose: nothing here asks for a send, so neither can say anything but "no". */
 type CreateAnswer = {
   student?: { id?: string }
   invitation_token?: string | null
   invitation_url?: string | null
-  invitation_email_configured?: boolean
-  invitation_email_sent?: boolean
 }
 
 const blankToUndefined = (value: string) => (value.trim() === '' ? undefined : value.trim())
@@ -73,6 +81,8 @@ export function createBodyFor(draft: Draft, family: Family): CreateBody {
     first_name,
     last_name,
     birthdate: /^\d{4}-\d{2}-\d{2}$/.test(draft.birthdate) ? draft.birthdate : null,
+    // The whole point of the import. See the note at the top of this file.
+    send_invitation: false,
     guardian: isAdult(draft)
       ? // 18 and over is self-guarding: the trainee IS the guardian and the email is
         // theirs. Their own name is reused so an adult never becomes two Person rows.
@@ -88,10 +98,9 @@ export function createBodyFor(draft: Draft, family: Family): CreateBody {
 }
 
 function invitationFrom(answer: CreateAnswer): InvitationOutcome {
-  if (answer.invitation_email_sent) return 'sent'
-  if (!answer.invitation_token && !answer.invitation_url) return 'not_needed'
-  if (answer.invitation_email_configured === false) return 'unconfigured'
-  return 'failed'
+  // No token and no link means the server matched an existing, signed-in guardian and
+  // minted nothing — §5.4a's `match_person`. Anything else is a credential sitting ready.
+  return !answer.invitation_token && !answer.invitation_url ? 'not_needed' : 'held'
 }
 
 export async function runImport(

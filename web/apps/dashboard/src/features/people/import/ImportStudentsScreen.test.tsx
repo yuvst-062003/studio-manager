@@ -167,7 +167,10 @@ describe('ImportStudentsScreen — step 2', () => {
     expect(screen.getByTestId('import-done')).toHaveTextContent('3')
     const cohen = screen.getByTestId('import-family-ruth@example.com')
     expect(within(cohen).getAllByText(t('he', 'people.import.state.added'))).toHaveLength(2)
-    expect(within(cohen).getByTestId(/^import-invite-/)).toHaveTextContent(t('he', 'people.import.invite.sent'))
+    expect(within(cohen).getByTestId(/^import-invite-/)).toHaveTextContent(t('he', 'people.import.invite.held'))
+    // The seam the owner actually cares about: the screen reaches the server with the
+    // send suppressed, for every row, not merely renders a chip that says so.
+    for (const [body] of vi.mocked(client.createStudent).mock.calls) expect(body.send_invitation).toBe(false)
     // The rows that were not ready are still here, still editable.
     expect(screen.getByTestId('import-family-avi.m@example.com')).toHaveTextContent(t('he', 'people.import.problem.unknown_group'))
     expect(screen.getByTestId('import-finish')).toHaveAttribute('href', '#/students')
@@ -187,10 +190,12 @@ describe('ImportStudentsScreen — step 2', () => {
     expect(within(cohen).getAllByText(t('he', 'people.import.state.added'))).toHaveLength(1)
   })
 
-  it('an invitation email that did not go out gets a resend on the family', async () => {
+  it('a held invitation can be sent to one family on the spot, without sending the rest', async () => {
+    // The parent standing at the desk on import day. Everyone else stays held — this is
+    // the ONLY way an email leaves this screen, and it takes a deliberate click per family.
     const client = fakeClient({
       createStudent: vi.fn(async (body: { first_name: string }) =>
-        json({ student: { id: `s-${body.first_name}` }, invitation_token: 'tok', invitation_email_configured: true, invitation_email_sent: false }, 201),
+        json({ student: { id: `s-${body.first_name}` }, invitation_token: 'tok' }, 201),
       ),
     })
     render(<ImportStudentsScreen locale="he" client={client} />)
@@ -201,6 +206,8 @@ describe('ImportStudentsScreen — step 2', () => {
     const resend = screen.getByTestId('import-resend-ruth@example.com')
     await userEvent.click(resend)
     await waitFor(() => expect(client.resendInvitation).toHaveBeenCalledWith('s-דנה'))
-    expect(resend).toHaveTextContent(t('he', 'people.import.invite.resent'))
+    expect(resend).toHaveTextContent(t('he', 'people.import.invite.sentNow'))
+    // One family asked for, one email attempted.
+    expect(client.resendInvitation).toHaveBeenCalledTimes(1)
   })
 })

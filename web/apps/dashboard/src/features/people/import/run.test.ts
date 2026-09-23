@@ -71,7 +71,7 @@ describe('runImport', () => {
     expect(result.rows.get('d1')).toMatchObject({ studentId: 's-דנה', problem: null })
     expect(result.rows.get('d2')).toMatchObject({ studentId: 's-יוסי', problem: null })
     expect(seen).toEqual(['d1:sending', 'd1:added', 'd2:sending', 'd2:added'])
-    expect(result.families.get('ruth@example.com')).toMatchObject({ invitation: 'sent', studentId: 's-דנה' })
+    expect(result.families.get('ruth@example.com')).toMatchObject({ invitation: 'held', studentId: 's-דנה' })
   })
 
   it('sends the parent as the guardian for a child and the trainee as their own guardian when adult', async () => {
@@ -133,22 +133,33 @@ describe('runImport', () => {
     expect(result.families.get('ruth@example.com')?.invitation).toBe('none')
   })
 
-  it('reads the invitation outcome from the first created member: matched account, unconfigured mail, mail that did not go', async () => {
+  it('reads the invitation outcome from the first created member: a waiting token, or an account that already exists', async () => {
     const answers = [
-      { student: { id: 's1' }, invitation_token: null, invitation_url: null, invitation_email_configured: true, invitation_email_sent: false },
-      { student: { id: 's2' }, invitation_token: 'tok', invitation_email_configured: false, invitation_email_sent: false },
-      { student: { id: 's3' }, invitation_token: 'tok', invitation_email_configured: true, invitation_email_sent: false },
+      // No token and no link: the server matched a guardian who already has a login.
+      { student: { id: 's1' }, invitation_token: null, invitation_url: null },
+      { student: { id: 's2' }, invitation_token: 'tok' },
     ]
     let i = 0
     const client = fakeClient({ createStudent: vi.fn(async () => json(answers[i++])) })
     const fams = [
       family([draft({ id: 'a', group_id: '' })], { key: 'a@x.com', email: 'a@x.com' }),
       family([draft({ id: 'b', group_id: '' })], { key: 'b@x.com', email: 'b@x.com' }),
-      family([draft({ id: 'c', group_id: '' })], { key: 'c@x.com', email: 'c@x.com' }),
     ]
     const result = await runImport(fams, client, { today: '2026-09-18', beltNote: 'ייבוא' })
     expect(result.families.get('a@x.com')?.invitation).toBe('not_needed')
-    expect(result.families.get('b@x.com')?.invitation).toBe('unconfigured')
-    expect(result.families.get('c@x.com')?.invitation).toBe('failed')
+    expect(result.families.get('b@x.com')?.invitation).toBe('held')
+  })
+
+  it('NEVER asks the server to send: every create carries send_invitation false', async () => {
+    // The owner's requirement in one assertion (2026-09-23). The club is loaded from the
+    // office's spreadsheet weeks before its parents are told the app exists, and the
+    // server mails an invitation on create unless it is told not to.
+    const client = fakeClient({})
+    const fams = [family([draft({ id: 'a' }), draft({ id: 'b' })], { key: 'ruth@example.com', email: 'ruth@example.com' })]
+    await runImport(fams, client, { today: '2026-09-18', beltNote: 'ייבוא' })
+
+    const calls = vi.mocked(client.createStudent).mock.calls
+    expect(calls).toHaveLength(2)
+    for (const [body] of calls) expect(body.send_invitation).toBe(false)
   })
 })

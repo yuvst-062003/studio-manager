@@ -68,10 +68,20 @@ describe('problemsOf — what stops a row', () => {
     expect(problemsOf(one({}), LISTS, TODAY)).toEqual([])
   })
 
-  it('requires the first name and a real email', () => {
+  it('requires the first name, and an address that is one when an address is given', () => {
     expect(problemsOf(one({ first_name: '' }), LISTS, TODAY)).toContain('missing_first_name')
-    expect(problemsOf(one({ email: '' }), LISTS, TODAY)).toContain('missing_email')
     expect(problemsOf(one({ email: 'ruth at example' }), LISTS, TODAY)).toContain('bad_email')
+  })
+
+  it('takes a phone in place of an email, and refuses a family reachable by neither', () => {
+    // The server's own rule and nothing narrower: `GuardianCreate` refuses a guardian
+    // carrying neither, and `invitation`'s CHECK says the same in the database. Demanding
+    // the EMAIL here kept a club that has run on WhatsApp for years from importing the
+    // families it reaches by phone (owner, 2026-09-23).
+    expect(problemsOf(one({ email: '' }), LISTS, TODAY)).toEqual([])
+    expect(problemsOf(one({ email: '', phone: '' }), LISTS, TODAY)).toContain('missing_contact')
+    // Two digits is not a phone number, so it is not a way to reach anybody either.
+    expect(problemsOf(one({ email: '', phone: '12' }), LISTS, TODAY)).toContain('missing_contact')
   })
 
   it('names an unknown group, belt or plan rather than dropping it silently', () => {
@@ -130,6 +140,35 @@ describe('familiesOf — one card per email', () => {
     expect(families[0]!.adult).toBe(false)
     expect(families[0]!.parentName).toBe('רות כהן')
     expect(families[1]!.adult).toBe(true)
+  })
+})
+
+describe('familiesOf — a family the club reaches only by phone', () => {
+  it('groups those siblings onto ONE card, matching how the server matches them', () => {
+    // `pending_guardian` (`app/services/people/matching.py`) normalises a phone on both
+    // sides and reuses the parent it finds, so these two children really do land on one
+    // Person. A review that split them would tell the manager he was creating two.
+    const drafts = draftsFromRows(
+      [
+        row({ line: 2, first_name: 'דנה', email: '', phone: '050-123-4567' }),
+        row({ line: 3, first_name: 'יוסי', email: '', phone: '0501234567' }),
+      ],
+      LISTS,
+    )
+    const families = familiesOf(drafts)
+    expect(families).toHaveLength(1)
+    expect(families[0]!.members.map((member) => member.first_name)).toEqual(['דנה', 'יוסי'])
+  })
+
+  it('keeps two families apart when neither has an email or a usable phone', () => {
+    const drafts = draftsFromRows(
+      [
+        row({ line: 2, first_name: 'דנה', email: '', phone: '' }),
+        row({ line: 3, first_name: 'יוסי', email: '', phone: '' }),
+      ],
+      LISTS,
+    )
+    expect(familiesOf(drafts)).toHaveLength(2)
   })
 })
 
