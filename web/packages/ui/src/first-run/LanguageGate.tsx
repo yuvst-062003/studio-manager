@@ -41,8 +41,8 @@ const card: CSSProperties = {
   width: 'min(100%, 380px)',
   maxHeight: '92dvh',
   overflowY: 'auto',
-  background: 'var(--surface, #ffffff)',
-  color: 'var(--ink, #111927)',
+  background: 'var(--surface)',
+  color: 'var(--fg)',
   borderRadius: 12,
   boxShadow: '0 18px 48px rgba(8, 14, 26, 0.28)',
   padding: '22px 20px 18px',
@@ -80,8 +80,8 @@ function rowStyle(active: boolean): CSSProperties {
     width: '100%',
     padding: '0 14px',
     cursor: 'pointer',
-    background: active ? 'var(--surface-sunk, #eef2f7)' : 'var(--surface, #ffffff)',
-    border: `1px solid ${active ? 'var(--accent, #003874)' : 'var(--rule, #d8dee8)'}`,
+    background: active ? 'var(--ground)' : 'var(--surface)',
+    border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
     //: The edge accent is on the INLINE start, so it sits on the correct side in both
     //: directions without a second rule.
     borderInlineStartWidth: active ? 4 : 1,
