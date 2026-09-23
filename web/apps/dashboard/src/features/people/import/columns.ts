@@ -42,9 +42,9 @@ export const IMPORT_COLUMNS: readonly ImportColumn[] = [
   { key: 'parent_last', he: 'שם משפחה ההורה', aliases: ['parent_last', 'שם משפחה הורה'], kind: 'text', required: false },
   { key: 'email', he: 'אימייל', aliases: ['email', 'מייל', 'אימייל הורה', 'דוא"ל'], kind: 'text', required: true },
   { key: 'phone', he: 'טלפון', aliases: ['phone', 'נייד'], kind: 'text', required: false },
-  { key: 'group', he: 'קבוצה', aliases: ['group'], kind: 'list', required: false },
+  { key: 'group', he: 'קבוצה', aliases: ['group'], kind: 'list', required: true },
   { key: 'belt', he: 'חגורה', aliases: ['belt'], kind: 'list', required: false },
-  { key: 'plan', he: 'מסלול', aliases: ['plan', 'price_plan', 'מסלול מחיר'], kind: 'list', required: false },
+  { key: 'plan', he: 'מסלול', aliases: ['plan', 'price_plan', 'מסלול מחיר'], kind: 'list', required: true },
   { key: 'payment', he: 'הסדר תשלום מראש', aliases: ['payment', 'paid_by', 'payment_received', 'הסדר תשלום'], kind: 'list', required: false },
 ]
 
@@ -62,7 +62,16 @@ export const HEBREW_HEADERS: readonly string[] = IMPORT_COLUMNS.map((column) => 
 export type Mandatory = 'always' | 'contact' | 'optional'
 
 export function mandatoryOf(key: ColumnKey): Mandatory {
-  if (key === 'first_name') return 'always'
+  //: `group` and `plan` joined `first_name` on 2026-09-23, at the owner's word. Both were
+  //: optional because §5.4a lets a manager create a lead and price them later — true of the
+  //: phone enquiry the by-hand form was built for, and wrong for THIS door. A club arrives
+  //: with its roster in a spreadsheet and the office already knows which group each child
+  //: trains in and what the family pays; a blank there is a typo, not a decision. Left
+  //: optional they produced the two failures the import exists to prevent: a hundred
+  //: trainees with no enrollment, invisible on every roster and every register, and a
+  //: hundred with no price, invisible to billing. Neither shows as an error anywhere —
+  //: which is why the file has to refuse them rather than the manager having to notice.
+  if (key === 'first_name' || key === 'group' || key === 'plan') return 'always'
   return key === 'email' || key === 'phone' ? 'contact' : 'optional'
 }
 

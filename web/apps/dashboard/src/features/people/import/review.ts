@@ -55,9 +55,11 @@ export type Problem =
   | 'missing_contact'
   | 'bad_email'
   | 'bad_birthdate'
+  | 'missing_group'
   | 'unknown_group'
   | 'unknown_belt'
   | 'belt_without_group'
+  | 'missing_plan'
   | 'unknown_plan'
   | 'bad_payment'
   | 'card_payment'
@@ -206,14 +208,28 @@ export function problemsOf(draft: Draft, lists: Lists, today: string): Problem[]
   } else if (!EMAIL.test(draft.email.trim())) problems.push('bad_email')
   if (draft.birthdate === 'invalid') problems.push('bad_birthdate')
 
+  // A group and a plan are what make the row a TRAINEE rather than a name: without the
+  // first there is no enrollment and the child is on no roster, without the second no price
+  // and nothing to bill. Both used to be optional, and both failures are silent — nothing
+  // downstream says "this student has no group", it just shows an empty register. The one
+  // place that can catch it is here, while the manager still has the file open.
+  //
+  // Named apart from `unknown_*`: "you left it blank" and "the club has no such group" are
+  // different mistakes with different fixes, and one message for both would send a manager
+  // hunting the list for a value they never wrote.
   const groupUnknown = draft.group_id === '' && draft.group_name.trim() !== ''
+  const groupMissing = draft.group_id === '' && !groupUnknown
   if (groupUnknown) problems.push('unknown_group')
+  else if (groupMissing) problems.push('missing_group')
   // The belt is checked against the ladder of the group's class, so it waits for the
   // group: one problem for the root cause, not two for one fix.
-  if (!groupUnknown && draft.belt_rank_id === '' && draft.belt_name.trim() !== '') {
-    problems.push(draft.group_id === '' ? 'belt_without_group' : 'unknown_belt')
+  // Still one problem per root cause: a row with no group at all has already been told to
+  // choose one, and `belt_without_group` would only repeat the same instruction.
+  if (!groupUnknown && !groupMissing && draft.belt_rank_id === '' && draft.belt_name.trim() !== '') {
+    problems.push('unknown_belt')
   }
   if (draft.plan_id === '' && draft.plan_name.trim() !== '') problems.push('unknown_plan')
+  else if (draft.plan_id === '') problems.push('missing_plan')
 
   if (draft.payment === '' && draft.payment_text.trim() !== '') {
     problems.push(paymentFromText(draft.payment_text) === 'card' ? 'card_payment' : 'bad_payment')

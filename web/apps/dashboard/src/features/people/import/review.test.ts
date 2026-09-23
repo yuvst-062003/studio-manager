@@ -90,8 +90,17 @@ describe('problemsOf — what stops a row', () => {
     expect(problemsOf(one({ plan: 'שנתי' }), LISTS, TODAY)).toEqual(['unknown_plan'])
   })
 
-  it('a belt with no group cannot be checked against a ladder, so it is a problem too', () => {
-    expect(problemsOf(one({ group: '', belt: 'צהוב' }), LISTS, TODAY)).toEqual(['belt_without_group'])
+  it('a blank group and a blank plan each stop the row', () => {
+    // Both were optional until 2026-09-23. A trainee with no group is on no register and a
+    // trainee with no price is invisible to billing, and NEITHER shows as an error anywhere
+    // downstream — the file is the only place the mistake can still be caught.
+    expect(problemsOf(one({ group: '' }), LISTS, TODAY)).toContain('missing_group')
+    expect(problemsOf(one({ plan: '' }), LISTS, TODAY)).toEqual(['missing_plan'])
+  })
+
+  it('says "choose a group" once, not twice, when the belt is waiting on it', () => {
+    // `belt_without_group` would repeat the instruction `missing_group` has already given.
+    expect(problemsOf(one({ group: '', belt: 'צהוב' }), LISTS, TODAY)).toEqual(['missing_group'])
   })
 
   it('refuses a card as the prepaid method — a card payment closes itself through the app', () => {

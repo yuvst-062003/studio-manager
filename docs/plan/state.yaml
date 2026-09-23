@@ -1601,6 +1601,18 @@ holdbacks:
       `reinvite_guardian` can only refuse. The column table also still said אימייל was
       mandatory while the review asked for email OR phone, so `mandatoryOf` now names the
       cell-level rule apart from `required`, which stays the header contract.
+
+      **קבוצה and מסלול became required the same day**, at the owner's word. Both were
+      optional because §5.4a lets a manager create a lead and price them later — true of the
+      phone enquiry the by-hand form was built for, and wrong for this door: a club arrives
+      with its roster in a spreadsheet and the office already knows the group and the plan, so
+      a blank there is a typo. Left optional they produced the two failures the import exists
+      to prevent, both of them silent — a hundred trainees with no enrollment, on no register,
+      and a hundred with no price, invisible to billing. The file now refuses the row rather
+      than the manager having to notice. It also refuses the whole FILE when either column is
+      absent, which retires the 2026-08-30 sample's seven-column shape: every row it produced
+      would be flagged, so naming the missing columns once beats a hundred identical red rows.
+      The English header names stay as aliases.
     blocks: nothing — the Gladiator migration (HB-parents) can run without touching a parent
     status: closed
     opened: 2026-09-23

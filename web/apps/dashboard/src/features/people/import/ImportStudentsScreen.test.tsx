@@ -245,7 +245,11 @@ describe('a flagged cell can always be answered', () => {
     expect(screen.getByTestId(/^import-state-/)).toHaveTextContent(t('he', 'people.import.state.ready'))
   })
 
-  it('a group with no match can still be answered "no group at all"', async () => {
+  it('an unmatched group can still be cleared — and then asks for a real one', async () => {
+    // The empty option has to be REACHABLE (that is the dead end this describes). It is not
+    // an answer, though: a group became required on 2026-09-23, so clearing it moves the row
+    // from "that group is not in the club" to "choose a group", which is the honest next step
+    // rather than a silent pass.
     render(<ImportStudentsScreen locale="he" client={fakeClient()} />)
     await uploadCsv(ONE({ group: 'קבוצת על', belt: '' }))
     const select = screen.getByTestId(/^import-group-/) as HTMLSelectElement
@@ -253,6 +257,9 @@ describe('a flagged cell can always be answered', () => {
     expect(select.value).not.toBe('')
 
     await userEvent.selectOptions(select, '')
+    expect(screen.getByTestId(/^import-state-/)).toHaveTextContent(t('he', 'people.import.problem.missing_group'))
+
+    await userEvent.selectOptions(select, 'g-teens')
     expect(screen.getByTestId(/^import-state-/)).toHaveTextContent(t('he', 'people.import.state.ready'))
   })
 

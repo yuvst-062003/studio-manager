@@ -61,6 +61,8 @@ describe('buildTemplate', () => {
     expect(String(header.getCell(1).value)).toContain('*')
     expect(String(header.getCell(6).value)).not.toContain('*')
     expect(String(header.getCell(7).value)).not.toContain('*')
+    expect(String(header.getCell(8).value)).toContain('*') // קבוצה
+    expect(String(header.getCell(10).value)).toContain('*') // מסלול
     expect(ws.getRow(2).getCell(1).value).toBeNull()
   })
 
@@ -107,8 +109,13 @@ describe('what a row cannot do without', () => {
     expect(mandatoryOf('first_name')).toBe('always')
     expect(mandatoryOf('email')).toBe('contact')
     expect(mandatoryOf('phone')).toBe('contact')
+    // A group and a plan joined them on 2026-09-23: without the first the child is on no
+    // register, without the second there is no price and nothing to bill, and both failures
+    // are silent everywhere downstream.
+    expect(mandatoryOf('group')).toBe('always')
+    expect(mandatoryOf('plan')).toBe('always')
     // Everything the review lets through empty.
-    for (const key of ['last_name', 'birthdate', 'parent_first', 'group', 'belt', 'plan', 'payment'] as const) {
+    for (const key of ['last_name', 'birthdate', 'parent_first', 'belt', 'payment'] as const) {
       expect(mandatoryOf(key)).toBe('optional')
     }
   })
