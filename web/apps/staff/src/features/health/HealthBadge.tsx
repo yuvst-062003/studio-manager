@@ -72,6 +72,8 @@ export type HealthBadgeProps = {
   locale: Locale
   onRemind?: (studentId: string) => void
   reminderSent?: boolean
+  /** On a roster row, whose screen states `missingHint` once above the list. */
+  onRoster?: boolean
 }
 
 /** Booleans only. Never a value, never a key the namespace cannot name. */
@@ -92,6 +94,7 @@ export function HealthBadge({
   locale,
   onRemind,
   reminderSent = false,
+  onRoster = false,
 }: HealthBadgeProps) {
   const raised = labelledFlags(flags)
 
@@ -99,10 +102,15 @@ export function HealthBadge({
     return (
       <div data-testid={`health-badge-${studentId}`} style={rowStyle}>
         <StatusChip label={`⚠ ${t(locale, 'health.badge.missing')}`} status="debt" />
-        {/* §5.5 — the coach can still mark them present, and the hint says so out loud. */}
-        <span style={{ color: 'var(--text-muted)', fontSize: 'var(--text-caption)' }}>
-          {t(locale, 'health.badge.missingHint')}
-        </span>
+        {/* §5.5 — the coach can still mark them present, and the hint says so out loud.
+            Once per roster rather than once per row (2026-10-04): a migrated club arrives
+            with no declarations at all, and the same sentence under sixteen names in a row
+            buried the names it was meant to qualify. `RosterScreen` says it above the list. */}
+        {onRoster ? null : (
+          <span style={{ color: 'var(--text-muted)', fontSize: 'var(--text-caption)' }}>
+            {t(locale, 'health.badge.missingHint')}
+          </span>
+        )}
         {onRemind ? (
           <Button onClick={() => onRemind(studentId)} type="button" variant="secondary">
             {reminderSent ? t(locale, 'health.reminder.sent') : t(locale, 'health.reminder.send')}
@@ -148,6 +156,7 @@ export function RosterHealthBadge({ row, locale }: { row: CoreRosterRow; locale:
     <HealthBadge
       flags={row.derived_flags}
       locale={locale}
+      onRoster
       status={row.health_status}
       studentId={row.student_id}
     />

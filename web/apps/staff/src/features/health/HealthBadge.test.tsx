@@ -35,6 +35,14 @@ describe('HealthBadge', () => {
     expect(screen.getByText(t('he', 'health.badge.missingHint'))).toBeInTheDocument()
   })
 
+  it('on a roster row it keeps the ⚠ and leaves the hint to the screen, said once', () => {
+    // 2026-10-04 — a migrated club has no declarations at all, and the same sentence under
+    // every name buried the names. `RosterScreen` states it once above the list.
+    render(<HealthBadge flags={NO_FLAGS} locale="he" onRoster status="missing" studentId="st1" />)
+    expect(screen.getByText(`⚠ ${t('he', 'health.badge.missing')}`)).toBeInTheDocument()
+    expect(screen.queryByText(t('he', 'health.badge.missingHint'))).toBeNull()
+  })
+
   it('one-tap reminder calls back exactly once, with the student it is about', async () => {
     const onRemind = vi.fn()
     render(<HealthBadge flags={NO_FLAGS} locale="he" onRemind={onRemind} status="missing" studentId="st1" />)

@@ -59,3 +59,16 @@ describe('the payment column for a child with no parent yet', () => {
     )
   })
 })
+
+describe('the result count while more pages wait', () => {
+  it('says 50+ rather than a page size that reads as the total', async () => {
+    const many = Array.from({ length: 50 }, (_, n) => row(`s${n}`, 'no_contact'))
+    const paged = {
+      students: vi.fn(async () => ({ items: many, next_cursor: 's49', has_more: true })),
+    } as unknown as DashboardPeopleClient
+    render(<StudentsScreen locale="he" client={paged} />)
+    await waitFor(() =>
+      expect(screen.getByTestId('students-result-count')).toHaveTextContent('50+'),
+    )
+  })
+})

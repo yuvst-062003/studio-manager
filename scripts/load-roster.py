@@ -70,6 +70,8 @@ from sqlalchemy import select  # noqa: E402
 
 _SCOPE = "scripts/load-roster.py -- resolving the target studio by slug before scoping to it"
 _METHODS = {"cash", "cheque", "standing_order"}
+#: Mirrored in the staff app's `StudentsSearch.tsx`, which hides the seniority line for it.
+ROSTER_SOURCE = "club_roster"
 
 
 @dataclass
@@ -178,7 +180,9 @@ def plan_rows(session: TenantSession, rows: list[dict[str, Any]], today: date) -
     return planned
 
 
-def apply(session: TenantSession, planned: list[Planned], actor: uuid.UUID) -> int:
+def apply(
+    session: TenantSession, planned: list[Planned], actor: uuid.UUID, member_since: date
+) -> int:
     schedule = ScheduleService(session)
     at = now()
     created = 0
@@ -199,9 +203,18 @@ def apply(session: TenantSession, planned: list[Planned], actor: uuid.UUID) -> i
             guardian_phone=None,
             at=at,
             actor_person_id=actor,
-            source="manager",
+            # `club_roster`, not `manager`: the staff list reads it to leave out a
+            # months-in-club figure it would get wrong, and every screen can tell a child
+            # brought over with the club from one added at the desk.
+            source=ROSTER_SOURCE,
             contact_pending=True,
         ).student
+        # The training year's start, not today (owner, 2026-10-04: billing and the months
+        # already paid both count from 1 September). Set before `convert`, which keeps an
+        # existing `joined_on` -- left to it, sixty-nine veterans would read as members who
+        # all joined on the afternoon of the load, and the membership report would show
+        # them as one month's intake.
+        student.joined_on = member_since
         StudentService.convert(
             session,
             student_id=student.id,
@@ -228,6 +241,11 @@ def main() -> int:
     parser.add_argument("--studio-slug", required=True)
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--confirm-studio-id")
+    parser.add_argument(
+        "--member-since",
+        default="2026-09-01",
+        help="joined_on for every loaded child: the training year's start, not the load date",
+    )
     args = parser.parse_args()
 
     rows = json.loads(args.data.read_text(encoding="utf-8"))["rows"]
@@ -262,7 +280,7 @@ def main() -> int:
         if args.confirm_studio_id != str(studio.id):
             print("--apply needs --confirm-studio-id matching the studio above")
             return 2
-        created = apply(s, planned, actor)
+        created = apply(s, planned, actor, date.fromisoformat(args.member_since))
         print(f"applied -- {created} students created")
     return 0
 

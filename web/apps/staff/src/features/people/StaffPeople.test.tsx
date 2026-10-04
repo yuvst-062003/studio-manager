@@ -548,6 +548,20 @@ describe('StudentsSearch — S8', () => {
     const row = (await screen.findByText('נועה לוי')).closest('button')
     expect(row).toHaveTextContent('מתחילים · 5 חודשים · 92%')
   })
+
+  it('leaves tenure off a child brought over with the club, whose real start is unknown', async () => {
+    // 2026-10-04 — the roster load sets `joined_on` to the training year's start, so the
+    // months since then say nothing about a veteran and "1 חודשים" would be invented.
+    const client = makeClient({
+      search: vi.fn(() =>
+        Promise.resolve({ items: [summary({ attendance_percent: 92, source: 'club_roster' })] }),
+      ),
+    })
+    render(<StudentsSearch locale="he" client={client} now="2027-02-10T12:00:00Z" />)
+    const row = (await screen.findByText('נועה לוי')).closest('button')
+    expect(row).toHaveTextContent('מתחילים · 92%')
+    expect(row).not.toHaveTextContent('חודשים')
+  })
 })
 
 // -- C4's addition: the prototype's "לפי נוכחות" / "סדר א-ב" flip ----------------

@@ -322,6 +322,9 @@ export function StudentDetailScreen({
     })
 
   const primary = (student.guardians ?? []).find((g) => g.is_primary) ?? student.guardians?.[0]
+  /** `app/services/people/status.py`'s LEGAL_TRANSITIONS: converting and "did not join"
+   *  leave these three statuses and no other. */
+  const beforeMembership = ['lead', 'trial', 'pending_approval'].includes(student.status)
   const firstGroup = live[0]
 
   return (
@@ -671,7 +674,8 @@ export function StudentDetailScreen({
       </div>
 
       <div className="student-card__footer">
-        {freezing ? (
+        {/* `active → frozen` is the only freeze `LEGAL_TRANSITIONS` allows. */}
+        {student.status !== 'active' ? null : freezing ? (
           <>
             <label>
               {t(locale, 'people.freeze.from')}
@@ -719,8 +723,11 @@ export function StudentDetailScreen({
         )}
         {/* §5.4a step 5. The button opens the decision rather than converting in place,
             because the group is part of it — and it had no handler at all, so the one
-            action that turns a trial into a member did nothing when pressed. */}
-        {converting ? (
+            action that turns a trial into a member did nothing when pressed.
+            Offered only before membership (2026-10-04): `LEGAL_TRANSITIONS` refuses both
+            this and "did not join" from `active`, and an active member's card offered
+            צירוף למועדון and סימון כלא הצטרף anyway — two buttons that can only fail. */}
+        {!beforeMembership ? null : converting ? (
           <>
             <label>
               {t(locale, 'people.convert.group')}
@@ -797,7 +804,7 @@ export function StudentDetailScreen({
             {t(locale, 'people.convert.title')}
           </Button>
         )}
-        {markingLost ? (
+        {!beforeMembership ? null : markingLost ? (
           <>
             <label>
               {t(locale, 'people.convert.markLostReason')}

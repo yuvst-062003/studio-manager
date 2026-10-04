@@ -1694,6 +1694,18 @@ holdbacks:
       `convert(started_on=today)`, dry run by default, `--apply` only with the studio id the
       dry run printed, idempotent on name + group, and it prints line numbers and counts —
       never a name. The dataset is the operator's scratch file and never enters the repo.
+      Read off the rehearsal screenshots the same day, and fixed at the owner's word: the
+      staff child card stacked three components that each drew the name (three times), a
+      full-width status pill, an empty הורים box beside "no parents", unstyled attendance and
+      pickup lines, and mark-present/absent buttons that did nothing when opened from the
+      list — embedded now, one set of cards; the staff list said "0 חודשים" for every
+      migrated child — the load now sets `source = club_roster` and `joined_on` to the
+      training year's start (1 Sep 2026, also what billing will count from), and the list
+      leaves seniority off for them rather than invent it; the dashboard card offered צירוף
+      למועדון and סימון כלא הצטרף on an ACTIVE child, both refused by LEGAL_TRANSITIONS —
+      shown now only before membership, and freeze only to a member; the list said "50
+      חניכים" for a filter matching 69 — a floor "50+" while pages remain; the health
+      hint repeated under every roster row — said once above the list.
     blocks: the manager testing the staff and dashboard apps against the real club
     status: open
     opened: 2026-10-04
@@ -1702,6 +1714,32 @@ holdbacks:
       owner, 2026-10-04 · app/services/people/students.py · app/routers/students.py ·
       app/schemas/people.py · scripts/load-roster.py · web/apps/dashboard/src/features/people/ ·
       web/apps/staff/src/features/attendance/attendance.css
+  - id: HB-gladiator-billing
+    kind: external
+    title: Gladiator is billed from September, collected by the manager — waiting on the studio's prices
+    why: >-
+      Owner, 2026-10-04, after seeing the rehearsal: the manager must see what each child
+      owes and how many months are paid — "full billing, but without the parents paying; the
+      manager takes the payments and only needs to see it". Decided: billing counts from
+      1 Sep 2026; a charge for a child with no parent is addressed to the CHILD's own record
+      as its bookkeeping payer (no schema change, nobody notified — the manager tells the
+      family); the manager is alerted only when a month is OVERDUE, which the alert centre
+      and the collections screen already count once charges exist; standing-order children
+      pay their plan's price, which the plan's own standing-order link already fixes.
+
+      Blocked on the studio, by the owner's choice: column L's per-child amounts differ from
+      the plan price on 13 rows (sibling discounts or special deals — unknown), Q/R's months
+      already paid need confirming (row 14: 7 × 200 = 1,400 written 2,400), whether September
+      and October were paid for children with no months, and a plan for the 8 rows without
+      one. The questions went to the owner as a ready-to-send Hebrew message. Built after the
+      answers, as one change: the child-as-payer fallback, a per-child monthly price if L
+      holds, and a backfill that raises Sep/Oct and records the months already received —
+      deployed together, so no charge is ever raised at a price nobody confirmed.
+    blocks: the manager seeing each child's payments for Gladiator
+    status: open
+    opened: 2026-10-04
+    closed: null
+    source: owner, 2026-10-04 · HB-gladiator-roster
   - id: HB-upay-receipt-link
     kind: carried
     title: D6's receipt button needs one real uPay transaction to settle it

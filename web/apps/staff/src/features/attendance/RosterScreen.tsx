@@ -113,6 +113,7 @@ export function RosterScreen({
   canWritePlan?: boolean
 }) {
   const [roster, setRoster] = useState<RosterRowData[]>([])
+  const missingHealth = roster.filter((row) => row.health_status === 'missing').length
   const [header, setHeader] = useState<{
     groupName: string
     startsAt: string
@@ -387,6 +388,13 @@ export function RosterScreen({
       {roster.length === 0 ? (
         <p className="text-sm text-[var(--text-muted)]" data-testid="roster-empty">
           {t(locale, 'attendance.roster.empty')}
+        </p>
+      ) : null}
+
+      {/* §5.5's hint, once for the whole list — see `HealthBadge`'s `onRoster`. */}
+      {missingHealth > 0 ? (
+        <p className="text-xs text-[var(--text-muted)] m-0" data-testid="roster-health-note">
+          {t(locale, 'health.badge.missingRosterNote').replace('{{count}}', String(missingHealth))}
         </p>
       ) : null}
 

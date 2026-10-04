@@ -50,7 +50,10 @@ export function StudentCardScreen({
   client,
   row,
   onMark,
+  embedded = false,
 }: StaffStudentCardProps & {
+  /** Inside `StudentCardRoute`, whose banner already names the child (2026-10-04). */
+  embedded?: boolean
   /** The roster row this card was opened from, so the footer pair can show the CURRENT
    *  state. `2d` finding: "neither shows which state the student is currently in... so
    *  toggle or one-shot is undecided." Decided here — they are one-shot buttons that report
@@ -61,40 +64,51 @@ export function StudentCardScreen({
   const sections = useSlot<StaffStudentCardProps>('student-card')
 
   return (
-    <article aria-labelledby="staff-student-card-title" data-testid="staff-student-card">
-      <header>
-        <h1 id="staff-student-card-title">
-          {/* <bdi>, as `StudentRow` already does: a name can be Latin and mixed-direction
+    <article
+      aria-label={embedded ? `${student.first_name} ${student.last_name}` : undefined}
+      aria-labelledby={embedded ? undefined : 'staff-student-card-title'}
+      data-testid="staff-student-card"
+    >
+      {embedded ? null : (
+        <header>
+          <h1 id="staff-student-card-title">
+            {/* <bdi>, as `StudentRow` already does: a name can be Latin and mixed-direction
               text reorders without isolation (§9). */}
-          <bdi>{`${student.first_name} ${student.last_name}`}</bdi>
-        </h1>
-      </header>
+            <bdi>{`${student.first_name} ${student.last_name}`}</bdi>
+          </h1>
+        </header>
+      )}
 
       {sections.map(({ key, render: Section }) => (
         <Section client={client} key={key} locale={locale} student={student} />
       ))}
 
-      <footer data-testid="staff-student-card-actions">
-        {/* `2d` finding 6 — the mark-present button binds `--accent`, NEVER `--paid`. The
+      {/* Only where there is a session to mark (2026-10-04): embedded in the card route
+          there is no `onMark`, and two buttons that do nothing when pressed are worse than
+          none. */}
+      {!embedded || onMark ? (
+        <footer data-testid="staff-student-card-actions">
+          {/* `2d` finding 6 — the mark-present button binds `--accent`, NEVER `--paid`. The
             two hold the same light-mode value, so a payment token here would render
             identically and pass review; D12's dark-mode correction moves `--paid` and the
             button would change colour on one theme only. §3.2 says a coach sees no payment
             data, and wiring an attendance control to the payment semantic is that rule
             broken in the one place nobody would look. The variant carries it — see
             attendance.css. */}
-        <Button
-          className="attendance-mark-present"
-          onClick={() => onMark?.('present')}
-          variant="secondary"
-        >
-          {t(locale, 'attendance.card.markPresent')}
-          {row?.status === 'present' ? ' ✓' : ''}
-        </Button>
-        <Button onClick={() => onMark?.('absent_unexcused')} variant="destructive">
-          {t(locale, 'attendance.card.markAbsent')}
-          {row?.status === 'absent_unexcused' ? ' ✓' : ''}
-        </Button>
-      </footer>
+          <Button
+            className="attendance-mark-present"
+            onClick={() => onMark?.('present')}
+            variant="secondary"
+          >
+            {t(locale, 'attendance.card.markPresent')}
+            {row?.status === 'present' ? ' ✓' : ''}
+          </Button>
+          <Button onClick={() => onMark?.('absent_unexcused')} variant="destructive">
+            {t(locale, 'attendance.card.markAbsent')}
+            {row?.status === 'absent_unexcused' ? ' ✓' : ''}
+          </Button>
+        </footer>
+      ) : null}
     </article>
   )
 }

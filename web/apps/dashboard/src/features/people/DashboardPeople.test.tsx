@@ -467,7 +467,7 @@ describe('B2.2 — the filter bar', () => {
     render(<StudentsScreen locale="he" client={client} />)
     await screen.findByTestId('students-table')
     const count = screen.getByTestId('students-result-count')
-    expect(count).toHaveTextContent(fill(t('he', 'people.student.countSubtitle'), { count: 2 }))
+    expect(count).toHaveTextContent(fill(t('he', 'people.student.countSubtitle'), { count: '\u20662+\u2069' }))
     // The literal claim this guards against: "מתוך" ("out of") is the denominator word
     // `people.filter.resultCount` alone carries — asserting its absence is what proves
     // no (wrong) total rendered, not merely that some plausible-looking text did.
@@ -560,6 +560,22 @@ describe('documentLabelKey', () => {
 
 // -- 3c: adding a student -------------------------------------------------------
 
+/** A child still on trial: converting is legal only before membership
+ *  (`LEGAL_TRANSITIONS`), and the card offers it only then (2026-10-04). */
+function trialClient(over: Partial<DashboardPeopleClient> = {}): DashboardPeopleClient {
+  return makeClient({
+    student: vi.fn(() =>
+      Promise.resolve({
+        ...summary({ status: 'trial' }),
+        current_belt_color_hex: '#ffffff',
+        current_belt_name: 'לבנה',
+        guardians: [],
+      }),
+    ),
+    ...over,
+  })
+}
+
 describe('converting a student — the price travels with it', () => {
   it('sends the chosen price plan, so the student is not left unbilled', async () => {
     // **§5.4a step 5 is ONE decision** — "picks group, sets price, status=active" — and this
@@ -567,7 +583,7 @@ describe('converting a student — the price travels with it', () => {
     // unpriced: active, enrolled, training, billed nothing. `billing/unpriced-students`
     // listed them and offered no way to fix it.
     const user = userEvent.setup()
-    const client = makeClient()
+    const client = trialClient()
     render(<StudentDetailScreen locale="he" client={client} studentId="st1" />)
 
     await user.click(await screen.findByTestId('detail-convert'))
@@ -586,7 +602,7 @@ describe('converting a student — the price travels with it', () => {
     // Empty is a real answer, not a gap to force a guess into: the billing screen's own
     // unpriced list is where that is chased.
     const user = userEvent.setup()
-    const client = makeClient()
+    const client = trialClient()
     render(<StudentDetailScreen locale="he" client={client} studentId="st1" />)
 
     await user.click(await screen.findByTestId('detail-convert'))
@@ -606,7 +622,7 @@ describe('converting a student — the price travels with it', () => {
       // post-dated cheques and a wad of notes the same row in the club's ledger. The
       // manager knows which; the screen now asks.
       const user = userEvent.setup()
-      const client = makeClient()
+      const client = trialClient()
       render(<StudentDetailScreen locale="he" client={client} studentId="st1" />)
 
       await user.click(await screen.findByTestId('detail-convert'))
@@ -626,7 +642,7 @@ describe('converting a student — the price travels with it', () => {
     // payment recorded twice — once by the machine and once by a person — and the club
     // could not reconcile the second against its merchant account.
     const user = userEvent.setup()
-    render(<StudentDetailScreen locale="he" client={makeClient()} studentId="st1" />)
+    render(<StudentDetailScreen locale="he" client={trialClient()} studentId="st1" />)
 
     await user.click(await screen.findByTestId('detail-convert'))
     const picker = screen.getByTestId('detail-convert-paid') as HTMLSelectElement
@@ -640,7 +656,7 @@ describe('converting a student — the price travels with it', () => {
 
   it('sends no method unless the manager picks one', async () => {
     const user = userEvent.setup()
-    const client = makeClient()
+    const client = trialClient()
     render(<StudentDetailScreen locale="he" client={client} studentId="st1" />)
 
     await user.click(await screen.findByTestId('detail-convert'))
@@ -653,7 +669,7 @@ describe('converting a student — the price travels with it', () => {
 
   it('never offers a closed plan — that is last year\'s price', async () => {
     const user = userEvent.setup()
-    const client = makeClient()
+    const client = trialClient()
     render(<StudentDetailScreen locale="he" client={client} studentId="st1" />)
 
     await user.click(await screen.findByTestId('detail-convert'))
@@ -1106,10 +1122,19 @@ describe('StudentDetailScreen — 4a', () => {
     )
   })
 
-  it('offers freeze, convert and mark-lost', async () => {
-    render(<StudentDetailScreen studentId="st1" locale="he" client={makeClient()} />)
+  it('offers freeze to a member, and convert and mark-lost only before membership', async () => {
+    // 2026-10-04 — an active member's card offered צירוף למועדון and סימון כלא הצטרף,
+    // both of which `LEGAL_TRANSITIONS` refuses from `active`: two buttons that can only fail.
+    const { unmount } = render(
+      <StudentDetailScreen studentId="st1" locale="he" client={makeClient()} />,
+    )
     expect(await screen.findByTestId('detail-freeze')).toBeInTheDocument()
-    expect(screen.getByTestId('detail-convert')).toBeInTheDocument()
+    expect(screen.queryByTestId('detail-convert')).toBeNull()
+    expect(screen.queryByTestId('detail-mark-lost')).toBeNull()
+    unmount()
+
+    render(<StudentDetailScreen studentId="st1" locale="he" client={trialClient()} />)
+    expect(await screen.findByTestId('detail-convert')).toBeInTheDocument()
     expect(screen.getByTestId('detail-mark-lost')).toBeInTheDocument()
   })
 
@@ -1389,7 +1414,7 @@ describe('F2 — the four buttons that used to do nothing', () => {
   })
 
   it('mark-lost expands, requires a reason, then fires with it', async () => {
-    const client = makeClient()
+    const client = trialClient()
     ;(client.markLost as ReturnType<typeof vi.fn>).mockResolvedValue(new Response('{}'))
     render(<StudentDetailScreen studentId="st1" locale="he" client={client} />)
     await userEvent.click(await screen.findByTestId('detail-mark-lost'))

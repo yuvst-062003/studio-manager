@@ -274,6 +274,14 @@ export function StudentsScreen({
   // understated one.
   const [baselineCount, setBaselineCount] = useState<number | null>(null)
 
+  /** What the loaded page holds — with a `+` while more pages wait (2026-10-04). The
+   *  filter for "no contact yet" matched 69 children and the line said "50 חניכים": the
+   *  first page, read as the answer. The list carries no total, so the honest number is a
+   *  floor, said as one. */
+  //  Isolated left-to-right (LRI…PDI) so the `+` stays on the number in an RTL line — the
+  //  neutral sign otherwise drifts to the front and "50+" reads "+50".
+  const shownCount = page.has_more ? `\u2066${page.items.length}+\u2069` : String(page.items.length)
+
   const reload = () => {
     setVersion((n) => n + 1)
     // F12's bulk move/leave can change the roster size. Write-once cuts both ways: a
@@ -474,10 +482,10 @@ export function StudentsScreen({
           <span className="people-filter-result" data-testid="students-result-count">
             {baselineCount !== null
               ? fill(t(locale, 'people.filter.resultCount'), {
-                  count: page.items.length,
+                  count: shownCount,
                   total: baselineCount,
                 })
-              : fill(t(locale, 'people.student.countSubtitle'), { count: page.items.length })}
+              : fill(t(locale, 'people.student.countSubtitle'), { count: shownCount })}
           </span>
         ) : null}
       </div>
@@ -697,7 +705,10 @@ export function StudentsScreen({
                     // is not "paid", and a ✓ over a club that has never been billed reads as
                     // money collected. Billing starts once the manager adds the parent.
                     return (
-                      <span data-testid={`students-payment-${student.id}`}>
+                      <span
+                        data-testid={`students-payment-${student.id}`}
+                        title={t(locale, 'people.student.payment.notBilledWhy')}
+                      >
                         {t(locale, 'people.student.payment.notBilled')}
                       </span>
                     )
