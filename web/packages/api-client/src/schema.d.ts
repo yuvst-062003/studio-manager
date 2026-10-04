@@ -12866,6 +12866,11 @@ export interface components {
             attends_weekdays?: number[] | null;
             /** Birthdate */
             birthdate?: string | null;
+            /**
+             * Contact Pending
+             * @default false
+             */
+            contact_pending: boolean;
             /** Email */
             email?: string | null;
             /** First Name */
@@ -13608,6 +13613,11 @@ export interface components {
             attends_weekdays?: number[] | null;
             /** Birthdate */
             birthdate?: string | null;
+            /**
+             * Contact Pending
+             * @default false
+             */
+            contact_pending: boolean;
             /** Email */
             email?: string | null;
             /** First Name */
@@ -21864,7 +21874,7 @@ export interface operations {
                 class_id?: string | null;
                 health_status?: string | null;
                 q?: string | null;
-                invite_state?: ("signed_in" | "ready" | "no_email") | null;
+                invite_state?: ("signed_in" | "ready" | "no_email" | "no_contact") | null;
                 after?: string | null;
                 limit?: number;
             };

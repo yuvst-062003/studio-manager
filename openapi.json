@@ -14550,6 +14550,11 @@
             ],
             "title": "Birthdate"
           },
+          "contact_pending": {
+            "default": false,
+            "title": "Contact Pending",
+            "type": "boolean"
+          },
           "email": {
             "anyOf": [
               {
@@ -16332,6 +16337,11 @@
               }
             ],
             "title": "Birthdate"
+          },
+          "contact_pending": {
+            "default": false,
+            "title": "Contact Pending",
+            "type": "boolean"
           },
           "email": {
             "anyOf": [
@@ -30246,7 +30256,8 @@
                   "enum": [
                     "signed_in",
                     "ready",
-                    "no_email"
+                    "no_email",
+                    "no_contact"
                   ],
                   "type": "string"
                 },

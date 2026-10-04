@@ -67,18 +67,25 @@ INVITATION_TTL_DAYS = 30
 INVITE_SIGNED_IN = "signed_in"
 INVITE_READY = "ready"
 INVITE_NO_EMAIL = "no_email"
+#: **No guardian at all yet** (owner, 2026-10-04). The club-migration load brings a roster
+#: whose office kept no parent and no contact for anyone, so its children arrive with
+#: nobody attached and the manager adds each family afterwards. That is a different task
+#: from `no_email` — "add the parent" rather than "find their address" — and the screen
+#: has to be able to list exactly those children, so it is a state of its own.
+INVITE_NO_CONTACT = "no_contact"
 
 
 def invite_state(guardians: Iterable[tuple[uuid.UUID | None, str | None]]) -> str:
-    """`(auth_identity_id, email)` per guardian -> one of the three states above.
+    """`(auth_identity_id, email)` per guardian -> one of the four states above.
 
     Signed in wins over addressed: `accept_invitation` binds a login to a Person once and
     matches only on `auth_identity_id IS NULL`, so a token minted for a family who already
     signed in is a link that silently fails. A student with no guardian at all answers
-    `no_email`, which is true in the only sense the screen cares about — there is nobody to
-    send to.
+    `no_contact`.
     """
     pairs = list(guardians)
+    if not pairs:
+        return INVITE_NO_CONTACT
     if any(auth_identity_id is not None for auth_identity_id, _ in pairs):
         return INVITE_SIGNED_IN
     return INVITE_READY if any(email for _, email in pairs) else INVITE_NO_EMAIL
@@ -124,7 +131,8 @@ class StudentRow:
     guardian_display_names: list[str]
     #: 9h — present / (present + absent) over marked sessions; None until anything was.
     attendance_percent: int | None = None
-    #: One of `INVITE_SIGNED_IN` / `INVITE_READY` / `INVITE_NO_EMAIL`. See `invite_state`.
+    #: One of `INVITE_SIGNED_IN` / `INVITE_READY` / `INVITE_NO_EMAIL` / `INVITE_NO_CONTACT`.
+    #: See `invite_state`.
     guardian_invite_state: str = INVITE_NO_EMAIL
 
 
@@ -156,6 +164,7 @@ class StudentService:
         group_id: uuid.UUID | None = None,
         attends_weekdays: list[int] | None = None,
         schedule: ScheduleReader | None = None,
+        contact_pending: bool = False,
     ) -> CreatedStudent:
         """§5.4(a) -- the manager-added student, created immediately.
 
@@ -184,6 +193,18 @@ class StudentService:
         "a real student who simply has no enrollment" -- so the student stays a lead and
         no enrollment is invented. `attends_weekdays` rides along because C12 makes it part
         of every enrolment form; L6 still holds, because every caller of this is a manager.
+
+        **`contact_pending` creates the student with NO guardian** (owner, 2026-10-04). The
+        club-migration load brings a roster whose office kept no parent and no contact for
+        anyone; the children are loaded so the staff and dashboard apps show the real club,
+        and the manager adds each family afterwards through `add_guardian`. Nothing is
+        matched, no Person is invented for a parent nobody named, and no invitation is
+        minted -- `invitation`'s CHECK would refuse one with no recipient anyway. Every
+        other caller keeps §5.3's rule, which the router enforces.
+
+        With nobody to bill, `BillingRunService` raises nothing for such a student until a
+        primary guardian exists -- the owner's chosen way of loading a club with no charges
+        yet, accepted knowing that billing starts by itself once a parent is added.
         """
         if group_id is not None and schedule is None:  # pragma: no cover - a wiring error
             raise ValueError("group_id needs a schedule reader to validate the pattern")
@@ -205,6 +226,30 @@ class StudentService:
         )
         session.add(student)
         session.flush()
+
+        if contact_pending:
+            if guardian_person_id is not None or guardian_email or guardian_phone:
+                raise ValueError("contact_pending means no guardian was given")  # pragma: no cover
+            AuditService.record(
+                session,
+                action="student.created",
+                entity_type="student",
+                entity_id=student.id,
+                studio_id=student.studio_id,
+                actor_person_id=actor_person_id,
+                diff={"source": source, "status": status, "contact_pending": True},
+            )
+            session.flush()
+            return StudentService._enrol_on_create(
+                session,
+                student=student,
+                token=None,
+                group_id=group_id,
+                attends_weekdays=attends_weekdays,
+                at=at,
+                actor_person_id=actor_person_id,
+                schedule=schedule,
+            )
 
         matched = (
             None
@@ -290,6 +335,32 @@ class StudentService:
         )
         session.flush()
 
+        return StudentService._enrol_on_create(
+            session,
+            student=student,
+            token=token,
+            group_id=group_id,
+            attends_weekdays=attends_weekdays,
+            at=at,
+            actor_person_id=actor_person_id,
+            schedule=schedule,
+        )
+
+    @staticmethod
+    def _enrol_on_create(
+        session: Session,
+        *,
+        student: Student,
+        token: str | None,
+        group_id: uuid.UUID | None,
+        attends_weekdays: list[int] | None,
+        at: datetime,
+        actor_person_id: uuid.UUID | None,
+        schedule: ScheduleReader | None,
+    ) -> CreatedStudent:
+        """`create`'s second half -- the enrollment §5.4(a) writes when a group is named --
+        shared by the guarded path and the contact-pending one, so the two cannot answer
+        "what does naming a group do" differently."""
         enrollment: Enrollment | None = None
         if group_id is not None:
             assert schedule is not None  # guarded at the top of this method
@@ -567,7 +638,13 @@ class StudentService:
             elif invite_state_is == INVITE_READY:
                 stmt = stmt.where(Student.id.not_in(has_login), Student.id.in_(has_email))
             elif invite_state_is == INVITE_NO_EMAIL:
-                stmt = stmt.where(Student.id.not_in(has_login), Student.id.not_in(has_email))
+                stmt = stmt.where(
+                    Student.id.not_in(has_login),
+                    Student.id.not_in(has_email),
+                    Student.id.in_(of_guardians),
+                )
+            elif invite_state_is == INVITE_NO_CONTACT:
+                stmt = stmt.where(Student.id.not_in(select(Guardian.student_id)))
 
         if after is not None:
             stmt = stmt.where(Student.id > after)
@@ -830,6 +907,18 @@ class StudentService:
                 actor_person_id=actor_person_id,
             )
 
+        #: **The first guardian of a student is its primary**, whatever the caller asked
+        #: (2026-10-04). A child loaded with `contact_pending` has nobody, and the manager's
+        #: "add the parent" is this call with the schema's default `is_primary=False` --
+        #: which left the child with guardians and no primary, so billing still found no
+        #: payer and the coach hand-over still refused. `create` makes the same rule for the
+        #: guardian it writes.
+        first = (
+            session.execute(
+                select(Guardian.id).where(Guardian.student_id == student.id).limit(1)
+            ).first()
+            is None
+        )
         row = Guardian(
             student_id=student.id,
             person_id=person_id,
@@ -839,7 +928,7 @@ class StudentService:
         )
         session.add(row)
         session.flush()
-        if is_primary:
+        if is_primary or first:
             StudentService.set_primary_guardian(
                 session,
                 student_id=student.id,

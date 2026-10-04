@@ -86,6 +86,22 @@ export function makeDashboardPeopleClient(fetcher: Fetcher) {
       fetcher(`/api/v1/students/${studentId}/invitation/resend`, { method: 'POST' }),
 
     /**
+     * §5.3 — attach a parent to a child who has none yet (2026-10-04): the club-migration
+     * load brings children with no contact, and this is how the manager adds each family.
+     * The server makes the first guardian the primary one, so billing and the invitation
+     * find them. Nothing is sent: the invitation is held until the manager sends it.
+     */
+    addGuardian: (
+      studentId: string,
+      body: { first_name?: string; last_name?: string; email?: string | null; phone?: string | null },
+    ) =>
+      fetcher(`/api/v1/students/${studentId}/guardians`, {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify(body),
+      }),
+
+    /**
      * C11's two numbers, manager-scoped. Never coach-reachable — `price_plan_id` is what
      * invariant 3's detector reads as a financial field, which is why it lives behind its
      * own route instead of on the card.
@@ -169,7 +185,8 @@ export function makeDashboardPeopleClient(fetcher: Fetcher) {
       group_id?: string | null
       /** C12 — NULL means every session of that group, which is the default. */
       attends_weekdays?: number[] | null
-      guardian: {
+      /** Absent only with `contact_pending` — see below. */
+      guardian?: {
         //: Optional (decision 20, 2026-09-03 onboarding doors spec) — the dashboard's
         //: 3-field add-student form sends a guardian email with no name at all;
         //: `GuardianCreate` (`app/schemas/people.py`) accepts that. The file import
@@ -188,6 +205,10 @@ export function makeDashboardPeopleClient(fetcher: Fetcher) {
        *  loaded from the office's spreadsheet weeks before its parents are told the app
        *  exists. */
       send_invitation?: boolean
+      /** No guardian yet, deliberately (2026-10-04): the file import's row with no parent
+       *  and no contact. The server creates the child with nobody attached and lists it
+       *  as `no_contact`; the manager adds the parent from the student card. */
+      contact_pending?: boolean
     }) =>
       fetcher('/api/v1/students', {
         method: 'POST',

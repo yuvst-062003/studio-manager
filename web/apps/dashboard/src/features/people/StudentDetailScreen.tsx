@@ -23,6 +23,8 @@ import { ClassPricesCard } from '../billing/ClassPricesCard'
 import { fill, formatDateInStudioZone } from '@studio/core'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { AddGuardianForm } from './AddGuardianForm'
+import type { NewGuardian } from './AddGuardianForm'
 import { CopyButton } from './SharingCards'
 import { chipToneFor } from './StudentsScreen'
 import type {
@@ -230,6 +232,15 @@ export function StudentDetailScreen({
    * server names which, and that message is shown rather than a generic failure, because
    * the two have completely different fixes.
    */
+  /** §5.3 — the parent of a child loaded with no contact (2026-10-04). Reloads the card on
+   *  success, which replaces this form with the guardian it just saved. */
+  async function addGuardian(body: NewGuardian): Promise<boolean> {
+    const response = await client.addGuardian(studentId, body)
+    if (!response.ok) return false
+    setReloads((n) => n + 1)
+    return true
+  }
+
   async function resendInvitation() {
     if (resend?.state === 'sending') return
     setResend({ state: 'sending' })
@@ -416,7 +427,10 @@ export function StudentDetailScreen({
               </Field>
               <Field label={t(locale, 'people.guardian.plural')}>
                 {(student.guardians ?? []).length === 0 ? (
-                  '—'
+                  <>
+                    <span data-testid="detail-no-contact">{t(locale, 'people.invite.no_contact')}</span>
+                    <AddGuardianForm locale={locale} onSubmit={addGuardian} />
+                  </>
                 ) : (
                   <ul className="student-card__stack">
                     {(student.guardians ?? []).map((guardian) => (

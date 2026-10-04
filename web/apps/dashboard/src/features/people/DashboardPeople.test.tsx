@@ -793,7 +793,7 @@ describe('AddStudentScreen — the family roster (2026-09-13)', () => {
     await screen.findByTestId('add-student-done')
     expect(client.createStudent).toHaveBeenCalledTimes(2)
     const bodies = vi.mocked(client.createStudent).mock.calls.map((call) => call[0])
-    expect(bodies.map((body) => body.guardian.email)).toEqual([
+    expect(bodies.map((body) => body.guardian?.email)).toEqual([
       'dana@example.invalid',
       'dana@example.invalid',
     ])
@@ -816,13 +816,13 @@ describe('AddStudentScreen — the family roster (2026-09-13)', () => {
 
     await screen.findByTestId('add-student-done')
     const bodies = vi.mocked(client.createStudent).mock.calls.map((call) => call[0])
-    expect(bodies[0]!.guardian.relation).toBe('parent')
+    expect(bodies[0]!.guardian!.relation).toBe('parent')
     expect(bodies[0]!.guardian).not.toHaveProperty('first_name')
     // Self-guarding: the student IS the guardian, under their own split name.
-    expect(bodies[1]!.guardian.relation).toBe('self')
-    expect(bodies[1]!.guardian.first_name).toBe('רון')
-    expect(bodies[1]!.guardian.last_name).toBe('לוי')
-    expect(bodies[1]!.guardian.email).toBe('ron@example.invalid')
+    expect(bodies[1]!.guardian!.relation).toBe('self')
+    expect(bodies[1]!.guardian!.first_name).toBe('רון')
+    expect(bodies[1]!.guardian!.last_name).toBe('לוי')
+    expect(bodies[1]!.guardian!.email).toBe('ron@example.invalid')
     expect(screen.getAllByTestId('add-student-invite-url')).toHaveLength(2)
   })
 
@@ -1808,5 +1808,68 @@ describe('the bulk invite', () => {
     expect(screen.getByTestId('bulk-refused-st2')).toHaveTextContent(
       t('he', 'people.bulk.refused.not_invitable'),
     )
+  })
+})
+
+describe('a child loaded with no contact yet (2026-10-04)', () => {
+  it('says so on the students list row, from the server’s invite state', async () => {
+    const client = makeClient({
+      students: vi.fn(() =>
+        Promise.resolve({
+          items: [{ ...summary(), guardian_invite_state: 'no_contact' }],
+          next_cursor: null,
+          has_more: false,
+        }),
+      ),
+    })
+    render(<StudentsScreen locale="he" client={client} />)
+    expect(await screen.findByTestId('no-contact-chip')).toHaveTextContent(
+      t('he', 'people.invite.no_contact'),
+    )
+  })
+
+  it('offers "add the parent" on the card, posts it, and reloads into the guardian', async () => {
+    const user = userEvent.setup()
+    const withParent = {
+      person_id: 'p1',
+      student_id: 'st1',
+      display_name: 'רות כהן',
+      relation: 'parent',
+      is_primary: true,
+      phone: '050-1234567',
+      email: '',
+      has_login: false,
+    }
+    const student = vi
+      .fn()
+      .mockResolvedValueOnce({ ...summary(), guardians: [] })
+      .mockResolvedValue({ ...summary(), guardians: [withParent] })
+    const addGuardian = vi.fn(async () => new Response('{"items":[]}', { status: 201 }))
+    render(
+      <StudentDetailScreen
+        studentId="st1"
+        locale="he"
+        client={makeClient({ student, addGuardian })}
+      />,
+    )
+
+    expect(await screen.findByTestId('detail-no-contact')).toHaveTextContent(
+      t('he', 'people.invite.no_contact'),
+    )
+    const save = screen.getByTestId('add-guardian-save')
+    // A phone or an email is the server's own rule, so the button waits for one.
+    expect(save).toBeDisabled()
+    await user.type(screen.getByTestId('add-guardian-first'), 'רות')
+    await user.type(screen.getByTestId('add-guardian-phone'), '050-1234567')
+    await user.click(save)
+
+    expect(addGuardian).toHaveBeenCalledWith('st1', {
+      first_name: 'רות',
+      last_name: undefined,
+      phone: '050-1234567',
+      email: null,
+    })
+    expect(await screen.findByTestId('detail-guardian')).toHaveTextContent('רות כהן')
+    expect(screen.queryByTestId('add-guardian')).toBeNull()
   })
 })

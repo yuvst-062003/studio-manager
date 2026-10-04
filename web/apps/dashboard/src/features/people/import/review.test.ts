@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import type { RawRow } from './columns'
 import type { Lists } from './review'
 import { t } from '@studio/i18n'
-import { beltIdInGroup, draftsFromRows, familiesOf, isAdult, paymentFromText, problemsOf, readyDrafts } from './review'
+import { beltIdInGroup, draftsFromRows, familiesOf, isAdult, isContactPending, paymentFromText, problemsOf, readyDrafts } from './review'
 
 const LISTS: Lists = {
   groups: [
@@ -83,6 +83,20 @@ describe('problemsOf — what stops a row', () => {
     expect(problemsOf(one({ email: '', phone: '' }), LISTS, TODAY)).toContain('missing_contact')
     // Two digits is not a phone number, so it is not a way to reach anybody either.
     expect(problemsOf(one({ email: '', phone: '12' }), LISTS, TODAY)).toContain('missing_contact')
+  })
+
+  it('loads a child with no parent and no contact as contact-pending, not as an adult', () => {
+    // Owner, 2026-10-04: Gladiator's roster has no family on any row. A blank family with
+    // no contact either is the child whose parent is added later — not a mistake to flag,
+    // and not an 18-year-old's own account.
+    const orphan = one({ parent_first: '', parent_last: '', email: '', phone: '', birthdate: '' })
+    expect(isContactPending(orphan)).toBe(true)
+    expect(isAdult(orphan)).toBe(false)
+    expect(problemsOf(orphan, LISTS, TODAY)).toEqual([])
+    // A NAMED parent with nowhere to reach them is still a gap in the file.
+    expect(problemsOf(one({ email: '', phone: '' }), LISTS, TODAY)).toContain('missing_contact')
+    // And an adult is still an adult when they gave their own contact.
+    expect(isAdult(one({ parent_first: '', parent_last: '', email: 'ron@example.com' }))).toBe(true)
   })
 
   it('names an unknown group, belt or plan rather than dropping it silently', () => {

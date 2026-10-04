@@ -257,7 +257,7 @@ def list_students(
     #: then sends to what it selected; `signed_in` and `no_email` are the two ways a family
     #: is NOT invitable, kept apart because they need different things done about them —
     #: nothing, and an address.
-    invite_state: Literal["signed_in", "ready", "no_email"] | None = None,
+    invite_state: Literal["signed_in", "ready", "no_email", "no_contact"] | None = None,
     after: uuid.UUID | None = None,
     limit: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> StudentSummaryPage:
@@ -358,22 +358,25 @@ def create_student(
     phone-enquiry case and leaves a lead with no enrollment, which is what §5.4a says a
     lead is.
     """
-    if body.guardian is None:
+    if body.guardian is None and not body.contact_pending:
         # §5.3 makes at least one guardian structural; the schema cannot say so, because
         # §5.4a's trial booking reuses this shape with the parent supplied once for the
-        # whole submission.
+        # whole submission. `contact_pending` is the one deliberate exception -- the
+        # club-migration import's child whose family is added afterwards (2026-10-04).
         raise _refused("guardian_required", "a student needs at least one guardian")
+    guardian = body.guardian
     try:
         created = StudentService.create(
             session,
             first_name=body.first_name,
             last_name=body.last_name,
             birthdate=body.birthdate,
-            guardian_first_name=body.guardian.first_name,
-            guardian_last_name=body.guardian.last_name,
-            guardian_email=body.guardian.email,
-            guardian_phone=body.guardian.phone,
-            relation=body.guardian.relation,
+            guardian_first_name=guardian.first_name if guardian else None,
+            guardian_last_name=guardian.last_name if guardian else None,
+            guardian_email=guardian.email if guardian else None,
+            guardian_phone=guardian.phone if guardian else None,
+            relation=guardian.relation if guardian else "parent",
+            contact_pending=body.contact_pending,
             at=now(),
             actor_person_id=getattr(request.state, "person_id", None),
             group_id=body.group_id,
@@ -412,10 +415,10 @@ def create_student(
     # invited later through `/invitation/resend` -- which re-issues the token and refreshes
     # the expiry, so the thirty days that pass in between cost nothing.
     invitation_email_sent = False
-    if invitation_url and body.guardian.email and body.send_invitation:
+    if invitation_url and guardian is not None and guardian.email and body.send_invitation:
         studio_row = session.get(Studio, require_current_studio_id())
         invitation_email_sent = send_invitation_email(
-            to_email=body.guardian.email,
+            to_email=guardian.email,
             studio_name=studio_row.name if studio_row is not None else "",
             invitation_url=invitation_url,
         )

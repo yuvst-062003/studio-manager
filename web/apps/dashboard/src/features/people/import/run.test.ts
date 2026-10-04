@@ -3,7 +3,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { DashboardPeopleClient } from '../peopleClient'
 import type { Draft, Family } from './review'
-import { runImport, type ImportClient } from './run'
+import { createBodyFor, runImport, type ImportClient } from './run'
 
 const json = (body: unknown, status = 201) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
@@ -161,5 +161,23 @@ describe('runImport', () => {
     const calls = vi.mocked(client.createStudent).mock.calls
     expect(calls).toHaveLength(2)
     for (const [body] of calls) expect(body.send_invitation).toBe(false)
+  })
+})
+
+describe('a child whose contact is still to come (2026-10-04)', () => {
+  it('is created with contact_pending and no guardian, and the family says so', async () => {
+    const orphan = draft({ parent_first: '', parent_last: '', email: '', phone: '', birthdate: '' })
+    const fam = family([orphan], { key: 'line-2', email: '', parentName: '', phone: '' })
+    const body = createBodyFor(orphan, fam)
+    expect(body.contact_pending).toBe(true)
+    expect(body.guardian).toBeUndefined()
+    expect(body.send_invitation).toBe(false)
+
+    const client = fakeClient({
+      createStudent: vi.fn(async () => json({ student: { id: 's-1' }, invitation_token: null, invitation_url: null })),
+    })
+    const result = await runImport([fam], client, { today: '2026-10-04', beltNote: '' })
+    expect(result.families.get('line-2')?.invitation).toBe('no_contact')
+    expect(result.rows.get(orphan.id)?.problem).toBeNull()
   })
 })

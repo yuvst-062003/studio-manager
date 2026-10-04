@@ -158,6 +158,21 @@ class StudentCreate(BaseModel):
     #: the by-hand form, and §5.4a's trial booking, which never sets it -- sending exactly
     #: as before.
     send_invitation: bool = True
+    #: **No guardian yet, on purpose** (owner, 2026-10-04). The club-migration load and the
+    #: file import send a child whose office record has no parent and no contact; the
+    #: student is created with nobody attached, shown as `no_contact` on the students list,
+    #: and the manager adds the family later through `POST /students/{id}/guardians`.
+    #:
+    #: An explicit flag rather than a missing `guardian`, so §5.3's rule still holds for
+    #: every other caller: the by-hand form and §5.4a's trial booking omit a guardian only
+    #: by mistake, and the route still refuses them for it.
+    contact_pending: bool = False
+
+    @model_validator(mode="after")
+    def _pending_means_no_guardian(self) -> StudentCreate:
+        if self.contact_pending and self.guardian is not None:
+            raise ValueError("contact_pending is a student sent with no guardian")
+        return self
 
 
 class StudentUpdate(BaseModel):
@@ -446,7 +461,8 @@ class StudentSummaryOut(BaseModel):
     #: open-ended freeze, which is a real state a manager sets deliberately.
     frozen_until: date | None = None
     guardian_display_names: list[str] = Field(default_factory=list)
-    #: `signed_in` / `ready` / `no_email` — whether this family can be sent an invitation,
+    #: `signed_in` / `ready` / `no_email` / `no_contact` — whether this family can be sent an
+    #: invitation (`no_contact`: no guardian at all yet, 2026-10-04),
     #: and the column the bulk invite selects on (2026-09-23). Decided by
     #: `app.services.people.students.invite_state`, the same predicate `/invitation/resend`
     #: refuses on, so a row this says is `ready` is a row the send will accept.

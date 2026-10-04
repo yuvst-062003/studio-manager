@@ -24,7 +24,7 @@
 // weeks in between cost nothing.
 import type { DashboardPeopleClient } from '../peopleClient'
 import type { Draft, Family } from './review'
-import { isAdult } from './review'
+import { isAdult, isContactPending } from './review'
 
 export type ImportClient = Pick<DashboardPeopleClient, 'createStudent' | 'convert' | 'awardBelt'>
 
@@ -44,8 +44,10 @@ export type RowOutcome = {
  *    the runner never asks for a send, so none of the three can happen here.
  *  - `not_needed`: the guardian matched an account that already exists; they sign in as
  *    usual and there is nothing to invite them to.
+ *  - `no_contact`: created with no guardian yet (`contact_pending`); there is nobody to
+ *    invite until the manager adds the parent.
  *  - `none`: no member of the family was created. */
-export type InvitationOutcome = 'held' | 'not_needed' | 'none'
+export type InvitationOutcome = 'held' | 'not_needed' | 'no_contact' | 'none'
 
 export type FamilyOutcome = { invitation: InvitationOutcome; studentId: string | null }
 
@@ -75,6 +77,17 @@ const lastNameOrSpace = (value: string) => value.trim() || ' '
 export function createBodyFor(draft: Draft, family: Family): CreateBody {
   const first_name = draft.first_name.trim()
   const last_name = lastNameOrSpace(draft.last_name)
+  if (isContactPending(draft)) {
+    // No family to attach yet (2026-10-04): the server creates the child with nobody, and
+    // the manager adds the parent from the student card afterwards.
+    return {
+      first_name,
+      last_name,
+      birthdate: /^\d{4}-\d{2}-\d{2}$/.test(draft.birthdate) ? draft.birthdate : null,
+      send_invitation: false,
+      contact_pending: true,
+    }
+  }
   const email = blankToUndefined(draft.email) ?? null
   const phone = blankToUndefined(draft.phone) ?? null
   return {
@@ -127,7 +140,10 @@ export async function runImport(
         const answer = (await created.json()) as CreateAnswer
         outcome.studentId = answer.student?.id ?? null
         if (familyOutcome.studentId === null && outcome.studentId) {
-          familyOutcome = { invitation: invitationFrom(answer), studentId: outcome.studentId }
+          familyOutcome = {
+            invitation: isContactPending(draft) ? 'no_contact' : invitationFrom(answer),
+            studentId: outcome.studentId,
+          }
         }
 
         if (outcome.studentId && draft.group_id) {

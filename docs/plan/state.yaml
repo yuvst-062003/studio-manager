@@ -1649,6 +1649,59 @@ holdbacks:
     source: >-
       owner, 2026-09-23 · app/routers/students.py · app/services/people/students.py ·
       web/apps/dashboard/src/features/people/import/ · StudentsScreen.tsx
+  - id: HB-gladiator-roster
+    kind: carried
+    title: Gladiator's roster goes into production with no family attached, and is billed nothing yet
+    why: >-
+      The manager filled the import template from the office's records (תלמידים 2026, 70
+      rows) so the staff and dashboard apps show the real club. Not one row carries a parent,
+      an email, a phone or a birthdate, and the import refused all of them — `missing_contact`
+      in the review, and `GuardianCreate`'s validator and `POST /students`'s guardian check on
+      the server. Owner, 2026-10-04: load the children anyway, add each family afterwards, and
+      run it directly against production rather than through the upload screen.
+
+      Built for that. `StudentCreate.contact_pending` creates a student with NO guardian — no
+      Person invented for a parent nobody named, no invitation minted — and only on that
+      explicit flag: the by-hand form and §5.4a's trial booking are still refused for an
+      absent guardian. The file import sends it for a row with no parent and no contact,
+      which is no longer read as an adult's own account. The students list publishes them as
+      `no_contact` (a fourth invite state, filterable, chipped on the row), the payment column
+      says "not billed" for them instead of a ✓ over money nobody was asked for, and the card
+      offers "add the parent" — `POST /students/{id}/guardians`, whose first guardian is now
+      made PRIMARY whatever the caller asked, or billing would still find no payer.
+
+      **No charges, by relying on the absence of a guardian** (owner's choice over a studio
+      switch). `BillingRunService` raises nothing for a student with no primary guardian, on
+      `convert` and in the monthly run, and nothing downstream errors — tested in
+      `tests/people/test_contact_pending.py`. Accepted consequence: billing starts by itself
+      for a child the day the manager adds their parent.
+
+      Deferred by the owner, and kept OUT of the database: column L סכום (a per-student
+      monthly amount that often differs from the plan's price — its meaning is still to be
+      settled), and columns Q/R (months already paid and their total, counted from 1 Sep
+      2026, the start of the training year). Row 14's total does not equal amount × months
+      (7 × 200 = 1,400, written 2,400) and is unresolved. Row 33 ("6940", no group, no plan)
+      is skipped. Eight rows have a group and no plan or payment (lines 63, 65–71) and are
+      loaded unpriced. The payment method (K) IS loaded, onto `student.payment_method`.
+
+      Looked at, not only tested: a rehearsal load into a local studio carrying the same
+      five groups and three plans showed the staff roster rendering every one of those
+      children WITHOUT A NAME — the "missing declaration" badge took the row's width and the
+      name column collapsed. Every child of a migrated club starts with no declaration, so
+      `.roster-row__text` now holds a floor and the badge wraps beneath it.
+
+      The load itself is `scripts/load-roster.py`: the import's own `create` →
+      `convert(started_on=today)`, dry run by default, `--apply` only with the studio id the
+      dry run printed, idempotent on name + group, and it prints line numbers and counts —
+      never a name. The dataset is the operator's scratch file and never enters the repo.
+    blocks: the manager testing the staff and dashboard apps against the real club
+    status: open
+    opened: 2026-10-04
+    closed: null
+    source: >-
+      owner, 2026-10-04 · app/services/people/students.py · app/routers/students.py ·
+      app/schemas/people.py · scripts/load-roster.py · web/apps/dashboard/src/features/people/ ·
+      web/apps/staff/src/features/attendance/attendance.css
   - id: HB-upay-receipt-link
     kind: carried
     title: D6's receipt button needs one real uPay transaction to settle it
