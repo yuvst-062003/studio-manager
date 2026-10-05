@@ -32,7 +32,12 @@ def test_every_runtime_dependency_is_declared(dependency):
     """SQLAlchemy and Alembic were in .venv but not here -- CI would have failed at
     import, not at the assertion that mattered."""
     declared = _requirements()
-    assert any(re.match(rf"^{dependency}(\[|==|>=|~=|$)", d) for d in declared), (
+    # Any PEP 440 specifier, not the four that happened to be in the file when this was
+    # written: `sqlalchemy<2.1` is as much a declaration as `sqlalchemy>=2.0`, and reading
+    # it as "absent" sent me looking for a missing dependency that was on the line above the
+    # assertion. The character class still has to match immediately after the name, so a
+    # different package that merely starts with these letters does not satisfy it.
+    assert any(re.match(rf"^{dependency}(\[|[=!<>~]|$)", d) for d in declared), (
         f"{dependency} is imported by the app but absent from requirements-dev.txt"
     )
 
