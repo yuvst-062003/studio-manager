@@ -10,7 +10,14 @@
 
 .roster-row__text {
   display: flex;
-  flex: 1;
+
+  /* 2026-10-04 — a floor, not just a grow. The health badge (M4's slot section) sits beside
+   * this column at its own intrinsic width, and the "missing" badge carries a sentence-long
+   * hint; with `flex: 1` and `min-inline-size: 0` it took the whole row and squeezed this
+   * column to nothing, so a child with no declaration showed on the roster WITHOUT A NAME.
+   * Every child of a migrated club starts that way. The floor makes the badge wrap below
+   * instead (see `.roster-row-shell .roster-row`'s wrap). */
+  flex: 1 1 8rem;
   flex-direction: column;
   gap: var(--space-1);
   min-inline-size: 0;
@@ -182,6 +189,7 @@
 
 .roster-row-shell .roster-row {
   flex: 1;
+  flex-wrap: wrap;
   min-inline-size: 0;
 }
 

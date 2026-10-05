@@ -189,6 +189,13 @@ export function RosterScreen({
     }
   }, [roster, notExpectedIds])
 
+  // Over the EXPECTED section too, for the same reason as the three counts below: the note
+  // sits above that list, and the not-expected rows are inside a `<details>` that is
+  // collapsed. Counting the whole roster made the sentence promise more ⚠ than the screen
+  // was showing — and after a club migration, where every child starts with no
+  // declaration, the gap is the size of the not-expected section.
+  const missingHealth = split.expected.filter((row) => row.health_status === 'missing').length
+
   // §5.7's three counts. Every one of them is over the EXPECTED section only: "its rows
   // never count toward `לא סומן`", and a not-expected child who did not come has not
   // missed anything.
@@ -387,6 +394,13 @@ export function RosterScreen({
       {roster.length === 0 ? (
         <p className="text-sm text-[var(--text-muted)]" data-testid="roster-empty">
           {t(locale, 'attendance.roster.empty')}
+        </p>
+      ) : null}
+
+      {/* §5.5's hint, once for the whole list — see `HealthBadge`'s `onRoster`. */}
+      {missingHealth > 0 ? (
+        <p className="text-xs text-[var(--text-muted)] m-0" data-testid="roster-health-note">
+          {t(locale, 'health.badge.missingRosterNote').replace('{{count}}', String(missingHealth))}
         </p>
       ) : null}
 

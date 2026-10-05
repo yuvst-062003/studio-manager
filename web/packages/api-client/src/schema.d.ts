@@ -1821,20 +1821,12 @@ export interface paths {
          *     process alive", and a database it cannot reach does not make it dead. Letting the
          *     failure propagate would turn every database blip into a page.
          */
-        get: operations["read_health_api_v1_health_head"];
+        get: operations["read_health_api_v1_health_get"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
-        /**
-         * Read Health
-         * @description Liveness. Deliberately carries no tenant data and needs no auth.
-         *
-         *     `revision` is best-effort and never affects `status`: this endpoint answers "is this
-         *     process alive", and a database it cannot reach does not make it dead. Letting the
-         *     failure propagate would turn every database blip into a page.
-         */
-        head: operations["read_health_api_v1_health_head"];
+        head?: never;
         patch?: never;
         trace?: never;
     };
@@ -12866,6 +12858,11 @@ export interface components {
             attends_weekdays?: number[] | null;
             /** Birthdate */
             birthdate?: string | null;
+            /**
+             * Contact Pending
+             * @default false
+             */
+            contact_pending: boolean;
             /** Email */
             email?: string | null;
             /** First Name */
@@ -13608,6 +13605,11 @@ export interface components {
             attends_weekdays?: number[] | null;
             /** Birthdate */
             birthdate?: string | null;
+            /**
+             * Contact Pending
+             * @default false
+             */
+            contact_pending: boolean;
             /** Email */
             email?: string | null;
             /** First Name */
@@ -17114,27 +17116,7 @@ export interface operations {
             };
         };
     };
-    read_health_api_v1_health_head: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HealthResponse"];
-                };
-            };
-        };
-    };
-    read_health_api_v1_health_head: {
+    read_health_api_v1_health_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -21864,7 +21846,7 @@ export interface operations {
                 class_id?: string | null;
                 health_status?: string | null;
                 q?: string | null;
-                invite_state?: ("signed_in" | "ready" | "no_email") | null;
+                invite_state?: ("signed_in" | "ready" | "no_email" | "no_contact") | null;
                 after?: string | null;
                 limit?: number;
             };

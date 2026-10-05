@@ -1649,6 +1649,132 @@ holdbacks:
     source: >-
       owner, 2026-09-23 · app/routers/students.py · app/services/people/students.py ·
       web/apps/dashboard/src/features/people/import/ · StudentsScreen.tsx
+  - id: HB-gladiator-roster
+    kind: carried
+    title: Gladiator's roster goes into production with no family attached, and is billed nothing yet
+    why: >-
+      The manager filled the import template from the office's records (תלמידים 2026, 70
+      rows) so the staff and dashboard apps show the real club. Not one row carries a parent,
+      an email, a phone or a birthdate, and the import refused all of them — `missing_contact`
+      in the review, and `GuardianCreate`'s validator and `POST /students`'s guardian check on
+      the server. Owner, 2026-10-04: load the children anyway, add each family afterwards, and
+      run it directly against production rather than through the upload screen.
+
+      Built for that. `StudentCreate.contact_pending` creates a student with NO guardian — no
+      Person invented for a parent nobody named, no invitation minted — and only on that
+      explicit flag: the by-hand form and §5.4a's trial booking are still refused for an
+      absent guardian. The file import sends it for a row with no parent and no contact,
+      which is no longer read as an adult's own account. The students list publishes them as
+      `no_contact` (a fourth invite state, filterable, chipped on the row), the payment column
+      says "not billed" for them instead of a ✓ over money nobody was asked for, and the card
+      offers "add the parent" — `POST /students/{id}/guardians`, whose first guardian is now
+      made PRIMARY whatever the caller asked, or billing would still find no payer.
+
+      **No charges, by relying on the absence of a guardian** (owner's choice over a studio
+      switch). `BillingRunService` raises nothing for a student with no primary guardian, on
+      `convert` and in the monthly run, and nothing downstream errors — tested in
+      `tests/people/test_contact_pending.py`. Accepted consequence: billing starts by itself
+      for a child the day the manager adds their parent.
+
+      Deferred by the owner, and kept OUT of the database: column L סכום (a per-student
+      monthly amount that often differs from the plan's price — its meaning is still to be
+      settled), and columns Q/R (months already paid and their total, counted from 1 Sep
+      2026, the start of the training year). Row 14's total does not equal amount × months
+      (7 × 200 = 1,400, written 2,400) and is unresolved. Row 33 ("6940", no group, no plan)
+      is skipped. Eight rows have a group and no plan or payment (lines 63, 65–71) and are
+      loaded unpriced. The payment method (K) IS loaded, onto `student.payment_method`.
+
+      **Column J is known wrong on three rows, and the plan they need does not exist.** The
+      file has an unheadered column S the import never reads — 24 free-text notes the office
+      kept — and three of them say the child trains ONCE a week (lines 14, 18, 53), while
+      column J puts all three on פעמיים בשבוע. The studio offers twice, three times and 4–6
+      only, so there is no plan to load them onto, and their amounts in L (200, blank, 200)
+      sit below the twice-a-week 300 accordingly. A fourth (line 61) is the mirror: 4-6
+      אימונים בשבוע in J, "comes more, paid for twice only" in S. Loaded on J regardless, by
+      the owner's decision that the plan matching J stands for now — recorded here because
+      the first charge raised for any of these four will be at a price the file itself
+      disputes. Asked of the manager with the rest, 2026-10-05.
+
+      Looked at, not only tested: a rehearsal load into a local studio carrying the same
+      five groups and three plans showed the staff roster rendering every one of those
+      children WITHOUT A NAME — the "missing declaration" badge took the row's width and the
+      name column collapsed. Every child of a migrated club starts with no declaration, so
+      `.roster-row__text` now holds a floor and the badge wraps beneath it.
+
+      The load itself is `scripts/load-roster.py`: the import's own `create` →
+      `convert(started_on=today)`, dry run by default, `--apply` only with the studio id the
+      dry run printed, idempotent on name + group, and it prints line numbers and counts —
+      never a name. The dataset is the operator's scratch file and never enters the repo.
+      Read off the rehearsal screenshots the same day, and fixed at the owner's word: the
+      staff child card stacked three components that each drew the name (three times), a
+      full-width status pill, an empty הורים box beside "no parents", unstyled attendance and
+      pickup lines, and mark-present/absent buttons that did nothing when opened from the
+      list — embedded now, one set of cards; the staff list said "0 חודשים" for every
+      migrated child — the load now sets `source = club_roster` and `joined_on` to the
+      training year's start (1 Sep 2026, also what billing will count from), and the list
+      leaves seniority off for them rather than invent it; the dashboard card offered צירוף
+      למועדון and סימון כלא הצטרף on an ACTIVE child, both refused by LEGAL_TRANSITIONS —
+      shown now only before membership, and freeze only to a member; the list said "50
+      חניכים" for a filter matching 69 — a floor "50+" while pages remain; the health
+      hint repeated under every roster row — said once above the list.
+    blocks: the manager testing the staff and dashboard apps against the real club
+    status: open
+    opened: 2026-10-04
+    closed: null
+    source: >-
+      owner, 2026-10-04 · app/services/people/students.py · app/routers/students.py ·
+      app/schemas/people.py · scripts/load-roster.py · web/apps/dashboard/src/features/people/ ·
+      web/apps/staff/src/features/attendance/attendance.css
+  - id: HB-gladiator-billing
+    kind: external
+    title: Gladiator is billed from September, collected by the manager — waiting on the studio's prices
+    why: >-
+      Owner, 2026-10-04, after seeing the rehearsal: the manager must see what each child
+      owes and how many months are paid — "full billing, but without the parents paying; the
+      manager takes the payments and only needs to see it". Decided: billing counts from
+      1 Sep 2026; a charge for a child with no parent is addressed to the CHILD's own record
+      as its bookkeeping payer (no schema change, nobody notified — the manager tells the
+      family); the manager is alerted only when a month is OVERDUE, which the alert centre
+      and the collections screen already count once charges exist; standing-order children
+      pay their plan's price, which the plan's own standing-order link already fixes.
+
+      Blocked on the studio, by the owner's choice: column L's per-child amounts differ from
+      the plan price on 13 rows (sibling discounts or special deals — unknown), Q/R's months
+      already paid need confirming (row 14: 7 × 200 = 1,400 written 2,400), whether September
+      and October were paid for children with no months, and a plan for the 8 rows without
+      one. The questions went to the owner as a ready-to-send Hebrew message. Built after the
+      answers, as one change: the child-as-payer fallback, a per-child monthly price if L
+      holds, and a backfill that raises Sep/Oct and records the months already received —
+      deployed together, so no charge is ever raised at a price nobody confirmed.
+
+      **Column S, read 2026-10-05, is where the payment truth actually is — and Q/R do not
+      carry it.** An unheadered 24-note column the import never reads, and no backfill can be
+      written from Q/R alone while it says otherwise:
+
+      · Seven of the eight rows with no plan (65–71) are not merely incomplete — they are
+        marked לא שולם, has not paid. Billing them from 1 Sep 2026 would invoice months the
+        manager has already recorded as unpaid, and at no price, since they have no plan.
+      · Five rows state a paid-THROUGH date rather than a count, and one of them contradicts
+        the September start outright: line 60 is "five months from 10.26 to 02.27", i.e. Oct,
+        not Sep. Lines 17, 24, 25, 62 are "through December", "until 02.27", "half of
+        September and the rest through December", "through December, must top up to 300".
+        A month count from 1 Sep is the wrong shape for every one of them.
+      · Two rows (21, 22) are "600 cash and two cheques" — one payment split across two
+        methods, which the single K value cannot hold.
+      · Four are the manager's own open questions: how a family paid (18), how much (19), who
+        a row even is (33, already skipped), and whether a child was charged TWICE (44).
+      · Line 15 is "80 with Vova" — money a third party holds. Line 23, "half of September,
+        did not pay the rest". Line 59, by bank transfer from 28.09 — a method not in K.
+
+      Nothing in column S is loaded and nothing is derived from it: it is the manager's
+      record of a reconciliation nobody has done yet. The questions above went out with the
+      roster's; Q/R stay out of the database until they come back, and the backfill is
+      written from the answers, never from this column.
+    blocks: the manager seeing each child's payments for Gladiator
+    status: open
+    opened: 2026-10-04
+    closed: null
+    source: owner, 2026-10-04 · HB-gladiator-roster
   - id: HB-upay-receipt-link
     kind: carried
     title: D6's receipt button needs one real uPay transaction to settle it

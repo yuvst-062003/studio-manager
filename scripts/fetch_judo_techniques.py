@@ -40,6 +40,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+from typing import Any
 
 KODOKAN = (
     "https://kdkjd.org/%E6%8A%80/%E6%9F%94%E9%81%93-%E6%8A%80%E5%90%8D%E7%A7%B0%E4%B8%80%E8%A6%A7/"
@@ -97,7 +98,10 @@ CONTEXT = _ssl_context()
 def fetch(url: str, *, timeout: int = 45) -> str:
     request = urllib.request.Request(url, headers={"User-Agent": UA})
     with urllib.request.urlopen(request, timeout=timeout, context=CONTEXT) as response:
-        return response.read().decode("utf-8", errors="replace")
+        # Named, because `urlopen`'s object is untyped: without this the decode below
+        # is `Any` and the `-> str` above stops meaning anything.
+        raw: bytes = response.read()
+    return raw.decode("utf-8", errors="replace")
 
 
 def strip_tags(fragment: str) -> str:
@@ -125,9 +129,9 @@ def slugify(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
 
 
-def parse_kodokan(page: str) -> tuple[list[dict], dict[str, int]]:
+def parse_kodokan(page: str) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """The eight family tables, and the 1920 Gokyo grouping."""
-    techniques: list[dict] = []
+    techniques: list[dict[str, Any]] = []
     gokyo: dict[str, int] = {}
 
     for table in re.findall(r"<table>(.*?)</table>", page, re.S):
@@ -294,8 +298,8 @@ def main() -> int:
     print(f"\nwrote {OUT.relative_to(ROOT)}", file=sys.stderr)
 
     # The English source material, for writing the Hebrew from. Not committed, not shipped.
-    source = DATA / ".source-definitions.json"
-    source.write_text(
+    source_path = DATA / ".source-definitions.json"
+    source_path.write_text(
         json.dumps(
             {t["slug"]: {"en": t["_definitionEn"], "meaning": t["_meaningEn"]} for t in techniques},
             ensure_ascii=False,

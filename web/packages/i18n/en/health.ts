@@ -35,6 +35,7 @@ export const health: Bundle = {
   'badge.trialSigned': 'Trial declaration',
   'badge.signed': 'Declaration on file',
   'badge.missingHint': 'You can still mark attendance. The declaration is owed by the guardian',
+  'badge.missingRosterNote': '{{count}} without a health declaration — attendance can still be marked; the parent must sign it',
   'reminder.send': 'Send a reminder to the guardian',
   'reminder.sent': 'Reminder sent',
   'reminder.sentOn': 'Last reminder sent on',

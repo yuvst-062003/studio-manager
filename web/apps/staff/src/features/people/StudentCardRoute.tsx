@@ -201,10 +201,11 @@ export function StudentCardRoute({
       />
       <PersonalDetails locale={locale} student={student} />
       <ParentContacts locale={locale} student={student} />
-      {/* Defect A's fix: 9c's מעבר כיתה, mounted for real. `StaffStudentCard` draws its
-          own name/status/belt/guardians/groups too, overlapping the sections above —
-          accepted rather than restyled; see this file's header. */}
+      {/* Defect A's fix: 9c's מעבר כיתה, mounted for real — `embedded`, so it draws only
+          the groups and the move, not a second name, status pill and parents box under the
+          banner and contacts above (2026-10-04, read off a screenshot). */}
       <StaffStudentCard
+        embedded
         actor={actor}
         client={peopleClient}
         enrollments={enrollments}
@@ -214,11 +215,18 @@ export function StudentCardRoute({
         student={student}
         today={resolvedToday}
       />
-      <StudentCardScreen
-        client={attendanceClient}
-        locale={locale}
-        student={{ id: student.id, first_name: student.first_name, last_name: student.last_name }}
-      />
+      {/* The attendance strip and the pickup contacts arrive through the `student-card`
+          slot unstyled; in the same card as the sections above, with their headings in the
+          same small bold, rather than as loose lines of body text at the foot of the page
+          (2026-10-04, read off a screenshot). */}
+      <section className="bg-[var(--surface-raised)] rounded-2xl p-4 border border-[var(--border)] shadow-sm text-sm text-[var(--fg)] [&_h2]:text-xs [&_h2]:font-black [&_h2]:tracking-wider [&_h2]:mt-0 [&_h2]:mb-2 [&_section+section]:mt-4">
+        <StudentCardScreen
+          embedded
+          client={attendanceClient}
+          locale={locale}
+          student={{ id: student.id, first_name: student.first_name, last_name: student.last_name }}
+        />
+      </section>
     </div>
   )
 }

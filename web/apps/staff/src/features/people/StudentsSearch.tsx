@@ -77,7 +77,11 @@ function metaLine(locale: Locale, student: StudentSummary, now: string | undefin
   } else {
     parts.push(t(locale, 'people.student.noGroup'))
   }
-  if (student.joined_on && now) {
+  // Not for a child brought over with the club (`club_roster`, 2026-10-04): their
+  // `joined_on` is the training year's start, set by the load because the real one was
+  // never in the office's file, so "1 חודשים" beside a five-year veteran would be a
+  // number the app made up. Said nothing rather than said wrong.
+  if (student.joined_on && now && student.source !== 'club_roster') {
     parts.push(
       t(locale, 'people.tenure.months').replace(
         '{{count}}',

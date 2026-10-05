@@ -45,6 +45,7 @@ import argparse
 import pathlib
 import sys
 import uuid
+from datetime import datetime
 
 # Same as scripts/verify-db-roles.py: run as a file, so the repo root is not on sys.path
 # and `app` would not import.
@@ -135,6 +136,61 @@ def live_owner(session: Session, studio_id: uuid.UUID) -> Person | None:
         )
 
 
+class OwnerConflictError(Exception):
+    """The studio already has an owner, and it is somebody else's login.
+
+    §3.1 allows exactly one. Raised rather than printed so the one place that knows how to
+    report and roll back stays in `main`.
+    """
+
+    def __init__(self, person_id: uuid.UUID) -> None:
+        super().__init__(str(person_id))
+        self.person_id = person_id
+
+
+def ensure_owner(
+    session: Session,
+    *,
+    studio_id: uuid.UUID,
+    identity_id: uuid.UUID,
+    email: str,
+    first_name: str,
+    last_name: str,
+    at: datetime,
+) -> tuple[Person, str | None]:
+    """The studio's owner Person, invited and accepted if it has none yet.
+
+    Returns the Person and what was written, or `None` when the owner was already there and
+    already bound. Extracted from `main` to be reachable from a test: this is the one step
+    of the bootstrap that creates a row through two services rather than one query, and the
+    fresh-studio branch below is the only one a new club ever takes.
+    """
+    owner = live_owner(session, studio_id)
+    if owner is None:
+        # The console's own call, followed by the browser's own call. The token
+        # never leaves this process: it is minted, spent, and dropped.
+        _, token = invite_owner(
+            session,
+            studio_id=studio_id,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            granted_by_identity_id=identity_id,
+            at=at,
+        )
+        accepted = accept_invitation(session, token=token, identity_id=identity_id, at=at)
+        return accepted.person, "owner"
+    if owner.auth_identity_id is None:
+        # An invitation was created but never accepted. Binding it here is exactly
+        # what accept_invitation does, minus a token nobody kept.
+        owner.auth_identity_id = identity_id
+        session.flush()
+        return owner, "owner login attached"
+    if owner.auth_identity_id != identity_id:
+        raise OwnerConflictError(owner.id)
+    return owner, None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--email", required=True, help="the Google address of the owner")
@@ -209,35 +265,26 @@ def main() -> int:
             wrote.append("studio")
         print(f"·  studio {studio.id} — {studio.name} ({studio.slug})")
 
-        owner = live_owner(session, studio.id)
-        if owner is None:
-            # The console's own call, followed by the browser's own call. The token
-            # never leaves this process: it is minted, spent, and dropped.
-            _, token = invite_owner(
+        try:
+            owner, wrote_owner = ensure_owner(
                 session,
                 studio_id=studio.id,
+                identity_id=identity.id,
                 email=args.email,
                 first_name=args.first_name,
                 last_name=args.last_name,
-                granted_by_identity_id=identity.id,
                 at=at,
             )
-            owner = accept_invitation(session, token=token, identity_id=identity.id, at=at)
-            wrote.append("owner")
-        elif owner.auth_identity_id is None:
-            # An invitation was created but never accepted. Binding it here is exactly
-            # what accept_invitation does, minus a token nobody kept.
-            owner.auth_identity_id = identity.id
-            session.flush()
-            wrote.append("owner login attached")
-        elif owner.auth_identity_id != identity.id:
+        except OwnerConflictError as conflict:
             print(
                 f"✋ studio {studio.slug!r} already has a different owner "
-                f"(person {owner.id}). §3.1 allows exactly one; nothing written.",
+                f"(person {conflict.person_id}). §3.1 allows exactly one; nothing written.",
                 file=sys.stderr,
             )
             session.rollback()
             return 1
+        if wrote_owner is not None:
+            wrote.append(wrote_owner)
         print(f"·  owner person {owner.id} — {owner.first_name} {owner.last_name}")
 
         session.commit()

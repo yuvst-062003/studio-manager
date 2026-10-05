@@ -27,7 +27,32 @@ from tests.structure.conftest import bearer
 STAFF = "/api/v1/staff"
 
 
-def _invite(client, as_manager, *, email: str, roles: list[str], group_ids=()) -> str:
+def live(token: str) -> dict[str, str]:
+    """An auth header on the REAL clock, deliberately without `bearer`'s pin to T0.
+
+    `bearer` pins because one assertion about a TTL drifts stale once real time passes it.
+    A JOURNEY that ROTATES is the opposite case: it creates an invitation, redeems it and
+    rotates the session in sequence, so what it needs is for those three to agree with EACH
+    OTHER — and on the real clock they always do, however long ago T0 was.
+
+    Pinning is what broke the two rotating journeys. Redeeming under the pin stamps the new
+    refresh row at T0, so it expired at `T0 + REFRESH_TOKEN_TTL_DAYS` = 2026-09-24 and every
+    rotation after it answered 401 `expired` from 2026-09-25 on, with nothing in the product
+    wrong. Pinning the rotation too does not help and cannot: `AuthContextMiddleware` is
+    registered AFTER `DevClockMiddleware` and therefore runs BEFORE it (`app/main.py` calls
+    that order load-bearing), so an access token is always verified against the real wall
+    clock — a token minted under a shifted clock is unusable by construction. Every other
+    suite mints unpinned for this reason, including this module's own `_make_caller`.
+
+    Used for a whole journey or not at all: redeeming live while inviting pinned is the
+    2026-09-09 failure in `bearer`'s own docstring, an invitation from T0 reaching a
+    redemption fourteen days past its expiry. The non-rotating tests here assert one thing
+    each, invite and redeem under the pin, and correctly keep `bearer`.
+    """
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _invite(client, as_manager, *, email: str, roles: list[str], group_ids=(), headers=None) -> str:
     """The manager's half of F5. Returns the plaintext token, which is returned once."""
     created = client.post(
         f"{STAFF}/invitations",
@@ -38,7 +63,7 @@ def _invite(client, as_manager, *, email: str, roles: list[str], group_ids=()) -
             "last_name": "מאמנת",
             "group_ids": [str(g) for g in group_ids],
         },
-        headers=as_manager.headers,
+        headers=as_manager.headers if headers is None else headers,
     )
     assert created.status_code == 201, created.text
     token = created.json()["token"]
@@ -63,20 +88,39 @@ def test_an_invited_coach_can_work_in_the_staff_app_after_a_rotation(
     and the assertions after the redemption are the ones a 201 cannot make.
     """
     email = f"coach-{uuid.uuid4().hex[:8]}@example.invalid"
-    token = _invite(client, as_manager, email=email, roles=["lead_coach"], group_ids=[a_group])
+    token = _invite(
+        client,
+        as_manager,
+        email=email,
+        roles=["lead_coach"],
+        group_ids=[a_group],
+        headers=live(as_manager.token),
+    )
 
-    # Signed in, but not yet redeemed: no Person is bound to this identity, so §6.1's
-    # `access.staff` query answers false and the staff app shows the refusal. This is the
-    # state the invited coach is in when they open the app for the first time.
+    # **Signing in AT the invited address is itself the binding** — §5.3's
+    # `accept_invitations_for_verified_email`, which the callback calls. So the coach is
+    # staff before touching the token, and the token's own route is what a DIFFERENT address
+    # needs (`accept_invitation_code`'s docstring: "a correctly-invited parent whose email
+    # differs from the invitation by one character").
+    #
+    # This asserted `access.staff is False` and `studios == []` until 2026-10-05, and
+    # passed — but only because the invitation was created under the T0 pin and had expired
+    # 2026-09-08, and that binder refuses an expired invitation. So the "not yet redeemed"
+    # state it was describing is the state of an invitation that has AGED OUT, not the state
+    # an invited coach is ever in. With the journey on the real clock the invitation is
+    # live, and the product does what §5.3 says.
     signed = _sign_in_as_the_invited(client, fake_provider, email)
     assert signed.status_code == 200, signed.text
-    assert signed.json()["access"]["staff"] is False
-    assert signed.json()["studios"] == []
+    assert signed.json()["access"]["staff"] is True, (
+        "a verified sign-in at the invited address is §5.3's binding; this answering false "
+        "would mean the coach opens the staff app to the refusal screen with no way forward"
+    )
+    assert "lead_coach" in signed.json()["studios"][0]["roles"]
 
     redeemed = client.post(
         "/api/v1/auth/accept-invitation",
         json={"token": token},
-        headers=bearer(signed.json()["access_token"]),
+        headers=live(signed.json()["access_token"]),
     )
     assert redeemed.status_code == 200, redeemed.text
     body = redeemed.json()
@@ -93,7 +137,7 @@ def test_an_invited_coach_can_work_in_the_staff_app_after_a_rotation(
         "and the staff app renders empty with no error on screen"
     )
     assert rotated.json()["access"]["staff"] is True
-    coach = {"Authorization": f"Bearer {rotated.json()['access_token']}"}
+    coach = live(rotated.json()["access_token"])
 
     # The screens a lead_coach's roles allow, on the token the app is actually holding.
     # A 401 here is the failure this file exists to catch: it means the session named no
@@ -156,17 +200,19 @@ def test_an_invited_manager_reaches_the_staff_screen_the_invitation_promised(
     """The roles are not decoration. An invitation naming `manager` must actually open the
     manager-only screens, on the rotated token."""
     email = f"mgr-{uuid.uuid4().hex[:8]}@example.invalid"
-    token = _invite(client, as_manager, email=email, roles=["manager"])
+    token = _invite(
+        client, as_manager, email=email, roles=["manager"], headers=live(as_manager.token)
+    )
     signed = _sign_in_as_the_invited(client, fake_provider, email)
     redeemed = client.post(
         "/api/v1/auth/accept-invitation",
         json={"token": token},
-        headers=bearer(signed.json()["access_token"]),
+        headers=live(signed.json()["access_token"]),
     )
     assert redeemed.status_code == 200, redeemed.text
 
     rotated = client.post("/api/v1/auth/refresh")
-    manager = {"Authorization": f"Bearer {rotated.json()['access_token']}"}
+    manager = live(rotated.json()["access_token"])
     assert client.get(STAFF, headers=manager).status_code == 200
 
 

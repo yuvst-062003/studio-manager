@@ -60,6 +60,7 @@ export const health: Bundle = {
   // §5.5 — the coach can still mark them present. The hint says so out loud, so nobody
   // reads the ⚠ as a permission error.
   'badge.missingHint': 'אפשר לסמן נוכחות. ההצהרה נדרשת מההורה',
+  'badge.missingRosterNote': '{{count}} בלי הצהרת בריאות — אפשר לסמן נוכחות, ההצהרה נדרשת מההורה',
   'reminder.send': 'שלח תזכורת להורה',
   'reminder.sent': 'התזכורת נשלחה',
   'reminder.sentOn': 'תזכורת אחרונה נשלחה בתאריך',

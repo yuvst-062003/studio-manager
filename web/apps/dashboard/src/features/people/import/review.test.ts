@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import type { RawRow } from './columns'
 import type { Lists } from './review'
 import { t } from '@studio/i18n'
-import { beltIdInGroup, draftsFromRows, familiesOf, isAdult, paymentFromText, problemsOf, readyDrafts } from './review'
+import { beltIdInGroup, draftsFromRows, familiesOf, isAdult, isContactPending, normalizePhone, paymentFromText, problemsOf, readyDrafts } from './review'
 
 const LISTS: Lists = {
   groups: [
@@ -83,6 +83,37 @@ describe('problemsOf — what stops a row', () => {
     expect(problemsOf(one({ email: '', phone: '' }), LISTS, TODAY)).toContain('missing_contact')
     // Two digits is not a phone number, so it is not a way to reach anybody either.
     expect(problemsOf(one({ email: '', phone: '12' }), LISTS, TODAY)).toContain('missing_contact')
+  })
+
+  it('loads a child with no parent and no contact as contact-pending, not as an adult', () => {
+    // Owner, 2026-10-04: Gladiator's roster has no family on any row. A blank family with
+    // no contact either is the child whose parent is added later — not a mistake to flag,
+    // and not an 18-year-old's own account.
+    const orphan = one({ parent_first: '', parent_last: '', email: '', phone: '', birthdate: '' })
+    expect(isContactPending(orphan)).toBe(true)
+    expect(isAdult(orphan)).toBe(false)
+    expect(problemsOf(orphan, LISTS, TODAY)).toEqual([])
+    // A NAMED parent with nowhere to reach them is still a gap in the file.
+    expect(problemsOf(one({ email: '', phone: '' }), LISTS, TODAY)).toContain('missing_contact')
+    // And an adult is still an adult when they gave their own contact.
+    expect(isAdult(one({ parent_first: '', parent_last: '', email: 'ron@example.com' }))).toBe(true)
+  })
+
+  it('does not read an unparseable phone as an empty one', () => {
+    // `normalizePhone` answers `''` for BOTH "the cell was empty" and "I could not make a
+    // number of what was in it" — two numbers in one cell is the commonest case the office
+    // actually writes. Keying contact-pending on the normalized value made the second one
+    // import as a child with no guardian, dropping what the office wrote and silencing the
+    // flag that used to make the manager fix the row.
+    const twoInOneCell = one({
+      parent_first: '',
+      parent_last: '',
+      email: '',
+      phone: '0501234567 / 0529876543',
+    })
+    expect(normalizePhone(twoInOneCell.phone)).toBe('')
+    expect(isContactPending(twoInOneCell)).toBe(false)
+    expect(problemsOf(twoInOneCell, LISTS, TODAY)).toContain('missing_contact')
   })
 
   it('names an unknown group, belt or plan rather than dropping it silently', () => {

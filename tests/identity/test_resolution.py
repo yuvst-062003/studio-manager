@@ -589,7 +589,6 @@ def _mailbox(label: str) -> str:
     return f"{label}-{uuid.uuid4().hex[:10]}@example.invalid"
 
 
-
 # -- claiming a pending invitation with a verified address (2026-09-13) --------
 """§5.3's binding, reached by proving you own the invited mailbox instead of by holding
 the link.
@@ -632,9 +631,7 @@ def test_a_verified_address_claims_the_record_a_manager_pre_created(app_session,
 def test_the_address_matches_regardless_of_how_the_manager_typed_it(app_session, studio):
     # A manager typing `Dana@Example.invalid` into a form has invited the same mailbox.
     address = _mailbox("mixed")
-    person = Person(
-        studio_id=studio.id, first_name="דנה", last_name="לוי", email=address.upper()
-    )
+    person = Person(studio_id=studio.id, first_name="דנה", last_name="לוי", email=address.upper())
     app_session.add(person)
     app_session.flush()
     _invitation(app_session, studio, email=address.capitalize())
@@ -797,9 +794,7 @@ def test_the_claim_lands_on_the_linked_identity_not_the_new_one(app_session, stu
     assert person.auth_identity_id == effective_identity_id(apple) == google.id
 
 
-def test_the_link_still_works_for_someone_who_already_signed_in_and_claimed_it(
-    app_session, studio
-):
+def test_the_link_still_works_for_someone_who_already_signed_in_and_claimed_it(app_session, studio):
     """**A consequence of the claim above, and it would have been a bad one.**
 
     The claim marks the invitation accepted. So a parent who signs in FIRST (claiming their

@@ -89,6 +89,40 @@ describe('artboards 1c and 9f — the roster screen', () => {
     expect(await screen.findByText('דנה כהן')).toBeInTheDocument()
   })
 
+  it('states the missing-declaration hint ONCE above the list, with how many it covers', async () => {
+    // 2026-10-04 — every child of a migrated club starts without a declaration; the hint
+    // used to repeat under each of them.
+    renderScreen({
+      client: makeClient([
+        row({ student_id: 'a', health_status: 'missing' }),
+        row({ student_id: 'b', health_status: 'missing' }),
+        row({ student_id: 'c', health_status: 'signed' }),
+      ]),
+    })
+    const note = await screen.findByTestId('roster-health-note')
+    expect(note).toHaveTextContent(
+      t('he', 'health.badge.missingRosterNote').replace('{{count}}', '2'),
+    )
+  })
+
+  it('counts that hint over the expected list only, like every other count here', async () => {
+    // The hint sits above the expected list, and the not-expected rows are inside a
+    // `<details>` that is collapsed — so counting the whole roster promised more ⚠ than the
+    // screen was showing. Worst exactly after a club migration, where every child starts
+    // with no declaration and the gap is the size of the collapsed section.
+    renderScreen({
+      client: makeClient([
+        row({ student_id: 'a', health_status: 'missing' }),
+        row({ student_id: 'd', health_status: 'missing' }),
+      ]),
+      notExpectedIds: ['d'],
+    })
+    const note = await screen.findByTestId('roster-health-note')
+    expect(note).toHaveTextContent(
+      t('he', 'health.badge.missingRosterNote').replace('{{count}}', '1'),
+    )
+  })
+
   it('names the weekday, the hour and the hall in the header (S6)', async () => {
     // A coach covering for someone needs the hall. 2026-11-03T15:00Z is Tuesday 17:00 in
     // Jerusalem — the weekday comes from the studio's calendar day, not the UTC date.

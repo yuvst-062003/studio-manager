@@ -42,7 +42,7 @@ const STATUSES = [
  *  find. Decided server-side by `app.services.people.students.invite_state`, the same
  *  predicate `/invitation/resend` refuses on — so `ready` here is a send that will be
  *  accepted, not one that will 422. */
-const INVITE_STATES = ['ready', 'no_email', 'signed_in'] as const
+const INVITE_STATES = ['ready', 'no_email', 'no_contact', 'signed_in'] as const
 
 const BULK_LABEL = {
   move: 'people.bulk.move',
@@ -274,6 +274,14 @@ export function StudentsScreen({
   // understated one.
   const [baselineCount, setBaselineCount] = useState<number | null>(null)
 
+  /** What the loaded page holds — with a `+` while more pages wait (2026-10-04). The
+   *  filter for "no contact yet" matched 69 children and the line said "50 חניכים": the
+   *  first page, read as the answer. The list carries no total, so the honest number is a
+   *  floor, said as one. */
+  //  Isolated left-to-right (LRI…PDI) so the `+` stays on the number in an RTL line — the
+  //  neutral sign otherwise drifts to the front and "50+" reads "+50".
+  const shownCount = page.has_more ? `\u2066${page.items.length}+\u2069` : String(page.items.length)
+
   const reload = () => {
     setVersion((n) => n + 1)
     // F12's bulk move/leave can change the roster size. Write-once cuts both ways: a
@@ -326,7 +334,16 @@ export function StudentsScreen({
   const loadMore = () => {
     if (!page.next_cursor) return
     client
-      .students({ q: query, status, class_id: classId || undefined, after: page.next_cursor })
+      // Every filter the mount effect sends goes on the next page too. Drop one and
+      // page 2 comes back unfiltered and gets appended to a filtered page 1 -- which
+      // a 69-child `no_contact` roster reaches on the first press of this button.
+      .students({
+        q: query,
+        status,
+        class_id: classId || undefined,
+        invite_state: inviteState || undefined,
+        after: page.next_cursor,
+      })
       // `appendPage` from @studio/core — never a hand-rolled merge, which is where a
       // cursor list starts duplicating rows.
       .then((next) => setPage((current) => appendPage(current, next)))
@@ -474,10 +491,10 @@ export function StudentsScreen({
           <span className="people-filter-result" data-testid="students-result-count">
             {baselineCount !== null
               ? fill(t(locale, 'people.filter.resultCount'), {
-                  count: page.items.length,
+                  count: shownCount,
                   total: baselineCount,
                 })
-              : fill(t(locale, 'people.student.countSubtitle'), { count: page.items.length })}
+              : fill(t(locale, 'people.student.countSubtitle'), { count: shownCount })}
           </span>
         ) : null}
       </div>
@@ -643,6 +660,15 @@ export function StudentsScreen({
                         <StatusChip status="pending" label={t(locale, 'people.join.chip')} />
                       </span>
                     ) : null}
+                    {student.guardian_invite_state === 'no_contact' ? (
+                      // 2026-10-04 — loaded from the club's roster with no family yet. Said
+                      // on the row, not only in the filter: it is the manager's next task
+                      // for this child, and a coach phoning home needs to know there is
+                      // nobody on file before opening the card.
+                      <span data-testid="no-contact-chip">
+                        <StatusChip status="pending" label={t(locale, 'people.invite.no_contact')} />
+                      </span>
+                    ) : null}
                   </>
                 ),
               },
@@ -682,6 +708,20 @@ export function StudentsScreen({
                     return <span data-testid="students-payment-pending">—</span>
                   }
                   const state = openByStudent[student.id]
+                  if (state === undefined && student.guardian_invite_state === 'no_contact') {
+                    // 2026-10-04 — nobody to bill, so nothing is ever raised for this child
+                    // (`BillingRunService` needs a primary guardian). "No open charge" here
+                    // is not "paid", and a ✓ over a club that has never been billed reads as
+                    // money collected. Billing starts once the manager adds the parent.
+                    return (
+                      <span
+                        data-testid={`students-payment-${student.id}`}
+                        title={t(locale, 'people.student.payment.notBilledWhy')}
+                      >
+                        {t(locale, 'people.student.payment.notBilled')}
+                      </span>
+                    )
+                  }
                   return (
                     <span data-testid={`students-payment-${student.id}`}>
                       <StatusChip

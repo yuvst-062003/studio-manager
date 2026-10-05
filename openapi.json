@@ -14550,6 +14550,11 @@
             ],
             "title": "Birthdate"
           },
+          "contact_pending": {
+            "default": false,
+            "title": "Contact Pending",
+            "type": "boolean"
+          },
           "email": {
             "anyOf": [
               {
@@ -16332,6 +16337,11 @@
               }
             ],
             "title": "Birthdate"
+          },
+          "contact_pending": {
+            "default": false,
+            "title": "Contact Pending",
+            "type": "boolean"
           },
           "email": {
             "anyOf": [
@@ -22530,27 +22540,7 @@
     "/api/v1/health": {
       "get": {
         "description": "Liveness. Deliberately carries no tenant data and needs no auth.\n\n`revision` is best-effort and never affects `status`: this endpoint answers \"is this\nprocess alive\", and a database it cannot reach does not make it dead. Letting the\nfailure propagate would turn every database blip into a page.",
-        "operationId": "read_health_api_v1_health_head",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HealthResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Read Health",
-        "tags": [
-          "health"
-        ]
-      },
-      "head": {
-        "description": "Liveness. Deliberately carries no tenant data and needs no auth.\n\n`revision` is best-effort and never affects `status`: this endpoint answers \"is this\nprocess alive\", and a database it cannot reach does not make it dead. Letting the\nfailure propagate would turn every database blip into a page.",
-        "operationId": "read_health_api_v1_health_head",
+        "operationId": "read_health_api_v1_health_get",
         "responses": {
           "200": {
             "content": {
@@ -30246,7 +30236,8 @@
                   "enum": [
                     "signed_in",
                     "ready",
-                    "no_email"
+                    "no_email",
+                    "no_contact"
                   ],
                   "type": "string"
                 },

@@ -12,6 +12,7 @@
 // `price_plan_id` at all — invariant 3's detector reads that name as financial — so this
 // screen could not render a price even by accident.
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import type { CSSProperties } from 'react'
 import { BeltBar, Button, Card, StatusChip } from '@studio/ui'
 import { can } from '@studio/core'
@@ -30,6 +31,21 @@ const pageStyle: CSSProperties = {
 
 export type MoveTarget = { id: string; name: string }
 
+/** The route's own section style (`PersonalDetails`, `ParentContacts`), so the groups box
+ *  embedded under them reads as one more card of the same set rather than a different
+ *  primitive with a different border and a heading twice the size (2026-10-04). */
+const EMBEDDED_CARD =
+  'bg-[var(--surface-raised)] rounded-2xl p-4 border border-[var(--border)] shadow-sm'
+const EMBEDDED_HEADING = 'text-xs font-black text-[var(--fg)] tracking-wider m-0 mb-3'
+
+function GroupsCard({ embedded, children }: { embedded: boolean; children: ReactNode }) {
+  return embedded ? (
+    <section className={EMBEDDED_CARD}>{children}</section>
+  ) : (
+    <Card>{children}</Card>
+  )
+}
+
 export function StaffStudentCard({
   student,
   enrollments,
@@ -39,6 +55,7 @@ export function StaffStudentCard({
   groups = [],
   today,
   onMoved,
+  embedded = false,
 }: {
   student: StudentDetail
   enrollments: EnrollmentOut[]
@@ -48,6 +65,8 @@ export function StaffStudentCard({
   groups?: MoveTarget[]
   today: string
   onMoved?: () => void
+  /** Inside `StudentCardRoute` (2026-10-04): draw only the groups and מעבר קבוצה. */
+  embedded?: boolean
 }) {
   const [moving, setMoving] = useState(false)
   const [targetGroup, setTargetGroup] = useState('')
@@ -100,54 +119,67 @@ export function StaffStudentCard({
     // name is a worse a11y story than one, not a better one. The `<h1>` itself is
     // unchanged — heading navigation still finds this section by its own name.
     <section style={pageStyle} data-testid="staff-student-transfer-card">
-      <h1 id="staff-card-title">
-        <bdi>{`${student.first_name} ${student.last_name}`}</bdi>
-      </h1>
+      {/* 2026-10-04 — `embedded` inside `StudentCardRoute`, whose banner already names the
+          child with group and belt and whose contacts section lists the parents with a
+          one-tap call. Drawn again here they stacked into the name three times, a
+          full-width status pill and an empty הורים box beside "no parents" — read off a
+          screenshot. Embedded, this card is only what the route does not show. */}
+      {embedded ? null : (
+        <>
+          <h1 id="staff-card-title">
+            <bdi>{`${student.first_name} ${student.last_name}`}</bdi>
+          </h1>
 
-      <StatusChip
-        status={chipToneFor(student.status)}
-        label={t(locale, `people.status.${student.status}`)}
-      />
+          <StatusChip
+            status={chipToneFor(student.status)}
+            label={t(locale, `people.status.${student.status}`)}
+          />
 
-      {student.current_belt_color_hex ? (
-        // D7's ring is unconditional and lives in BeltBar. Redrawing a belt here would be
-        // the one place it goes fill-only.
-        <BeltBar
-          colorHex={student.current_belt_color_hex}
-          label={student.current_belt_name ?? ''}
-        />
-      ) : null}
+          {student.current_belt_color_hex ? (
+            // D7's ring is unconditional and lives in BeltBar. Redrawing a belt here would be
+            // the one place it goes fill-only.
+            <BeltBar
+              colorHex={student.current_belt_color_hex}
+              label={student.current_belt_name ?? ''}
+            />
+          ) : null}
 
-      <Card>
-        <h2>{t(locale, 'people.guardian.plural')}</h2>
-        <ul>
-          {(student.guardians ?? []).map((guardian) => (
-            // `-transfer-` — `StudentCardRoute`'s own `ParentContacts` already uses
-            // `staff-card-guardian`/`staff-card-call` for the same guardian, once both
-            // mount together on the same screen.
-            <li key={guardian.person_id} data-testid="staff-card-transfer-guardian">
-              <bdi>{guardian.display_name}</bdi>
-              {/* §6.2 — 'contact in one tap' from the roster. */}
-              <a href={`tel:${guardian.phone ?? ''}`} data-testid="staff-card-transfer-call">
-                {t(locale, 'people.guardian.call')}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </Card>
+          <Card>
+            <h2>{t(locale, 'people.guardian.plural')}</h2>
+            <ul>
+              {(student.guardians ?? []).map((guardian) => (
+                // `-transfer-` — `StudentCardRoute`'s own `ParentContacts` already uses
+                // `staff-card-guardian`/`staff-card-call` for the same guardian, once both
+                // mount together on the same screen.
+                <li key={guardian.person_id} data-testid="staff-card-transfer-guardian">
+                  <bdi>{guardian.display_name}</bdi>
+                  {/* §6.2 — 'contact in one tap' from the roster. */}
+                  <a href={`tel:${guardian.phone ?? ''}`} data-testid="staff-card-transfer-call">
+                    {t(locale, 'people.guardian.call')}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </>
+      )}
 
-      <Card>
-        <h2>{t(locale, 'people.student.groups')}</h2>
+      <GroupsCard embedded={embedded}>
+        <h2 className={embedded ? EMBEDDED_HEADING : undefined}>
+          {t(locale, 'people.student.groups')}
+        </h2>
         {/* C11 — every live enrollment. A card showing one would hide the second group from
             the coach standing in front of the child. */}
-        <ul>
+        <ul
+          className={embedded ? 'list-none m-0 p-0 text-sm font-bold text-[var(--fg)]' : undefined}
+        >
           {live.map((enrollment) => (
             <li key={enrollment.id} data-testid="staff-card-enrollment">
               <bdi>{enrollment.group_name}</bdi>
             </li>
           ))}
         </ul>
-      </Card>
+      </GroupsCard>
 
       {mayMove ? (
         moving ? (
@@ -209,7 +241,11 @@ export function StaffStudentCard({
             </Button>
           </div>
         ) : (
-          <Button variant="secondary" onClick={() => setMoving(true)} data-testid="move-group-start">
+          <Button
+            variant="secondary"
+            onClick={() => setMoving(true)}
+            data-testid="move-group-start"
+          >
             {t(locale, 'people.enrollment.moveGroup')}
           </Button>
         )

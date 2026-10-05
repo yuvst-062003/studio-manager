@@ -245,7 +245,8 @@ def test_the_key_pair_the_script_generates_actually_sends() -> None:
     from py_vapid import Vapid
 
     spec = importlib.util.spec_from_file_location(
-        "generate_vapid_keys", Path(__file__).resolve().parents[2] / "scripts/generate-vapid-keys.py"
+        "generate_vapid_keys",
+        Path(__file__).resolve().parents[2] / "scripts/generate-vapid-keys.py",
     )
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
