@@ -18,7 +18,28 @@ mypy
 # run `ruff format app scripts tests tools` in the same commit.
 ruff==0.16.4
 pip-audit
-sqlalchemy
+# **Pinned below 2.1, the second pin in this file, because 2.1 changes what `Select` MEANS
+# to the typechecker.**
+#
+# 2.1 unpacked the generic: `select(Class)` is `Select[Class]` where 2.0 gave
+# `Select[tuple[Class]]`, and a row from `select(A, B)` is `Row[A, B]` rather than
+# `Row[tuple[A, B]]`. Four copies of a `_paged` helper (schedule/service.py,
+# schedule/constraints.py, structure/service.py, attendance/service.py) are declared
+# `Select[tuple[Row]] -> Select[tuple[Row]]`, so under 2.1 every caller stops matching and
+# `Row` stops being solvable. That is **31 errors across 8 files in `app/`** — all of them
+# this one change, none of them a defect in this code.
+#
+# This is the `ruff` case above, not the httpx/pytest case: it changes what TYPECHECKS, not
+# what is tested, and it appeared with nobody having touched the code — CI resolved 2.1.3
+# while the repo's own `.venv` still had 2.0.52, so the typecheck passed locally and failed
+# in CI on the same commit. Unpinned, the backend job cannot go green, which also means
+# `pytest` (the step after it) never runs at all.
+#
+# Moving to 2.1 is a deliberate piece of work: regenerate the helpers' signatures, fix the
+# unpacking in people/students.py and routers/webhooks.py, drop the now-unneeded
+# `type: ignore` in comms/install.py, and run the suite — which has never run against 2.1,
+# so expect behaviour findings beyond the 31 typing ones. Bump this line as that commit.
+sqlalchemy<2.1
 alembic
 psycopg[binary]
 cryptography
