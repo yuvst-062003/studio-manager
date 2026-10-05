@@ -40,10 +40,20 @@ def _read_revision() -> str | None:
 # probes this route with `HEAD` every fifteen seconds to decide whether the app is online.
 # FastAPI does not add HEAD to a `@router.get` route the way bare Starlette does, so this
 # answered 405 -- and the client counted that as "offline", which is why the staff app
-# showed `לא מקוון` forever on a working connection. `api_route` is the only way to say
-# both verbs for one handler; Starlette returns the response with the body stripped for the
-# HEAD, which is exactly what a probe wants.
-@router.api_route("/health", methods=["GET", "HEAD"], response_model=HealthResponse)
+# showed `לא מקוון` forever on a working connection.
+#
+# **Two declarations rather than one `api_route(methods=["GET", "HEAD"])`, and that is a
+# fix, not a style.** One route carrying two methods gets ONE generated operation id, built
+# from `route.methods` -- which is a `set`. So the id was `..._get` or `..._head` depending
+# on where string hashing happened to put "GET" and "HEAD" that run, FastAPI warned
+# "Duplicate Operation ID", and `openapi.json` came out differently from the same source on
+# the same version: seeds 0-2 wrote `_get`, seeds 3-5 wrote `_head` (measured 2026-10-05).
+# The `generated` CI job regenerates and diffs against what is committed, so it was a coin
+# flip on every run -- green on 2026-10-04, red on 2026-10-05, with nothing in between.
+# Splitting the verbs gives each a stable id of its own. The HEAD stays out of the schema:
+# it is a liveness probe, not an operation anybody generates a client against, and nothing
+# in `web/` referenced its generated type.
+@router.get("/health", response_model=HealthResponse)
 def read_health() -> HealthResponse:
     """Liveness. Deliberately carries no tenant data and needs no auth.
 
@@ -56,3 +66,14 @@ def read_health() -> HealthResponse:
     except Exception:  # noqa: BLE001 -- liveness must not depend on the database
         revision = None
     return HealthResponse(status="ok", env=settings.ENV, revision=revision, started_at=_STARTED_AT)
+
+
+@router.head("/health", response_model=HealthResponse, include_in_schema=False)
+def probe_health() -> HealthResponse:
+    """The same answer, for `useOffline`'s fifteen-second probe.
+
+    Starlette strips the body from a HEAD response, so this computes exactly what the GET
+    does and the client gets the status line it is actually looking at. It delegates rather
+    than repeating the handler, so the two verbs can never drift apart.
+    """
+    return read_health()
