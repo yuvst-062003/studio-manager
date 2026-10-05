@@ -46,7 +46,7 @@ def _pick(candidates: list[Candidate]) -> Candidate | None:
     return max(useful, key=lambda candidate: candidate.updated_at)
 
 
-def _seed_studio(session: TenantSession, *, apply: bool, writer: csv.DictWriter) -> int:
+def _seed_studio(session: TenantSession, *, apply: bool, writer: csv.DictWriter[str]) -> int:
     writes = 0
     guardians = session.execute(select(Guardian).order_by(Guardian.person_id)).scalars().all()
     by_person: dict[Any, list[Guardian]] = defaultdict(list)

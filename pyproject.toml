@@ -44,3 +44,11 @@ ignore_errors = true
 # is the only file that imports it, and its own functions are still fully typed.
 module = "pywebpush"
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Same situation as pywebpush: fontTools ships no py.typed marker. Only
+# scripts/build-pdf-font.py imports it — a build-time tool that subsets the PDF font, with
+# no import anywhere in `app/` — and its own functions stay typed. Four of the fourteen
+# errors that were keeping the backend job from ever reaching pytest were just these.
+module = "fontTools.*"
+ignore_missing_imports = true
