@@ -144,9 +144,7 @@ def test_the_second_child_still_mints_a_usable_invitation(client, as_manager):
         "guardian": {"email": email, "relation": "parent"},
     }
     _create(client, as_manager, payload)
-    second = _create(
-        client, as_manager, {**payload, "first_name": f"דלת{tag}"}
-    )
+    second = _create(client, as_manager, {**payload, "first_name": f"דלת{tag}"})
     assert second["invitation_token"]
 
 
@@ -190,7 +188,9 @@ def _already_paid_promises_for(app_session, student_id: uuid.UUID) -> list[uuid.
     return list(
         app_session.execute(
             select(PaymentPromise.id)
-            .join(PaymentPromiseCharge, PaymentPromiseCharge.payment_promise_id == PaymentPromise.id)
+            .join(
+                PaymentPromiseCharge, PaymentPromiseCharge.payment_promise_id == PaymentPromise.id
+            )
             .join(Charge, Charge.id == PaymentPromiseCharge.charge_id)
             .where(PaymentPromise.already_paid.is_(True), Charge.student_id == student_id)
             .distinct()
@@ -198,9 +198,7 @@ def _already_paid_promises_for(app_session, student_id: uuid.UUID) -> list[uuid.
     )
 
 
-def test_a_manager_can_convert_a_student_as_already_paid(
-    client, app_session, as_manager, a_group
-):
+def test_a_manager_can_convert_a_student_as_already_paid(client, app_session, as_manager, a_group):
     """**The family paid the manager in person, and the manager says so.**
 
     Asserted on an UNPRICED student on purpose: the payment method must be recorded either
@@ -303,9 +301,7 @@ def test_an_unpromisable_charge_never_fails_the_managers_conversion(
     assert len(promises) == 1
     named = [
         row.charge_id
-        for row in app_session.query(PaymentPromiseCharge).filter_by(
-            payment_promise_id=promises[0]
-        )
+        for row in app_session.query(PaymentPromiseCharge).filter_by(payment_promise_id=promises[0])
     ]
     # The tuition charge the conversion itself raised, and not the credit.
     assert credit.id not in named
@@ -313,7 +309,7 @@ def test_an_unpromisable_charge_never_fails_the_managers_conversion(
 
 
 @pytest.mark.parametrize("method", ["cash", "cheque", "standing_order"])
-def test_the_manager_records_WHICH_way_the_family_already_paid(
+def test_the_manager_records_which_way_the_family_already_paid(
     client, app_session, as_manager, a_group, a_price_plan, method
 ):
     """**"The manager has to set what option the parent already paid for"** (owner,
@@ -404,16 +400,12 @@ def test_the_managers_own_statement_needs_no_second_confirmation(
     # it covered are closed rather than sitting on the family's balance.
     payment = app_session.get(Payment, promise.payment_id)
     assert payment.method == "cheque"
-    charges = (
-        app_session.query(Charge).filter(Charge.student_id == uuid.UUID(student_id)).all()
-    )
+    charges = app_session.query(Charge).filter(Charge.student_id == uuid.UUID(student_id)).all()
     assert charges
     assert {charge.status for charge in charges} == {"settled"}
 
 
-def test_the_card_is_refused_as_an_already_paid_method(
-    client, as_manager, a_group, a_price_plan
-):
+def test_the_card_is_refused_as_an_already_paid_method(client, as_manager, a_group, a_price_plan):
     """A 422 that names the problem, not a silent fallback to cash. Card money arrives
     through uPay and closes its own charge; a manager marking it here would be recording a
     payment twice."""
@@ -1038,9 +1030,13 @@ def test_resending_issues_a_working_link_and_kills_the_old_one(client, as_manage
     first_url = created["invitation_url"]
     assert first_url, "fixture: the create route issued no link"
     student_id = created["student"]["id"]
-    before = app_session.execute(
-        select(Invitation).where(Invitation.student_id == uuid.UUID(student_id))
-    ).scalars().one()
+    before = (
+        app_session.execute(
+            select(Invitation).where(Invitation.student_id == uuid.UUID(student_id))
+        )
+        .scalars()
+        .one()
+    )
     old_hash = before.token_hash
 
     response = client.post(
@@ -1055,9 +1051,13 @@ def test_resending_issues_a_working_link_and_kills_the_old_one(client, as_manage
     assert "@" in body["email"]
 
     app_session.expire_all()
-    after = app_session.execute(
-        select(Invitation).where(Invitation.student_id == uuid.UUID(student_id))
-    ).scalars().all()
+    after = (
+        app_session.execute(
+            select(Invitation).where(Invitation.student_id == uuid.UUID(student_id))
+        )
+        .scalars()
+        .all()
+    )
     # One row, not two -- the pending invitation is refreshed rather than duplicated.
     assert len(after) == 1
     assert after[0].token_hash != old_hash
@@ -1075,7 +1075,9 @@ def test_resending_refuses_once_the_guardian_has_a_login(client, as_manager, app
     student_id = created["student"]["id"]
     guardian_id = _guardian_person_id(client, as_manager, student_id)
 
-    identity = AuthIdentity(provider="google", provider_subject=f"g-{uuid.uuid4()}", email_verified=True)
+    identity = AuthIdentity(
+        provider="google", provider_subject=f"g-{uuid.uuid4()}", email_verified=True
+    )
     app_session.add(identity)
     app_session.flush()
     guardian = app_session.get(Person, uuid.UUID(guardian_id))
@@ -1122,9 +1124,12 @@ def test_a_coach_may_read_the_guardian_but_may_not_reissue_their_key(
     assert client.get(
         f"/api/v1/students/{student_id}/guardians", headers=as_assistant_coach.headers
     ).status_code in (200, 404)
-    assert client.post(
-        f"/api/v1/students/{student_id}/invitation/resend", headers=as_assistant_coach.headers
-    ).status_code == 403
+    assert (
+        client.post(
+            f"/api/v1/students/{student_id}/invitation/resend", headers=as_assistant_coach.headers
+        ).status_code
+        == 403
+    )
 
 
 def test_the_guardian_list_reports_whether_they_can_actually_sign_in(client, as_manager):

@@ -526,9 +526,8 @@ never reads as "written to and ignored".
 
 
 def _mail(monkeypatch, *, key="re_test_key", sender="club@example.invalid"):
-    from pydantic import SecretStr
-
     from app.core.config import settings as app_settings
+    from pydantic import SecretStr
 
     monkeypatch.setattr(app_settings, "RESEND_API_KEY", SecretStr(key) if key else None)
     monkeypatch.setattr(app_settings, "MAIL_FROM", sender)

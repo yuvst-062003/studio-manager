@@ -575,9 +575,7 @@ def test_signing_in_lands_on_the_record_a_manager_pre_created(client, fake_provi
         studio = Studio(name="מועדון בדיקה", slug=f"t-{uuid.uuid4().hex[:8]}")
         app_session.add(studio)
         app_session.flush()
-        parent = Person(
-            studio_id=studio.id, first_name="דנה", last_name="לוי", email=address
-        )
+        parent = Person(studio_id=studio.id, first_name="דנה", last_name="לוי", email=address)
         child = Person(studio_id=studio.id, first_name="נועה", last_name="לוי")
         app_session.add_all([parent, child])
         app_session.flush()
@@ -586,9 +584,7 @@ def test_signing_in_lands_on_the_record_a_manager_pre_created(client, fake_provi
         app_session.flush()
         # The guardian link is what §6.1's parent-app query keys on: without it the claim
         # would attach a login to a Person with no children and the app would still be empty.
-        app_session.add(
-            Guardian(studio_id=studio.id, person_id=parent.id, student_id=student.id)
-        )
+        app_session.add(Guardian(studio_id=studio.id, person_id=parent.id, student_id=student.id))
         app_session.add(
             Invitation(
                 studio_id=studio.id,

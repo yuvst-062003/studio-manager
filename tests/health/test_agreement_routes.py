@@ -143,7 +143,7 @@ def test_the_photo_permission_is_optional_and_never_blocks(client, as_guardian_o
 def test_declining_the_photograph_is_recorded_rather_than_left_silent(
     client, as_guardian_of, a_student, tenant_session
 ):
-    """"Asked and said no" and "never asked" are different facts, and only the first is an answer.
+    """ "Asked and said no" and "never asked" are different facts, and only the first is an answer.
 
     The club needs to tell them apart before it films: a family that declined must not be
     chased, and a family nobody asked is a gap to close. A silent skip collapses the two.
