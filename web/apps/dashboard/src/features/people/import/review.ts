@@ -196,9 +196,15 @@ const noParentNamed = (draft: Pick<Draft, 'parent_first' | 'parent_last'>): bool
  *  nothing in the four family cells is not a mistake to flag but the commonest honest
  *  answer. It is sent with `contact_pending` and no guardian, and the students screen lists
  *  it as "no contact yet" until the manager adds the parent. */
+//: The test is the **cell**, not `normalizePhone` of it. `normalizePhone` answers `''` for
+//: "I could not make a number of this" as well as for "there was nothing here", and only
+//: the second is a contact still to come. The first is something the office wrote — two
+//: numbers in one cell, most often — and reading it as an empty cell would load the child
+//: with no guardian, drop what was written, and take away the `missing_contact` flag that
+//: is the one thing able to make the manager fix the row.
 export const isContactPending = (
   draft: Pick<Draft, 'parent_first' | 'parent_last' | 'email' | 'phone'>,
-): boolean => noParentNamed(draft) && draft.email.trim() === '' && normalizePhone(draft.phone) === ''
+): boolean => noParentNamed(draft) && draft.email.trim() === '' && draft.phone.trim() === ''
 
 /** No parent named, and a contact of their own: the trainee IS the account (18+). A blank
  *  family with no contact either is NOT this — see `isContactPending`. */

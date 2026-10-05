@@ -334,7 +334,16 @@ export function StudentsScreen({
   const loadMore = () => {
     if (!page.next_cursor) return
     client
-      .students({ q: query, status, class_id: classId || undefined, after: page.next_cursor })
+      // Every filter the mount effect sends goes on the next page too. Drop one and
+      // page 2 comes back unfiltered and gets appended to a filtered page 1 -- which
+      // a 69-child `no_contact` roster reaches on the first press of this button.
+      .students({
+        q: query,
+        status,
+        class_id: classId || undefined,
+        invite_state: inviteState || undefined,
+        after: page.next_cursor,
+      })
       // `appendPage` from @studio/core — never a hand-rolled merge, which is where a
       // cursor list starts duplicating rows.
       .then((next) => setPage((current) => appendPage(current, next)))
