@@ -88,7 +88,13 @@ describe('every routed screen is reachable from inside the app', () => {
   it('found the route table', () => {
     // A guard on the guard: a refactor that renamed `hash` would silently empty the list
     // above and make every assertion below vacuous.
-    expect(routes.length).toBeGreaterThan(8)
+    // A guard on the guard: a refactor that renamed `hash` would silently empty the list
+    // above and make every assertion below vacuous. The floor moved from 8 to 5 on
+    // 2026-10-13, when the owner removed four screens from this app — the month calendar,
+    // the coach's availability, the events list and the setup wizard — and the join-link
+    // and summary pages became dialogs. A floor that outlives its routes is a test that
+    // fails for being right.
+    expect(routes.length).toBeGreaterThan(5)
     expect(routes).toContain('#/cash')
     // `#/join-link` and `#/setup` are deliberately NOT here (owner, 2026-10-13): the join
     // link is a row that copies rather than a screen to visit, and the setup wizard is the

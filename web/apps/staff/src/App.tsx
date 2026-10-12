@@ -21,7 +21,6 @@ import {
   AccessibilityMenu,
   EmptyState,
   InstallBanner,
-  InstallWalkthrough,
   ManagerSignIn,
   PRIVACY_HASH,
   TERMS_HASH,
@@ -37,14 +36,10 @@ import { AccessGate } from './features/identity/AccessGate'
 import { Resolve } from './features/identity/Resolve'
 import { PaymentPromisesSection } from './features/billing/PaymentPromisesSection'
 import { ScheduleSection } from './features/schedule/ScheduleSection'
-import { CalendarScreen } from './features/schedule/CalendarScreen'
 import { makeStaffScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
 import { StudentsSearch, makeStaffPeopleClient } from './features/people'
 import {
-  EventRosterScreen,
-  ExamResultsScreen,
-  StaffEventsScreen,
   makeStaffEventsClient,
 } from './features/events'
 import {
@@ -75,9 +70,9 @@ import { NetworkStatus } from './NetworkStatus'
 import { StaffShell } from './features/shell/StaffShell'
 import type { StaffTab } from './features/shell/StaffTabBar'
 import { AccountScreen } from './features/account/AccountScreen'
+import { InstallSheet } from './features/account/InstallSheet'
 import { TimerScreen } from './features/timer'
 import { TasksScreen, openTaskCount, useOpenTasks } from './features/tasks'
-import { CoachConstraintsScreen, makeCoachConstraintsClient } from './features/constraints'
 import './features/attendance/attendance.css'
 
 // §5.1 — 'the staff app and dashboard route them into a resumable wizard'. Both mount the
@@ -161,6 +156,7 @@ export default function App() {
   // See the parent app's note: index.html's `dir="rtl"` is a literal, and the locale in
   // React state was never written back to the document.
   useDocumentLocale(locale)
+  const [installOpen, setInstallOpen] = useState(false)
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
   // Memoised: SetupWizard reads through this in an effect keyed on the client, so a fresh
   // object every render would re-fetch progress forever.
@@ -171,7 +167,6 @@ export default function App() {
   const commsClient = useMemo(() => makeStaffCommsClient(apiFetch), [])
   const privacyClient = useMemo(() => makeStaffPrivacyClient(apiFetch), [])
   const consentClient = useMemo(() => makeStaffConsentClient(apiFetch), [])
-  const constraintsClient = useMemo(() => makeCoachConstraintsClient(apiFetch), [])
   // §6.1 step 6 — "offline prime: today's and tomorrow's sessions + rosters are fetched and
   // written to IndexedDB BEFORE the coach reaches Today", and "the first launch BLOCKS on
   // this fetch". The gate below renders instead of the app while it runs.
@@ -252,8 +247,6 @@ export default function App() {
   // screen would change only when something else happened to re-render App. One
   // subscription serves both lanes' routes.
   const onStudents = hash === '#/students'
-  // §6.5's walkthrough, now an on-demand screen behind InstallBanner's nudge.
-  const onInstall = hash === '#/install'
   const onCash = hash === '#/cash'
   // §16's privacy queue. Manager-gated below with `#/cash`: a coach
   // reading it would get an empty list — the endpoint scopes a non-manager to their OWN
@@ -275,11 +268,9 @@ export default function App() {
   const onTasks = hash === '#/tasks'
   // §4.8 / §6.1 (checkpoint C10) — filing, withdrawing and reading a coach's own
   // unavailability. Reached from the account tab's own row, not a tab of its own.
-  const onConstraints = hash === '#/constraints'
   // §4.7 (checkpoint C11) — the month calendar. Every staff role may open it (decision 7);
   // who may edit FROM it is a question the screen asks itself, the same `viewerCanWritePlan`
   // trio §6.2 already computes, not a second gate at this door.
-  const onCalendar = hash === '#/calendar'
   // §5.7's register, opened from a session. The id is in the hash so the back button works
   // and a link survives a reload — the same shape both W2 lanes settled on, and the reason
   // NAV's `/attendance` entry became a hash below. A second segment picks the in-session
@@ -293,13 +284,7 @@ export default function App() {
   const cardStudentId = hash.startsWith('#/students/') ? hash.slice('#/students/'.length) : null
   // 9i's list, and 9d's result sheet behind `#/events/<id>`. Same shape as the roster
   // id above: the id is in the hash so the back button works and a link survives a reload.
-  const onEvents = hash === '#/events'
   // `#/events/<id>` is the exam sheet; `#/events/<id>/roster` the participants list (9i).
-  const eventParts = hash.startsWith('#/events/')
-    ? hash.slice('#/events/'.length).split('/')
-    : []
-  const rosterEventId = eventParts.length === 2 && eventParts[1] === 'roster' ? eventParts[0]! : null
-  const examEventId = eventParts.length === 1 && eventParts[0] ? eventParts[0] : null
 
   // Which of the five tabs the current hash belongs to. `null` is a real answer, not a
   // fallback — see `StaffShell`'s own header: a student card, the privacy operator queue
@@ -429,6 +414,7 @@ export default function App() {
           ) : session.access.staff && onAccount ? (
             <AccountScreen
               activeStudioId={session.activeStudioId}
+              onOpenInstall={() => setInstallOpen(true)}
               commsClient={commsClient}
               displayName={session.displayName}
               locale={locale}
@@ -464,44 +450,6 @@ export default function App() {
               viewerIsManager={viewerIsManager}
               today={today}
             />
-          ) : session.access.staff && onConstraints ? (
-            // §4.8 / §6.1 (checkpoint C10) — a coach files their own unavailability.
-            // Every staff role, not manager-gated: approving it (C12) is the dashboard's,
-            // filing it is this screen's, and `#/account` links here for exactly that
-            // reason.
-            <CoachConstraintsScreen locale={locale} client={constraintsClient} today={today} />
-          ) : session.access.staff && onCalendar ? (
-            // §4.7 (checkpoint C11) — the month grid. Every staff role reads it (decision
-            // 7); `canEdit` is the same owner/manager/lead_coach trio §6.2 already computes
-            // as `viewerCanWritePlan`, passed straight through rather than re-derived, so
-            // the calendar's edit sheet asks the identical question `PATCH /sessions`
-            // itself asks. `fetcher` is `apiFetch` — the edit sheet's own best-effort
-            // `/api/v1/staff` read, same shape the dashboard's `SessionPopover` already uses.
-            <CalendarScreen
-              locale={locale}
-              client={scheduleClient}
-              eventsClient={eventsClient}
-              constraintsClient={constraintsClient}
-              fetcher={apiFetch}
-              today={today}
-              canEdit={viewerCanWritePlan}
-              attendanceClient={attendanceClient}
-            />
-          ) : onInstall ? (
-            // Needs no access guard: installing the app is every signed-in person's
-            // business, and the screen shows nothing from any studio.
-            <section aria-label={t(locale, 'common.install.title')}>
-              <a href="#/">{t(locale, 'common.install.back')}</a>
-              {installed ? (
-                <p>{t(locale, 'common.install.done')}</p>
-              ) : (
-                <InstallWalkthrough
-                  locale={locale}
-                  installed={false}
-                  deferredPrompt={installPrompt}
-                />
-              )}
-            </section>
           ) : session.access.staff && rosterSessionId ? (
             // §6.1 step 6 — "today's and tomorrow's sessions + rosters are fetched and
             // written to IndexedDB BEFORE the coach reaches Today", and "the first launch
@@ -587,43 +535,27 @@ export default function App() {
                 globalThis.location.hash = `#/students/${studentId}`
               }}
             />
-          ) : session.access.staff && rosterEventId ? (
-            <EventRosterScreen
-              client={eventsClient}
-              eventId={rosterEventId}
-              locale={locale}
-              personId={membership?.person_id ?? null}
-            />
-          ) : session.access.staff && examEventId ? (
-            <ExamResultsScreen client={eventsClient} eventId={examEventId} locale={locale} />
-          ) : session.access.staff && onEvents ? (
-            <StaffEventsScreen
-              client={eventsClient}
-              locale={locale}
-              now={today}
-              canPublish={
-                viewerIsManager || (membership?.roles.includes('lead_coach') ?? false)
-              }
-              onOpen={(id) => {
-                globalThis.location.hash = `#/events/${id}`
-              }}
-              onOpenRoster={(id) => {
-                globalThis.location.hash = `#/events/${id}/roster`
-              }}
-            />
           ) : (
             <>
+              {/* The nudge opens the SAME dialog the settings row does (owner,
+                  2026-10-13) — `#/install` was a screen until then. */}
               <InstallBanner
                 locale={locale}
                 installed={installed}
-                onOpenWalkthrough={() => {
-                  globalThis.location.hash = '#/install'
-                }}
+                onOpenWalkthrough={() => setInstallOpen(true)}
               />
               <Resolve />
             </>
           )}
         </StaffShell>
+        {installOpen ? (
+          <InstallSheet
+            locale={locale}
+            installed={installed}
+            deferredPrompt={installPrompt}
+            onClose={() => setInstallOpen(false)}
+          />
+        ) : null}
         </StaffConsentGate>
         </AccessGate>
       ) : null}

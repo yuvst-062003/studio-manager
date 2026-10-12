@@ -1,11 +1,10 @@
-// Staff artboards 9i (אירועים בצוות) and 9d (מבחן חגורה).
+// What is left of 9i (אירועים בצוות) and 9d (מבחן חגורה) after the owner removed both
+// screens from the staff app (2026-10-13): the CLIENT and the two small pieces the
+// schedule still draws with.
 //
-// **No `registerSlot` here.** 9i is a page and 9d is a page; neither is a section of
-// somebody else's screen. C2's documented exception — M7 having staff work with no new
-// artboard — does not apply to this lane, which has two.
-export { StaffEventsScreen, invited } from './StaffEventsScreen'
-export { ExamResultsScreen } from './ExamResultsScreen'
-export { EventRosterScreen } from './EventRosterScreen'
+// §4.1 folds an event into the day's own session list, so `TodayScreen` and `timeline`
+// read `EventOut` whether or not a screen listing events exists. The screens themselves —
+// the list, the exam-results sheet and the event roster — are the dashboard's work now.
 export { ExamResultMark, nextResult } from './ExamResultMark'
 export type { ExamResult } from './ExamResultMark'
 export { BeltPair } from './BeltPair'

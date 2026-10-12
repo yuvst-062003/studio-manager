@@ -39,6 +39,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Accessibility,
   Bell,
+  Smartphone,
   CalendarDays,
   ChevronLeft,
   Edit3,
@@ -201,6 +202,7 @@ export function AccountScreen({
   onSwitchStudio,
   onChooseLocale,
   onSignOut,
+  onOpenInstall,
 }: {
   locale: Locale
   displayName: string | null
@@ -213,6 +215,9 @@ export function AccountScreen({
   onSwitchStudio: (studioId: string) => void
   onChooseLocale: (next: Locale) => void
   onSignOut: () => void
+  /** Opens §6.5's install walkthrough, which `App` owns because `InstallBanner` opens the
+   *  same dialog from Today. Absent → the row is withheld rather than inert. */
+  onOpenInstall?: () => void
 }) {
   const [profile, setProfile] = useState<AccountProfile | null>(null)
   // The raw `/me/profile` body, kept beside the mapped card above because
@@ -453,6 +458,19 @@ export function AccountScreen({
             subtitle={t(locale, 'comms.calendar.coachSubtitle')}
             onOpen={() => setSheet('calendar')}
           />
+          {/* §6.5's walkthrough. The ONLY door to it besides `InstallBanner`'s nudge, which
+              is why it is here rather than nowhere: a coach who dismissed the banner once
+              had no way back to it (owner, 2026-10-13). */}
+          {onOpenInstall ? (
+            <SheetRow
+              icon={Smartphone}
+              hue="blue"
+              testId="install-open"
+              title={t(locale, 'common.install.title')}
+              subtitle={t(locale, 'common.install.why')}
+              onOpen={onOpenInstall}
+            />
+          ) : null}
           <SheetRow
             icon={Settings}
             hue="blue"
