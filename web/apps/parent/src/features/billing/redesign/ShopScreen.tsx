@@ -3,7 +3,7 @@
 // colour, order-tracker state) and why none of them is guessable from what the API returns.
 import { useMemo, useState } from 'react'
 import { CheckCircle2, ChevronLeft, ShieldCheck, ShoppingBag, X } from 'lucide-react'
-import { fill } from '@studio/core'
+import { fill, useAuthedImage } from '@studio/core'
 import { t } from '@studio/i18n'
 import { resolveLoadFailedText } from '../../shell/loadFailed'
 import type { Locale } from '@studio/i18n'
@@ -11,6 +11,40 @@ import { useDialog } from '../../onboarding/wizard/useDialog'
 import type { CartLine, CheckoutState, ShopProduct } from './types'
 
 const QUANTITY_OPTIONS = Array.from({ length: 10 }, (_, index) => index + 1)
+
+/** A product's photo, or the default tile while there is none.
+ *
+ *  `image_url` is `/api/v1/products/{id}/image`, and that route needs the session bearer —
+ *  deliberately open to guardians, but still authenticated (`read_product_image`). A bare
+ *  `<img src>` cannot send an Authorization header, so it 401'd on every photo and the shop
+ *  drew the broken-image glyph exactly where the manager's upload should have been
+ *  (2026-09-17). Same lesson as the dashboard's studio logo: fetch through `useAuthedImage`
+ *  and hand the tag an object URL. While the bytes are on their way — or when there is no
+ *  photo at all, the ordinary state of a catalogue nobody has photographed — the default
+ *  tile stands in; a tile is not an error. */
+function ProductPhoto({
+  path,
+  locale,
+  frameClassName,
+  iconClassName,
+}: {
+  path: string | null
+  locale: Locale
+  frameClassName: string
+  iconClassName: string
+}) {
+  const url = useAuthedImage(path)
+  if (url) return <img src={url} alt="" loading="lazy" className={`${frameClassName} object-cover`} />
+  return (
+    <div
+      role="img"
+      aria-label={t(locale, 'billing.shop.noPhoto')}
+      className={`${frameClassName} flex items-center justify-center`}
+    >
+      <ShoppingBag className={iconClassName} aria-hidden="true" />
+    </div>
+  )
+}
 
 export function ShopScreen({
   products,
@@ -105,25 +139,12 @@ export function ShopScreen({
       className="product-item-card bg-white dark:bg-slate-900 rounded-2xl p-2.5 shadow-xs border border-slate-100 dark:border-slate-800 flex flex-col justify-between transition-all hover:shadow-md cursor-pointer active:scale-[0.98]"
     >
       <div>
-        {/* The manager's photo when there is one, the default tile when there
-            is not — which is the ordinary state of a catalogue nobody has
-            photographed yet, not an error. */}
-        {product.imageUrl ? (
-          <img
-            src={product.imageUrl}
-            alt=""
-            loading="lazy"
-            className="relative w-full aspect-square rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-800/70 mb-2.5 object-cover"
-          />
-        ) : (
-          <div
-            role="img"
-            aria-label={t(locale, 'billing.shop.noPhoto')}
-            className="relative w-full aspect-square rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-800/70 mb-2.5 flex items-center justify-center"
-          >
-            <ShoppingBag className="w-8 h-8 text-slate-300 dark:text-slate-600" aria-hidden="true" />
-          </div>
-        )}
+        <ProductPhoto
+          path={product.imageUrl}
+          locale={locale}
+          frameClassName="relative w-full aspect-square rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-800/70 mb-2.5"
+          iconClassName="w-8 h-8 text-slate-300 dark:text-slate-600"
+        />
         <h3 className="font-black text-[15px] text-[#0A1938] dark:text-slate-50 leading-tight mb-1 line-clamp-1 text-start">
           {product.name}
         </h3>
@@ -359,21 +380,12 @@ export function ShopScreen({
             <div className="p-5 overflow-y-auto space-y-4 no-scrollbar flex-1">
               {/* Item Info Box */}
               <div className="flex gap-3.5 bg-white dark:bg-slate-900 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs">
-                {selectedProduct.imageUrl ? (
-                  <img
-                    src={selectedProduct.imageUrl}
-                    alt=""
-                    className="w-20 h-20 rounded-xl border border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50 dark:bg-slate-800/70 object-cover"
-                  />
-                ) : (
-                  <div
-                    role="img"
-                    aria-label={t(locale, 'billing.shop.noPhoto')}
-                    className="w-20 h-20 rounded-xl border border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50 dark:bg-slate-800/70 flex items-center justify-center"
-                  >
-                    <ShoppingBag className="w-8 h-8 text-slate-300 dark:text-slate-600" aria-hidden="true" />
-                  </div>
-                )}
+                <ProductPhoto
+                  path={selectedProduct.imageUrl}
+                  locale={locale}
+                  frameClassName="w-20 h-20 rounded-xl border border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50 dark:bg-slate-800/70"
+                  iconClassName="w-8 h-8 text-slate-300 dark:text-slate-600"
+                />
                 <div className="flex flex-col justify-between py-0.5">
                   <div>
                     <h3 className="font-black text-base text-[#0A1938] dark:text-slate-50 leading-snug">
