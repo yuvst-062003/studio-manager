@@ -114,6 +114,20 @@ describe('StudentsSearch — 9h', () => {
     await waitFor(() => expect(client.search).toHaveBeenCalled())
   })
 
+  it('interpolates the health banner for the icon label too, not only the visible text', async () => {
+    // The label used to be handed the raw template, so a screen reader read out the
+    // literal "{{count}} חניכים..." beside a sighted "50 חניכים..." (Gladiator, 2026-10-12).
+    const client = makeClient({
+      search: vi.fn(() =>
+        Promise.resolve({ items: [summary({ id: 'a', health_status: 'missing' })] }),
+      ),
+    } as Partial<StaffPeopleClient>)
+    const { container } = render(<StudentsSearch locale="he" client={client} />)
+
+    await screen.findByTestId('health-missing-banner')
+    expect(container.innerHTML).not.toContain('{{count}}')
+  })
+
   it('renders a StudentRow rather than a redrawn row', async () => {
     // Composing @studio/ui's row is what carries D7's belt ring into this screen without
     // this lane having to remember it (G10).

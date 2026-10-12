@@ -2,6 +2,8 @@
 import type { components } from '@studio/api-client'
 
 export type StudentSummary = components['schemas']['StudentSummaryOut']
+/** The paged envelope `GET /students` answers with — `search` below reads it to the end. */
+export type StudentSummaryPage = components['schemas']['CursorPage_StudentSummaryOut_']
 export type StudentDetail = components['schemas']['StudentDetailOut']
 export type EnrollmentOut = components['schemas']['EnrollmentOut']
 export type WeekdayOptions = components['schemas']['EnrollmentWeekdayOptionsOut']
@@ -23,13 +25,42 @@ async function json<T>(response: Response): Promise<T> {
 
 export function makeStaffPeopleClient(fetcher: Fetcher) {
   return {
-    /** Staff `9h`. §3.2 scopes a coach to their own groups server-side, not here. */
-    search: (query: string, groupId?: string): Promise<{ items: StudentSummary[] }> =>
-      fetcher(
-        `/api/v1/students?q=${encodeURIComponent(query)}${
-          groupId ? `&group_id=${groupId}` : ''
-        }`,
-      ).then(json<{ items: StudentSummary[] }>),
+    /** Staff `9h`. §3.2 scopes a coach to their own groups server-side, not here.
+     *
+     *  **Reads every page, because this screen's answer is the whole roster.** The request
+     *  used to send no `limit` and ignore `next_cursor`, so it got the server's default
+     *  page of 50 — and a club with more children than that lost the rest silently: 72
+     *  loaded, 50 drawn, and each class heading counting only what had arrived rather than
+     *  who trains there (Gladiator, 2026-10-12). A coach looking for a child who is not in
+     *  the first fifty was told, in effect, that the child is not in the club.
+     *
+     *  `PAGE` is the server's own `MAX_PAGE_SIZE`, so a club of any ordinary size is one
+     *  request and the loop never runs a second time. `MAX_PAGES` is a guard against a
+     *  cursor that never advances — a bug on either side would otherwise fetch forever. */
+    search: async (query: string, groupId?: string): Promise<{ items: StudentSummary[] }> => {
+      const PAGE = 200
+      const MAX_PAGES = 25
+      const base = `/api/v1/students?q=${encodeURIComponent(query)}${
+        groupId ? `&group_id=${groupId}` : ''
+      }&limit=${PAGE}`
+
+      const items: StudentSummary[] = []
+      let after: string | null = null
+      const seen = new Set<string>()
+      for (let read = 0; read < MAX_PAGES; read += 1) {
+        const body: StudentSummaryPage = await fetcher(
+          after ? `${base}&after=${encodeURIComponent(after)}` : base,
+        ).then(json<StudentSummaryPage>)
+        items.push(...body.items)
+        const next = body.next_cursor ?? null
+        // A repeated cursor means the server is not advancing; taking it again would
+        // re-read the same page until MAX_PAGES, and duplicate every child in the list.
+        if (next === null || seen.has(next)) break
+        seen.add(next)
+        after = next
+      }
+      return { items }
+    },
 
     /** 9h's class tabs. The same scoping note applies: a coach receives their own. */
     groups: (): Promise<{ items: GroupOut[] }> =>

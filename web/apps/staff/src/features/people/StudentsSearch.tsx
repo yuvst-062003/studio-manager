@@ -290,8 +290,17 @@ export function StudentsSearch({
         />
       ) : null}
 
+      {/* Both the icon's label and the visible text are the INTERPOLATED string: the label
+          used to be handed the template, so a screen reader announced the literal
+          "{{count}} חניכים עם הצהרת בריאות חסרה" beside a sighted "50 חניכים...". */}
       {missingHealth > 0 ? (
-        <Alert iconLabel={t(locale, 'people.health.missingCount')} tone="pending">
+        <Alert
+          iconLabel={t(locale, 'people.health.missingCount').replace(
+            '{{count}}',
+            String(missingHealth),
+          )}
+          tone="pending"
+        >
           <span data-testid="health-missing-banner">
             {t(locale, 'people.health.missingCount').replace('{{count}}', String(missingHealth))}
           </span>
