@@ -57,6 +57,13 @@ class AttendanceIn(BaseModel):
     client_mark_id: uuid.UUID
     device_marked_at: datetime
     note: str | None = Field(default=None, max_length=500)
+    #: The caller KNOWS this student is not enrolled in the session's group and means it
+    #: anyway — a child visiting from another group (owner, 2026-10-13). §10.5's
+    #: `student_unenrolled` conflict card exists for the opposite case: a mark made offline
+    #: against an enrollment that ended meanwhile, which a human has to look at. A
+    #: deliberate visit is not a conflict, and raising a card for one would teach a manager
+    #: to dismiss the cards that matter.
+    visiting: bool = False
 
 
 class BatchAttendanceIn(BaseModel):
@@ -172,6 +179,10 @@ class RosterEntry(BaseModel):
     #: because "said yes", "said no" and "has not answered" are three states — a coach
     #: reading one boolean cannot tell the last two apart, which is the gap this closes.
     has_confirmation: bool = False
+    #: Here for this one session, with no live enrollment in its group (owner, 2026-10-13).
+    #: The staff roster draws such a row with a אורח chip and leaves it out of the
+    #: "expected today" count — see `app/services/attendance/roster.py::RosterRowRaw`.
+    visiting: bool = False
 
     _validate_flags = field_validator("derived_flags", mode="before")(_flags_are_booleans)
 

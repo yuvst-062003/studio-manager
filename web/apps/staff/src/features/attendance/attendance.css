@@ -51,6 +51,17 @@
   color: var(--pending);
 }
 
+/* A child visiting from another group (owner, 2026-10-13). --emphasis rather than a status
+ * colour: it is not a state of the mark, it is a fact about who this child is on this
+ * roster, and it must not read as a warning about them. */
+.roster-row__note[data-note='visiting'] {
+  background: var(--emphasis-tint);
+  border-radius: var(--radius-pill);
+  color: var(--emphasis);
+  font-weight: var(--weight-medium);
+  padding-inline: var(--space-2);
+}
+
 /* 1c's three count tiles. Finding 6 on that spec: --paid and --pending have no tint tokens
  * and the tiles need both. Until the token layer grows them, the tile carries a semantic
  * BORDER — which 1c's own table lists ("the absent tile" under --debt/--danger) and which

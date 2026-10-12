@@ -17,7 +17,8 @@ from datetime import timedelta
 
 import pytest
 from app.models.attendance import AbsenceReport, Attendance
-from app.models.people import Enrollment
+from app.models.people import Enrollment, Student
+from app.models.person import Person
 from app.schemas.attendance import AttendanceIn, BatchAttendanceIn
 from app.services.attendance.errors import NotFoundError
 from app.services.attendance.service import AttendanceService
@@ -25,12 +26,13 @@ from sqlalchemy import select
 from tests.attendance.conftest import T0
 
 
-def _mark(student_id, *, status="present", at=None, mark_id=None) -> AttendanceIn:
+def _mark(student_id, *, status="present", at=None, mark_id=None, visiting=False) -> AttendanceIn:
     return AttendanceIn(
         student_id=student_id,
         status=status,
         client_mark_id=mark_id or uuid.uuid4(),
         device_marked_at=at or T0,
+        visiting=visiting,
     )
 
 
@@ -345,3 +347,54 @@ def test_a_batch_records_one_audit_entry_carrying_counts_and_no_names(
     )
     assert len(entries) == 1
     assert entries[0].diff == {"applied": 1, "replayed": 0, "superseded": 0, "conflicts": 0}
+
+
+# -- a child visiting from another group (owner, 2026-10-13) ----------------------------
+
+
+def _a_student_of_another_group(app_session, studio) -> uuid.UUID:
+    person = Person(studio_id=studio.id, first_name="אורח", last_name="מקבוצה אחרת")
+    app_session.add(person)
+    app_session.flush()
+    student = Student(studio_id=studio.id, person_id=person.id, status="active")
+    app_session.add(student)
+    app_session.flush()
+    app_session.commit()
+    return student.id
+
+
+def test_a_deliberate_visit_is_stored_and_raises_no_conflict(
+    tenant_session, app_session, studio, a_session, as_lead_coach
+):
+    """The manager says "this child from another group was here". That is a decision, not
+    the §10.5 case the `student_unenrolled` card exists for — and a card raised over every
+    deliberate visit is how a manager learns to dismiss the cards that matter."""
+    visitor = _a_student_of_another_group(app_session, studio)
+
+    result = AttendanceService(tenant_session).apply_batch(
+        _batch(a_session, _mark(visitor, visiting=True)),
+        actor_person_id=as_lead_coach.person_id,
+        at=T0,
+    )
+    tenant_session.commit()
+
+    assert result.applied == 1
+    assert result.conflicts == []
+
+
+def test_the_same_mark_without_the_flag_is_still_flagged(
+    tenant_session, app_session, studio, a_session, as_lead_coach
+):
+    """The opposite case keeps its card: a mark made offline against an enrollment that
+    ended meanwhile is exactly what a human has to look at."""
+    visitor = _a_student_of_another_group(app_session, studio)
+
+    result = AttendanceService(tenant_session).apply_batch(
+        _batch(a_session, _mark(visitor)),
+        actor_person_id=as_lead_coach.person_id,
+        at=T0,
+    )
+    tenant_session.commit()
+
+    assert result.applied == 1
+    assert [c.kind for c in result.conflicts] == ["student_unenrolled"]

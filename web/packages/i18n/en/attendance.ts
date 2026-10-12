@@ -2,6 +2,11 @@ import type { Bundle } from '../types'
 
 /** Mirrors `he/attendance.ts`. `en` is `strict` in the parity check — a missing key fails. */
 export const attendance: Bundle = {
+  'addToSession.title': 'Add a student to this session',
+  'addToSession.existing': 'From the club',
+  'addToSession.trial': 'Trial lesson',
+  'addToSession.existingHint': 'A student from another group who came to this session. Attendance is recorded for this session only — their group, plan and billing do not change.',
+  'addToSession.visiting': 'Visiting',
   'roster.title': 'Attendance',
   // 2c's attendance row qualifier. The 62 is baked into the sentence rather than
   // composed, because the number leads in Hebrew and sits mid-phrase in English —

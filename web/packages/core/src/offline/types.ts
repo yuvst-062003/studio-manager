@@ -131,6 +131,12 @@ export type RosterRow = {
   /** Optional so every producer of this shape from before this field existed still type-
    *  checks unchanged. `undefined` and `null` both render as "no badge". */
   plan_name?: string | null
+  /** Here for this session only, with no live enrollment in its group (owner, 2026-10-13):
+   *  a child visiting from another group. Mirrors `RosterEntry.visiting` on the wire, and
+   *  optional for the same reason the two fields above are — every producer from before it
+   *  existed still type-checks, and `undefined` means "not a visitor", which is what every
+   *  row before this change was. */
+  visiting?: boolean
 }
 
 /** Mirrors `app/schemas/schedule.py::SessionOut`, narrowed to what the roster draws.

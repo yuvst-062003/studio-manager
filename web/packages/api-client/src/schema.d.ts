@@ -6430,6 +6430,11 @@ export interface components {
              * Format: uuid
              */
             student_id: string;
+            /**
+             * Visiting
+             * @default false
+             */
+            visiting: boolean;
         };
         /** AttendanceOut */
         AttendanceOut: {
@@ -11896,6 +11901,11 @@ export interface components {
              * Format: uuid
              */
             student_id: string;
+            /**
+             * Visiting
+             * @default false
+             */
+            visiting: boolean;
         };
         /**
          * RsvpAnswerIn

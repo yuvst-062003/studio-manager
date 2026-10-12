@@ -415,3 +415,78 @@ def test_the_family_read_refuses_an_unbounded_range(client, as_guardian):
         "/api/v1/me/attendance?from=2026-01-01&to=2026-12-31", headers=as_guardian.headers
     )
     assert response.status_code == 422
+
+
+# -- a student visiting from another group (owner, 2026-10-13) ---------------------------
+#
+# The club's real case: a child comes on a day their own group does not train, or trains an
+# extra session. The manager marks them present at THIS session, and nothing about their
+# enrollment, plan or billing changes — the owner's choice between three meanings, and the
+# narrowest of them.
+#
+# The server already stored such a mark (§10.5's "unenrolled meanwhile ... stored and
+# flagged"), but `build_roster` listed enrollments alone, so the mark it accepted was
+# invisible on the very screen that made it: the coach marked a child present and then could
+# not see them in the list. These two tests pin the fix in both directions.
+
+
+def _visiting_student(app_session, studio, *, first_name: str = "אורח") -> uuid.UUID:
+    """A student of this studio with no enrollment in the session's group."""
+    person = Person(studio_id=studio.id, first_name=first_name, last_name="מקבוצה אחרת")
+    app_session.add(person)
+    app_session.flush()
+    student = Student(
+        studio_id=studio.id, person_id=person.id, status="active", joined_on=YEAR_STARTS
+    )
+    app_session.add(student)
+    app_session.flush()
+    app_session.commit()
+    return student.id
+
+
+def test_a_marked_student_from_another_group_appears_on_the_roster(
+    tenant_session, app_session, studio, a_session, an_enrolled_student
+):
+    visitor = _visiting_student(app_session, studio)
+    app_session.add(
+        Attendance(
+            studio_id=studio.id,
+            session_id=a_session,
+            student_id=visitor,
+            status="present",
+            marked_at=T0,
+            device_marked_at=T0,
+            client_mark_id=uuid.uuid4(),
+        )
+    )
+    app_session.commit()
+
+    _, rows = build_roster(tenant_session, a_session)
+
+    by_id = {row.student_id: row for row in rows}
+    assert visitor in by_id, "a mark the server accepted must be visible on the roster"
+    assert by_id[visitor].status == "present"
+    assert by_id[visitor].visiting is True
+    # §5.14's denominator is "expected sessions". A visit is not one: counting it would make
+    # the child's own attendance percentage worse for turning up to extra training.
+    assert by_id[visitor].expected is False
+
+
+def test_an_enrolled_student_is_never_flagged_as_visiting(
+    tenant_session, a_session, an_enrolled_student
+):
+    _, rows = build_roster(tenant_session, a_session)
+
+    by_id = {row.student_id: row for row in rows}
+    assert by_id[an_enrolled_student].visiting is False
+
+
+def test_a_student_with_no_mark_here_stays_off_the_roster(
+    tenant_session, app_session, studio, a_session, an_enrolled_student
+):
+    """The list is the group plus whoever was actually marked — never the whole club."""
+    _visiting_student(app_session, studio, first_name="לאאורח")
+
+    _, rows = build_roster(tenant_session, a_session)
+
+    assert [row.student_id for row in rows] == [an_enrolled_student]

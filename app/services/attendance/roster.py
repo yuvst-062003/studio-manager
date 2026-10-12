@@ -92,6 +92,13 @@ class RosterRowRaw:
     #: `PricePlan.name` via `student.price_plan_id`. `None` when no plan is chosen yet,
     #: same as the belt fields above.
     plan_name: str | None = None
+    #: Here for this session only, with no live enrollment in its group (owner, 2026-10-13).
+    #: A child who comes on a day their own group does not train, or trains an extra
+    #: session: the manager marks them present and nothing about their enrollment, plan or
+    #: billing moves. `expected` is False for them by construction -- §5.14's denominator is
+    #: expected sessions, and counting a visit would make a child's own percentage worse for
+    #: turning up to extra training.
+    visiting: bool = False
 
 
 def require_session(session: OrmSession, session_id: uuid.UUID) -> SessionRow:
@@ -138,22 +145,37 @@ def build_roster(
         .tuples()
         .all()
     )
-    if not enrollments:
-        return session_row, []
-
-    student_ids = [student.id for _, student, _ in enrollments]
-
+    # **Every mark for this session, not only the enrolled ones** (owner, 2026-10-13). A
+    # child visiting from another group is marked here and has no enrollment in this group,
+    # and §10.5 has always STORED such a mark ("a student unenrolled meanwhile is stored and
+    # flagged"). Reading marks through the enrolled ids made the row the server accepted
+    # invisible on the screen that produced it: a coach marked a child present and then
+    # could not find them in the list.
     marks = {
         row.student_id: row
-        for row in session.execute(
-            select(Attendance).where(
-                Attendance.session_id == session_id,
-                Attendance.student_id.in_(student_ids),
-            )
-        )
+        for row in session.execute(select(Attendance).where(Attendance.session_id == session_id))
         .scalars()
         .all()
     }
+
+    enrolled_ids = {student.id for _, student, _ in enrollments}
+    visitor_ids = [sid for sid in marks if sid not in enrolled_ids]
+    visitors = (
+        session.execute(
+            select(Student, Person)
+            .join(Person, Person.id == Student.person_id)
+            .where(Student.id.in_(visitor_ids))
+        )
+        .tuples()
+        .all()
+        if visitor_ids
+        else []
+    )
+
+    if not enrollments and not visitors:
+        return session_row, []
+
+    student_ids = [*enrolled_ids, *(student.id for student, _ in visitors)]
     reports = {
         row.student_id: row
         for row in session.execute(
@@ -187,7 +209,14 @@ def build_roster(
             )
         ).tuples()
     }
-    plan_ids = {student.price_plan_id for _, student, _ in enrollments if student.price_plan_id}
+    plan_ids = {
+        student.price_plan_id
+        for student in (
+            *(student for _, student, _ in enrollments),
+            *(student for student, _ in visitors),
+        )
+        if student.price_plan_id
+    }
     plan_names = {
         plan_id: name
         for plan_id, name in session.execute(
@@ -208,6 +237,21 @@ def build_roster(
             plan_name=plan_names.get(student.price_plan_id) if student.price_plan_id else None,
         )
         for enrollment, student, person in enrollments
+    ] + [
+        # Same projection, no enrollment to read a pattern from — see `RosterRowRaw.visiting`.
+        _row(
+            enrollment=None,
+            student=student,
+            person=person,
+            weekday=weekday,
+            mark=marks.get(student.id),
+            report=reports.get(student.id),
+            confirmed=student.id in confirmations,
+            derived_flags=flags.get(student.id) or {},
+            plan_name=plan_names.get(student.price_plan_id) if student.price_plan_id else None,
+            visiting=True,
+        )
+        for student, person in visitors
     ]
     # Sorted by name so a coach scanning thirty rows reads the same order every session.
     # Not by enrollment date, which is invisible on the mat.
@@ -217,7 +261,7 @@ def build_roster(
 
 def _row(
     *,
-    enrollment: Enrollment,
+    enrollment: Enrollment | None,
     student: Student,
     person: Person,
     weekday: int,
@@ -226,6 +270,7 @@ def _row(
     confirmed: bool,
     derived_flags: dict[str, bool],
     plan_name: str | None,
+    visiting: bool = False,
 ) -> RosterRowRaw:
     return RosterRowRaw(
         student_id=student.id,
@@ -242,8 +287,14 @@ def _row(
         # This session exists, so its weekday is a day the group trains. Passing that one
         # day as the group's scheduled set is C12's intersection applied to one session --
         # see the module docstring for why the general helper is the wrong tool here.
-        expected=is_expected(enrollment.attends_weekdays, (weekday,), weekday),
+        # A visitor is expected at nothing: they have no enrollment to read a pattern from.
+        expected=(
+            False
+            if enrollment is None
+            else is_expected(enrollment.attends_weekdays, (weekday,), weekday)
+        ),
         belt_color_hex=None,
         belt_name=None,
         plan_name=plan_name,
+        visiting=visiting,
     )

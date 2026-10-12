@@ -58,7 +58,6 @@ import {
 // a hash a coach can actually reach.
 import { SessionSummarySection } from './features/attendance/SessionSummarySection'
 import { HandOverSection } from './features/billing/HandOverSection'
-import { TrialSection } from './features/people/TrialSection'
 import { StudentCardRoute } from './features/people/StudentCardRoute'
 import { useQueueFlusher } from './features/attendance/useQueueFlusher'
 import { registerHealthSections } from './features/health'
@@ -534,19 +533,13 @@ export default function App() {
                 locale={locale}
                 sessionId={rosterSessionId}
               />
-            ) : sessionView === 'trial' ? (
-              <TrialSection
-                attendanceClient={attendanceClient}
-                canGrantOverride={viewerIsManager}
-                client={peopleClient}
-                locale={locale}
-                sessionId={rosterSessionId}
-              />
             ) : (
               <RosterScreen
                 canWritePlan={viewerCanWritePlan}
+                canGrantTrialOverride={viewerIsManager}
                 client={attendanceClient}
                 locale={locale}
+                peopleClient={peopleClient}
                 personId={membership?.person_id ?? null}
                 sessionId={rosterSessionId}
               />

@@ -244,6 +244,15 @@ export function RosterRow({
               {row.plan_name}
             </span>
           ) : null}
+          {/* A child from another group, here for this session only (owner, 2026-10-13).
+              Said on the row because a coach counting heads has to be able to tell their
+              own group from a visitor — and because the visit is deliberately NOT in the
+              "expected today" count beside it. */}
+          {row.visiting ? (
+            <span className="roster-row__note" data-note="visiting" data-testid="roster-visiting">
+              {t(locale, 'attendance.addToSession.visiting')}
+            </span>
+          ) : null}
         </span>
 
         {/* Every section this wave and later waves register. Named nowhere. */}

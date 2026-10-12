@@ -51,6 +51,9 @@ import type { RosterRow as RosterRowData } from '@studio/core'
 import { SessionPlanCard } from '../briefing'
 import { RosterRow } from './RosterRow'
 import type { StaffAttendanceClient } from './client'
+import { AddToSessionSheet } from './AddToSessionSheet'
+import { TrialInClass } from '../people'
+import type { StaffPeopleClient } from '../people'
 
 /**
  * Isolates digit runs (and the `/` between two of them, so a "3/12" counter reads as one
@@ -93,6 +96,8 @@ export function RosterScreen({
    *  briefing below the header but no editor — decision 16, straight from the App shell's
    *  own `viewerIsManager || roles.includes('lead_coach')` computation. */
   canWritePlan = false,
+  peopleClient,
+  canGrantTrialOverride = false,
 }: {
   sessionId: string
   locale: Locale
@@ -111,9 +116,16 @@ export function RosterScreen({
   personId: string | null
   notExpectedIds?: string[]
   canWritePlan?: boolean
+  /** For the add-to-session sheet's search and its trial form. Optional for the same reason
+   *  `eventsClient` is optional on the schedule: a caller that has not wired one yet still
+   *  gets a working roster, without the sheet. */
+  peopleClient?: StaffPeopleClient
+  /** §5.4a — a second free trial is a MANAGER's deliberate act. */
+  canGrantTrialOverride?: boolean
 }) {
   const [roster, setRoster] = useState<RosterRowData[]>([])
   const [header, setHeader] = useState<{
+    groupId: string | null
     groupName: string
     startsAt: string
     locationName: string | null
@@ -126,6 +138,7 @@ export function RosterScreen({
   const [plan, setPlan] = useState<string | null>(null)
   const pending = usePendingCount()
   const stale = useStaleQueueWarning(clock)
+  const [addOpen, setAddOpen] = useState(false)
 
   useEffect(() => {
     let live = true
@@ -135,6 +148,9 @@ export function RosterScreen({
         if (!live) return
         setRoster(body.roster)
         setHeader({
+          // The sheet's trial form needs it, and the roster read already carries it —
+          // `TrialSection` used to make a SECOND `sessionRoster` call for this one field.
+          groupId: body.session.group_id ?? null,
           groupName: body.session.group_name,
           startsAt: body.session.starts_at,
           locationName: body.session.location_name,
@@ -157,6 +173,7 @@ export function RosterScreen({
         if (cachedRoster) setRoster(cachedRoster)
         if (cachedSession) {
           setHeader({
+            groupId: cachedSession.group_id ?? null,
             groupName: cachedSession.group_name,
             startsAt: cachedSession.starts_at,
             locationName: cachedSession.location_name,
@@ -468,17 +485,89 @@ export function RosterScreen({
             <Package aria-hidden="true" className="h-4 w-4 text-[var(--emphasis)]" />
             {t(locale, 'billing.product.handOut')}
           </a>
-          <a
-            className="flex flex-col items-center gap-1 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-2 py-2.5 text-center text-[11px] font-bold text-[var(--text-secondary)] shadow-2xs transition-all active:scale-95 hover:bg-[var(--surface)]"
-            href={`#/attendance/${sessionId}/trial`}
-          >
-            <UserPlus aria-hidden="true" className="h-4 w-4 text-[var(--emphasis)]" />
-            {t(locale, 'people.trial.addDuringClass')}
-          </a>
+          {/* A popup, not a page (owner, 2026-10-13) — and it answers the question a coach
+              actually has mid-lesson, which is "who else is on the mat", not "is this child
+              new". See `AddToSessionSheet` for both halves and what a visit means. */}
+          {peopleClient ? (
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              data-testid="add-to-session-open"
+              onClick={() => setAddOpen(true)}
+              className="flex flex-col items-center gap-1 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-2 py-2.5 text-center text-[11px] font-bold text-[var(--text-secondary)] shadow-2xs transition-all active:scale-95 hover:bg-[var(--surface)]"
+            >
+              <UserPlus aria-hidden="true" className="h-4 w-4 text-[var(--emphasis)]" />
+              {t(locale, 'people.trial.addDuringClass')}
+            </button>
+          ) : null}
         </nav>
       </footer>
+
+      {addOpen && peopleClient ? (
+        <AddToSessionSheet
+          locale={locale}
+          peopleClient={peopleClient}
+          alreadyOnRoster={new Set(roster.map((row) => row.student_id))}
+          onClose={() => setAddOpen(false)}
+          onPickStudent={(student) => {
+            markVisitor(student)
+            setAddOpen(false)
+          }}
+          trialForm={
+            header?.groupId ? (
+              <TrialInClass
+                canGrantOverride={canGrantTrialOverride}
+                client={peopleClient}
+                groupId={header.groupId}
+                locale={locale}
+                sessionId={sessionId}
+                onLogged={() => setAddOpen(false)}
+              />
+            ) : (
+              <p data-testid="trial-loading">{t(locale, 'common.setup.loading')}</p>
+            )
+          }
+        />
+      ) : null}
     </section>
   )
+
+  /** Mark a student from another group present at THIS session. Optimistic like every other
+   *  mark on this screen, and queued with `visiting` so the server stores it without raising
+   *  §10.5's `student_unenrolled` card — see `app/schemas/attendance.py::AttendanceIn`. */
+  function markVisitor(student: { id: string; first_name: string; last_name: string }): void {
+    setRoster((current) =>
+      current.some((row) => row.student_id === student.id)
+        ? current
+        : [
+            ...current,
+            {
+              student_id: student.id,
+              display_name: `${student.first_name} ${student.last_name}`.trim(),
+              status: 'present',
+              source: 'coach',
+              health_status: 'missing',
+              derived_flags: {},
+              has_absence_report: false,
+              absence_reason: null,
+              has_confirmation: false,
+              visiting: true,
+              belt_color_hex: null,
+              belt_name: null,
+              plan_name: null,
+            } satisfies RosterRowData,
+          ],
+    )
+    void queueMark({
+      clientMarkId: markId(sessionId, student.id),
+      kind: 'attendance.mark',
+      sessionId,
+      studentId: student.id,
+      payload: { status: 'present', visiting: true },
+      deviceMarkedAt: clock(),
+      personId,
+    })
+  }
 
   async function bulkPresent(): Promise<void> {
     const prefix = markId(sessionId, 'bulk')

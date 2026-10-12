@@ -650,6 +650,7 @@ class AttendanceService:
             session_row,
             accepted=accepted,
             session_status_seen=session_status_seen,
+            deliberate_visits={mark.student_id for mark in marks if mark.visiting},
         )
         AuditService.record(
             self.session,
@@ -675,6 +676,7 @@ class AttendanceService:
         *,
         accepted: list[uuid.UUID],
         session_status_seen: str | None,
+        deliberate_visits: set[uuid.UUID] | None = None,
     ) -> list[AttendanceConflictOut]:
         """§10.5's two cross-actor cases, raised **beside** the stored marks.
 
@@ -697,8 +699,17 @@ class AttendanceService:
                 )
             )
 
-        on_roster = {row.student_id for row in self._roster_ids(session_row)}
-        strays = [student_id for student_id in accepted if student_id not in on_roster]
+        on_roster = {row.student_id for row in self._roster_ids(session_row) if not row.visiting}
+        # A mark sent with `visiting` is a manager saying "this child from another group was
+        # here" — a decision, not a conflict. §10.5's card is for the opposite case: a mark
+        # made offline against an enrollment that ended meanwhile, which a human must look
+        # at. Raising a card for a deliberate visit would teach them to dismiss both.
+        deliberate = deliberate_visits or set()
+        strays = [
+            student_id
+            for student_id in accepted
+            if student_id not in on_roster and student_id not in deliberate
+        ]
         if strays:
             cards.append(
                 AttendanceConflictOut(
@@ -728,6 +739,7 @@ class AttendanceService:
             absence_reason=row.absence_reason,
             has_confirmation=row.has_confirmation,
             plan_name=row.plan_name,
+            visiting=row.visiting,
         )
 
     def _project_session(self, session_row: SessionRow, rows: list[RosterRowRaw]) -> SessionOut:
