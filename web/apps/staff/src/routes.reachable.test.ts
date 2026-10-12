@@ -90,7 +90,11 @@ describe('every routed screen is reachable from inside the app', () => {
     // above and make every assertion below vacuous.
     expect(routes.length).toBeGreaterThan(8)
     expect(routes).toContain('#/cash')
-    expect(routes).toContain('#/join-link')
+    // `#/join-link` and `#/setup` are deliberately NOT here (owner, 2026-10-13): the join
+    // link is a row that copies rather than a screen to visit, and the setup wizard is the
+    // dashboard's. A route this app no longer renders must not come back by accident.
+    expect(routes).not.toContain('#/join-link')
+    expect(routes).not.toContain('#/setup')
     // §16's operator queue — a subject's access, rectification and erasure rights, per
     // the parent app's own note on why this route is named here rather than left to the
     // sweep below.

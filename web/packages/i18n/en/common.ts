@@ -604,6 +604,8 @@ export const common: Bundle = {
   'account.group.club': 'Club management',
   'account.group.notifications': 'Notifications and communication',
   'account.group.system': 'System and preferences',
+  'account.preferences': 'Language, theme and sign out',
+  'account.preferencesSubtitle': 'How the app looks on this device',
   'account.group.legal': 'Policies and terms',
   // The shared stepper (§3.21, §3.19, §3.17).
   'stepper.completion': 'Wizard progress',

@@ -11,6 +11,7 @@
 // `.claude/rules/ui-rtl-a11y.md` says not to add one without asking.
 import type { Locale } from '@studio/i18n'
 import { TodayScreen } from './TodayScreen'
+import { ScheduleTools } from './ScheduleTools'
 import type { CoachOption } from './TodayScreen'
 import type { StaffScheduleClient } from './client'
 import type { StaffEventsClient } from '../events/client'
@@ -62,6 +63,7 @@ export function ScheduleSection({
   canWritePlan?: boolean
 }) {
   return (
+    <>
     <TodayScreen
       locale={locale}
       client={client}
@@ -75,5 +77,10 @@ export function ScheduleSection({
       viewerIsManager={viewerIsManager}
       canWritePlan={canWritePlan}
     />
+    {/* The four doors that were in Settings until 2026-10-13 — see `ScheduleTools` for why
+        the schedule tab is where they belong. Below the day, not above it: the day is what
+        a coach opened this tab for. */}
+    <ScheduleTools locale={locale} />
+    </>
   )
 }

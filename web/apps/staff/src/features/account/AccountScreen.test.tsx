@@ -21,15 +21,15 @@ import { makeStaffCommsClient } from '../comms/staffCommsClient'
  *  calendar feed) answers an empty list — none of them are what this file is testing. */
 const fetcher = vi.fn(async () => new Response(JSON.stringify({ items: [] }), { status: 200 }))
 
-function renderScreen() {
+function renderScreen(over: { roles?: string[]; viewerIsManager?: boolean } = {}) {
   render(
     // `AccountDrawerFooter`'s theme control reads `useTheme()`.
     <ThemeProvider>
       <AccountScreen
         locale="he"
         displayName="שירה לוי"
-        roles={['lead_coach']}
-        viewerIsManager={false}
+        roles={over.roles ?? ['lead_coach']}
+        viewerIsManager={over.viewerIsManager ?? false}
         peopleClient={makeStaffPeopleClient(fetcher)}
         commsClient={makeStaffCommsClient(fetcher)}
         studios={[]}
@@ -57,5 +57,63 @@ describe('the accessibility row in the legal group', () => {
       await screen.findByRole('dialog', { name: t('he', 'common.a11y.title') }),
     ).toBeInTheDocument()
     expect(screen.getByText(t('he', 'common.a11y.statement.title'))).toBeInTheDocument()
+  })
+})
+
+// Every panel the owner named is behind a row now (2026-10-13), under one heading, opening
+// as a sheet. The rule this pins is the one that was actually broken before: a settings
+// screen that renders every panel expanded is a screen you scroll past rather than use.
+describe('the settings panels open as sheets, not as a column of open panels', () => {
+  const CASES = [
+    ['notifications-open', 'notifications-sheet'],
+    ['calendar-feed-open', 'calendar-feed-sheet'],
+    ['preferences-open', 'preferences-sheet'],
+  ] as const
+
+  it.each(CASES)('%s opens %s and nothing before it is pressed', async (opener, sheet) => {
+    renderScreen()
+    expect(screen.queryByTestId(sheet)).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId(opener))
+
+    const dialog = await screen.findByTestId(sheet)
+    expect(dialog).toHaveAttribute('role', 'dialog')
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+  })
+
+  it('closes again, so the screen is a list of rows between visits', async () => {
+    renderScreen()
+    await userEvent.click(screen.getByTestId('preferences-open'))
+    await screen.findByTestId('preferences-sheet')
+
+    await userEvent.click(screen.getByTestId('preferences-sheet-close'))
+
+    expect(screen.queryByTestId('preferences-sheet')).not.toBeInTheDocument()
+  })
+
+  it('offers the emergency contact to an assistant coach only', async () => {
+    renderScreen({ roles: ['assistant_coach'] })
+    await userEvent.click(screen.getByTestId('emergency-open'))
+    expect(await screen.findByTestId('emergency-contact-setting')).toBeInTheDocument()
+  })
+
+  it('does not offer it to a lead coach', () => {
+    renderScreen()
+    expect(screen.queryByTestId('emergency-open')).not.toBeInTheDocument()
+  })
+
+  it('keeps language and theme out of the page and inside the sheet', async () => {
+    renderScreen()
+    // The footer carries the language radios; before 2026-10-13 they were always on screen.
+    expect(screen.queryByText(t('he', 'common.language.title'))).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('preferences-open'))
+
+    expect(await screen.findByText(t('he', 'common.language.title'))).toBeInTheDocument()
+  })
+
+  it('shows a manager the club rows, and a coach none of them', () => {
+    renderScreen({ viewerIsManager: true })
+    expect(screen.getByText(t('he', 'billing.cash.manager.title'))).toBeInTheDocument()
   })
 })

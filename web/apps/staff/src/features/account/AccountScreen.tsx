@@ -38,17 +38,15 @@ import type { ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import {
   Accessibility,
+  Bell,
   CalendarDays,
-  CalendarX,
-  Edit3,
   ChevronLeft,
+  Edit3,
   FileText,
-  Link2,
+  LifeBuoy,
   Settings,
   Shield,
   ShieldAlert,
-  Smartphone,
-  Trophy,
   Wallet,
 } from 'lucide-react'
 import { t } from '@studio/i18n'
@@ -66,6 +64,8 @@ import { CoachCalendarFeed, NotificationPreferences, StaffPushSetting } from '..
 import type { StaffCommsClient } from '../comms'
 import type { MyProfile, MyProfileUpdate, StaffPeopleClient } from '../people'
 import { EmergencyContactSetting, shouldOfferEmergencyContact } from './EmergencyContactSetting'
+import { JoinLinkCopyRow } from './JoinLinkCopyRow'
+import { SettingsSheet } from './SettingsSheet'
 import { EditProfileSheet } from './EditProfileSheet'
 import type { EditableProfile } from './EditProfileSheet'
 
@@ -95,11 +95,59 @@ function GroupHeading({ id, children }: { id: string; children: ReactNode }) {
   )
 }
 
+/** The settings panels that open over this screen, each from its own row. */
+type SettingsSheetName = 'notifications' | 'calendar' | 'preferences' | 'emergency' | null
+
 function RowCard({ children }: { children: ReactNode }) {
   return (
     <div className="bg-[var(--surface-raised)] rounded-2xl border border-[var(--border)] shadow-xs divide-y divide-[var(--border)] overflow-hidden text-xs">
       {children}
     </div>
+  )
+}
+
+/** A row that opens a panel in place (owner, 2026-10-13). A `<button>` and not an `<a>`,
+ *  because there is nowhere to go: the setting is a dialog over this screen, and a link to
+ *  nothing would break the back button's promise. Drawn exactly like `Row` so the list reads
+ *  as one list whether a row navigates or opens. */
+function SheetRow({
+  icon: Icon,
+  hue,
+  title,
+  subtitle,
+  testId,
+  onOpen,
+}: {
+  icon: LucideIcon
+  hue: keyof typeof TILE_HUE
+  title: string
+  subtitle?: string
+  testId: string
+  onOpen: () => void
+}) {
+  return (
+    <button
+      type="button"
+      aria-haspopup="dialog"
+      data-testid={testId}
+      onClick={onOpen}
+      className="w-full p-3.5 flex items-center justify-between gap-3 hover:bg-[var(--surface)] active:bg-[var(--disabled-surface)] transition-colors text-start"
+    >
+      <span className="flex items-center gap-3 min-w-0">
+        <span
+          className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 font-bold ${TILE_HUE[hue]}`}
+        >
+          <Icon className="w-4 h-4" aria-hidden="true" />
+        </span>
+        <span className="flex flex-col items-start text-start min-w-0">
+          <span className="font-bold text-[var(--fg)] truncate">{title}</span>
+          {subtitle ? (
+            <span className="text-[11px] text-[var(--text-muted)] truncate">{subtitle}</span>
+          ) : null}
+        </span>
+      </span>
+      <ChevronLeft className="w-4 h-4 text-[var(--text-muted)] shrink-0" aria-hidden="true" />
+    </button>
   )
 }
 
@@ -172,6 +220,9 @@ export function AccountScreen({
   const [rawProfile, setRawProfile] = useState<MyProfile | null>(null)
   const [groupNames, setGroupNames] = useState<string[]>([])
   const [editOpen, setEditOpen] = useState(false)
+  // Which settings panel is open, or null. One value rather than a boolean each: two sheets
+  // can never be open at once, and a single state is what makes that true by construction.
+  const [sheet, setSheet] = useState<SettingsSheetName>(null)
   const [saving, setSaving] = useState(false)
   const [saveFailed, setSaveFailed] = useState(false)
 
@@ -351,24 +402,32 @@ export function AccountScreen({
         </div>
       ) : null}
 
-      {/* The club-management group. Manager-only as a UNIT — see this file's own header:
-          a coach must never see a heading with nothing reachable under it. */}
-      {viewerIsManager ? (
-        <section aria-labelledby="account-group-club" className="flex flex-col gap-2">
-          <GroupHeading id="account-group-club">{t(locale, 'common.account.group.club')}</GroupHeading>
-          <RowCard>
+      {/* **One group, every door (owner, 2026-10-13).** The screen used to carry four
+          headed sections — club management, emergency, notifications, system — each holding
+          a fully expanded panel, so the settings nobody was looking for were always open and
+          always in the way. Everything the owner named now lives under ניהול המועדון as a
+          row, and what is behind a row opens as a sheet when it is asked for.
+
+          The heading is no longer manager-gated, because the rows under it are not all
+          management: a coach reaches notifications, the calendar feed and their own
+          preferences here. The individual management rows keep their own `viewerIsManager`
+          guard, which is what the old rule — "never a heading with nothing under it" —
+          actually protects, since every role has something reachable here now. */}
+      <section aria-labelledby="account-group-club" className="flex flex-col gap-2">
+        <GroupHeading id="account-group-club">{t(locale, 'common.account.group.club')}</GroupHeading>
+        <RowCard>
+          {viewerIsManager ? (
             <Row
               href="#/cash"
               icon={Wallet}
               hue="emerald"
               title={t(locale, 'billing.cash.manager.title')}
             />
-            <Row
-              href="#/join-link"
-              icon={Link2}
-              hue="indigo"
-              title={t(locale, 'people.join.card.title')}
-            />
+          ) : null}
+          {/* One tap, one clipboard write, one "הועתק" — see `JoinLinkCopyRow` for what
+              screen this replaced and why revoking did not come with it. */}
+          {viewerIsManager ? <JoinLinkCopyRow locale={locale} /> : null}
+          {viewerIsManager ? (
             <Row
               href="#/privacy"
               icon={ShieldAlert}
@@ -376,102 +435,121 @@ export function AccountScreen({
               title={t(locale, 'reports.privacy.requests.operatorTitle')}
               subtitle={t(locale, 'reports.privacy.requests.operatorSubtitle')}
             />
-            <Row href="#/setup" icon={Settings} hue="blue" title={t(locale, 'common.setup.title')} />
-          </RowCard>
-        </section>
+          ) : null}
+
+          <SheetRow
+            icon={Bell}
+            hue="amber"
+            testId="notifications-open"
+            title={t(locale, 'common.account.group.notifications')}
+            subtitle={t(locale, 'comms.preferences.subtitle')}
+            onOpen={() => setSheet('notifications')}
+          />
+          <SheetRow
+            icon={CalendarDays}
+            hue="indigo"
+            testId="calendar-feed-open"
+            title={t(locale, 'comms.calendar.title')}
+            subtitle={t(locale, 'comms.calendar.coachSubtitle')}
+            onOpen={() => setSheet('calendar')}
+          />
+          <SheetRow
+            icon={Settings}
+            hue="blue"
+            testId="preferences-open"
+            title={t(locale, 'common.account.preferences')}
+            subtitle={t(locale, 'common.account.preferencesSubtitle')}
+            onOpen={() => setSheet('preferences')}
+          />
+          {/* 0025, assistant coaches only — see `EmergencyContactSetting.tsx` for why it is
+              that role and why it is no longer a gate at launch. */}
+          {shouldOfferEmergencyContact(roles) ? (
+            <SheetRow
+              icon={LifeBuoy}
+              hue="rose"
+              testId="emergency-open"
+              title={t(locale, 'people.emergency.settingTitle')}
+              onOpen={() => setSheet('emergency')}
+            />
+          ) : null}
+        </RowCard>
+      </section>
+
+      {sheet === 'notifications' ? (
+        <SettingsSheet
+          locale={locale}
+          icon={Bell}
+          testId="notifications-sheet"
+          title={t(locale, 'common.account.group.notifications')}
+          onClose={() => setSheet(null)}
+        >
+          {/* Above the switches, not beside them: the switches mute notifications, and
+              until this component existed there was no way to turn any on. */}
+          <StaffPushSetting client={commsClient} locale={locale} />
+          <NotificationPreferences client={commsClient} locale={locale} />
+        </SettingsSheet>
+      ) : null}
+
+      {sheet === 'calendar' ? (
+        <SettingsSheet
+          locale={locale}
+          icon={CalendarDays}
+          testId="calendar-feed-sheet"
+          title={t(locale, 'comms.calendar.title')}
+          onClose={() => setSheet(null)}
+        >
+          <CoachCalendarFeed client={commsClient} locale={locale} />
+        </SettingsSheet>
+      ) : null}
+
+      {sheet === 'preferences' ? (
+        <SettingsSheet
+          locale={locale}
+          icon={Settings}
+          testId="preferences-sheet"
+          title={t(locale, 'common.account.preferences')}
+          onClose={() => setSheet(null)}
+        >
+          {/* Language, theme, sign out — carried whole, never split up. `AccountDrawerFooter`
+              is shared with the parent app and its own header says so; it moves into this
+              sheet intact rather than being taken apart for one app's layout. */}
+          <AccountDrawerFooter
+            accountName={displayName}
+            locale={locale}
+            onChooseLocale={onChooseLocale}
+            onSignOut={onSignOut}
+          />
+        </SettingsSheet>
+      ) : null}
+
+      {sheet === 'emergency' && shouldOfferEmergencyContact(roles) ? (
+        <SettingsSheet
+          locale={locale}
+          icon={LifeBuoy}
+          testId="emergency-sheet"
+          title={t(locale, 'people.emergency.settingTitle')}
+          onClose={() => setSheet(null)}
+        >
+          {/* Re-keyed on the read landing: the setting seeds its fields from `profile` at
+              mount rather than adopting them in an effect — see its own header. */}
+          <EmergencyContactSetting
+            key={rawProfile ? 'loaded' : 'loading'}
+            locale={locale}
+            client={peopleClient}
+            profile={rawProfile}
+          />
+        </SettingsSheet>
       ) : null}
 
       {/* Who the club IS. Staff sign the same club's agreements and answer families who ask
           who they are contracting with; the registered name and number belong where the
-          person holding the app can read them without opening a parent's תקנון. Outside the
-          manager-only block above, because identifying the club is not a management action. */}
+          person holding the app can read them without opening a parent's תקנון. */}
       <p
         data-testid="account-club-entity"
         className="text-[11px] text-[var(--text-muted)] text-center pt-1"
       >
         {t(locale, 'health.clubTerms.entity')}
       </p>
-
-      {/* 0025, moved out of the launch flow (owner, 2026-10-12) — see
-          `EmergencyContactSetting.tsx` for why. Assistant coaches only, and small: a field
-          to fill once in a quiet minute, not a form standing between a coach and the mat. */}
-      {shouldOfferEmergencyContact(roles) ? (
-        <section aria-labelledby="account-group-emergency" className="flex flex-col gap-2">
-          <GroupHeading id="account-group-emergency">
-            {t(locale, 'people.emergency.settingTitle')}
-          </GroupHeading>
-          <div className="bg-[var(--surface-raised)] rounded-2xl border border-[var(--border)] shadow-xs p-3.5">
-            {/* Re-keyed on the read landing: the setting seeds its fields from `profile`
-                at mount rather than adopting them in an effect — see its own header. */}
-            <EmergencyContactSetting
-              key={rawProfile ? 'loaded' : 'loading'}
-              locale={locale}
-              client={peopleClient}
-              profile={rawProfile}
-            />
-          </div>
-        </section>
-      ) : null}
-
-      <section aria-labelledby="account-group-notifications" className="flex flex-col gap-2">
-        <GroupHeading id="account-group-notifications">
-          {t(locale, 'common.account.group.notifications')}
-        </GroupHeading>
-        <div className="bg-[var(--surface-raised)] rounded-2xl border border-[var(--border)] shadow-xs p-3.5 text-xs">
-          {/* Above the switches, not beside them: the switches mute notifications, and
-              until this component existed there was no way to turn any on. */}
-          <StaffPushSetting client={commsClient} locale={locale} />
-          <NotificationPreferences client={commsClient} locale={locale} />
-        </div>
-      </section>
-
-      <section aria-labelledby="account-group-system" className="flex flex-col gap-2">
-        <GroupHeading id="account-group-system">{t(locale, 'common.account.group.system')}</GroupHeading>
-        <div className="bg-[var(--surface-raised)] rounded-2xl border border-[var(--border)] shadow-xs p-3.5 text-xs">
-          <CoachCalendarFeed client={commsClient} locale={locale} />
-        </div>
-        <RowCard>
-          {/* Decision #4 of the redesign spec folds events into the schedule's own
-              session list, later. Until that lands this is the one reachable door to
-              the events screen and its exam-results/roster sub-routes — visible to
-              every coach, the same as the old NAV entry it replaces, not manager-gated. */}
-          <Row
-            href="#/events"
-            icon={Trophy}
-            hue="amber"
-            title={t(locale, 'events.title')}
-            subtitle={t(locale, 'events.list.subtitle')}
-          />
-          <Row
-            href="#/install"
-            icon={Smartphone}
-            hue="blue"
-            title={t(locale, 'common.install.title')}
-            subtitle={t(locale, 'common.install.why')}
-          />
-          {/* §4.7 (checkpoint C11) — the month calendar. Every staff role, not
-              manager-gated: reading it is open to any coach (decision 7), and the
-              editing decisions 8/9 gate are inside the screen itself, per session,
-              not at this door. */}
-          <Row
-            href="#/calendar"
-            icon={CalendarDays}
-            hue="indigo"
-            title={t(locale, 'schedule.staffCalendar.account.title')}
-            subtitle={t(locale, 'schedule.staffCalendar.account.subtitle')}
-          />
-          {/* §4.8 / §6.1 (checkpoint C10) — filing, withdrawing and reading a coach's own
-              unavailability. Every staff role, not manager-gated: it is the coach filing
-              against themself, the same reason `#/events` above is unconditional. */}
-          <Row
-            href="#/constraints"
-            icon={CalendarX}
-            hue="rose"
-            title={t(locale, 'schedule.constraint.account.title')}
-            subtitle={t(locale, 'schedule.constraint.account.subtitle')}
-          />
-        </RowCard>
-      </section>
 
       <section aria-labelledby="account-group-legal" className="flex flex-col gap-2">
         <GroupHeading id="account-group-legal">{t(locale, 'common.account.group.legal')}</GroupHeading>
@@ -518,13 +596,6 @@ export function AccountScreen({
         studios={studios}
       />
 
-      {/* Language, theme, sign out — carried whole, never split up. */}
-      <AccountDrawerFooter
-        accountName={displayName}
-        locale={locale}
-        onChooseLocale={onChooseLocale}
-        onSignOut={onSignOut}
-      />
     </div>
   )
 }

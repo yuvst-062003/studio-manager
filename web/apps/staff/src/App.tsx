@@ -24,31 +24,18 @@ import {
   InstallWalkthrough,
   ManagerSignIn,
   PRIVACY_HASH,
-  SetupIncompleteBanner,
-  SetupWizard,
   TERMS_HASH,
   ThemeProvider,
   UpdateToast,
-  makeSetupClient,
-  registerM1WizardSteps,
-  makeWizardBeltsClient,
-  makeWizardItemsClient,
-  makeWizardPricesClient,
-  registerBeltsWizardStep,
-  registerItemsWizardStep,
-  registerPricesWizardStep,
-  LanguageGate,
   useDocumentLocale,
 } from '@studio/ui'
 import { DevBar } from '@studio/ui/dev-bar'
 import type { InstallPromptEvent } from '@studio/ui'
 import { t } from '@studio/i18n'
-import type { Locale } from '@studio/i18n'
 import { LegalScreen } from './features/legal/LegalScreen'
 import { AccessGate } from './features/identity/AccessGate'
 import { Resolve } from './features/identity/Resolve'
 import { PaymentPromisesSection } from './features/billing/PaymentPromisesSection'
-import { JoinLinkSection } from './features/people/JoinLinkSection'
 import { ScheduleSection } from './features/schedule/ScheduleSection'
 import { CalendarScreen } from './features/schedule/CalendarScreen'
 import { makeStaffScheduleClient } from './features/schedule/client'
@@ -97,42 +84,7 @@ import './features/attendance/attendance.css'
 
 // §5.1 — 'the staff app and dashboard route them into a resumable wizard'. Both mount the
 // SAME wizard from @studio/ui; no step lives in one app's feature directory. Registered
-// at module load so the slot is populated before anything renders, and `apiFetch` is
-// passed in because @studio/ui must not depend on @studio/core.
-registerM1WizardSteps(apiFetch)
 
-/** §6.1 step 1, asked where somebody is actually being onboarded.
- *
- * **Why the gate hangs off the WIZARD and not the shell.** It first shipped over every
- * session state, which put it in front of the sign-in screen — a place nobody is being
- * set up, and a place a returning manager meets it for no reason. The wizard is the
- * onboarding moment in this app, so the question belongs at its door: asked once, before
- * the first step, and never again once answered. */
-function StaffSetupWithLanguage({
-  client,
-  locale,
-}: {
-  client: Parameters<typeof SetupWizard>[0]['client']
-  locale: Locale
-}) {
-  const { setLocale, hasChosen } = useStoredLocale()
-  const [gateOpen, setGateOpen] = useState(!hasChosen)
-  return (
-    <>
-      {gateOpen ? (
-        <LanguageGate locale={locale} onChoose={setLocale} onDone={() => setGateOpen(false)} />
-      ) : null}
-      <SetupWizard client={client} locale={locale} />
-    </>
-  )
-}
-// The other three (2026-08-30): belts, prices and items lived in the DASHBOARD's feature
-// directories, so this app's wizard showed them as dead rail entries — the owner read
-// that as "payments and belts don't work". They live beside the container now, and both
-// apps register the same components.
-registerBeltsWizardStep(makeWizardBeltsClient(apiFetch))
-registerPricesWizardStep(makeWizardPricesClient(apiFetch))
-registerItemsWizardStep(makeWizardItemsClient(apiFetch))
 
 // §19.4's `📴 offline` and `🐌 slow` toggles, plus the `student-card` attendance strip and
 // the `staff-alerts` conflict cards. Registered at module load for the same reason the
@@ -214,7 +166,6 @@ export default function App() {
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
   // Memoised: SetupWizard reads through this in an effect keyed on the client, so a fresh
   // object every render would re-fetch progress forever.
-  const setupClient = useMemo(() => makeSetupClient(apiFetch), [])
   const scheduleClient = useMemo(() => makeStaffScheduleClient(apiFetch), [])
   const peopleClient = useMemo(() => makeStaffPeopleClient(apiFetch), [])
   const eventsClient = useMemo(() => makeStaffEventsClient(apiFetch), [])
@@ -306,8 +257,7 @@ export default function App() {
   // §6.5's walkthrough, now an on-demand screen behind InstallBanner's nudge.
   const onInstall = hash === '#/install'
   const onCash = hash === '#/cash'
-  const onJoinLink = hash === '#/join-link'
-  // §16's privacy queue. Manager-gated below with `#/cash` and `#/join-link`: a coach
+  // §16's privacy queue. Manager-gated below with `#/cash`: a coach
   // reading it would get an empty list — the endpoint scopes a non-manager to their OWN
   // subjects — and an empty list on a screen titled "requests in this club" reads as
   // "there are none", which is a different and worse claim than "not yours".
@@ -319,9 +269,6 @@ export default function App() {
   // these while signed in before this redesign).
   const onTerms = hash === TERMS_HASH
   const onPrivacyPolicy = hash === PRIVACY_HASH
-  // 2026-08-28 — the way BACK into the wizard after a dismissal. Resolve routes an owner
-  // in only on first run; the incomplete-setup banner needs a door that exists after it.
-  const onSetup = hash === '#/setup'
   // The account tab's own screen, and the two stubs beside it (timer, tasks) — reserved
   // routes StaffTabBar already links to. Real screens land at later checkpoints; a tab
   // that goes nowhere today is the exact bug (2.2) this pass exists to not repeat.
@@ -466,19 +413,6 @@ export default function App() {
             />
           }
         >
-          {/* The unfinished-setup nudge (2026-08-28). Manager-gated — S4's lesson: a
-              manager-only read mounted in front of a coach is a 403 on every screen.
-              Hidden on the wizard itself; keyed on the hash so leaving it re-asks. */}
-          {session.access.staff && viewerIsManager && !onSetup ? (
-            <SetupIncompleteBanner
-              key={hash}
-              client={setupClient}
-              locale={locale}
-              onOpen={() => {
-                globalThis.location.hash = '#/setup'
-              }}
-            />
-          ) : null}
           {/* §6.1's first-run routing still owns the DEFAULT screen: `Resolve` decides
               between the setup wizard, today and the refusal. Both W2 lanes hang a
               screen off a hash in front of it, and neither claims the fallback — an
@@ -647,7 +581,7 @@ export default function App() {
             />
           ) : session.access.staff &&
             !viewerIsManager &&
-            (onCash || onJoinLink || onSetup || onPrivacy) ? (
+            (onCash || onPrivacy) ? (
             // S10 — restricted, said out loud. The gate used to fall through to the
             // date-picker screen, which made the app look broken rather than reserved.
             <EmptyState
@@ -655,13 +589,9 @@ export default function App() {
               title={t(locale, 'common.permission.locked')}
               description={t(locale, 'common.permission.managerOnly')}
             />
-          ) : session.access.staff && viewerIsManager && onSetup ? (
-            <StaffSetupWithLanguage client={setupClient} locale={locale} />
           ) : session.access.staff && viewerIsManager && onCash ? (
             <PaymentPromisesSection locale={locale} />
-          ) : session.access.staff && viewerIsManager && onJoinLink ? (
-            <JoinLinkSection locale={locale} />
-          ) : session.access.staff && viewerIsManager && onPrivacy ? (
+                    ) : session.access.staff && viewerIsManager && onPrivacy ? (
             <PrivacyOperatorScreen client={privacyClient} locale={locale} />
           ) : session.access.staff && onStudents ? (
             <StudentsSearch
@@ -705,10 +635,7 @@ export default function App() {
                   globalThis.location.hash = '#/install'
                 }}
               />
-              <Resolve
-                session={session}
-                wizard={<StaffSetupWithLanguage client={setupClient} locale={locale} />}
-              />
+              <Resolve />
             </>
           )}
         </StaffShell>

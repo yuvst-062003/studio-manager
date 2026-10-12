@@ -1,6 +1,6 @@
 // S10 — permission boundaries are UI.
 //
-// The gates on `#/cash` and `#/join-link` used to FALL THROUGH: a coach following a link
+// The gate on `#/cash` used to FALL THROUGH: a coach following a link
 // landed on the date-picker screen, which reads as a bug, not as a boundary. Now the
 // boundary is said (`לא זמין בהרשאה שלך`), and 9e's drawer lists the locked capabilities
 // with the footnote naming who holds them — the same show-don't-hide choice 9c already
@@ -8,7 +8,6 @@
 //
 // One test per role per surface, because the matrix IS the deliverable.
 import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { memoryStore, setOfflineStore } from '@studio/core'
 import { t } from '@studio/i18n'
@@ -89,75 +88,12 @@ describe('S10 — the gated surfaces, per role', () => {
     expect(screen.queryByTestId('staff-payment-promises')).toBeNull()
   })
 
-  it('refuses #/join-link to a lead coach — the reservation is managerial, not senior', async () => {
-    vi.stubGlobal('fetch', staffFetch(['lead_coach']))
-    globalThis.location.hash = '#/join-link'
-    render(<App />)
-    expect(await REFUSAL()).toBeInTheDocument()
-  })
-
   it('gives a manager the cash screen, with no refusal in sight', async () => {
     vi.stubGlobal('fetch', staffFetch(['manager']))
     globalThis.location.hash = '#/cash'
     render(<App />)
     expect(await screen.findByTestId('staff-payment-promises')).toBeInTheDocument()
     expect(screen.queryByText(t('he', 'common.permission.managerOnly'))).toBeNull()
-  })
-})
-
-describe('the setup nudge and its door (2026-08-28)', () => {
-  it('refuses #/setup to a coach, visibly — and never even asks the server', async () => {
-    const fetchSpy = staffFetch(['assistant_coach'])
-    vi.stubGlobal('fetch', fetchSpy)
-    globalThis.location.hash = '#/setup'
-    render(<App />)
-    expect(await REFUSAL()).toBeInTheDocument()
-    // The manager-gate is what keeps GET /setup off a coach's wire (S4's lesson).
-    const setupCalls = fetchSpy.mock.calls.filter(([input]) => String(input).includes('/setup'))
-    expect(setupCalls).toHaveLength(0)
-  })
-
-  it('shows a manager the unfinished-setup banner, and the resume lands in the wizard', async () => {
-    const base = staffFetch(['manager'])
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: RequestInfo | URL) => {
-        if (String(input).includes('/setup')) {
-          return new Response(
-            JSON.stringify({
-              steps: [
-                { key: 'studio', status: 'done' },
-                { key: 'groups', status: 'pending' },
-              ],
-              complete: false,
-              dismissed_at: '2026-08-27T10:00:00Z',
-            }),
-            { status: 200 },
-          )
-        }
-        return base(input)
-      }),
-    )
-    render(<App />)
-    // waitFor rather than findBy: the shell re-keys the banner as the session settles,
-    // and the assertion must survive a node being replaced mid-flight.
-    await waitFor(() => expect(screen.getByTestId('setup-incomplete')).toBeInTheDocument(), {
-      timeout: 3000,
-    })
-    // findBy, not getBy: the banner re-keys as the session settles (and since
-    // 2026-08-30 re-reads on focus), so the node the waitFor saw can be replaced
-    // before the click lands. Query fresh, retrying, at the click itself.
-    await userEvent.click(await screen.findByTestId('setup-incomplete-resume'))
-    await waitFor(() => expect(globalThis.location.hash).toBe('#/setup'))
-  })
-
-  it('shows a coach no banner at all', async () => {
-    vi.stubGlobal('fetch', staffFetch(['lead_coach']))
-    render(<App />)
-    // The drawer's own "עוד" button is gone (S3 redesign) — the tab bar rendering at all
-    // is the new "the shell finished mounting" signal.
-    await screen.findByTestId('tab-bar')
-    expect(screen.queryByTestId('setup-incomplete')).toBeNull()
   })
 })
 

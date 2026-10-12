@@ -14,6 +14,7 @@ import type { Bundle } from '../types'
  *    dialog can say what is *protected* and why, not merely how many rows change.
  */
 export const schedule: Bundle = {
+  'tools.title': 'עוד בלוח הזמנים',
   // -- the day / week views (staff 9a, 1d; dashboard 3a) ------------------------
   'today.title': 'היום',
   'today.sessionCount': '{{count}} שיעורים',

@@ -613,6 +613,8 @@ export const common: Bundle = {
   'account.group.club': 'Управление клубом',
   'account.group.notifications': 'Уведомления и связь',
   'account.group.system': 'Система и предпочтения',
+  'account.preferences': 'Язык, тема и выход',
+  'account.preferencesSubtitle': 'Как приложение выглядит на этом устройстве',
   'account.group.legal': 'Политики и условия',
   // The shared stepper (§3.21, §3.19, §3.17).
   'stepper.completion': 'Ход мастера',

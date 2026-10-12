@@ -689,6 +689,8 @@ export const common: Bundle = {
   'account.group.club': 'ניהול המועדון',
   'account.group.notifications': 'התראות ותקשורת',
   'account.group.system': 'מערכת והעדפות',
+  'account.preferences': 'שפה, ערכת נושא ויציאה',
+  'account.preferencesSubtitle': 'העדפות התצוגה של האפליקציה',
   'account.group.legal': 'מדיניות ותנאים',
   // The shared stepper (§3.21, §3.19, §3.17). Its state words are never the only signal —
   // the mark and the tint carry it on screen, and these carry it to a screen reader.

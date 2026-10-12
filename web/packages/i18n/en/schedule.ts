@@ -2,6 +2,7 @@ import type { Bundle } from '../types'
 
 /** Mirrors `he/schedule.ts`. `en` is `strict` in the parity check — a missing key fails. */
 export const schedule: Bundle = {
+  'tools.title': 'More in the schedule',
   'today.title': 'Today',
   'today.sessionCount': '{{count}} sessions',
   'today.sessionCount.one': '1 session',

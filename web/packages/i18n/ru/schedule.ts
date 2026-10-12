@@ -5,6 +5,7 @@ import type { Bundle } from '../types'
  * native-speaker read lands (that is an M11 gate, `HB-ru-review`).
  */
 export const schedule: Bundle = {
+  'tools.title': 'Ещё в расписании',
   'today.title': 'Сегодня',
   'today.sessionCount': '{{count}} занятий',
   'today.sessionCount.one': '1 занятие',

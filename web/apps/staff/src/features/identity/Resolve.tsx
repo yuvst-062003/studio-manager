@@ -1,112 +1,25 @@
-// §6.1's staff-app first launch, step 3's non-refusal arms:
+// §6.1's staff-app first launch, after the setup wizard left this app (owner, 2026-10-13).
 //
-//   3  resolve  ├─ owner of a studio that has not been set up
-//               │     → studio setup wizard (§5.1), resumable
-//               └─ manager / coach with role assignments
-//                     → offline priming → Today
+// **What this used to decide.** §6.1 step 3 had two non-refusal arms: an owner of a studio
+// that had not been set up went to the setup wizard (§5.1), and everybody else went to
+// Today. The arm existed because §5.1 said both the staff app and the dashboard routed into
+// the same wizard, so either app could be an owner's first door.
 //
-// §6.1's 3-screen tour used to sit on that second arm. It was removed on 2026-09-07 --
-// see `StaffLanding.tsx`, which now holds the routing the tour was quietly doing.
+// The owner's call: the wizard does not belong in the coach app at all. Setting a club up —
+// classes, halls, the training year, the price list — is desk work done on the dashboard,
+// and this app is for the person standing on a mat. It was also the only reason this file
+// asked `/api/v1/setup` on launch and held a three-valued "have we asked yet" state to keep
+// the wizard from flashing at every returning owner.
 //
-// The third arm — "no role assignment anywhere → refusal" — moved to `AccessGate`
-// (2026-09-02), which wraps this component's caller rather than living inside it — see
-// that file's header for why. Everything here now runs under the guarantee `AccessGate`
-// provides: `session.access.staff` is `true`.
+// So the branch is gone, the question with it, and what is left is the second arm: staff
+// access means Today. The wizard itself is untouched in `@studio/ui` and the dashboard still
+// routes into it — this is one app's door closing, not a feature being deleted.
 //
-// **What "has not been set up" is, and what it deliberately is not.**
-//
-// §6.1 words this arm as "owner of a studio with no classes yet", and that is what this
-// file routed on until M1.9. It has a defect that only becomes visible once the wizard
-// exists: §5.1 says "each step can be skipped and returned to", and creating a class is
-// step 3. An owner who skips step 3 therefore has no classes — so a classes-based rule
-// throws them back into the wizard on every single launch, forever, with no way out.
-//
-// The rule is `dismissed_at`: the wizard opens for an owner who has never chosen an exit
-// from it. That is the persistence §5.1 actually asks for, and it removes a real defect
-// rather than working around it. It is also NOT "complete": completeness governs the
-// dashboard checklist, and an owner who skipped a step is never complete, so routing on
-// completeness would reproduce the same trap by a different name.
-import { useEffect, useState } from 'react'
-import { apiFetch } from '@studio/core'
-import type { Session } from '@studio/core'
+// The refusal arm — "no role assignment anywhere" — moved to `AccessGate` (2026-09-02),
+// which wraps this component's caller rather than living inside it. Everything here runs
+// under the guarantee it provides: `session.access.staff` is `true`.
 import { StaffLanding } from './StaffLanding'
 
-export type ResolveOutcome = 'loading' | 'wizard' | 'today'
-
-/**
- * `dismissedAt` is three-valued on purpose:
- *   a string — the owner exited the wizard at some point
- *   null     — they never have, so it should open
- *   undefined — we have not asked yet
- * Collapsing the last two would flash the wizard at every returning owner on every cold
- * start, which is the same class of bug as rendering sign-in while a session is loading.
- */
-export function decideOutcome(
-  session: Session,
-  dismissedAt: string | null | undefined,
-): ResolveOutcome {
-  if (dismissedAt === undefined) return 'loading'
-
-  const active = session.studios.find((s) => s.studio_id === session.activeStudioId)
-  // §3.2 — 'Studio settings, training year, rollover: owner ✓ manager ✓' and nothing
-  // else. §5.1 is narrower still — the wizard is what the OWNER is routed into once they
-  // accept — so a manager configures a studio from Settings rather than from here.
-  const isOwner = active?.roles.includes('owner') ?? false
-  return isOwner && dismissedAt === null ? 'wizard' : 'today'
-}
-
-export function Resolve({
-  session,
-  wizard,
-}: {
-  session: Session
-  /** The setup wizard, injected. It lives in @studio/ui because §5.1 routes both the
-   *  staff app and the dashboard into the same one. */
-  wizard: React.ReactNode
-}) {
-  const [dismissedAt, setDismissedAt] = useState<string | null | undefined>(undefined)
-
-  // S4.1 — §3.2 keeps /setup at owner and manager, and decideOutcome routes only an
-  // OWNER into the wizard. Asking anyway meant every coach took a 403 on every screen,
-  // on every launch. A question whose answer cannot change the outcome is not asked.
-  const activeMembership = session.studios.find((s) => s.studio_id === session.activeStudioId)
-  const isOwner = activeMembership?.roles.includes('owner') ?? false
-
-  useEffect(() => {
-    if (!session.access.staff || !isOwner) return
-    let alive = true
-    void (async () => {
-      try {
-        const response = await apiFetch('/api/v1/setup')
-        if (!alive) return
-        if (!response.ok) {
-          setDismissedAt(NEVER_ROUTE)
-          return
-        }
-        const body = await response.json()
-        setDismissedAt(body.dismissed_at ?? null)
-      } catch {
-        // Offline. §10.2 says the staff app works offline, so an unanswerable question
-        // resolves to "assume it was dismissed" — routing a returning owner into a setup
-        // wizard because their train went into a tunnel would be far worse than skipping
-        // it, and the wizard stays reachable from Settings either way.
-        if (alive) setDismissedAt(NEVER_ROUTE)
-      }
-    })()
-    return () => {
-      alive = false
-    }
-  }, [session.access.staff, isOwner])
-
-  // A non-owner never asked the question, so the answer is derived rather than set:
-  // any non-null value routes away from the wizard, which is the only thing decideOutcome
-  // does with it for a coach or a manager.
-  const outcome = decideOutcome(session, isOwner ? dismissedAt : NEVER_ROUTE)
-
-  if (outcome === 'loading') return <p data-testid="staff-resolving" />
-  if (outcome === 'wizard') return <div data-testid="staff-wizard">{wizard}</div>
+export function Resolve() {
   return <StaffLanding />
 }
-
-/** Any non-null value routes away from the wizard; this one names WHY it is not null. */
-const NEVER_ROUTE = 'unknown'
