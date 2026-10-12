@@ -64,7 +64,8 @@ import type { SwitchableStudio } from '@studio/ui'
 import { PermissionBoundaries, roleLabelsOf } from '../identity/DrawerIdentity'
 import { CoachCalendarFeed, NotificationPreferences, StaffPushSetting } from '../comms'
 import type { StaffCommsClient } from '../comms'
-import type { MyProfileUpdate, StaffPeopleClient } from '../people'
+import type { MyProfile, MyProfileUpdate, StaffPeopleClient } from '../people'
+import { EmergencyContactSetting, shouldOfferEmergencyContact } from './EmergencyContactSetting'
 import { EditProfileSheet } from './EditProfileSheet'
 import type { EditableProfile } from './EditProfileSheet'
 
@@ -166,6 +167,9 @@ export function AccountScreen({
   onSignOut: () => void
 }) {
   const [profile, setProfile] = useState<AccountProfile | null>(null)
+  // The raw `/me/profile` body, kept beside the mapped card above because
+  // `EmergencyContactSetting` reads 0025's three fields from it. One read, two readers.
+  const [rawProfile, setRawProfile] = useState<MyProfile | null>(null)
   const [groupNames, setGroupNames] = useState<string[]>([])
   const [editOpen, setEditOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -175,17 +179,17 @@ export function AccountScreen({
     let live = true
     peopleClient
       .myProfile()
-      .then(
-        (body) =>
-          live &&
-          setProfile({
-            firstName: body.first_name,
-            lastName: body.last_name,
-            displayName: body.display_name,
-            email: body.email,
-            phone: body.phone,
-          }),
-      )
+      .then((body) => {
+        if (!live) return
+        setRawProfile(body)
+        setProfile({
+          firstName: body.first_name,
+          lastName: body.last_name,
+          displayName: body.display_name,
+          email: body.email,
+          phone: body.phone,
+        })
+      })
       // A read failure leaves the card showing the session's own `displayName` and hides
       // the phone/email line and the edit button — never a placeholder pretending to be
       // real contact details.
@@ -387,6 +391,27 @@ export function AccountScreen({
       >
         {t(locale, 'health.clubTerms.entity')}
       </p>
+
+      {/* 0025, moved out of the launch flow (owner, 2026-10-12) — see
+          `EmergencyContactSetting.tsx` for why. Assistant coaches only, and small: a field
+          to fill once in a quiet minute, not a form standing between a coach and the mat. */}
+      {shouldOfferEmergencyContact(roles) ? (
+        <section aria-labelledby="account-group-emergency" className="flex flex-col gap-2">
+          <GroupHeading id="account-group-emergency">
+            {t(locale, 'people.emergency.settingTitle')}
+          </GroupHeading>
+          <div className="bg-[var(--surface-raised)] rounded-2xl border border-[var(--border)] shadow-xs p-3.5">
+            {/* Re-keyed on the read landing: the setting seeds its fields from `profile`
+                at mount rather than adopting them in an effect — see its own header. */}
+            <EmergencyContactSetting
+              key={rawProfile ? 'loaded' : 'loading'}
+              locale={locale}
+              client={peopleClient}
+              profile={rawProfile}
+            />
+          </div>
+        </section>
+      ) : null}
 
       <section aria-labelledby="account-group-notifications" className="flex flex-col gap-2">
         <GroupHeading id="account-group-notifications">

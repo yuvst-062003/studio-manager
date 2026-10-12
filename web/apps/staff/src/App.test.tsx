@@ -1,5 +1,4 @@
 import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LOCALE_STORAGE_KEY } from '@studio/core'
 import { t } from '@studio/i18n'
@@ -292,9 +291,12 @@ describe('§6.1 step 5 — the consent gate is actually MOUNTED', () => {
   })
 })
 
-describe('revision 0025 — the emergency-contact step is MOUNTED, and only for assistants', () => {
-  /** Same reasoning as the consent block above: a step nobody mounts asks nobody anything.
-   *  `EmergencyContactStep.test.tsx` renders the component, which proves the component. */
+describe('revision 0025 — the emergency contact does NOT stand in front of the app', () => {
+  /** It used to: a first-run step for assistant coaches, skippable, with the skip dying at
+   *  the end of the launch so it returned every time. The owner — an assistant coach as well
+   *  as a manager — met it on every open (2026-10-12). It is a field in the account tab now,
+   *  and `EmergencyContactSetting.test.tsx` proves the field. What is left to prove here is
+   *  that nothing gates on it. */
   const asRole = (role: string) => ({
     ...SIGNED_IN_BODY,
     studios: [{ ...SIGNED_IN_BODY.studios[0], roles: [role] }],
@@ -323,36 +325,18 @@ describe('revision 0025 — the emergency-contact step is MOUNTED, and only for 
       }),
     )
 
-  it('asks an assistant coach who has nobody on file', async () => {
+  it('lets an assistant coach with nobody on file straight through to the app', async () => {
     stubFor('assistant_coach', { emergency_contact_name: null })
     render(<App />)
-    await waitFor(() =>
-      expect(screen.getByTestId('emergency-contact-step')).toBeInTheDocument(),
-    )
+    await waitFor(() => expect(screen.getByTestId('tab-bar')).toBeInTheDocument())
+    expect(screen.queryByTestId('emergency-contact-step')).not.toBeInTheDocument()
   })
 
-  it('never asks a lead coach', async () => {
+  it('asks a lead coach nothing either, as it never did', async () => {
     stubFor('lead_coach', { emergency_contact_name: null })
     render(<App />)
     await waitFor(() => expect(screen.getByTestId('tab-bar')).toBeInTheDocument())
     expect(screen.queryByTestId('emergency-contact-step')).not.toBeInTheDocument()
-  })
-
-  it('stops asking an assistant who already answered', async () => {
-    stubFor('assistant_coach', { emergency_contact_name: 'רונית גולן' })
-    render(<App />)
-    await waitFor(() => expect(screen.getByTestId('tab-bar')).toBeInTheDocument())
-    expect(screen.queryByTestId('emergency-contact-step')).not.toBeInTheDocument()
-  })
-
-  it('lets the app through once postponed', async () => {
-    stubFor('assistant_coach', { emergency_contact_name: null })
-    render(<App />)
-    await screen.findByTestId('emergency-contact-step')
-
-    await userEvent.click(screen.getByTestId('emergency-skip'))
-
-    await waitFor(() => expect(screen.getByTestId('tab-bar')).toBeInTheDocument())
   })
 })
 

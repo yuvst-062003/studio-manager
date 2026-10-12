@@ -1464,6 +1464,8 @@ export const people: Bundle = {
   'emergency.saving': 'שומר…',
   'emergency.later': 'אמלא בהמשך',
   'emergency.saveFailed': 'השמירה נכשלה. נסו שוב.',
+  'emergency.saved': 'נשמר',
+  'emergency.settingTitle': 'איש קשר לשעת חירום',
 
   // -- the public trial booking page (Door A, `/trial`) ---------------------------
   //
