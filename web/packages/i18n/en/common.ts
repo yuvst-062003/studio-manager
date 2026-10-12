@@ -606,6 +606,8 @@ export const common: Bundle = {
   'account.group.system': 'System and preferences',
   'account.preferences': 'Language, theme and sign out',
   'account.preferencesSubtitle': 'How the app looks on this device',
+  'account.group.app': 'App and display',
+  'account.group.safety': 'Safety',
   'account.group.legal': 'Policies and terms',
   // The shared stepper (§3.21, §3.19, §3.17).
   'stepper.completion': 'Wizard progress',

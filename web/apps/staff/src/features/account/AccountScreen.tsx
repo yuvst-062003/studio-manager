@@ -54,7 +54,8 @@ import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import {
   AccessibilityMenu,
-  AccountDrawerFooter,
+  LanguagePicker,
+  ThemeControl,
   PRIVACY_HASH,
   StudioSwitcher,
   TERMS_HASH,
@@ -407,32 +408,26 @@ export function AccountScreen({
         </div>
       ) : null}
 
-      {/* **One group, every door (owner, 2026-10-13).** The screen used to carry four
-          headed sections — club management, emergency, notifications, system — each holding
-          a fully expanded panel, so the settings nobody was looking for were always open and
-          always in the way. Everything the owner named now lives under ניהול המועדון as a
-          row, and what is behind a row opens as a sheet when it is asked for.
+      {/* **Grouped under headings, not one long list** (owner, 2026-10-13, after seeing the
+          single card this screen briefly became). Everything is still a row that opens a
+          sheet; what changed is that related rows sit under a heading that names what they
+          have in common, so the eye lands on a group of two or three rather than scanning
+          eight unrelated lines.
 
-          The heading is no longer manager-gated, because the rows under it are not all
-          management: a coach reaches notifications, the calendar feed and their own
-          preferences here. The individual management rows keep their own `viewerIsManager`
-          guard, which is what the old rule — "never a heading with nothing under it" —
-          actually protects, since every role has something reachable here now. */}
-      <section aria-labelledby="account-group-club" className="flex flex-col gap-2">
-        <GroupHeading id="account-group-club">{t(locale, 'common.account.group.club')}</GroupHeading>
-        <RowCard>
-          {viewerIsManager ? (
+          Each group is withheld whole when it has nothing in it — the rule this screen has
+          always followed: a coach must never meet a heading with nothing reachable under it. */}
+      {viewerIsManager ? (
+        <section aria-labelledby="account-group-club" className="flex flex-col gap-2">
+          <GroupHeading id="account-group-club">{t(locale, 'common.account.group.club')}</GroupHeading>
+          <RowCard>
             <Row
               href="#/cash"
               icon={Wallet}
               hue="emerald"
               title={t(locale, 'billing.cash.manager.title')}
             />
-          ) : null}
-          {/* One tap, one clipboard write, one "הועתק" — see `JoinLinkCopyRow` for what
-              screen this replaced and why revoking did not come with it. */}
-          {viewerIsManager ? <JoinLinkCopyRow locale={locale} /> : null}
-          {viewerIsManager ? (
+            {/* One tap, one clipboard write, one "הועתק" — see `JoinLinkCopyRow`. */}
+            <JoinLinkCopyRow locale={locale} />
             <Row
               href="#/privacy"
               icon={ShieldAlert}
@@ -440,13 +435,20 @@ export function AccountScreen({
               title={t(locale, 'reports.privacy.requests.operatorTitle')}
               subtitle={t(locale, 'reports.privacy.requests.operatorSubtitle')}
             />
-          ) : null}
+          </RowCard>
+        </section>
+      ) : null}
 
+      <section aria-labelledby="account-group-notifications" className="flex flex-col gap-2">
+        <GroupHeading id="account-group-notifications">
+          {t(locale, 'common.account.group.notifications')}
+        </GroupHeading>
+        <RowCard>
           <SheetRow
             icon={Bell}
             hue="amber"
             testId="notifications-open"
-            title={t(locale, 'common.account.group.notifications')}
+            title={t(locale, 'comms.preferences.title')}
             subtitle={t(locale, 'comms.preferences.subtitle')}
             onOpen={() => setSheet('notifications')}
           />
@@ -458,9 +460,15 @@ export function AccountScreen({
             subtitle={t(locale, 'comms.calendar.coachSubtitle')}
             onOpen={() => setSheet('calendar')}
           />
-          {/* §6.5's walkthrough. The ONLY door to it besides `InstallBanner`'s nudge, which
+        </RowCard>
+      </section>
+
+      <section aria-labelledby="account-group-app" className="flex flex-col gap-2">
+        <GroupHeading id="account-group-app">{t(locale, 'common.account.group.app')}</GroupHeading>
+        <RowCard>
+          {/* §6.5's walkthrough. The only door to it besides `InstallBanner`'s nudge, which
               is why it is here rather than nowhere: a coach who dismissed the banner once
-              had no way back to it (owner, 2026-10-13). */}
+              had no way back to it. */}
           {onOpenInstall ? (
             <SheetRow
               icon={Smartphone}
@@ -479,19 +487,30 @@ export function AccountScreen({
             subtitle={t(locale, 'common.account.preferencesSubtitle')}
             onOpen={() => setSheet('preferences')}
           />
-          {/* 0025, assistant coaches only — see `EmergencyContactSetting.tsx` for why it is
-              that role and why it is no longer a gate at launch. */}
-          {shouldOfferEmergencyContact(roles) ? (
+        </RowCard>
+      </section>
+
+      {/* 0025, assistant coaches only — see `EmergencyContactSetting.tsx` for why it is that
+          role and why it is no longer a gate at launch. Its own heading rather than a row
+          among the app's preferences: it is the one thing on this screen that is about
+          somebody being hurt. */}
+      {shouldOfferEmergencyContact(roles) ? (
+        <section aria-labelledby="account-group-safety" className="flex flex-col gap-2">
+          <GroupHeading id="account-group-safety">
+            {t(locale, 'common.account.group.safety')}
+          </GroupHeading>
+          <RowCard>
             <SheetRow
               icon={LifeBuoy}
               hue="rose"
               testId="emergency-open"
               title={t(locale, 'people.emergency.settingTitle')}
+              subtitle={t(locale, 'people.emergency.settingSubtitle')}
               onOpen={() => setSheet('emergency')}
             />
-          ) : null}
-        </RowCard>
-      </section>
+          </RowCard>
+        </section>
+      ) : null}
 
       {sheet === 'notifications' ? (
         <SettingsSheet
@@ -528,15 +547,27 @@ export function AccountScreen({
           title={t(locale, 'common.account.preferences')}
           onClose={() => setSheet(null)}
         >
-          {/* Language, theme, sign out — carried whole, never split up. `AccountDrawerFooter`
-              is shared with the parent app and its own header says so; it moves into this
-              sheet intact rather than being taken apart for one app's layout. */}
-          <AccountDrawerFooter
-            accountName={displayName}
-            locale={locale}
-            onChooseLocale={onChooseLocale}
-            onSignOut={onSignOut}
-          />
+          {/* Language and theme, WITHOUT sign out (owner, 2026-10-13): leaving the app is
+              not a display preference, and a destructive-ish action at the bottom of a
+              settings dialog is one a thumb finds by accident. It stands alone at the end
+              of the page instead. `AccountDrawerFooter` carried all three together and is
+              still what the parent app uses; this screen composes the two pieces it wants
+              from `@studio/ui` directly rather than hiding a third inside a sheet. */}
+          <div className="flex flex-col gap-4">
+            <LanguagePicker locale={locale} onChoose={onChooseLocale} />
+            <ThemeControl
+              legend={t(locale, 'common.theme.legend')}
+              labels={{
+                light: t(locale, 'common.theme.light'),
+                dark: t(locale, 'common.theme.dark'),
+                system: t(locale, 'common.theme.system'),
+              }}
+              stateLabels={{
+                light: t(locale, 'common.theme.state.light'),
+                dark: t(locale, 'common.theme.state.dark'),
+              }}
+            />
+          </div>
         </SettingsSheet>
       ) : null}
 
@@ -613,6 +644,27 @@ export function AccountScreen({
         onSwitch={onSwitchStudio}
         studios={studios}
       />
+
+      {/* **The last thing on the page** (owner, 2026-10-13). It used to ride inside the
+          language/theme sheet, where a thumb reaching for "dark" could find it; and before
+          that inside `AccountDrawerFooter`, which keeps the three together for the parent
+          app. Leaving is not a preference — it is the end of the screen, and it says the
+          name of whoever is leaving so nobody signs out of somebody else's session. */}
+      <section className="pt-2 pb-8 flex flex-col items-stretch gap-2">
+        {displayName ? (
+          <p className="text-[11px] text-[var(--text-muted)] text-center m-0" data-testid="account-name">
+            <bdi>{displayName}</bdi>
+          </p>
+        ) : null}
+        <button
+          type="button"
+          data-testid="account-sign-out"
+          onClick={onSignOut}
+          className="min-h-11 w-full rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] text-xs font-black text-[var(--danger)] active:scale-[0.99] transition-transform"
+        >
+          {t(locale, 'common.nav.signOut')}
+        </button>
+      </section>
 
     </div>
   )

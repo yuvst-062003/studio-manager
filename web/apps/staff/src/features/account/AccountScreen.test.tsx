@@ -21,7 +21,9 @@ import { makeStaffCommsClient } from '../comms/staffCommsClient'
  *  calendar feed) answers an empty list — none of them are what this file is testing. */
 const fetcher = vi.fn(async () => new Response(JSON.stringify({ items: [] }), { status: 200 }))
 
-function renderScreen(over: { roles?: string[]; viewerIsManager?: boolean } = {}) {
+function renderScreen(
+  over: { roles?: string[]; viewerIsManager?: boolean; onSignOut?: () => void } = {},
+) {
   render(
     // `AccountDrawerFooter`'s theme control reads `useTheme()`.
     <ThemeProvider>
@@ -36,7 +38,7 @@ function renderScreen(over: { roles?: string[]; viewerIsManager?: boolean } = {}
         activeStudioId={null}
         onSwitchStudio={vi.fn()}
         onChooseLocale={vi.fn()}
-        onSignOut={vi.fn()}
+        onSignOut={over.onSignOut ?? vi.fn()}
       />
     </ThemeProvider>,
   )
@@ -115,5 +117,53 @@ describe('the settings panels open as sheets, not as a column of open panels', (
   it('shows a manager the club rows, and a coach none of them', () => {
     renderScreen({ viewerIsManager: true })
     expect(screen.getByText(t('he', 'billing.cash.manager.title'))).toBeInTheDocument()
+  })
+})
+
+// Owner, 2026-10-13, looking at the screen this became: "headings for things that belong
+// together, not one long row" — and sign out at the END of the page, not inside the
+// language/theme sheet where a thumb reaching for "dark" could find it.
+describe('the shape of the settings screen', () => {
+  it('groups the rows under headings rather than one list', () => {
+    renderScreen({ viewerIsManager: true, roles: ['owner', 'assistant_coach'] })
+    const headings = [...document.querySelectorAll('h2, h3')].map((n) => n.textContent?.trim())
+    expect(headings).toEqual(
+      expect.arrayContaining([
+        t('he', 'common.account.group.club'),
+        t('he', 'common.account.group.notifications'),
+        t('he', 'common.account.group.app'),
+        t('he', 'common.account.group.safety'),
+        t('he', 'common.account.group.legal'),
+      ]),
+    )
+  })
+
+  it('withholds a heading whose rows a coach cannot reach', () => {
+    renderScreen()
+    const headings = [...document.querySelectorAll('h2, h3')].map((n) => n.textContent?.trim())
+    expect(headings).not.toContain(t('he', 'common.account.group.club'))
+    // ...and the safety one, which only an assistant coach is offered.
+    expect(headings).not.toContain(t('he', 'common.account.group.safety'))
+  })
+
+  it('signs out from the end of the page, not from inside a sheet', async () => {
+    const onSignOut = vi.fn()
+    renderScreen({ onSignOut })
+
+    const button = screen.getByTestId('account-sign-out')
+    expect(button).toHaveTextContent(t('he', 'common.nav.signOut'))
+    await userEvent.click(button)
+    expect(onSignOut).toHaveBeenCalled()
+  })
+
+  it('keeps sign out OUT of the language and theme sheet', async () => {
+    renderScreen()
+    await userEvent.click(screen.getByTestId('preferences-open'))
+    const sheet = await screen.findByTestId('preferences-sheet')
+
+    expect(sheet.textContent).not.toContain(t('he', 'common.nav.signOut'))
+    // The two things it does carry.
+    expect(sheet.textContent).toContain(t('he', 'common.language.title'))
+    expect(sheet.textContent).toContain(t('he', 'common.theme.legend'))
   })
 })

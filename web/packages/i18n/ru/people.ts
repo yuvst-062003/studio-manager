@@ -1304,6 +1304,7 @@ export const people: Bundle = {
   'emergency.saveFailed': 'Не удалось сохранить. Попробуйте снова.',
   'emergency.saved': 'Сохранено',
   'emergency.settingTitle': 'Экстренный контакт',
+  'emergency.settingSubtitle': 'Кому звонить, если с вами что-то случится на занятии',
 
   // -- the public trial booking page (Door A, `/trial`). Counterpart of he/people.ts's
   // bookTrial block; `{n}` `{name}` `{age}` `{date}` are replaced at the call site.
