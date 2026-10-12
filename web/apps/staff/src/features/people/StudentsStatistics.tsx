@@ -70,6 +70,27 @@ export function averageAttendance(students: StudentSummary[]): AttendanceAverage
   return { average: Math.round(sum / marked.length), markedCount: marked.length }
 }
 
+/** How much of the list must carry attendance before an average means anything.
+ *
+ *  A migrated club is the case this exists for: Gladiator's 72 children arrived from the
+ *  office's spreadsheet with one of them carrying any history, and the card said
+ *  "ממוצע נוכחות 100%" — true of that one child, and read by everyone as the club's. The
+ *  number is not wrong, it is unrepresentative, and a caption naming the denominator does
+ *  not undo what the big figure says at a glance. */
+export const MIN_MARKED_SHARE = 0.25
+
+/** Whether an average is worth showing at all, given how many students it rests on.
+ *
+ *  A small group where everybody is marked passes: three of three is the whole truth. A
+ *  club where one of seventy-two is marked does not. */
+export function hasEnoughAttendanceData(
+  { average, markedCount }: AttendanceAverage,
+  listed: number,
+): boolean {
+  if (average === null || listed === 0) return false
+  return markedCount / listed >= MIN_MARKED_SHARE
+}
+
 export type GroupAttendanceBar = {
   key: string
   /** `null` marks the leading "כל המועדון" bar — the current-scope average, not a group. */
@@ -91,7 +112,9 @@ export function attendanceBars(
 ): GroupAttendanceBar[] {
   const bars: GroupAttendanceBar[] = []
   const club = averageAttendance(students)
-  if (club.average !== null) {
+  // Same bar as before, now subject to the share rule: a bar drawn from one marked child
+  // in seventy-two is a picture of nothing, and a chart is read even faster than a figure.
+  if (club.average !== null && hasEnoughAttendanceData(club, students.length)) {
     bars.push({ key: 'all', groupId: null, label: null, value: club.average, markedCount: club.markedCount })
   }
 
@@ -104,9 +127,16 @@ export function attendanceBars(
     }
   }
   for (const group of groups) {
-    const { average, markedCount } = averageAttendance(byName.get(group.name) ?? [])
-    if (average === null) continue
-    bars.push({ key: group.id, groupId: group.id, label: group.name, value: average, markedCount })
+    const listed = byName.get(group.name) ?? []
+    const stats = averageAttendance(listed)
+    if (!hasEnoughAttendanceData(stats, listed.length)) continue
+    bars.push({
+      key: group.id,
+      groupId: group.id,
+      label: group.name,
+      value: stats.average as number,
+      markedCount: stats.markedCount,
+    })
   }
   return bars
 }
@@ -169,6 +199,9 @@ export function StudentsStatistics({
   const [collapsed, setCollapsed] = useState(readCollapsed)
 
   const club = averageAttendance(students)
+  // Guards the figure AND its caption: below the share, the card says there is not enough
+  // yet rather than publishing an average that stands for one child in seventy-two.
+  const enoughData = hasEnoughAttendanceData(club, students.length)
   const bars = attendanceBars(students, groups)
   const attention = studentsNeedingAttention(students, ATTENTION_THRESHOLD)
 
@@ -232,10 +265,18 @@ export function StudentsStatistics({
               </span>
               <div className="flex items-baseline gap-1.5 mt-0.5">
                 <span className="text-xl font-black font-mono text-[var(--fg)]" data-testid="stats-club-average">
-                  {club.average === null ? '—' : `${club.average}%`}
+                  {enoughData ? `${club.average}%` : '—'}
                 </span>
-                <span className="text-[11px] font-bold text-[var(--text-muted)] font-mono">
-                  {t(locale, 'people.stats.clubAverageOf').replace('{{count}}', String(club.markedCount))}
+                <span
+                  className="text-[11px] font-bold text-[var(--text-muted)] font-mono"
+                  data-testid="stats-club-average-note"
+                >
+                  {enoughData
+                    ? t(locale, 'people.stats.clubAverageOf').replace(
+                        '{{count}}',
+                        String(club.markedCount),
+                      )
+                    : t(locale, 'people.stats.tooFewMarked')}
                 </span>
               </div>
             </div>

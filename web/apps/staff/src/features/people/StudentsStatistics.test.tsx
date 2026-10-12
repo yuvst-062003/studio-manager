@@ -10,6 +10,7 @@ import {
   StudentsStatistics,
   attendanceBars,
   averageAttendance,
+  hasEnoughAttendanceData,
   studentsNeedingAttention,
 } from './StudentsStatistics'
 import type { GroupOut, StudentSummary } from './peopleClient'
@@ -71,6 +72,72 @@ describe('averageAttendance', () => {
       summary({ id: 's3', attendance_percent: 99 }),
     ])
     expect(result.average).toBe(99) // 99.33.. rounds down, not up
+  })
+})
+
+describe('the average while a club has barely any attendance history', () => {
+  // Gladiator, 2026-10-12: 72 children loaded from the club's roster, exactly one of them
+  // carrying attendance from before. The card read "ממוצע נוכחות 100%" — true of that one
+  // child, and read by everyone as the club's attendance, next to "69 זקוקים לתשומת לב".
+  const club = (markedCount: number, total: number) =>
+    Array.from({ length: total }, (_, index) =>
+      summary({
+        id: `s${index}`,
+        attendance_percent: index < markedCount ? 100 : null,
+      }),
+    )
+
+  it('reports nothing while too small a share of the listed students is marked', () => {
+    expect(hasEnoughAttendanceData(averageAttendance(club(1, 72)), 72)).toBe(false)
+  })
+
+  it('reports once a quarter of them are', () => {
+    expect(hasEnoughAttendanceData(averageAttendance(club(18, 72)), 72)).toBe(true)
+  })
+
+  it('reports for a small group where everybody is marked', () => {
+    expect(hasEnoughAttendanceData(averageAttendance(club(3, 3)), 3)).toBe(true)
+  })
+
+  it('draws no percentage in the card, and says why', () => {
+    render(
+      <StudentsStatistics
+        locale="he"
+        students={club(1, 72)}
+        groups={[]}
+        selectedGroupId=""
+        onSelectGroup={() => {}}
+      />,
+    )
+    expect(screen.getByTestId('stats-club-average')).toHaveTextContent('—')
+    expect(screen.getByTestId('stats-club-average-note')).toHaveTextContent(
+      t('he', 'people.stats.tooFewMarked'),
+    )
+  })
+
+  it('still draws the percentage once there is enough', () => {
+    render(
+      <StudentsStatistics
+        locale="he"
+        students={club(18, 72)}
+        groups={[]}
+        selectedGroupId=""
+        onSelectGroup={() => {}}
+      />,
+    )
+    expect(screen.getByTestId('stats-club-average')).toHaveTextContent('100%')
+  })
+
+  it('leaves out a group bar that rests on too few marked students', () => {
+    const students = Array.from({ length: 12 }, (_, index) =>
+      summary({
+        id: `g${index}`,
+        group_names: ['קבוצה 2'],
+        attendance_percent: index === 0 ? 100 : null,
+      }),
+    )
+    const bars = attendanceBars(students, [{ id: 'g2', name: 'קבוצה 2' } as GroupOut])
+    expect(bars.map((bar) => bar.label)).not.toContain('קבוצה 2')
   })
 })
 

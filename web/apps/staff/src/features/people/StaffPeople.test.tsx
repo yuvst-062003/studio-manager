@@ -11,6 +11,7 @@ import { t } from '@studio/i18n'
 import { setForcedMode } from '@studio/core'
 import type { Actor } from '@studio/core'
 import { StudentsSearch, chipToneFor } from './StudentsSearch'
+import type { GroupOut } from './peopleClient'
 import { StaffStudentCard } from './StaffStudentCard'
 import { TrialInClass } from './TrialInClass'
 import { WeekdayPicker, attendsWeekdaysFor } from './WeekdayPicker'
@@ -112,6 +113,37 @@ describe('StudentsSearch — 9h', () => {
     render(<StudentsSearch locale="he" client={client} />)
     await user.type(screen.getByLabelText(t('he', 'people.student.search')), 'נועה')
     await waitFor(() => expect(client.search).toHaveBeenCalled())
+  })
+
+  it('names the strip קבוצות, and orders the groups the club counts them in', async () => {
+    // Owner, 2026-10-12: the all-tab read "הכיתות שלי · 10" — the club calls them groups,
+    // and the strip arrived in the API's order, so קבוצה 5 could sit before קבוצה 2.
+    const client = makeClient({
+      groups: vi.fn(() =>
+        Promise.resolve({
+          items: [
+            { id: 'g5', name: 'קבוצה 5' },
+            { id: 'g10', name: 'קבוצה 10' },
+            { id: 'g2', name: 'קבוצה 2' },
+            { id: 'gn', name: 'נבחרת' },
+            { id: 'g1', name: 'קבוצה 1' },
+          ].map((group) => ({ ...group, is_active: true }) as unknown as GroupOut),
+        }),
+      ),
+    } as Partial<StaffPeopleClient>)
+    render(<StudentsSearch locale="he" client={client} />)
+
+    const all = await screen.findByTestId('class-tab-all')
+    expect(all).toHaveTextContent(t('he', 'people.tabs.allGroups'))
+
+    await screen.findByTestId('class-tab-g1')
+    const labels = [...document.querySelectorAll('[data-testid^="class-tab-g"]')].map(
+      (node) => node.textContent?.trim(),
+    )
+    // Alphabetical by name, and NUMERIC within it: "קבוצה 10" comes after "קבוצה 2",
+    // never between 1 and 2, which is the whole point of the `numeric` collation. A named
+    // group sorts by its own letter — נבחרת before קבוצה — rather than being special-cased.
+    expect(labels).toEqual(['נבחרת', 'קבוצה 1', 'קבוצה 2', 'קבוצה 5', 'קבוצה 10'])
   })
 
   it('interpolates the health banner for the icon label too, not only the visible text', async () => {
@@ -498,11 +530,12 @@ describe('StudentsSearch — S8', () => {
 
   it('renders a tab per ACTIVE class and re-asks the server when one is chosen', async () => {
     const client = makeClient({ groups: vi.fn(() => Promise.resolve({ items: GROUPS })) })
-    render(<StudentsSearch locale="he" client={client} viewerIsCoach />)
-    // The retired group is no tab; the all-tab carries the count of live ones.
+    render(<StudentsSearch locale="he" client={client} />)
+    // The retired group is no tab. The all-tab is named for what the chips beside it are
+    // — "קבוצות" — and carries no count since 2026-10-12.
     expect(await screen.findByTestId('class-tab-g1')).toBeInTheDocument()
     expect(screen.queryByTestId('class-tab-g3')).toBeNull()
-    expect(screen.getByTestId('class-tab-all')).toHaveTextContent('הכיתות שלי · 2')
+    expect(screen.getByTestId('class-tab-all')).toHaveTextContent(t('he', 'people.tabs.allGroups'))
 
     await userEvent.click(screen.getByTestId('class-tab-g2'))
     // The tab filter is the SERVER's — §3.2's coach scoping lives in the query.

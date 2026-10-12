@@ -115,15 +115,15 @@ export function StudentsSearch({
   client,
   onOpen,
   now,
-  viewerIsCoach = false,
 }: {
   locale: Locale
   client: StaffPeopleClient
   onOpen?: (studentId: string) => void
   /** The app clock, for tenure. Optional so the meta line degrades rather than lying. */
   now?: string
-  /** Labels the all-tab `הכיתות שלי` for a coach, whose server scope IS their classes. */
-  viewerIsCoach?: boolean
+  // `viewerIsCoach` was here to label the all-tab `הכיתות שלי` against `כל הכיתות`. The
+  // strip is called קבוצות for everyone since 2026-10-12, and a prop that no longer
+  // changes anything is a prop a reader has to rule out.
 }) {
   const [query, setQuery] = useState('')
   const [groupTab, setGroupTab] = useState('')
@@ -141,7 +141,17 @@ export function StudentsSearch({
     let live = true
     client
       .groups()
-      .then((body) => live && setGroups(body.items.filter((group) => group.is_active)))
+      .then(
+        (body) =>
+          live &&
+          setGroups(
+            body.items
+              .filter((group) => group.is_active)
+              // The club's own counting order, not the API's: `numeric` is what puts
+              // קבוצה 10 after קבוצה 2 instead of between 1 and 2 (owner, 2026-10-12).
+              .sort((a, b) => a.name.localeCompare(b.name, 'he', { numeric: true })),
+          ),
+      )
       .catch(() => live && setGroups([]))
     return () => {
       live = false
@@ -256,10 +266,10 @@ export function StudentsSearch({
                 : 'bg-[var(--surface-raised)] text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--surface)]'
             }`}
           >
-            {t(locale, viewerIsCoach ? 'people.tabs.myClasses' : 'people.tabs.allClasses').replace(
-              '{{count}}',
-              String(groups.length),
-            )}
+            {/* "קבוצות", not "הכיתות שלי · 10" (owner, 2026-10-12): the club says groups,
+                and the strip's own chips are the groups — the count belonged to a label
+                that was naming the wrong thing. */}
+            {t(locale, 'people.tabs.allGroups')}
           </button>
           {groups.map((group) => (
             <button
