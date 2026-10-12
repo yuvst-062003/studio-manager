@@ -296,7 +296,6 @@ export function StudentsSearch({
           students={students}
           groups={groups}
           selectedGroupId={groupTab}
-          onSelectGroup={setGroupTab}
         />
       ) : null}
 

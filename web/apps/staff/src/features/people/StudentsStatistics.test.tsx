@@ -3,7 +3,7 @@
 // numbers: the owner wants the section, built from the roster's real current snapshot.
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { t } from '@studio/i18n'
 import {
   ATTENTION_THRESHOLD,
@@ -106,7 +106,6 @@ describe('the average while a club has barely any attendance history', () => {
         students={club(1, 72)}
         groups={[]}
         selectedGroupId=""
-        onSelectGroup={() => {}}
       />,
     )
     expect(screen.getByTestId('stats-club-average')).toHaveTextContent('—')
@@ -122,7 +121,6 @@ describe('the average while a club has barely any attendance history', () => {
         students={club(18, 72)}
         groups={[]}
         selectedGroupId=""
-        onSelectGroup={() => {}}
       />,
     )
     expect(screen.getByTestId('stats-club-average')).toHaveTextContent('100%')
@@ -138,6 +136,26 @@ describe('the average while a club has barely any attendance history', () => {
     )
     const bars = attendanceBars(students, [{ id: 'g2', name: 'קבוצה 2' } as GroupOut])
     expect(bars.map((bar) => bar.label)).not.toContain('קבוצה 2')
+  })
+})
+
+describe('one group filter per screen', () => {
+  // Owner, 2026-10-12: "לא ברור הפילטור" — the screen drew the same filter twice. This card's
+  // chips and the tab strip above it were always the SAME state, so two rows of chips asked
+  // one question in two places. The strip above stays; this card follows it.
+  it('draws no chip strip of its own', () => {
+    render(
+      <StudentsStatistics
+        locale="he"
+        students={[summary({ id: 's1', attendance_percent: 80 })]}
+        groups={GROUPS}
+        selectedGroupId=""
+      />,
+    )
+    expect(screen.queryByTestId('stats-chip-all')).toBeNull()
+    expect(screen.queryByTestId('stats-chip-g1')).toBeNull()
+    // The chart itself is untouched — it is the card's whole point.
+    expect(screen.getByTestId('stats-bar-chart')).toBeInTheDocument()
   })
 })
 
@@ -230,7 +248,6 @@ describe('StudentsStatistics', () => {
         students={STUDENTS}
         groups={GROUPS}
         selectedGroupId=""
-        onSelectGroup={() => {}}
       />,
     )
     expect(screen.getByTestId('stats-club-average')).toHaveTextContent('70%')
@@ -244,7 +261,6 @@ describe('StudentsStatistics', () => {
         students={STUDENTS}
         groups={GROUPS}
         selectedGroupId=""
-        onSelectGroup={() => {}}
       />,
     )
     expect(screen.getByTestId('stats-bar-value-g1')).toHaveTextContent('80%')
@@ -264,7 +280,6 @@ describe('StudentsStatistics', () => {
         students={STUDENTS}
         groups={GROUPS}
         selectedGroupId=""
-        onSelectGroup={() => {}}
       />,
     )
     // s2 is 60% (< 80 threshold) AND missing health — one student, union of one.
@@ -284,41 +299,24 @@ describe('StudentsStatistics', () => {
         students={STUDENTS}
         groups={GROUPS}
         selectedGroupId=""
-        onSelectGroup={() => {}}
       />,
     )
     expect(screen.getByTestId('stats-footer')).toHaveTextContent(t('he', 'people.stats.footer'))
   })
 
-  it("the chips ARE the list's own group filter — clicking one calls the shared setter", async () => {
-    const user = userEvent.setup()
-    const onSelectGroup = vi.fn()
-    render(
-      <StudentsStatistics
-        locale="he"
-        students={STUDENTS}
-        groups={GROUPS}
-        selectedGroupId=""
-        onSelectGroup={onSelectGroup}
-      />,
-    )
-    expect(screen.getByTestId('stats-chip-all')).toHaveAttribute('aria-pressed', 'true')
-    await user.click(screen.getByTestId('stats-chip-g2'))
-    expect(onSelectGroup).toHaveBeenCalledWith('g2')
-  })
-
-  it('reflects the externally-selected group as pressed and highlighted', () => {
+  it('marks the bar of the group the page is filtered to', () => {
+    // What `selectedGroupId` is still for, now that the chips are gone: the card follows
+    // the one filter above it rather than offering a second one.
     render(
       <StudentsStatistics
         locale="he"
         students={STUDENTS}
         groups={GROUPS}
         selectedGroupId="g2"
-        onSelectGroup={() => {}}
       />,
     )
-    expect(screen.getByTestId('stats-chip-g2')).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByTestId('stats-chip-all')).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('stats-bar-value-g2').className).toContain('font-black')
+    expect(screen.getByTestId('stats-bar-value-g1').className).not.toContain('font-black')
   })
 
   it('collapses, and remembers it across a remount (reload)', async () => {
@@ -329,7 +327,6 @@ describe('StudentsStatistics', () => {
         students={STUDENTS}
         groups={GROUPS}
         selectedGroupId=""
-        onSelectGroup={() => {}}
       />,
     )
     expect(screen.getByTestId('stats-bar-chart')).toBeInTheDocument()
@@ -343,7 +340,6 @@ describe('StudentsStatistics', () => {
         students={STUDENTS}
         groups={GROUPS}
         selectedGroupId=""
-        onSelectGroup={() => {}}
       />,
     )
     expect(screen.queryByTestId('stats-bar-chart')).toBeNull()
@@ -357,7 +353,6 @@ describe('StudentsStatistics', () => {
         students={STUDENTS}
         groups={GROUPS}
         selectedGroupId=""
-        onSelectGroup={() => {}}
       />,
     )
     expect(document.body.textContent ?? '').not.toContain('₪')
@@ -370,7 +365,6 @@ describe('StudentsStatistics', () => {
         students={STUDENTS}
         groups={GROUPS}
         selectedGroupId=""
-        onSelectGroup={() => {}}
       />,
     )
     noPhysicalCss(container)
@@ -383,7 +377,6 @@ describe('StudentsStatistics', () => {
         students={[summary({ attendance_percent: null, health_status: 'missing' })]}
         groups={GROUPS}
         selectedGroupId=""
-        onSelectGroup={() => {}}
       />,
     )
     expect(screen.getByTestId('stats-no-data')).toBeInTheDocument()

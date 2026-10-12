@@ -13,11 +13,11 @@
 // fetch — every number below is computed from the exact `students` array `StudentsSearch`
 // already holds, whatever the current search/tab scope narrowed it to.
 //
-// **The chips are not a mirrored copy.** `selectedGroupId`/`onSelectGroup` are
-// `StudentsSearch`'s own `groupTab`/`setGroupTab`, passed straight through — the same piece
-// of state, not a `useEffect` kept in sync with it the way the prototype's own
-// `selectedGroupFilter` prop was. Picking a chip here re-queries the roster exactly as
-// picking the class tab above it does, so the two rows of chips cannot drift apart.
+// **This card has no filter of its own (owner, 2026-10-12).** It used to draw a second row
+// of chips bound to `StudentsSearch`'s `groupTab` — the very same state as the strip above
+// it, so the screen asked "which group?" twice in two places and neither row explained what
+// it governed. The strip above is now the page's single filter: `selectedGroupId` arrives
+// here only to mark which bar is the current scope, and `students` is already narrowed to it.
 //
 // **The chart's text equivalent.** Every bar's percentage is real, visible text next to it
 // (`stats-bar-value-*`), not a number a hover or a tooltip alone reveals — a screen reader
@@ -169,32 +169,23 @@ export function studentsNeedingAttention(
   }
 }
 
-function chipClass(active: boolean): string {
-  return `shrink-0 min-h-11 px-3 py-1.5 rounded-full text-[11px] font-bold transition-transform active:scale-95 ${
-    active
-      ? 'bg-slate-900 text-white shadow-sm'
-      : 'bg-[var(--surface-raised)] text-[var(--text-secondary)] border border-[var(--border)] hover:bg-[var(--surface)]'
-  }`
-}
-
 export function StudentsStatistics({
   locale,
   students,
   groups,
   selectedGroupId,
-  onSelectGroup,
 }: {
   locale: Locale
   /** The SAME rows `StudentsSearch` just fetched — whatever the current search/tab scope
    *  is. No second fetch: a monthly history would need one request per child (see the file
    *  header), and this section draws only what is already on the wire. */
   students: StudentSummary[]
-  /** The SAME active-group list the class tabs render, so a bar and a chip exist for
-   *  every class the coach can already see. */
+  /** The SAME active-group list the class tabs render, so a bar exists for every class
+   *  the coach can already see. */
   groups: GroupOut[]
-  /** `groupTab` from `StudentsSearch`, passed straight through — see the file header. */
+  /** `groupTab` from `StudentsSearch`, read-only here: it marks which bar is the current
+   *  scope. The filter itself is the strip above — see the file header. */
   selectedGroupId: string
-  onSelectGroup: (groupId: string) => void
 }) {
   const [collapsed, setCollapsed] = useState(readCollapsed)
 
@@ -300,34 +291,6 @@ export function StudentsStatistics({
               .replace('{{threshold}}', String(ATTENTION_THRESHOLD))
               .replace('{{missing}}', String(attention.missingHealth))}
           </p>
-
-          <div
-            role="group"
-            aria-label={t(locale, 'people.stats.chipsLabel')}
-            className="flex items-center gap-1.5 mb-2.5 overflow-x-auto no-scrollbar pb-1"
-          >
-            <button
-              type="button"
-              data-testid="stats-chip-all"
-              aria-pressed={selectedGroupId === ''}
-              onClick={() => onSelectGroup('')}
-              className={chipClass(selectedGroupId === '')}
-            >
-              {t(locale, 'people.stats.allGroups')}
-            </button>
-            {groups.map((group) => (
-              <button
-                key={group.id}
-                type="button"
-                data-testid={`stats-chip-${group.id}`}
-                aria-pressed={selectedGroupId === group.id}
-                onClick={() => onSelectGroup(group.id)}
-                className={chipClass(selectedGroupId === group.id)}
-              >
-                {group.name}
-              </button>
-            ))}
-          </div>
 
           {bars.length === 0 ? (
             <p className="text-xs text-[var(--text-muted)] text-center py-4" data-testid="stats-no-data">
