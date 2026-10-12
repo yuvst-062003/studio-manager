@@ -2,6 +2,10 @@ import type { Bundle } from '../types'
 
 /** Mirrors `he/attendance.ts`. `en` is `strict` in the parity check — a missing key fails. */
 export const attendance: Bundle = {
+  'summary.howWasIt': 'How was the lesson?',
+  'summary.somethingOdd': 'Anything unusual? (optional)',
+  'summary.somethingOddPlaceholder': 'An injury, behaviour, equipment — whatever the manager needs to know',
+  'summary.somethingOddAudience': 'Sent to the club managers immediately. Parents do not receive it — the manager calls them.',
   'addToSession.title': 'Add a student to this session',
   'addToSession.existing': 'From the club',
   'addToSession.trial': 'Trial lesson',

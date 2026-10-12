@@ -8,7 +8,7 @@ import type { OfflineStore, RosterRow as RosterRowData } from '@studio/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AttendanceStrip } from './AttendanceStrip'
 import { OfflinePrimingGate, useOfflinePriming } from './OfflinePriming'
-import { SessionSummary } from './SessionSummary'
+import { SessionSummarySheet } from './SessionSummarySheet'
 import { StudentCardScreen } from './StudentCardScreen'
 import type { StaffStudentCardProps } from './StudentCardScreen'
 import type { AttendanceRecord, StaffAttendanceClient } from './client'
@@ -52,64 +52,100 @@ afterEach(() => {
   clearSlot('student-card')
 })
 
-describe('artboard 9g — the session summary', () => {
-  const renderSummary = (roster: RosterRowData[]) =>
+describe('artboard 9g — the session summary, as a popup (owner, 2026-10-13)', () => {
+  // The screen it replaced carried three cards and ONE RADIO PER STUDENT for the injury
+  // report. The owner's redesign is two boxes: how the lesson was, and anything specific —
+  // no roster in the dialog at all. `SessionSummarySheet`'s own header carries the rest.
+  const renderSummary = (
+    roster: RosterRowData[],
+    over: { onReportSomething?: (description: string) => Promise<void> } = {},
+  ) =>
     render(
-      <SessionSummary
+      <SessionSummarySheet
         clock={() => NOW}
         locale="he"
         personId="person-1"
         roster={roster}
         sessionId="session-1"
+        onClose={() => {}}
+        onReportSomething={over.onReportSomething}
       />,
     )
 
-  it('renders three read-only tiles', () => {
+  it('is a dialog, not a screen', () => {
+    renderSummary([row()])
+    const sheet = screen.getByTestId('session-summary-sheet')
+    expect(sheet).toHaveAttribute('role', 'dialog')
+    expect(sheet).toHaveAttribute('aria-modal', 'true')
+  })
+
+  it('counts present and absent in one line rather than three tiles', () => {
     renderSummary([
       row({ student_id: 'a', status: 'present' }),
       row({ student_id: 'b', status: 'absent_unexcused' }),
       row({ student_id: 'c', status: 'absent_excused', has_absence_report: true }),
     ])
-    const counts = screen.getByTestId('summary-counts')
-    expect(counts.querySelector('[data-count="present"]')?.textContent).toContain('1')
-    expect(counts.querySelector('[data-count="absent"]')?.textContent).toContain('1')
-    expect(counts.querySelector('[data-count="pre-reported"]')?.textContent).toContain('1')
+    expect(screen.getByTestId('summary-counts')).toHaveTextContent('1')
+  })
+
+  it('names no student anywhere — that is the whole point of the redesign', () => {
+    renderSummary([row({ student_id: 'a', display_name: 'נועה לוי' })], {
+      onReportSomething: async () => {},
+    })
+    expect(screen.queryByText('נועה לוי')).not.toBeInTheDocument()
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument()
   })
 
   it('shows NO exam or belt affordance, which is deliberate', () => {
-    // `9g` finding 8 — the artboard's own title says "without an exam recommendation", and
-    // §5.9 makes eligibility a manager's calculation from rank and time in grade, not a
-    // coach's impression at the end of a lesson. Asserted so a later reader does not
-    // "complete" the screen by adding one.
+    // `9g` finding 8 — §5.9 makes eligibility a manager's calculation from rank and time in
+    // grade, not a coach's impression at the end of a lesson.
     renderSummary([row()])
     expect(screen.queryByText(/מבחן/)).not.toBeInTheDocument()
     expect(screen.queryByText(/חגורה/)).not.toBeInTheDocument()
   })
 
   it('states who can read a session note', () => {
-    // `9g` finding 2 — the note card is the only one of three on that screen that states no
-    // audience, on a screen where both its neighbours do. §5.13: notes are visible to the
-    // group's coaches and to managers, and NEVER to guardians.
+    // `9g` finding 2 — §5.13: notes are visible to the group's coaches and to managers, and
+    // NEVER to guardians.
     renderSummary([row()])
     expect(screen.getByTestId('summary-note-audience')).toHaveTextContent('הורים לא רואים אותה')
   })
 
-  it('queues a note rather than posting it', async () => {
-    // §10.2's table — session notes are "Writable, queued", the same path as a mark. A coach
-    // writing up a lesson in a basement is the ordinary case, not the edge one.
+  it('says the second box goes to the manager and not to the parents', () => {
+    renderSummary([row()], { onReportSomething: async () => {} })
+    expect(screen.getByTestId('summary-odd-audience')).toHaveTextContent('ההורים לא מקבלים')
+  })
+
+  it('queues the note rather than posting it', async () => {
+    // §10.2's table — session notes are "Writable, queued", the same path as a mark.
     renderSummary([row()])
-    await userEvent.type(screen.getByLabelText('הוספת סיכום'), 'עבדנו על הטלות')
-    await userEvent.click(screen.getByRole('button', { name: 'הוספת הערה' }))
+    await userEvent.type(screen.getByTestId('summary-note'), 'עבדנו על הטלות')
+    await userEvent.click(screen.getByTestId('summary-save'))
     await waitFor(async () => {
       const ops = await listPending(store)
       expect(ops.map((op) => op.kind)).toEqual(['note.session'])
     })
   })
 
-  it('queues nothing for an empty note', async () => {
+  it('queues nothing when both boxes are empty, and offers nothing to press', async () => {
     renderSummary([row()])
-    await userEvent.click(screen.getByRole('button', { name: 'הוספת הערה' }))
+    expect(screen.getByTestId('summary-save')).toBeDisabled()
     expect(await listPending(store)).toHaveLength(0)
+  })
+
+  it('sends the specific thing immediately, with no student id', async () => {
+    const onReportSomething = vi.fn(async () => {})
+    renderSummary([row()], { onReportSomething })
+
+    await userEvent.type(screen.getByTestId('summary-odd'), 'ילד החליק על מזרן רטוב')
+    await userEvent.click(screen.getByTestId('summary-save'))
+
+    await waitFor(() => expect(onReportSomething).toHaveBeenCalledWith('ילד החליק על מזרן רטוב'))
+  })
+
+  it('withholds the second box when the container cannot send it', () => {
+    renderSummary([row()])
+    expect(screen.queryByTestId('summary-odd')).not.toBeInTheDocument()
   })
 })
 
@@ -299,13 +335,19 @@ describe('§6.1 — offline priming blocks the first launch', () => {
   })
 })
 
-describe('9g — the injury report card (S2)', () => {
-  const renderWithInjury = (onReportInjury: (s: string, d: string) => Promise<void>) =>
+describe('9g — the specific-thing box, which replaced the injury card (S2)', () => {
+  // It used to be a card with one radio per student plus a description, and sending it told
+  // the manager AND that child's guardians. The owner cut the radios (2026-10-13): the box
+  // takes words alone, and without a child there is nobody but the managers to tell — the
+  // manager phones the family, which is what they did anyway. The three rules that survived
+  // the cut are the three below.
+  const renderWithOdd = (onReportSomething: (d: string) => Promise<void>) =>
     render(
-      <SessionSummary
+      <SessionSummarySheet
         clock={() => NOW}
         locale="he"
-        onReportInjury={onReportInjury}
+        onReportSomething={onReportSomething}
+        onClose={() => {}}
         personId="person-1"
         roster={[row({ student_id: 'a', status: 'present' })]}
         sessionId="session-1"
@@ -314,34 +356,33 @@ describe('9g — the injury report card (S2)', () => {
 
   it('is withheld entirely when no handler exists — never inert', () => {
     render(
-      <SessionSummary
+      <SessionSummarySheet
         clock={() => NOW}
         locale="he"
+        onClose={() => {}}
         personId="person-1"
         roster={[row({ student_id: 'a', status: 'present' })]}
         sessionId="session-1"
       />,
     )
-    expect(screen.queryByTestId('injury-send')).toBeNull()
+    expect(screen.queryByTestId('summary-odd')).toBeNull()
   })
 
-  it('sends the chosen child and the description, immediately', async () => {
-    const onReportInjury = vi.fn().mockResolvedValue(undefined)
-    renderWithInjury(onReportInjury)
-    await userEvent.click(screen.getByRole('radio'))
-    await userEvent.type(screen.getByLabelText('מה קרה?'), 'נחבל בכתף')
-    await userEvent.click(screen.getByTestId('injury-send'))
-    expect(onReportInjury).toHaveBeenCalledWith('a', 'נחבל בכתף')
-    expect(await screen.findByTestId('injury-sent')).toBeInTheDocument()
+  it('sends the description immediately, and names no child', async () => {
+    const onReportSomething = vi.fn().mockResolvedValue(undefined)
+    renderWithOdd(onReportSomething)
+    await userEvent.type(screen.getByTestId('summary-odd'), 'נחבל בכתף')
+    await userEvent.click(screen.getByTestId('summary-save'))
+    expect(onReportSomething).toHaveBeenCalledWith('נחבל בכתף')
+    expect(onReportSomething).toHaveBeenCalledTimes(1)
   })
 
   it('says try-again on failure rather than pretending it sent', async () => {
-    const onReportInjury = vi.fn().mockRejectedValue(new Error('500'))
-    renderWithInjury(onReportInjury)
-    await userEvent.click(screen.getByRole('radio'))
-    await userEvent.type(screen.getByLabelText('מה קרה?'), 'x')
-    await userEvent.click(screen.getByTestId('injury-send'))
-    expect(await screen.findByTestId('injury-failed')).toBeInTheDocument()
-    expect(screen.queryByTestId('injury-sent')).toBeNull()
+    const onReportSomething = vi.fn().mockRejectedValue(new Error('500'))
+    renderWithOdd(onReportSomething)
+    await userEvent.type(screen.getByTestId('summary-odd'), 'x')
+    await userEvent.click(screen.getByTestId('summary-save'))
+    expect(await screen.findByTestId('summary-odd-failed')).toBeInTheDocument()
+    expect(screen.queryByTestId('summary-odd-sent')).toBeNull()
   })
 })

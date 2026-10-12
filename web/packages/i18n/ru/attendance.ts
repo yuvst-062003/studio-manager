@@ -2,6 +2,10 @@ import type { Bundle } from '../types'
 
 /** Mirrors `he/attendance.ts`. `ru` is `report` in the parity check until §15 item 9 lands. */
 export const attendance: Bundle = {
+  'summary.howWasIt': 'Как прошло занятие?',
+  'summary.somethingOdd': 'Что-то необычное? (необязательно)',
+  'summary.somethingOddPlaceholder': 'Травма, поведение, инвентарь — всё, что нужно знать управляющему',
+  'summary.somethingOddAudience': 'Отправляется управляющим сразу. Родители этого не получают — управляющий им звонит.',
   'addToSession.title': 'Добавить ученика на это занятие',
   'addToSession.existing': 'Из клуба',
   'addToSession.trial': 'Пробное занятие',

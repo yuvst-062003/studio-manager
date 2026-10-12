@@ -53,7 +53,7 @@ export interface StaffAttendanceClient {
   studentAttendance(studentId: string, limit?: number): Promise<AttendanceRecord[]>
   /**
    * §6.2 — `POST /sessions/{id}/notes`. Immediate and online-only, never queued: like
-   * `SessionSummarySection`'s injury report, a note is not attendance and §10.3's offline
+   * `SessionSummarySheet`'s injury report, a note is not attendance and §10.3's offline
    * guarantee is scoped to marks. `kind: 'plan'` is the briefing (`owner`/`manager`/
    * `lead_coach` only, refused with a 403 otherwise); `kind: 'summary'` is the existing
    * after-the-lesson note, any staff role's. Mirrors the dashboard's own

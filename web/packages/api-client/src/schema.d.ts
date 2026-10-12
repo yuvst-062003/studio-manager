@@ -9165,11 +9165,8 @@ export interface components {
         InjuryReportIn: {
             /** Description */
             description: string;
-            /**
-             * Student Id
-             * Format: uuid
-             */
-            student_id: string;
+            /** Student Id */
+            student_id?: string | null;
         };
         /** InjuryReportOut */
         InjuryReportOut: {

@@ -106,3 +106,69 @@ def test_the_route_is_staff_only_and_round_trips(
     )
     assert response.status_code == 201
     assert response.json()["notified"] >= 1
+
+
+# -- a note about the lesson with no child named (owner, 2026-10-13) ---------------------
+#
+# `9g` made the coach pick the hurt child from a radio per student — sixteen of them on a
+# phone, in a grid, at the end of a lesson. The owner's redesign: "no need to box every
+# student, only a place to write how it was and specific things". Without a child there are
+# no guardians to tell, so the report goes to the MANAGERS and to nobody else, and the
+# manager calls the family — which is what they did anyway.
+
+
+def test_a_report_with_no_student_reaches_the_managers(
+    tenant_session, a_session, an_enrolled_student, as_lead_coach, as_manager
+):
+    notified = AttendanceService(tenant_session).report_injury(
+        a_session,
+        student_id=None,
+        description="היה חם, שני ילדים ישבו בצד",
+        actor_person_id=as_lead_coach.person_id,
+    )
+    tenant_session.commit()
+
+    assert notified >= 1
+    kinds = (
+        tenant_session.execute(select(Notification).where(Notification.kind == "health.injury"))
+        .scalars()
+        .all()
+    )
+    assert kinds, "the managers are told"
+    # The body is the coach's words alone: there is no child to name in front of it.
+    assert all(not row.body.startswith(" —") for row in kinds)
+
+
+def test_a_report_with_no_student_tells_no_guardian(
+    tenant_session, app_session, a_session, an_enrolled_student, as_lead_coach, as_guardian
+):
+    """The one rule this change must not break: a guardian is told about THEIR child, and a
+    note with no child in it is not about anybody's child."""
+    AttendanceService(tenant_session).report_injury(
+        a_session,
+        student_id=None,
+        description="ציוד חסר",
+        actor_person_id=as_lead_coach.person_id,
+    )
+    tenant_session.commit()
+
+    to_guardian = (
+        tenant_session.execute(
+            select(Notification).where(
+                Notification.kind == "health.injury",
+                Notification.person_id == as_guardian.person_id,
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert to_guardian == []
+
+
+def test_the_route_accepts_a_report_with_no_student(client, a_session, as_lead_coach):
+    response = client.post(
+        f"/api/v1/sessions/{a_session}/injury-reports",
+        json={"description": "השיעור עבר חלק"},
+        headers=as_lead_coach.headers,
+    )
+    assert response.status_code == 201

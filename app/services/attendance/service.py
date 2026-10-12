@@ -98,7 +98,7 @@ class AttendanceService:
         self,
         session_id: uuid.UUID,
         *,
-        student_id: uuid.UUID,
+        student_id: uuid.UUID | None,
         description: str,
         actor_person_id: uuid.UUID | None,
     ) -> int:
@@ -112,17 +112,26 @@ class AttendanceService:
         any log line.
         """
         session_row = require_session(self.session, session_id)
-        student = self.session.get(Student, student_id)
-        if student is None:
-            raise NotFoundError(f"no student {student_id}")
-        person = self.session.get(Person, student.person_id)
-        display_name = f"{person.first_name} {person.last_name}" if person else ""
 
-        guardian_ids = set(
-            self.session.execute(
-                select(Guardian.person_id).where(Guardian.student_id == student_id)
-            ).scalars()
-        )
+        # **No child named is a legitimate report** (owner, 2026-10-13). `9g` made the coach
+        # pick the hurt child from one radio per student — sixteen of them, on a phone, at
+        # the end of a lesson — and most of what a coach actually wants to pass on is about
+        # the lesson rather than about one child. Without a child there are no guardians to
+        # tell: it goes to the managers, and the manager phones the family, which is what
+        # they did anyway.
+        display_name = ""
+        guardian_ids: set[uuid.UUID] = set()
+        if student_id is not None:
+            student = self.session.get(Student, student_id)
+            if student is None:
+                raise NotFoundError(f"no student {student_id}")
+            person = self.session.get(Person, student.person_id)
+            display_name = f"{person.first_name} {person.last_name}" if person else ""
+            guardian_ids = set(
+                self.session.execute(
+                    select(Guardian.person_id).where(Guardian.student_id == student_id)
+                ).scalars()
+            )
         manager_ids = set(
             self.session.execute(
                 select(RoleAssignment.person_id).where(
@@ -143,9 +152,10 @@ class AttendanceService:
                 person_id=person_id,
                 kind="health.injury",
                 title="דיווח פציעה בשיעור",
-                body=f"{display_name} — {description}",
+                # No leading " — " when there is no name in front of it.
+                body=f"{display_name} — {description}" if display_name else description,
                 payload={
-                    "student_id": str(student_id),
+                    "student_id": str(student_id) if student_id else None,
                     "session_id": str(session_id),
                     "description": description,
                 },
@@ -154,8 +164,10 @@ class AttendanceService:
         AuditService.record(
             self.session,
             action="attendance.injury_reported",
-            entity_type="student",
-            entity_id=student_id,
+            # The session is the subject when no child is named — an audit row has to point
+            # at something that exists.
+            entity_type="student" if student_id else "session",
+            entity_id=student_id or session_id,
             studio_id=session_row.studio_id,
             actor_person_id=actor_person_id,
             # The session and the recipient count -- never the description. An audit

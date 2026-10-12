@@ -6357,13 +6357,19 @@
             "type": "string"
           },
           "student_id": {
-            "format": "uuid",
-            "title": "Student Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Id"
           }
         },
         "required": [
-          "student_id",
           "description"
         ],
         "title": "InjuryReportIn",

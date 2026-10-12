@@ -255,7 +255,11 @@ class InjuryReportIn(BaseModel):
     child's guardians. The description is the coach's own words FOR those readers; it is
     not a health-declaration content and is never logged (G7 still applies to logs)."""
 
-    student_id: uuid.UUID
+    #: Optional since 2026-10-13: a coach writing up something that happened in the lesson
+    #: rather than to one child. Named, the report reaches the manager AND that child's
+    #: guardians, as it always has; unnamed, it reaches the managers alone — there is
+    #: nobody else it could be about.
+    student_id: uuid.UUID | None = None
     description: str = Field(min_length=1, max_length=500)
 
 

@@ -16,6 +16,10 @@ import type { Bundle } from '../types'
  * connection on purpose**, and the app says so rather than queuing into the void.
  */
 export const attendance: Bundle = {
+  'summary.howWasIt': 'איך היה השיעור?',
+  'summary.somethingOdd': 'משהו חריג? (לא חובה)',
+  'summary.somethingOddPlaceholder': 'פציעה, התנהגות, ציוד — כל מה שהמנהל צריך לדעת',
+  'summary.somethingOddAudience': 'נשלח למנהלי המועדון מיד. ההורים לא מקבלים את זה — המנהל מתקשר אליהם.',
   'addToSession.title': 'הוספת חניך לשיעור',
   'addToSession.existing': 'חניך מהמועדון',
   'addToSession.trial': 'שיעור ניסיון',

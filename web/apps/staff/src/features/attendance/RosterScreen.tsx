@@ -37,6 +37,7 @@ import { Alert } from '@studio/ui'
 import { plural, t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 import {
+  apiFetch,
   formatTimeInStudioZone,
   offlineStorageIsDurable,
   offlineStore,
@@ -52,6 +53,7 @@ import { SessionPlanCard } from '../briefing'
 import { RosterRow } from './RosterRow'
 import type { StaffAttendanceClient } from './client'
 import { AddToSessionSheet } from './AddToSessionSheet'
+import { SessionSummarySheet } from './SessionSummarySheet'
 import { TrialInClass } from '../people'
 import type { StaffPeopleClient } from '../people'
 
@@ -139,6 +141,7 @@ export function RosterScreen({
   const pending = usePendingCount()
   const stale = useStaleQueueWarning(clock)
   const [addOpen, setAddOpen] = useState(false)
+  const [summaryOpen, setSummaryOpen] = useState(false)
 
   useEffect(() => {
     let live = true
@@ -471,13 +474,18 @@ export function RosterScreen({
           className="grid grid-cols-3 gap-2"
           data-testid="roster-actions"
         >
-          <a
+          {/* A popup, not a page (owner, 2026-10-13) — see `SessionSummarySheet` for what
+              the screen behind this used to be and why the roster is not in it. */}
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            data-testid="session-summary-open"
+            onClick={() => setSummaryOpen(true)}
             className="flex flex-col items-center gap-1 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-2 py-2.5 text-center text-[11px] font-bold text-[var(--text-secondary)] shadow-2xs transition-all active:scale-95 hover:bg-[var(--surface)]"
-            href={`#/attendance/${sessionId}/summary`}
           >
             <ClipboardList aria-hidden="true" className="h-4 w-4 text-[var(--emphasis)]" />
             {t(locale, 'attendance.summary.title')}
-          </a>
+          </button>
           <a
             className="flex flex-col items-center gap-1 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-2 py-2.5 text-center text-[11px] font-bold text-[var(--text-secondary)] shadow-2xs transition-all active:scale-95 hover:bg-[var(--surface)]"
             href={`#/attendance/${sessionId}/handover`}
@@ -502,6 +510,31 @@ export function RosterScreen({
           ) : null}
         </nav>
       </footer>
+
+      {summaryOpen ? (
+        <SessionSummarySheet
+          locale={locale}
+          sessionId={sessionId}
+          roster={roster}
+          personId={personId}
+          clock={clock}
+          heading={
+            header ? `${header.groupName} · ${formatTimeInStudioZone(header.startsAt, locale)}` : null
+          }
+          onClose={() => setSummaryOpen(false)}
+          onReportSomething={async (description) => {
+            // Immediate, online-only — never queued (§10.2's absence-report reasoning,
+            // mirrored). No `student_id`: the report is about the lesson, so it reaches the
+            // managers and no guardian. A non-2xx must reject so the sheet can say so.
+            const response = await apiFetch(`/api/v1/sessions/${sessionId}/injury-reports`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ description }),
+            })
+            if (!response.ok) throw new Error(String(response.status))
+          }}
+        />
+      ) : null}
 
       {addOpen && peopleClient ? (
         <AddToSessionSheet

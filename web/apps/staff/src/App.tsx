@@ -56,7 +56,6 @@ import {
 } from './features/attendance'
 // S2 — the in-session screens (9g, 11a, 11b) and the student card (9c/2d), each behind
 // a hash a coach can actually reach.
-import { SessionSummarySection } from './features/attendance/SessionSummarySection'
 import { HandOverSection } from './features/billing/HandOverSection'
 import { StudentCardRoute } from './features/people/StudentCardRoute'
 import { useQueueFlusher } from './features/attendance/useQueueFlusher'
@@ -520,13 +519,6 @@ export default function App() {
             // without reopening anything here.
             priming.state !== 'ready' ? (
               <OfflinePrimingGate locale={locale} onRetry={priming.retry} state={priming.state} />
-            ) : sessionView === 'summary' ? (
-              <SessionSummarySection
-                client={attendanceClient}
-                locale={locale}
-                personId={membership?.person_id ?? null}
-                sessionId={rosterSessionId}
-              />
             ) : sessionView === 'handover' ? (
               <HandOverSection
                 attendanceClient={attendanceClient}
