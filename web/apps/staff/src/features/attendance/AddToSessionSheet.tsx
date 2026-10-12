@@ -25,6 +25,7 @@ import { Search, UserPlus, X } from 'lucide-react'
 import { useModalDialog } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
+import { TrialInClass } from '../people'
 import type { StaffPeopleClient, StudentSummary } from '../people'
 
 type Tab = 'existing' | 'trial'
@@ -34,7 +35,9 @@ export function AddToSessionSheet({
   peopleClient,
   onPickStudent,
   onClose,
-  trialForm,
+  trialGroupId,
+  trialSessionId,
+  canGrantTrialOverride = false,
   alreadyOnRoster,
 }: {
   locale: Locale
@@ -43,9 +46,11 @@ export function AddToSessionSheet({
    *  queueing, so this sheet never touches the offline store. */
   onPickStudent: (student: StudentSummary) => void
   onClose: () => void
-  /** §5.4a's trial form, injected rather than imported: it needs the group, the session and
-   *  the manager override, all of which the roster screen already holds. */
-  trialForm: React.ReactNode
+  /** The session's own group, for §5.4a's trial form on the second tab. */
+  trialGroupId?: string | null
+  trialSessionId?: string
+  /** §5.4a — a second free trial is a MANAGER's deliberate act. A coach is told to ask. */
+  canGrantTrialOverride?: boolean
   /** Students already drawn on the roster — offering to add them again would be a tap that
    *  does nothing a coach can see. */
   alreadyOnRoster: ReadonlySet<string>
@@ -190,7 +195,31 @@ export function AddToSessionSheet({
             </ul>
           </div>
         ) : (
-          <div data-testid="add-to-session-trial">{trialForm}</div>
+          <div data-testid="add-to-session-trial">
+            {trialGroupId ? (
+              <TrialInClass
+                canGrantOverride={canGrantTrialOverride}
+                client={peopleClient}
+                groupId={trialGroupId}
+                locale={locale}
+                sessionId={trialSessionId}
+                // **The child is marked present, not merely booked** (owner, 2026-10-13):
+                // "a manager needs to be able to write a name and add attendance". A trial
+                // booking records `attended` on itself and writes no attendance row, so the
+                // name a coach had just written down was absent from the roster in front of
+                // them. The same visitor path a club child takes, from the other tab.
+                onLogged={(created) =>
+                  onPickStudent({
+                    id: created.id,
+                    first_name: created.first_name,
+                    last_name: created.last_name,
+                  } as unknown as StudentSummary)
+                }
+              />
+            ) : (
+              <p data-testid="trial-loading">{t(locale, 'common.setup.loading')}</p>
+            )}
+          </div>
         )}
       </div>
     </div>

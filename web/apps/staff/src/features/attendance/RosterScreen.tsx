@@ -54,7 +54,6 @@ import { RosterRow } from './RosterRow'
 import type { StaffAttendanceClient } from './client'
 import { AddToSessionSheet } from './AddToSessionSheet'
 import { SessionSummarySheet } from './SessionSummarySheet'
-import { TrialInClass } from '../people'
 import type { StaffPeopleClient } from '../people'
 
 /**
@@ -546,20 +545,9 @@ export function RosterScreen({
             markVisitor(student)
             setAddOpen(false)
           }}
-          trialForm={
-            header?.groupId ? (
-              <TrialInClass
-                canGrantOverride={canGrantTrialOverride}
-                client={peopleClient}
-                groupId={header.groupId}
-                locale={locale}
-                sessionId={sessionId}
-                onLogged={() => setAddOpen(false)}
-              />
-            ) : (
-              <p data-testid="trial-loading">{t(locale, 'common.setup.loading')}</p>
-            )
-          }
+          trialGroupId={header?.groupId ?? null}
+          trialSessionId={sessionId}
+          canGrantTrialOverride={canGrantTrialOverride}
         />
       ) : null}
     </section>

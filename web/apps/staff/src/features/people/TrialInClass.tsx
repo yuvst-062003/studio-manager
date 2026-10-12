@@ -43,7 +43,11 @@ export function TrialInClass({
   sessionId?: string | null
   /** §5.4a — a second free trial is a MANAGER's deliberate act. A coach is told to ask. */
   canGrantOverride?: boolean
-  onLogged?: () => void
+  /** The child that was just created. Carries the id since 2026-10-13, so the caller can
+   *  mark them present at the session they were written down in — logging a trial records
+   *  `attended` on the BOOKING and no attendance row, which left a coach looking at a
+   *  roster that did not contain the child they had just added to it. */
+  onLogged?: (created: { id: string; first_name: string; last_name: string }) => void
 }) {
   const [childFirst, setChildFirst] = useState('')
   const [childLast, setChildLast] = useState('')
@@ -67,10 +71,18 @@ export function TrialInClass({
         child: { first_name: childFirst, last_name: childLast },
         guardian: { first_name: first, last_name: rest.join(' '), phone },
       })
-      .then((response) => {
+      .then(async (response) => {
         if (response.ok) {
           setDone(true)
-          onLogged?.()
+          // `TrialBookingOut.student_id` — the student the booking just created.
+          const booking = (await response.json().catch(() => null)) as { student_id?: string } | null
+          if (booking?.student_id) {
+            onLogged?.({
+              id: booking.student_id,
+              first_name: childFirst.trim(),
+              last_name: childLast.trim(),
+            })
+          }
         } else if (response.status === 409) setAlreadyUsed(true)
         else setFailed(true)
       })

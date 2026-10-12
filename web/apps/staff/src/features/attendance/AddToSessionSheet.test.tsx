@@ -26,7 +26,8 @@ function renderSheet(over: Partial<Parameters<typeof AddToSessionSheet>[0]> = {}
       onPickStudent={over.onPickStudent ?? onPickStudent}
       onClose={over.onClose ?? vi.fn()}
       alreadyOnRoster={over.alreadyOnRoster ?? new Set()}
-      trialForm={over.trialForm ?? <p data-testid="the-trial-form" />}
+      trialGroupId={over.trialGroupId ?? 'g-1'}
+      trialSessionId={over.trialSessionId ?? 's-1'}
     />,
   )
   return { onPickStudent }
@@ -74,11 +75,11 @@ describe('adding somebody to a session', () => {
 
   it('carries the trial form on its second tab, where the page used to be', async () => {
     renderSheet()
-    expect(screen.queryByTestId('the-trial-form')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('trial-in-class')).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByTestId('add-to-session-tab-trial'))
 
-    expect(screen.getByTestId('the-trial-form')).toBeInTheDocument()
+    expect(screen.getByTestId('trial-in-class')).toBeInTheDocument()
   })
 
   it('says plainly that a visit changes nothing about the student', () => {
@@ -86,5 +87,49 @@ describe('adding somebody to a session', () => {
     expect(
       screen.getByText(t('he', 'attendance.addToSession.existingHint')),
     ).toBeInTheDocument()
+  })
+})
+
+// A name nobody in the club carries (owner, 2026-10-13): "a manager needs to be able to
+// write a name and add attendance". The club's five extra groups — נבחרת, נבחרת בנות,
+// קרוספיט, ג'ודו גילאי 8-12 and אימון טכניקה אישי — have NOBODY enrolled, so an extra
+// session's roster is empty by construction and every name on it arrives this way.
+//
+// Logging a trial recorded `attended` on the BOOKING and no attendance row, so the child a
+// coach had just written down did not appear on the roster they were standing in front of.
+describe('a name written into the trial tab', () => {
+  it('is marked present on this session, not only booked', async () => {
+    const onPickStudent = vi.fn()
+    const logTrial = vi.fn(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ id: 'tb-1', student_id: 'new-st', group_id: 'g', session_id: 's' }), {
+          status: 201,
+        }),
+      ),
+    )
+    render(
+      <AddToSessionSheet
+        locale="he"
+        peopleClient={{ ...client(), logTrial } as unknown as StaffPeopleClient}
+        onPickStudent={onPickStudent}
+        onClose={vi.fn()}
+        alreadyOnRoster={new Set()}
+        trialGroupId="g-1"
+        trialSessionId="s-1"
+      />,
+    )
+
+    await userEvent.click(screen.getByTestId('add-to-session-tab-trial'))
+    await userEvent.type(screen.getByLabelText('שם פרטי'), 'יונתן')
+    await userEvent.type(screen.getByLabelText('שם משפחה'), 'לוי')
+    await userEvent.type(screen.getByLabelText('הורה'), 'דנה לוי')
+    await userEvent.type(screen.getByLabelText('טלפון'), '0521234567')
+    await userEvent.click(screen.getByTestId('trial-submit'))
+
+    await waitFor(() =>
+      expect(onPickStudent).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'new-st', first_name: 'יונתן', last_name: 'לוי' }),
+      ),
+    )
   })
 })
