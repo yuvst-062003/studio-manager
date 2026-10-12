@@ -524,3 +524,89 @@
   flex-wrap: wrap;
   gap: var(--space-2);
 }
+
+/* Checkpoint 2026-10-13 — the payment-requests queue.
+ *
+ * It was one `flex-wrap` row holding the payer, the method, the charge count, the date, the
+ * plan, the amount, the status chip, the months and BOTH buttons as siblings. With nine
+ * things competing for one line, the wrap landed wherever the viewport happened to run out:
+ * the name broke across two lines while the amount sat mid-row and the buttons — the two
+ * widest items — dominated a card whose actual subject is a number and a name. The owner's
+ * verdict on the production screen was the plain one, and it was right.
+ *
+ * Three rows instead, in the shape `.recon-card` already uses on this same screen: who and
+ * how much, then the quiet facts, then the decision. */
+.promise-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.promise-card {
+  background: var(--surface);
+  border: var(--border-width-hairline) solid var(--border);
+  border-radius: var(--radius-lg);
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+
+/* The two things a manager reads first, at opposite ends of one line: whose money, and how
+ * much. `baseline` rather than `center` so a wrapped name still sits on the amount's line. */
+.promise-card__head {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  justify-content: space-between;
+}
+
+.promise-card__who {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-inline-size: 0;
+}
+
+/* `anywhere`, because a long surname in a narrow column must break rather than push the
+ * amount off the card — the failure the screenshot caught. */
+.promise-card__name {
+  font-weight: var(--weight-medium);
+  overflow-wrap: anywhere;
+}
+
+/* One quiet line, read as a sentence rather than as a row of competing chips: method,
+ * charge count, date, and the plan or the months forward when there are any. */
+.promise-card__meta {
+  color: var(--text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--text-label);
+  gap: var(--space-1) var(--space-2);
+}
+
+.promise-card__meta > * + *::before {
+  content: '·';
+  margin-inline-end: var(--space-2);
+}
+
+/* The decision, last and on its own line. Equal widths so neither answer is the easy one to
+ * hit by accident — ✓ settles money and ✗ tells a parent they were not believed. */
+.promise-card__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.promise-card__actions > * {
+  flex: 1 1 0;
+}
+
+@media (width >= 30rem) {
+  .promise-card__actions {
+    justify-content: flex-end;
+  }
+
+  .promise-card__actions > * {
+    flex: 0 0 auto;
+  }
+}
