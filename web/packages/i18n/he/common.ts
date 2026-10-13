@@ -116,6 +116,7 @@ export const common: Bundle = {
   'tabs.staffSchedule': 'לוח זמנים',
   'tabs.staffStudents': 'תלמידים',
   'tabs.staffTimer': 'טיימר',
+  'tabs.staffCash': 'מזומן',
   'tabs.staffTasks': 'משימות',
   'tabs.staffAccount': 'חשבון',
   // §6.1's first run. The refusal wording is §6.1's own, verbatim.

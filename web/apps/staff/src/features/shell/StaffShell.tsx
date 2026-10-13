@@ -33,6 +33,7 @@ export function StaffShell({
   activeTab,
   locale,
   tasksBadgeCount,
+  canSeeCash = false,
   devBar,
   networkStatus,
   staffAlerts,
@@ -45,6 +46,9 @@ export function StaffShell({
   activeTab: StaffTab | null
   locale: Locale
   tasksBadgeCount?: number
+  /** `owner` / `manager`. The cash tab is drawn for them and for nobody else — see
+   *  `StaffTabBar`'s own `tabsFor`. */
+  canSeeCash?: boolean
   devBar?: ReactNode
   /** §5/S5's offline strip. Rendered above `children` so it is visible from every screen
    *  the shell wraps, not only the ones that remember to mount it themselves. */
@@ -87,7 +91,12 @@ export function StaffShell({
             {children}
           </main>
           {tabBar ? (
-            <StaffTabBar active={activeTab} locale={locale} tasksBadgeCount={tasksBadgeCount} />
+            <StaffTabBar
+              active={activeTab}
+              canSeeCash={canSeeCash}
+              locale={locale}
+              tasksBadgeCount={tasksBadgeCount}
+            />
           ) : null}
         </div>
       </div>

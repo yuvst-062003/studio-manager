@@ -118,6 +118,7 @@ import {
   CalendarDays,
   CheckCircle2,
   ChevronLeft,
+  Timer,
   ClipboardList,
   Clock,
   MapPin,
@@ -754,6 +755,18 @@ export function TodayScreen({
               9b's extra half was a date RANGE, and losing it costs nothing: `ScheduleSection`
               kept `range.from` and threw the end away ("היום shows one day"), so the range
               picker was two inputs feeding one value the month grid supplies with a tap. */}
+          {/* **The timer's new door** (owner, 2026-10-14): "put it as a small icon in the
+              schedule". It lost its tab to `מזומן` and kept everything else — the engine,
+              the presets, the sound, the wake lock and `#/timer` itself. This is where a
+              coach already is in the minute before a lesson starts. */}
+          <a
+            href="#/timer"
+            data-testid="open-timer"
+            aria-label={t(locale, 'common.tabs.staffTimer')}
+            className="w-10 h-10 rounded-2xl bg-[var(--surface)] text-[var(--text-secondary)] flex items-center justify-center shadow-xs border border-[var(--border)] active:scale-95 transition-all shrink-0"
+          >
+            <Timer className="w-5 h-5" aria-hidden="true" />
+          </a>
           <a
             href="#/calendar"
             data-testid="open-month-calendar"

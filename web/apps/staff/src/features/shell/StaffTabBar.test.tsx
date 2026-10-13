@@ -5,12 +5,12 @@ import { StaffTabBar } from './StaffTabBar'
 
 describe('StaffTabBar', () => {
   it('renders all five tabs with their Hebrew labels and correct hrefs', () => {
-    render(<StaffTabBar active="schedule" locale="he" />)
+    render(<StaffTabBar active="schedule" canSeeCash locale="he" />)
 
     const expected: Array<[string, string, string]> = [
       ['schedule', '#/schedule', 'common.tabs.staffSchedule'],
       ['students', '#/students', 'common.tabs.staffStudents'],
-      ['timer', '#/timer', 'common.tabs.staffTimer'],
+      ['cash', '#/cash', 'common.tabs.staffCash'],
       ['tasks', '#/tasks', 'common.tabs.staffTasks'],
       ['account', '#/account', 'common.tabs.staffAccount'],
     ]
@@ -57,13 +57,12 @@ describe('StaffTabBar', () => {
     expect(screen.getByTestId('tab-tasks')).toHaveAttribute('aria-label', `${label} 99+`)
   })
 
-  it('goes dark only when the timer tab is active', () => {
-    render(<StaffTabBar active="timer" locale="he" />)
-    expect(screen.getByTestId('tab-bar').className).toMatch(/bg-\[#090d16\]\/70/)
-  })
-
-  it.each(['schedule', 'students', 'tasks', 'account'] as const)(
-    'stays light when the active tab is %s, not timer',
+  // §3's timer inversion left with the timer tab (2026-10-14). The bar used to follow that
+  // screen's chrome; `#/timer` is not a tab any more, so `active` is null there and the bar
+  // is in its ordinary state — and the screen itself has followed the theme since
+  // 2026-09-07, which is what made the inversion redundant rather than missed.
+  it.each(['schedule', 'students', 'tasks', 'account', null] as const)(
+    'is light whatever is active (%s)',
     (tab) => {
       render(<StaffTabBar active={tab} locale="he" />)
       const className = screen.getByTestId('tab-bar').className
@@ -72,9 +71,25 @@ describe('StaffTabBar', () => {
     },
   )
 
-  it('goes light again when nothing is active', () => {
-    render(<StaffTabBar active={null} locale="he" />)
-    expect(screen.getByTestId('tab-bar').className).not.toMatch(/bg-\[#090d16\]\/70/)
+  // Owner, 2026-10-14: managers and owner only. SPEC §13's third invariant keeps financial
+  // fields off coach-scoped endpoints, so there is nothing behind this tab a coach may
+  // read — and a tab that is drawn and then refuses teaches people the app is broken.
+  it('draws the cash tab for a manager and not at all for a coach', () => {
+    const { rerender } = render(<StaffTabBar active="schedule" canSeeCash locale="he" />)
+    expect(screen.getByTestId('tab-cash')).toBeInTheDocument()
+
+    rerender(<StaffTabBar active="schedule" locale="he" />)
+
+    expect(screen.queryByTestId('tab-cash')).toBeNull()
+    expect(screen.getByTestId('tab-schedule')).toBeInTheDocument()
+    expect(screen.getByTestId('tab-account')).toBeInTheDocument()
+  })
+
+  it('places the capsule over four columns when the cash tab is not drawn', () => {
+    // A coach's bar is four equal columns, so `tasks` is third — 50%, not 60%. The capsule
+    // follows the list the viewer actually sees, or it sits under the wrong tab.
+    render(<StaffTabBar active="tasks" locale="he" />)
+    expect(screen.getByTestId('tab-indicator')).toHaveStyle({ insetInlineStart: '50%' })
   })
 
   it('clears the home indicator by ADDING the inset to the gap it floats above', () => {
@@ -96,10 +111,10 @@ describe('StaffTabBar', () => {
   })
 
   it('puts the capsule under the active tab, and nowhere when no tab is active', () => {
-    // The capsule is placed off the active INDEX against five equal columns. `timer` is
+    // The capsule is placed off the active INDEX against five equal columns. `cash` is
     // third, so 40%. A route outside the bar renders no capsule at all rather than parking
     // it under the first tab, claiming a screen nobody is on.
-    const { rerender } = render(<StaffTabBar active="timer" locale="he" />)
+    const { rerender } = render(<StaffTabBar active="cash" canSeeCash locale="he" />)
     expect(screen.getByTestId('tab-indicator')).toHaveStyle({ insetInlineStart: '40%' })
     rerender(<StaffTabBar active={null} locale="he" />)
     expect(screen.queryByTestId('tab-indicator')).toBeNull()

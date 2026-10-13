@@ -81,18 +81,25 @@
 // timer one above, not the app's light/dark theme preference. tailwind.css's own note about
 // the timer screen's dark surface is about the TIMER SCREEN's content, built separately from
 // this bar.
-import { Calendar, CheckSquare, Settings, Timer, Users } from 'lucide-react'
+import { Banknote, Calendar, CheckSquare, Settings, Users } from 'lucide-react'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
 
-export type StaffTab = 'schedule' | 'students' | 'timer' | 'tasks' | 'account'
+/**
+ * **`cash` replaced `timer` on 2026-10-14** (owner: "I want to replace the timer with cash,
+ * and there do the cash collection"). The timer kept its screen and its sixteen files — it
+ * is reached from the schedule header now — and the tab it was occupying went to the one
+ * surface in this app that had none: money, which this club takes in notes and cheques at
+ * the door of the dojo.
+ */
+export type StaffTab = 'schedule' | 'students' | 'cash' | 'tasks' | 'account'
 
 /** Where each tab points. The hashes are the app's existing or newly-reserved routes —
  *  §3's table — not routes invented here. */
 const HREF: Record<StaffTab, string> = {
   schedule: '#/schedule',
   students: '#/students',
-  timer: '#/timer',
+  cash: '#/cash',
   tasks: '#/tasks',
   account: '#/account',
 }
@@ -104,8 +111,7 @@ const HREF: Record<StaffTab, string> = {
 const ACTIVE_INK: Record<StaffTab, string> = {
   schedule: 'text-blue-600 dark:text-blue-300',
   students: 'text-emerald-600 dark:text-emerald-300',
-  // Only ever rendered while the bar itself is dark — see the module note above.
-  timer: 'text-blue-500 dark:text-blue-400',
+  cash: 'text-emerald-600 dark:text-emerald-300',
   tasks: 'text-emerald-600 dark:text-emerald-300',
   account: 'text-blue-600 dark:text-blue-300',
 }
@@ -116,7 +122,7 @@ const ACTIVE_INK: Record<StaffTab, string> = {
 const ACTIVE_CAPSULE: Record<StaffTab, string> = {
   schedule: 'bg-blue-600/10 dark:bg-blue-300/15',
   students: 'bg-emerald-600/10 dark:bg-emerald-300/15',
-  timer: 'bg-blue-500/10 dark:bg-blue-400/20',
+  cash: 'bg-emerald-600/10 dark:bg-emerald-300/15',
   tasks: 'bg-emerald-600/10 dark:bg-emerald-300/15',
   account: 'bg-blue-600/10 dark:bg-blue-300/15',
 }
@@ -128,8 +134,8 @@ const SOLID_OK: Record<StaffTab, boolean> = {
   schedule: false,
   // Two silhouettes. Fills cleanly.
   students: true,
-  // A circle around two hands. Filled, it is a dot.
-  timer: false,
+  // A banknote is a frame with a figure inside it — fill it and both go.
+  cash: false,
   // A box around a tick. Filled, the tick goes with it.
   tasks: false,
   // A gear. The centre circle is cut by the fill rule, so it survives as a solid gear.
@@ -139,7 +145,7 @@ const SOLID_OK: Record<StaffTab, boolean> = {
 const LABEL_KEY: Record<StaffTab, string> = {
   schedule: 'common.tabs.staffSchedule',
   students: 'common.tabs.staffStudents',
-  timer: 'common.tabs.staffTimer',
+  cash: 'common.tabs.staffCash',
   tasks: 'common.tabs.staffTasks',
   account: 'common.tabs.staffAccount',
 }
@@ -147,12 +153,24 @@ const LABEL_KEY: Record<StaffTab, string> = {
 const ICONS = {
   schedule: Calendar,
   students: Users,
-  timer: Timer,
+  cash: Banknote,
   tasks: CheckSquare,
   account: Settings,
 } as const
 
-const ORDER: readonly StaffTab[] = ['schedule', 'students', 'timer', 'tasks', 'account']
+/** The bar a manager sees. A coach's is the same list without `cash` — see `tabsFor`. */
+const ORDER: readonly StaffTab[] = ['schedule', 'students', 'cash', 'tasks', 'account']
+
+/**
+ * **A coach's bar has four tabs, not five with one that refuses them** (owner, 2026-10-14:
+ * managers and owner only). SPEC §13's third invariant keeps financial fields off
+ * coach-scoped endpoints, so there is nothing behind this tab a coach may read; a tab that
+ * is drawn and then answers 403 teaches people the app is broken, and a greyed one
+ * advertises a screen they cannot have.
+ */
+function tabsFor(canSeeCash: boolean): readonly StaffTab[] {
+  return canSeeCash ? ORDER : ORDER.filter((tab) => tab !== 'cash')
+}
 
 /** Deviation 4. `99+` past the cap, so the one slot that can grow does not squeeze the
  *  other four. */
@@ -164,18 +182,29 @@ export function StaffTabBar({
   active,
   locale,
   tasksBadgeCount = 0,
+  canSeeCash = false,
 }: {
   active: StaffTab | null
   locale: Locale
   /** Open tasks. `0` renders nothing — an empty list is not a notification, and a badge
    *  permanently showing zero stops meaning anything. */
   tasksBadgeCount?: number
+  /** `owner` / `manager` — the same pair the cash route itself checks. Defaults to false,
+   *  so a caller that has not wired it yet shows a coach's bar rather than a tab that
+   *  leads to a refusal. */
+  canSeeCash?: boolean
 }) {
-  const isTimerActive = active === 'timer'
+  const tabs = tabsFor(canSeeCash)
   // -1 when no tab matches — `active: StaffTab | null` already allowed a route outside the
-  // bar. The capsule is then not rendered at all, rather than parked under the first tab
-  // claiming a screen nobody is on.
-  const activeIndex = active === null ? -1 : ORDER.indexOf(active)
+  // bar, and `#/timer` is now one of those routes. The capsule is then not rendered at all,
+  // rather than parked under the first tab claiming a screen nobody is on.
+  const activeIndex = active === null ? -1 : tabs.indexOf(active)
+  // Four columns or five, as literal strings: Tailwind scans source for class names, so a
+  // constructed `grid-cols-${n}` generates no CSS at all. The capsule's width and offset
+  // follow the same count, which is what keeps it under the tab it marks.
+  const columns = tabs.length === 5 ? 'grid-cols-5' : 'grid-cols-4'
+  const capsuleWidth = tabs.length === 5 ? 'w-1/5' : 'w-1/4'
+  const step = 100 / tabs.length
 
   return (
     <nav
@@ -187,18 +216,15 @@ export function StaffTabBar({
       //
       // `transition-colors` still covers the timer swap, which is now a change of glass
       // rather than of fill.
-      className={`tw-scope fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] inset-x-3 mx-auto max-w-md rounded-[26px] border px-1.5 py-2 z-40 backdrop-blur-xl backdrop-saturate-150 shadow-[0_10px_30px_rgba(2,6,23,0.16),0_1px_2px_rgba(2,6,23,0.08)] transition-colors duration-300 ${
-        isTimerActive
-          ? // Follows the THEME now (owner, 2026-09-07), like the timer screen it matches.
-            // It used to be unconditionally dark, so a coach on the light theme got a black
-            // bar under a screen that is no longer black.
-            'bg-white/75 border-slate-900/10 text-slate-500 dark:bg-[#090d16]/70 dark:border-white/10 dark:text-slate-400 dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)]'
-          : 'bg-white/75 border-slate-900/10 text-slate-500 dark:bg-slate-900/70 dark:border-white/10 dark:text-slate-400 dark:shadow-[0_10px_30px_rgba(0,0,0,0.45)]'
-      }`}
+      // §3's timer inversion is gone with the timer tab: the bar followed that screen's
+      // chrome, and `#/timer` is no longer a tab, so `active` is null there and the bar is
+      // in its ordinary state. The screen itself has followed the theme since 2026-09-07,
+      // which is what made the inversion redundant rather than missed.
+      className="tw-scope fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] inset-x-3 mx-auto max-w-md rounded-[26px] border px-1.5 py-2 z-40 backdrop-blur-xl backdrop-saturate-150 shadow-[0_10px_30px_rgba(2,6,23,0.16),0_1px_2px_rgba(2,6,23,0.08)] transition-colors duration-300 bg-white/75 border-slate-900/10 text-slate-500 dark:bg-slate-900/70 dark:border-white/10 dark:text-slate-400 dark:shadow-[0_10px_30px_rgba(0,0,0,0.45)]"
     >
       {/* A GRID, not `justify-around`: the capsule is placed off the active INDEX, so the
           slots must be equal for it to land under the right tab. */}
-      <div className="relative grid grid-cols-5 items-center">
+      <div className={`relative grid ${columns} items-center`}>
         {activeIndex >= 0 && active !== null ? (
           <span
             aria-hidden="true"
@@ -207,11 +233,11 @@ export function StaffTabBar({
             // and .claude/rules/ui-rtl-a11y.md asks for logical properties. Inline `style`
             // because the offset is COMPUTED — Tailwind scans for literal class strings, so
             // a constructed `start-[40%]` would generate no CSS at all.
-            className={`pointer-events-none absolute inset-y-0 w-1/5 rounded-2xl transition-[inset-inline-start] duration-300 ease-out motion-reduce:transition-none ${ACTIVE_CAPSULE[active]}`}
-            style={{ insetInlineStart: `${activeIndex * 20}%` }}
+            className={`pointer-events-none absolute inset-y-0 ${capsuleWidth} rounded-2xl transition-[inset-inline-start] duration-300 ease-out motion-reduce:transition-none ${ACTIVE_CAPSULE[active]}`}
+            style={{ insetInlineStart: `${activeIndex * step}%` }}
           />
         ) : null}
-        {ORDER.map((tab) => {
+        {tabs.map((tab) => {
           const isActive = active === tab
           const Glyph = ICONS[tab]
           const badge = tab === 'tasks' ? tasksBadgeCount : 0
@@ -226,7 +252,7 @@ export function StaffTabBar({
               data-testid={`tab-${tab}`}
               className={`relative z-10 flex flex-col items-center justify-center gap-1 py-1 text-[11px] font-semibold tracking-tight transition-colors cursor-pointer ${
                 isActive
-                  ? `${ACTIVE_INK[tab]} ${tab === 'timer' ? 'font-black' : 'font-bold'}`
+                  ? `${ACTIVE_INK[tab]} font-bold`
                   : 'hover:text-slate-700 dark:hover:text-slate-200'
               }`}
             >

@@ -34,7 +34,6 @@ import { t } from '@studio/i18n'
 import { LegalScreen } from './features/legal/LegalScreen'
 import { AccessGate } from './features/identity/AccessGate'
 import { Resolve } from './features/identity/Resolve'
-import { PaymentPromisesSection } from './features/billing/PaymentPromisesSection'
 import { ScheduleSection } from './features/schedule/ScheduleSection'
 import { CalendarScreen } from './features/schedule/CalendarScreen'
 import { makeCoachConstraintsClient } from './features/constraints'
@@ -54,6 +53,7 @@ import {
 // S2 — the in-session screens (9g, 11a, 11b) and the student card (9c/2d), each behind
 // a hash a coach can actually reach.
 import { HandOverSection } from './features/billing/HandOverSection'
+import { CashScreen } from './features/billing/CashScreen'
 import { StudentCardRoute } from './features/people/StudentCardRoute'
 import { useQueueFlusher } from './features/attendance/useQueueFlusher'
 import { registerHealthSections } from './features/health'
@@ -306,8 +306,8 @@ export default function App() {
   // current on a screen that tab does not lead to is a lie told to a screen reader.
   const activeTab: StaffTab | null = onAccount
     ? 'account'
-    : onTimer
-      ? 'timer'
+    : onCash
+      ? 'cash'
       : onTasks
         ? 'tasks'
         : onStudents
@@ -381,6 +381,10 @@ export default function App() {
         <StaffConsentGate client={consentClient} locale={locale}>
         <StaffShell
           activeTab={activeTab}
+          // The cash tab is a manager's, by the same rule `#/cash` itself applies below —
+          // computed once, read in both places, so the bar can never offer a screen the
+          // route refuses.
+          canSeeCash={session.access.staff && viewerIsManager}
           locale={locale}
           // §4.4 (checkpoint 8) — the real open-task count, computed by the same
           // derivation the tasks screen itself renders from (`openTasks` above). Before
@@ -549,7 +553,12 @@ export default function App() {
               description={t(locale, 'common.permission.managerOnly')}
             />
           ) : session.access.staff && viewerIsManager && onCash ? (
-            <PaymentPromisesSection locale={locale} />
+            // §5.10's money tab (owner, 2026-10-14) — the payment requests this route
+            // already carried, plus what every family still owes and the act of taking
+            // notes for it at the door. `students` is the list the app already loads, for
+            // the names on the debt rows; without it a household renders by its children's
+            // names rather than as an empty row.
+            <CashScreen locale={locale} peopleClient={peopleClient} />
                     ) : session.access.staff && viewerIsManager && onPrivacy ? (
             <PrivacyOperatorScreen client={privacyClient} locale={locale} />
           ) : session.access.staff && onStudents ? (

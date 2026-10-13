@@ -105,6 +105,7 @@ export const common: Bundle = {
   'tabs.staffSchedule': 'Schedule',
   'tabs.staffStudents': 'Students',
   'tabs.staffTimer': 'Timer',
+  'tabs.staffCash': 'Cash',
   'tabs.staffTasks': 'Tasks',
   'tabs.staffAccount': 'Account',
   // §6.1's first run.
