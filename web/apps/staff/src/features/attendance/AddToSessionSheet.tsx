@@ -20,7 +20,7 @@
 // The search is `GET /students?q=`, which §3.2 scopes server-side: a manager searches the
 // whole club, a coach searches their own groups. That is the right answer for both without
 // this screen knowing the rule.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Search, UserPlus, X } from 'lucide-react'
 import { useModalDialog } from '@studio/ui'
 import { t } from '@studio/i18n'
@@ -58,26 +58,38 @@ export function AddToSessionSheet({
   const dialogRef = useModalDialog(true, onClose)
   const [tab, setTab] = useState<Tab>('existing')
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<StudentSummary[] | null>(null)
-  const [searching, setSearching] = useState(false)
+  const [club, setClub] = useState<StudentSummary[] | null>(null)
+  const [failed, setFailed] = useState(false)
 
-  async function search(next: string): Promise<void> {
-    setQuery(next)
-    // Two letters, like every other search in this app: one letter matches most of a club.
-    if (next.trim().length < 2) {
-      setResults(null)
-      return
+  // **The whole club, the moment this opens** (owner, 2026-10-13). It used to ask the server
+  // only after two characters were typed, which on a group with NOBODY enrolled — every one
+  // of this club's extra groups — meant opening the sheet onto an empty list with no way to
+  // see anybody: "I cannot filter all the students at all, and when I search for a student I
+  // cannot find him."
+  //
+  // An empty `q` is what the server already answers with everyone, scoped by §3.2 to what
+  // the caller may see: a manager gets the club, a coach gets their own groups. One request
+  // on open, and the typing filters what came back — a club is a few hundred names at most,
+  // and a filter that runs on the device answers on the first letter instead of the third.
+  useEffect(() => {
+    let alive = true
+    peopleClient
+      .search('')
+      .then((body) => alive && setClub(body.items))
+      .catch(() => alive && setFailed(true))
+    return () => {
+      alive = false
     }
-    setSearching(true)
-    try {
-      const body = await peopleClient.search(next.trim())
-      setResults(body.items.filter((student) => !alreadyOnRoster.has(student.id)))
-    } catch {
-      setResults([])
-    } finally {
-      setSearching(false)
-    }
-  }
+  }, [peopleClient])
+
+  const needle = query.trim().toLowerCase()
+  const results = (club ?? [])
+    .filter((student) => !alreadyOnRoster.has(student.id))
+    .filter((student) =>
+      needle === ''
+        ? true
+        : `${student.first_name ?? ''} ${student.last_name ?? ''}`.toLowerCase().includes(needle),
+    )
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -148,27 +160,33 @@ export function AddToSessionSheet({
                   type="search"
                   data-testid="add-to-session-search"
                   value={query}
-                  onChange={(event) => void search(event.currentTarget.value)}
+                  onChange={(event) => setQuery(event.currentTarget.value)}
                   placeholder={t(locale, 'people.search.placeholder')}
                   className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
                 />
               </span>
             </label>
 
-            {searching ? (
+            {club === null && !failed ? (
               <p className="text-[11px] text-[var(--text-muted)] m-0">
                 {t(locale, 'common.state.loading')}
               </p>
             ) : null}
 
-            {results?.length === 0 && !searching ? (
+            {failed ? (
+              <p className="text-[11px] text-[var(--danger)] m-0" data-testid="add-to-session-failed">
+                {t(locale, 'common.loadFailed.body')}
+              </p>
+            ) : null}
+
+            {club !== null && results.length === 0 ? (
               <p className="text-[11px] text-[var(--text-muted)] m-0" data-testid="add-to-session-none">
                 {t(locale, 'people.student.empty')}
               </p>
             ) : null}
 
             <ul className="list-none m-0 p-0 flex flex-col gap-1.5">
-              {(results ?? []).map((student) => (
+              {results.map((student) => (
                 <li key={student.id}>
                   <button
                     type="button"

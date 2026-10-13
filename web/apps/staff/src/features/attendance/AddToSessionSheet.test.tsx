@@ -64,13 +64,40 @@ describe('adding somebody to a session', () => {
     await waitFor(() => expect(screen.getByTestId('add-to-session-none')).toBeInTheDocument())
   })
 
-  it('asks the server nothing for one letter', async () => {
+  it('shows the whole club the moment it opens, with nothing typed', async () => {
+    // Owner, 2026-10-13, on a קרוספיט session: "I cannot filter all the students at all,
+    // and when I search for a student I cannot find him." The list used to stay empty until
+    // two characters were typed — on a group with nobody enrolled that is a dead end, and
+    // the server answers an empty `q` with the whole club.
     const peopleClient = client()
     renderSheet({ peopleClient })
 
-    await userEvent.type(screen.getByTestId('add-to-session-search'), 'מ')
+    expect(await screen.findByTestId(`add-to-session-pick-${VISITOR.id}`)).toBeInTheDocument()
+    expect(peopleClient.search).toHaveBeenCalledWith('')
+  })
 
-    expect(peopleClient.search).not.toHaveBeenCalled()
+  it('narrows the list as letters are typed, including the first one', async () => {
+    renderSheet({
+      peopleClient: client([
+        VISITOR,
+        { id: 'st-2', first_name: 'נועה', last_name: 'לוי', group_names: ['קבוצה 1'] } as never,
+      ]),
+    })
+    await screen.findByTestId(`add-to-session-pick-${VISITOR.id}`)
+
+    await userEvent.type(screen.getByTestId('add-to-session-search'), 'נ')
+
+    expect(screen.queryByTestId(`add-to-session-pick-${VISITOR.id}`)).not.toBeInTheDocument()
+    expect(screen.getByTestId('add-to-session-pick-st-2')).toBeInTheDocument()
+  })
+
+  it('finds a child by their family name too', async () => {
+    renderSheet()
+    await screen.findByTestId(`add-to-session-pick-${VISITOR.id}`)
+
+    await userEvent.type(screen.getByTestId('add-to-session-search'), 'כהן')
+
+    expect(screen.getByTestId(`add-to-session-pick-${VISITOR.id}`)).toBeInTheDocument()
   })
 
   it('carries the trial form on its second tab, where the page used to be', async () => {
