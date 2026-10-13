@@ -157,6 +157,15 @@ export function StudentCardRoute({
   // Degrades to an empty list rather than failing the card: a lead coach who cannot see
   // targets simply cannot pick one, which `StaffStudentCard`'s own disabled-submit state
   // already handles.
+  //
+  // **Base groups only** (owner, 2026-10-13): "when I press a student and I want to move
+  // him to another group, it should show only the base groups 1-5, not all of them". A
+  // `base` group is the one a child is enrolled in and billed for; an `extra` group
+  // (קרוספיט, נבחרת, ג'ודו גילאי 8-12) and a `private` one are sessions a child ATTENDS on
+  // top of it, which is why not one of this club's five has an enrolled student. Moving a
+  // child INTO one would produce an enrolment nobody's plan, timetable or invoice knows
+  // what to do with. `kind` has been on the wire since the file import — see
+  // `app/schemas/structure.py::GroupOut`.
   useEffect(() => {
     let live = true
     peopleClient
@@ -164,7 +173,9 @@ export function StudentCardRoute({
       .then((body) => {
         if (!live) return
         setGroups(
-          body.items.filter((group) => group.is_active).map((group) => ({ id: group.id, name: group.name })),
+          body.items
+            .filter((group) => group.is_active && group.kind === 'base')
+            .map((group) => ({ id: group.id, name: group.name })),
         )
       })
       .catch(() => live && setGroups([]))

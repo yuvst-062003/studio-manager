@@ -36,6 +36,8 @@ import { AccessGate } from './features/identity/AccessGate'
 import { Resolve } from './features/identity/Resolve'
 import { PaymentPromisesSection } from './features/billing/PaymentPromisesSection'
 import { ScheduleSection } from './features/schedule/ScheduleSection'
+import { CalendarScreen } from './features/schedule/CalendarScreen'
+import { makeCoachConstraintsClient } from './features/constraints'
 import { makeStaffScheduleClient } from './features/schedule/client'
 import { useToday } from './features/schedule/useToday'
 import { StudentsSearch, makeStaffPeopleClient } from './features/people'
@@ -161,6 +163,9 @@ export default function App() {
   // Memoised: SetupWizard reads through this in an effect keyed on the client, so a fresh
   // object every render would re-fetch progress forever.
   const scheduleClient = useMemo(() => makeStaffScheduleClient(apiFetch), [])
+  // §4.7's month grid draws a coach's own filed unavailability over the days. The screen
+  // for filing it left this app on 2026-10-13; the client did not, for exactly this.
+  const constraintsClient = useMemo(() => makeCoachConstraintsClient(apiFetch), [])
   const peopleClient = useMemo(() => makeStaffPeopleClient(apiFetch), [])
   const eventsClient = useMemo(() => makeStaffEventsClient(apiFetch), [])
   const attendanceClient = useMemo(() => makeStaffAttendanceClient(apiFetch), [])
@@ -266,6 +271,13 @@ export default function App() {
   const onAccount = hash === '#/account'
   const onTimer = hash === '#/timer'
   const onTasks = hash === '#/tasks'
+  // §4.7 (checkpoint C11) — the month calendar, reached from the icon in the schedule
+  // header. **Restored on 2026-10-13**: the screen was deleted with two others earlier the
+  // same day, but `open-month-calendar` was never its only door — the icon stayed on Today
+  // and on the schedule tab, and a tap on it landed on nothing. The owner asked for it back
+  // in those words: "now that I press the calendar icon in the right corner it doesn't
+  // work". A route with no screen is worse than either a screen or no icon.
+  const onCalendar = hash === '#/calendar'
   // §4.8 / §6.1 (checkpoint C10) — filing, withdrawing and reading a coach's own
   // unavailability. Reached from the account tab's own row, not a tab of its own.
   // §4.7 (checkpoint C11) — the month calendar. Every staff role may open it (decision 7);
@@ -490,6 +502,21 @@ export default function App() {
               locale={locale}
               peopleClient={peopleClient}
               studentId={cardStudentId}
+            />
+          ) : session.access.staff && onCalendar ? (
+            // Every staff role reads the grid (decision 7); `canEdit` is the same
+            // owner/manager/lead_coach trio §6.2 computes as `viewerCanWritePlan`, passed
+            // through rather than re-derived, so the calendar's edit sheet asks the
+            // identical question `PATCH /sessions` itself asks.
+            <CalendarScreen
+              locale={locale}
+              client={scheduleClient}
+              eventsClient={eventsClient}
+              constraintsClient={constraintsClient}
+              fetcher={apiFetch}
+              today={today}
+              canEdit={viewerCanWritePlan}
+              attendanceClient={attendanceClient}
             />
           ) : session.access.staff && hash.startsWith('#/schedule') ? (
             <ScheduleSection

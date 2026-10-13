@@ -100,7 +100,16 @@ function makePeopleClient(over: Partial<StaffPeopleClient> = {}): StaffPeopleCli
   return {
     student: vi.fn(() => Promise.resolve(DETAIL)),
     enrollments: vi.fn(() => Promise.resolve(ENROLLMENTS)),
-    groups: vi.fn(() => Promise.resolve({ items: [{ id: 'g2', name: 'נבחרת', is_active: true }] })),
+    groups: vi.fn(() =>
+      Promise.resolve({
+        items: [
+          { id: 'g2', name: 'קבוצה 3', is_active: true, kind: 'base' },
+          { id: 'g7', name: 'נבחרת', is_active: true, kind: 'extra' },
+          { id: 'g8', name: 'אימון טכניקה אישי', is_active: true, kind: 'private' },
+          { id: 'g9', name: 'קבוצה 9 (סגורה)', is_active: false, kind: 'base' },
+        ],
+      }),
+    ),
     ...over,
   } as unknown as StaffPeopleClient
 }
@@ -252,5 +261,37 @@ describe('StudentCardRoute — #/students/<id> and the real signed-in role (defe
     vi.stubGlobal('fetch', sessionFetch(['owner']))
     renderRoute()
     expect(await screen.findByTestId('move-group-start')).toBeInTheDocument()
+  })
+})
+
+// "When I press a student and I want to move him to another group, it should show only the
+// base groups 1-5, not all of them" (owner, 2026-10-13). An extra session — קרוספיט,
+// נבחרת, ג'ודו גילאי 8-12 — is something a child ATTENDS on top of their group; it is not
+// an enrolment, and none of this club's five extra groups has a single enrolled student.
+// Offering one as a move target was offering a move that means nothing.
+describe('move targets are base groups only', () => {
+  it('lists the base groups and leaves the extra and private ones out', async () => {
+    vi.stubGlobal('fetch', sessionFetch(['owner']))
+    renderRoute()
+
+    await userEvent.click(await screen.findByTestId('move-group-start'))
+    const picker = screen.getByTestId('move-group-target')
+
+    expect(within(picker).getByRole('option', { name: 'קבוצה 3' })).toBeInTheDocument()
+    expect(within(picker).queryByRole('option', { name: 'נבחרת' })).toBeNull()
+    expect(within(picker).queryByRole('option', { name: 'אימון טכניקה אישי' })).toBeNull()
+  })
+
+  it('still leaves out a closed group, base or not', async () => {
+    vi.stubGlobal('fetch', sessionFetch(['owner']))
+    renderRoute()
+
+    await userEvent.click(await screen.findByTestId('move-group-start'))
+
+    expect(
+      within(screen.getByTestId('move-group-target')).queryByRole('option', {
+        name: 'קבוצה 9 (סגורה)',
+      }),
+    ).toBeNull()
   })
 })

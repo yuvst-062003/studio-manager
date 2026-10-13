@@ -21,7 +21,7 @@
 // whole club, a coach searches their own groups. That is the right answer for both without
 // this screen knowing the rule.
 import { useEffect, useState } from 'react'
-import { Search, UserPlus, X } from 'lucide-react'
+import { Check, Search, UserPlus, X } from 'lucide-react'
 import { useModalDialog } from '@studio/ui'
 import { t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -33,7 +33,7 @@ type Tab = 'existing' | 'trial'
 export function AddToSessionSheet({
   locale,
   peopleClient,
-  onPickStudent,
+  onPickStudents,
   onClose,
   trialGroupId,
   trialSessionId,
@@ -42,9 +42,13 @@ export function AddToSessionSheet({
 }: {
   locale: Locale
   peopleClient: StaffPeopleClient
-  /** Mark this student present at the session as a visitor. The roster screen owns the
-   *  queueing, so this sheet never touches the offline store. */
-  onPickStudent: (student: StudentSummary) => void
+  /** Mark these students present at the session as visitors. The roster screen owns the
+   *  queueing, so this sheet never touches the offline store.
+   *
+   *  **A list, not a student** (owner, 2026-10-13): "allow, in add a student, to pick several
+   *  students at once from the list". Six children of one group turning up to a squad session
+   *  was six round trips through this sheet; it is now six ticks and one press. */
+  onPickStudents: (students: StudentSummary[]) => void
   onClose: () => void
   /** The session's own group, for §5.4a's trial form on the second tab. */
   trialGroupId?: string | null
@@ -60,6 +64,10 @@ export function AddToSessionSheet({
   const [query, setQuery] = useState('')
   const [club, setClub] = useState<StudentSummary[] | null>(null)
   const [failed, setFailed] = useState(false)
+  // Ids, not students: the filter re-derives the rows on every keystroke, and a selection
+  // that lived in the rows would disappear with them. Ticking somebody, searching for the
+  // next child and ticking them too is the ordinary case, not the clever one.
+  const [chosen, setChosen] = useState<ReadonlySet<string>>(() => new Set())
 
   // **The whole club, the moment this opens** (owner, 2026-10-13). It used to ask the server
   // only after two characters were typed, which on a group with NOBODY enrolled — every one
@@ -83,13 +91,23 @@ export function AddToSessionSheet({
   }, [peopleClient])
 
   const needle = query.trim().toLowerCase()
-  const results = (club ?? [])
-    .filter((student) => !alreadyOnRoster.has(student.id))
-    .filter((student) =>
-      needle === ''
-        ? true
-        : `${student.first_name ?? ''} ${student.last_name ?? ''}`.toLowerCase().includes(needle),
-    )
+  const offered = (club ?? []).filter((student) => !alreadyOnRoster.has(student.id))
+  const results = offered.filter((student) =>
+    needle === ''
+      ? true
+      : `${student.first_name ?? ''} ${student.last_name ?? ''}`.toLowerCase().includes(needle),
+  )
+  // In the club's own order, not the order they were tapped — the roster reads as a list of
+  // names, and so should the batch that joins it.
+  const picked = offered.filter((student) => chosen.has(student.id))
+
+  function toggle(id: string): void {
+    setChosen((current) => {
+      const next = new Set(current)
+      if (!next.delete(id)) next.add(id)
+      return next
+    })
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -186,31 +204,74 @@ export function AddToSessionSheet({
             ) : null}
 
             <ul className="list-none m-0 p-0 flex flex-col gap-1.5">
-              {results.map((student) => (
-                <li key={student.id}>
-                  <button
-                    type="button"
-                    data-testid={`add-to-session-pick-${student.id}`}
-                    onClick={() => onPickStudent(student)}
-                    className="w-full p-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] flex items-center justify-between gap-3 text-start active:scale-[0.99] transition-transform"
-                  >
-                    <span className="flex flex-col min-w-0">
-                      <span className="font-bold text-[var(--fg)] truncate">
-                        <bdi>
-                          {student.first_name} {student.last_name}
-                        </bdi>
+              {results.map((student) => {
+                const on = chosen.has(student.id)
+                return (
+                  <li key={student.id}>
+                    <button
+                      type="button"
+                      aria-pressed={on}
+                      data-testid={`add-to-session-pick-${student.id}`}
+                      onClick={() => toggle(student.id)}
+                      className={`w-full p-3 min-h-12 rounded-xl border flex items-center gap-3 text-start active:scale-[0.99] transition-transform ${
+                        on
+                          ? 'border-[var(--emphasis)] bg-[var(--emphasis-tint)]'
+                          : 'border-[var(--border)] bg-[var(--surface)]'
+                      }`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 ${
+                          on
+                            ? 'border-[var(--emphasis)] bg-[var(--emphasis)] text-[var(--on-emphasis)]'
+                            : 'border-[var(--border)] text-transparent'
+                        }`}
+                      >
+                        <Check className="w-3 h-3" />
                       </span>
-                      {student.group_names && student.group_names.length > 0 ? (
-                        <span className="text-[11px] text-[var(--text-muted)] truncate">
-                          <bdi>{student.group_names.join(' · ')}</bdi>
+                      <span className="flex flex-col min-w-0">
+                        <span className="font-bold text-[var(--fg)] truncate">
+                          <bdi>
+                            {student.first_name} {student.last_name}
+                          </bdi>
                         </span>
-                      ) : null}
-                    </span>
-                    <UserPlus className="w-4 h-4 text-[var(--emphasis)] shrink-0" aria-hidden="true" />
-                  </button>
-                </li>
-              ))}
+                        {student.group_names && student.group_names.length > 0 ? (
+                          <span className="text-[11px] text-[var(--text-muted)] truncate">
+                            <bdi>{student.group_names.join(' · ')}</bdi>
+                          </span>
+                        ) : null}
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
             </ul>
+
+            {/* One press writes them all. Disabled rather than hidden while nothing is
+                ticked: the button is what tells a coach that ticking is how this works. */}
+            <div className="sticky bottom-0 -mx-5 px-5 pt-2 pb-1 bg-[var(--surface-raised)] space-y-1">
+              <button
+                type="button"
+                data-testid="add-to-session-commit"
+                disabled={picked.length === 0}
+                onClick={() => onPickStudents(picked)}
+                className="w-full min-h-12 rounded-xl bg-[var(--emphasis)] text-[var(--on-emphasis)] text-sm font-black disabled:bg-[var(--disabled-surface)] disabled:text-[var(--text-muted)] transition-colors"
+              >
+                {picked.length === 0
+                  ? t(locale, 'attendance.addToSession.commitNone')
+                  : picked.length === 1
+                    ? t(locale, 'attendance.addToSession.commitOne')
+                    : t(locale, 'attendance.addToSession.commit').replace(
+                        '{{count}}',
+                        String(picked.length),
+                      )}
+              </button>
+              {picked.length > 0 ? (
+                <p className="text-[10px] text-[var(--text-muted)] text-center m-0">
+                  {t(locale, 'attendance.addToSession.keepsSelection')}
+                </p>
+              ) : null}
+            </div>
           </div>
         ) : (
           <div data-testid="add-to-session-trial">
@@ -227,11 +288,13 @@ export function AddToSessionSheet({
                 // name a coach had just written down was absent from the roster in front of
                 // them. The same visitor path a club child takes, from the other tab.
                 onLogged={(created) =>
-                  onPickStudent({
-                    id: created.id,
-                    first_name: created.first_name,
-                    last_name: created.last_name,
-                  } as unknown as StudentSummary)
+                  onPickStudents([
+                    {
+                      id: created.id,
+                      first_name: created.first_name,
+                      last_name: created.last_name,
+                    } as unknown as StudentSummary,
+                  ])
                 }
               />
             ) : (

@@ -18,19 +18,19 @@ const client = (items: StudentSummary[] = [VISITOR]): StaffPeopleClient =>
   ({ search: vi.fn(() => Promise.resolve({ items })) }) as unknown as StaffPeopleClient
 
 function renderSheet(over: Partial<Parameters<typeof AddToSessionSheet>[0]> = {}) {
-  const onPickStudent = vi.fn()
+  const onPickStudents = vi.fn()
   render(
     <AddToSessionSheet
       locale="he"
       peopleClient={over.peopleClient ?? client()}
-      onPickStudent={over.onPickStudent ?? onPickStudent}
+      onPickStudents={over.onPickStudents ?? onPickStudents}
       onClose={over.onClose ?? vi.fn()}
       alreadyOnRoster={over.alreadyOnRoster ?? new Set()}
       trialGroupId={over.trialGroupId ?? 'g-1'}
       trialSessionId={over.trialSessionId ?? 's-1'}
     />,
   )
-  return { onPickStudent }
+  return { onPickStudents }
 }
 
 describe('adding somebody to a session', () => {
@@ -42,12 +42,13 @@ describe('adding somebody to a session', () => {
   })
 
   it('finds a student from another group and hands them back', async () => {
-    const { onPickStudent } = renderSheet()
+    const { onPickStudents } = renderSheet()
 
     await userEvent.type(screen.getByTestId('add-to-session-search'), 'מיכ')
 
     await userEvent.click(await screen.findByTestId(`add-to-session-pick-${VISITOR.id}`))
-    expect(onPickStudent).toHaveBeenCalledWith(VISITOR)
+    await userEvent.click(screen.getByTestId('add-to-session-commit'))
+    expect(onPickStudents).toHaveBeenCalledWith([VISITOR])
   })
 
   it('shows which group they come from, which is the whole question a coach has', async () => {
@@ -126,7 +127,7 @@ describe('adding somebody to a session', () => {
 // coach had just written down did not appear on the roster they were standing in front of.
 describe('a name written into the trial tab', () => {
   it('is marked present on this session, not only booked', async () => {
-    const onPickStudent = vi.fn()
+    const onPickStudents = vi.fn()
     const logTrial = vi.fn(() =>
       Promise.resolve(
         new Response(JSON.stringify({ id: 'tb-1', student_id: 'new-st', group_id: 'g', session_id: 's' }), {
@@ -138,7 +139,7 @@ describe('a name written into the trial tab', () => {
       <AddToSessionSheet
         locale="he"
         peopleClient={{ ...client(), logTrial } as unknown as StaffPeopleClient}
-        onPickStudent={onPickStudent}
+        onPickStudents={onPickStudents}
         onClose={vi.fn()}
         alreadyOnRoster={new Set()}
         trialGroupId="g-1"
@@ -154,9 +155,83 @@ describe('a name written into the trial tab', () => {
     await userEvent.click(screen.getByTestId('trial-submit'))
 
     await waitFor(() =>
-      expect(onPickStudent).toHaveBeenCalledWith(
+      expect(onPickStudents).toHaveBeenCalledWith([
         expect.objectContaining({ id: 'new-st', first_name: 'יונתן', last_name: 'לוי' }),
-      ),
+      ]),
     )
+  })
+})
+
+// "Allow, in add a student, to pick several students at once from the list" (owner,
+// 2026-10-13). Six children of קבוצה 2 turning up to a squad session used to be six round
+// trips through the same sheet: type, pick, sheet closes, open it again.
+describe('picking several children in one trip', () => {
+  const SECOND = {
+    id: 'st-2',
+    first_name: 'נועה',
+    last_name: 'לוי',
+    group_names: ['קבוצה 1'],
+  } as unknown as StudentSummary
+
+  it('hands back everyone ticked, in one call', async () => {
+    const { onPickStudents } = renderSheet({ peopleClient: client([VISITOR, SECOND]) })
+    await screen.findByTestId(`add-to-session-pick-${VISITOR.id}`)
+
+    await userEvent.click(screen.getByTestId(`add-to-session-pick-${VISITOR.id}`))
+    await userEvent.click(screen.getByTestId(`add-to-session-pick-${SECOND.id}`))
+    await userEvent.click(screen.getByTestId('add-to-session-commit'))
+
+    expect(onPickStudents).toHaveBeenCalledTimes(1)
+    expect(onPickStudents).toHaveBeenCalledWith([VISITOR, SECOND])
+  })
+
+  it('writes nothing until the button is pressed', async () => {
+    const { onPickStudents } = renderSheet({ peopleClient: client([VISITOR, SECOND]) })
+    await screen.findByTestId(`add-to-session-pick-${VISITOR.id}`)
+
+    await userEvent.click(screen.getByTestId(`add-to-session-pick-${VISITOR.id}`))
+
+    expect(onPickStudents).not.toHaveBeenCalled()
+  })
+
+  it('counts what it is about to do', async () => {
+    renderSheet({ peopleClient: client([VISITOR, SECOND]) })
+    await screen.findByTestId(`add-to-session-pick-${VISITOR.id}`)
+    expect(screen.getByTestId('add-to-session-commit')).toBeDisabled()
+
+    await userEvent.click(screen.getByTestId(`add-to-session-pick-${VISITOR.id}`))
+    expect(screen.getByTestId('add-to-session-commit')).toHaveTextContent(
+      t('he', 'attendance.addToSession.commitOne'),
+    )
+
+    await userEvent.click(screen.getByTestId(`add-to-session-pick-${SECOND.id}`))
+    expect(screen.getByTestId('add-to-session-commit')).toHaveTextContent('2')
+  })
+
+  it('keeps a tick when the search changes — the whole point of one trip', async () => {
+    const { onPickStudents } = renderSheet({ peopleClient: client([VISITOR, SECOND]) })
+    await screen.findByTestId(`add-to-session-pick-${VISITOR.id}`)
+
+    await userEvent.click(screen.getByTestId(`add-to-session-pick-${VISITOR.id}`))
+    // Filter down to the other child — the first one leaves the list entirely.
+    await userEvent.type(screen.getByTestId('add-to-session-search'), 'נועה')
+    expect(screen.queryByTestId(`add-to-session-pick-${VISITOR.id}`)).not.toBeInTheDocument()
+    await userEvent.click(screen.getByTestId(`add-to-session-pick-${SECOND.id}`))
+    await userEvent.click(screen.getByTestId('add-to-session-commit'))
+
+    expect(onPickStudents).toHaveBeenCalledWith([VISITOR, SECOND])
+  })
+
+  it('un-ticks what was ticked by mistake', async () => {
+    renderSheet({ peopleClient: client([VISITOR, SECOND]) })
+    await screen.findByTestId(`add-to-session-pick-${VISITOR.id}`)
+
+    const row = screen.getByTestId(`add-to-session-pick-${VISITOR.id}`)
+    await userEvent.click(row)
+    expect(row).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(row)
+
+    expect(row).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByTestId('add-to-session-commit')).toBeDisabled()
   })
 })

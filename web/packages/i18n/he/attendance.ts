@@ -25,6 +25,10 @@ export const attendance: Bundle = {
   'addToSession.trial': 'שיעור ניסיון',
   'addToSession.existingHint': 'חניך מקבוצה אחרת שהגיע לאימון הזה. הנוכחות נרשמת לשיעור הזה בלבד — הקבוצה, המסלול והחיוב שלו לא משתנים.',
   'addToSession.visiting': 'אורח',
+  'addToSession.commit': 'הוספת {{count}} חניכים',
+  'addToSession.commitOne': 'הוספת חניך אחד',
+  'addToSession.commitNone': 'בחרו מי הגיע',
+  'addToSession.keepsSelection': 'הבחירה נשמרת גם כשמשנים את החיפוש',
   // -- the roster (staff 1c, 9f) -------------------------------------------------
   'roster.title': 'נוכחות',
   // 2c's attendance row qualifier. The 62 is baked into the sentence rather than

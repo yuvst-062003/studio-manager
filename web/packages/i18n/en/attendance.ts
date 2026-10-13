@@ -11,6 +11,10 @@ export const attendance: Bundle = {
   'addToSession.trial': 'Trial lesson',
   'addToSession.existingHint': 'A student from another group who came to this session. Attendance is recorded for this session only — their group, plan and billing do not change.',
   'addToSession.visiting': 'Visiting',
+  'addToSession.commit': 'Add {{count}} students',
+  'addToSession.commitOne': 'Add one student',
+  'addToSession.commitNone': 'Choose who came',
+  'addToSession.keepsSelection': 'What you tick stays ticked when the search changes',
   'roster.title': 'Attendance',
   // 2c's attendance row qualifier. The 62 is baked into the sentence rather than
   // composed, because the number leads in Hebrew and sits mid-phrase in English —

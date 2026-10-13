@@ -541,8 +541,11 @@ export function RosterScreen({
           peopleClient={peopleClient}
           alreadyOnRoster={new Set(roster.map((row) => row.student_id))}
           onClose={() => setAddOpen(false)}
-          onPickStudent={(student) => {
-            markVisitor(student)
+          onPickStudents={(students) => {
+            // One queued mark per child, each with its own `client_mark_id` — the batch is
+            // a convenience for the coach, not a new kind of write, so the offline queue
+            // and the server's idempotency see exactly what six separate taps would send.
+            students.forEach(markVisitor)
             setAddOpen(false)
           }}
           trialGroupId={header?.groupId ?? null}
