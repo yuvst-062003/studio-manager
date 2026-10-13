@@ -42,6 +42,8 @@ export const attendance: Bundle = {
   'roster.filterPlaceholder': 'Search by name…',
   'roster.noMatches': 'Nobody on this list by that name',
   'roster.bandEnrolled': 'Enrolled in the group · {{count}}',
+  'roster.bandEntitled': 'Entitled to this training · {{count}}',
+  'roster.bandAdded': 'Added by hand · {{count}}',
   'roster.markAllShown': 'Mark those shown',
   'roster.undoBulk': 'Undo',
   'roster.savedImmediately': 'Every tap is saved at once, with or without a network',

@@ -752,6 +752,7 @@ class AttendanceService:
             has_confirmation=row.has_confirmation,
             plan_name=row.plan_name,
             visiting=row.visiting,
+            entitled=row.entitled,
         )
 
     def _project_session(self, session_row: SessionRow, rows: list[RosterRowRaw]) -> SessionOut:

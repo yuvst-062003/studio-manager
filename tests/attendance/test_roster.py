@@ -490,3 +490,154 @@ def test_a_student_with_no_mark_here_stays_off_the_roster(
     _, rows = build_roster(tenant_session, a_session)
 
     assert [row.student_id for row in rows] == [an_enrolled_student]
+
+
+# --- §5.7a: an extra session lists the children whose plan pays for it ---------------
+#
+# Owner, 2026-10-13, on a קרוספיט session with twenty-four eligible children: "when a
+# manager enters a session he needs to see all the students of the class and the program —
+# for example, the extra is allowed only for the ones who pay for 3 times and all-include".
+# Before this, an `extra` group's register was EMPTY — not one of this club's five extra
+# groups has a single enrolment — so a coach typed twenty-four names into a search box, one
+# at a time, to record an hour's attendance.
+#
+# The rule is read from the price list and nothing else: a base group trains twice a week,
+# so a ×2 child's allowance is already spent, a ×3 child has one session spare and an
+# all-inclusive child has several. No new table, no setting, no migration.
+
+
+def _plan(app_session, studio, *, name: str, weekly: int | None):
+    from app.models.billing import PricePlan
+
+    row = PricePlan(
+        studio_id=studio.id,
+        name=name,
+        monthly_amount_agorot=40000,
+        sessions_per_week=weekly,
+        active_from=YEAR_STARTS,
+    )
+    app_session.add(row)
+    app_session.commit()
+    return row.id
+
+
+def _student_on_plan(app_session, studio, *, name: str, plan_id, status: str = "active"):
+    person = Person(studio_id=studio.id, first_name=name, last_name="בודק")
+    app_session.add(person)
+    app_session.flush()
+    student = Student(
+        studio_id=studio.id,
+        person_id=person.id,
+        status=status,
+        joined_on=YEAR_STARTS,
+        price_plan_id=plan_id,
+    )
+    app_session.add(student)
+    app_session.commit()
+    return student.id
+
+
+@pytest.fixture
+def an_extra_session(app_session, studio, a_class, a_training_year) -> uuid.UUID:
+    """A קרוספיט-shaped session: `kind='extra'`, and nobody enrolled in its group."""
+    from app.models.structure import Group
+
+    from tests.attendance.conftest import make_session
+
+    group = Group(studio_id=studio.id, class_id=a_class, name="קרוספיט", kind="extra")
+    app_session.add(group)
+    app_session.commit()
+    row = make_session(
+        studio_id=studio.id,
+        group_id=group.id,
+        training_year_id=a_training_year,
+        starts_at=T0,
+    )
+    app_session.add(row)
+    app_session.commit()
+    return row.id
+
+
+def test_an_extra_session_lists_the_children_whose_plan_allows_it(
+    tenant_session, app_session, studio, an_extra_session
+):
+    three = _plan(app_session, studio, name="שלוש פעמים בשבוע", weekly=3)
+    unlimited = _plan(app_session, studio, name="4-6 אימונים בשבוע", weekly=None)
+    twice = _plan(app_session, studio, name="פעמיים בשבוע", weekly=2)
+    on_three = _student_on_plan(app_session, studio, name="שלוש", plan_id=three)
+    on_unlimited = _student_on_plan(app_session, studio, name="חופשי", plan_id=unlimited)
+    _student_on_plan(app_session, studio, name="פעמיים", plan_id=twice)
+    _student_on_plan(app_session, studio, name="ללא", plan_id=None)
+
+    _, rows = build_roster(tenant_session, an_extra_session)
+
+    assert {row.student_id for row in rows} == {on_three, on_unlimited}
+    assert all(row.entitled for row in rows)
+
+
+def test_an_entitled_row_is_not_expected_so_no_percentage_moves(
+    tenant_session, app_session, studio, an_extra_session
+):
+    """§5.14's denominator is expected sessions. An extra training is optional, so a child
+    who skips one has missed nothing — the owner's own answer when asked what an untapped
+    row should record: nothing."""
+    plan = _plan(app_session, studio, name="שלוש פעמים בשבוע", weekly=3)
+    _student_on_plan(app_session, studio, name="שלוש", plan_id=plan)
+
+    _, rows = build_roster(tenant_session, an_extra_session)
+
+    assert rows[0].expected is False
+    assert rows[0].status == "unmarked"
+
+
+def test_a_frozen_child_is_not_offered_an_extra_session(
+    tenant_session, app_session, studio, an_extra_session
+):
+    """§5.10 — a frozen student generates nothing and is not training."""
+    plan = _plan(app_session, studio, name="שלוש פעמים בשבוע", weekly=3)
+    _student_on_plan(app_session, studio, name="קפוא", plan_id=plan, status="frozen")
+
+    _, rows = build_roster(tenant_session, an_extra_session)
+
+    assert rows == []
+
+
+def test_a_base_session_lists_its_enrolment_and_nobody_else(
+    tenant_session, app_session, studio, a_session, an_enrolled_student
+):
+    """The rule is for `extra` groups only. A base group's register is its enrolment, as it
+    has always been — entitlement has nothing to say about the session a child is in."""
+    plan = _plan(app_session, studio, name="4-6 אימונים בשבוע", weekly=None)
+    _student_on_plan(app_session, studio, name="חופשי", plan_id=plan)
+
+    _, rows = build_roster(tenant_session, a_session)
+
+    assert [row.student_id for row in rows] == [an_enrolled_student]
+    assert rows[0].entitled is False
+
+
+def test_a_marked_visitor_on_an_extra_session_is_not_doubled(
+    tenant_session, app_session, studio, an_extra_session
+):
+    """A child the coach added by hand is already on the list as a visitor. Being entitled
+    as well must not produce two rows for one child."""
+    plan = _plan(app_session, studio, name="שלוש פעמים בשבוע", weekly=3)
+    student_id = _student_on_plan(app_session, studio, name="שלוש", plan_id=plan)
+    app_session.add(
+        Attendance(
+            studio_id=studio.id,
+            session_id=an_extra_session,
+            student_id=student_id,
+            status="present",
+            source="coach",
+            marked_at=T0,
+            device_marked_at=T0,
+            client_mark_id=str(uuid.uuid4()),
+        )
+    )
+    app_session.commit()
+
+    _, rows = build_roster(tenant_session, an_extra_session)
+
+    assert len(rows) == 1
+    assert rows[0].status == "present"

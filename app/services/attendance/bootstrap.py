@@ -144,6 +144,8 @@ def build_bootstrap(
                 absence_reason=entry.absence_reason,
                 has_confirmation=entry.has_confirmation,
                 plan_name=entry.plan_name,
+                visiting=entry.visiting,
+                entitled=entry.entitled,
             )
             for entry in roster_rows
         ]

@@ -49,7 +49,6 @@ import {
   studioDayKey,
 } from '@studio/core'
 import type { RosterRow as RosterRowData } from '@studio/core'
-import { SessionPlanCard } from '../briefing'
 import { RosterRow } from './RosterRow'
 import type { StaffAttendanceClient } from './client'
 import { AddToSessionSheet } from './AddToSessionSheet'
@@ -96,11 +95,6 @@ export function RosterScreen({
    *  bootstrap payload does not carry `expected` per row, so the screen is told which ids
    *  are in the collapsed section rather than deriving a weekday rule of its own. */
   notExpectedIds = [],
-  /** §6.2 — `owner` / `manager` / `lead_coach`, the same trio the server's
-   *  `ManagerOrLeadCoach` checks. An assistant coach (the default, `false`) sees the
-   *  briefing below the header but no editor — decision 16, straight from the App shell's
-   *  own `viewerIsManager || roles.includes('lead_coach')` computation. */
-  canWritePlan = false,
   peopleClient,
   canGrantTrialOverride = false,
 }: {
@@ -120,7 +114,6 @@ export function RosterScreen({
   clock?: () => string
   personId: string | null
   notExpectedIds?: string[]
-  canWritePlan?: boolean
   /** For the add-to-session sheet's search and its trial form. Optional for the same reason
    *  `eventsClient` is optional on the schedule: a caller that has not wired one yet still
    *  gets a working roster, without the sheet. */
@@ -135,12 +128,6 @@ export function RosterScreen({
     startsAt: string
     locationName: string | null
   } | null>(null)
-  // §6.2 — the briefing rides in with its session on `GET /sync/bootstrap` and is read off
-  // the cache, never fetched: unlike the roster above, this has no live-fetch counterpart to
-  // fall back FROM, because `GET /sessions/{id}/attendance` (`sessionRoster`) does not carry
-  // it at all. That is deliberate, not an oversight — "the plan comes down in the bootstrap
-  // with its session", so the one reader is the cache, online or off.
-  const [plan, setPlan] = useState<string | null>(null)
   const pending = usePendingCount()
   const stale = useStaleQueueWarning(clock)
   const [addOpen, setAddOpen] = useState(false)
@@ -192,19 +179,6 @@ export function RosterScreen({
     }
   }, [client, sessionId])
 
-  // Independent of the fetch above and its catch branch: the briefing is cache-only
-  // regardless of whether the live roster read succeeds, so it must not live inside either
-  // branch of that effect.
-  useEffect(() => {
-    let live = true
-    void readSession(offlineStore(), sessionId).then((cached) => {
-      if (live) setPlan(cached?.plan ?? null)
-    })
-    return () => {
-      live = false
-    }
-  }, [sessionId])
-
   // **A filter over the names already on screen** (owner, 2026-10-13): "it is possible to
   // have search options at the top, so one does not have to scroll through everybody to
   // mark a child". Local, over the rows the register already holds — no request, works in
@@ -236,6 +210,38 @@ export function RosterScreen({
             ),
           },
     [split, needle],
+  )
+
+  // **Three bands, by why a row is on the list** (owner, 2026-10-13). An extra session
+  // lists the children whose plan pays for it; a base session lists its enrolment; and in
+  // both, whoever the coach wrote down by hand sits apart. The shortcut belongs to a band,
+  // not to the screen, which is what keeps the entitled list and a coach's own additions
+  // from being marked together by accident.
+  const bands = useMemo(
+    () =>
+      [
+        {
+          key: 'entitled',
+          label: 'attendance.roster.bandEntitled',
+          rows: shown.expected.filter((row) => row.entitled),
+          bulk: true,
+        },
+        {
+          key: 'enrolled',
+          label: 'attendance.roster.bandEnrolled',
+          rows: shown.expected.filter((row) => !row.entitled && !row.visiting),
+          bulk: true,
+        },
+        {
+          key: 'added',
+          label: 'attendance.roster.bandAdded',
+          // A child added by hand is marked present by the act of adding them, so there is
+          // nothing here for a bulk shortcut to do.
+          rows: shown.expected.filter((row) => !row.entitled && row.visiting),
+          bulk: false,
+        },
+      ].filter((band) => band.rows.length > 0),
+    [shown],
   )
 
   // Over the EXPECTED section too, for the same reason as the three counts below: the note
@@ -300,7 +306,10 @@ export function RosterScreen({
           <strong>{t(locale, 'attendance.sync.staleWarning')}</strong>
           <span>{t(locale, 'attendance.sync.staleBody')}</span>
         </Alert>
-        <p className="text-xs font-semibold text-[var(--text-muted)]" data-testid="roster-stale-count">
+        <p
+          className="text-xs font-semibold text-[var(--text-muted)]"
+          data-testid="roster-stale-count"
+        >
           {plural(locale, 'attendance.sync.pendingCount', pending)}
         </p>
       </section>
@@ -347,8 +356,9 @@ export function RosterScreen({
                   '{{weekday}}',
                   t(locale, `schedule.weekday.${sessionWeekday(header.startsAt)}`),
                 )}{' '}
-                · <span className="font-mono">{formatTimeInStudioZone(header.startsAt, locale)}</span> ·{' '}
-                <bdi>{header.groupName}</bdi>
+                ·{' '}
+                <span className="font-mono">{formatTimeInStudioZone(header.startsAt, locale)}</span>{' '}
+                · <bdi>{header.groupName}</bdi>
                 {header.locationName ? (
                   <>
                     {' '}
@@ -413,26 +423,14 @@ export function RosterScreen({
         ) : null}
       </header>
 
-      {/* §6.2 — "shows the plan at the top, before the roster... that is the moment
-          someone on the mat needs it." Above the quick-action strip and the list both.
-          `SessionPlanCard` moved to `../briefing` (2026-09-07) so the schedule tab's card
-          can open the same editor from its own marker — this screen's placement of it is
-          unchanged, only its address moved. */}
-      <SessionPlanCard
-        canWrite={canWritePlan}
-        locale={locale}
-        onSave={async (body) => {
-          // `addSessionNote` is optional on the interface (see `client.ts`'s own note on
-          // why) but never actually absent here: every real client implements it, and
-          // `canWritePlan` is what gates whether this card even offers the button that
-          // reaches this handler. A missing implementation refuses rather than silently
-          // updating local state for a write that never reached the server.
-          if (!client.addSessionNote) throw new Error('addSessionNote is not implemented')
-          await client.addSessionNote(sessionId, body, 'plan')
-          setPlan(body)
-        }}
-        plan={plan}
-      />
+      {/* **The briefing is not here any more** (owner, 2026-10-13): "in my opinion the
+          session briefing should not be on the attendance screen but on the schedule
+          screen, under a popup when you press the briefing, and stay on the schedule". Two
+          reasons, both the owner's: this screen is open DURING the lesson by whoever is
+          running it — often an assistant coach — and a plan is written BEFORE it by the
+          person answerable for it. `SessionPlanCard` is untouched and keeps its single home
+          on `TodayScreen`, where it already opens in a dialog over the day and already
+          gates writing to owner / manager / lead coach. */}
 
       {/* The prototype's quick-action strip. Only its "mark all" half is drawn — see this
           file's own header note on why "reset" has nothing behind it.
@@ -483,56 +481,66 @@ export function RosterScreen({
           acting on everybody at once. Here it reads as what it is: a shortcut on a set.
           With the filter active it marks what is on screen and says so, and the moment it
           is used it offers the way back. */}
-      {shown.expected.length > 0 ? (
-        <div className="flex items-center justify-between gap-2" data-testid="roster-band-enrolled">
-          <span className="text-[11px] font-semibold text-[var(--text-muted)]">
-            {t(locale, 'attendance.roster.bandEnrolled').replace(
-              '{{count}}',
-              String(shown.expected.length),
-            )}
-          </span>
-          <button
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold transition-all active:scale-95 ${
-              lastBulk
-                ? 'border-[var(--border)] text-[var(--text-muted)]'
-                : 'border-[var(--paid)] text-[var(--paid)]'
-            }`}
-            data-testid="roster-bulk"
-            onClick={() => {
-              void runBulk()
-            }}
-            type="button"
-          >
-            <CheckCheck aria-hidden="true" className="h-3.5 w-3.5" />
-            <span>
-              {lastBulk
-                ? t(locale, 'attendance.roster.undoBulk')
-                : needle === ''
-                  ? t(locale, 'attendance.roster.markAllPresent')
-                  : t(locale, 'attendance.roster.markAllShown')}
-            </span>
-          </button>
-        </div>
-      ) : null}
-
       {needle !== '' && shown.expected.length === 0 && shown.notExpected.length === 0 ? (
         <p className="text-sm text-[var(--text-muted)]" data-testid="roster-no-matches">
           {t(locale, 'attendance.roster.noMatches')}
         </p>
       ) : null}
 
-      <ul className="flex flex-col gap-2" data-testid="roster-list">
-        {shown.expected.map((row) => (
-          <li key={row.student_id}>
-            <RosterRow
-              locale={locale}
-              onCycle={(next) => mark(row, next, 'coach')}
-              onOverride={() => mark(row, 'present', 'coach')}
-              row={row}
-            />
-          </li>
+      {/* One container, still `roster-list` — the bands are inside it. A screen that used
+          to be one flat list is three sets now, and everything that pointed at the list as
+          a whole (the tests for the bulk rule, the not-expected split, §6.2's briefing)
+          still means what it meant. */}
+      <div className="flex flex-col gap-4" data-testid="roster-list">
+        {bands.map((band) => (
+          <section className="flex flex-col gap-2" key={band.key}>
+            <div
+              className="flex items-center justify-between gap-2"
+              data-testid={`roster-band-${band.key}`}
+            >
+              <span className="text-[11px] font-semibold text-[var(--text-muted)]">
+                {t(locale, band.label).replace('{{count}}', String(band.rows.length))}
+              </span>
+              {band.bulk ? (
+                <button
+                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold transition-all active:scale-95 ${
+                    lastBulk
+                      ? 'border-[var(--border)] text-[var(--text-muted)]'
+                      : 'border-[var(--paid)] text-[var(--paid)]'
+                  }`}
+                  data-testid={`roster-bulk-${band.key}`}
+                  onClick={() => {
+                    void runBulk(band.rows)
+                  }}
+                  type="button"
+                >
+                  <CheckCheck aria-hidden="true" className="h-3.5 w-3.5" />
+                  <span>
+                    {lastBulk
+                      ? t(locale, 'attendance.roster.undoBulk')
+                      : needle === ''
+                        ? t(locale, 'attendance.roster.markAllPresent')
+                        : t(locale, 'attendance.roster.markAllShown')}
+                  </span>
+                </button>
+              ) : null}
+            </div>
+
+            <ul className="flex flex-col gap-2" data-testid={`roster-list-${band.key}`}>
+              {band.rows.map((row) => (
+                <li key={row.student_id}>
+                  <RosterRow
+                    locale={locale}
+                    onCycle={(next) => mark(row, next, 'coach')}
+                    onOverride={() => mark(row, 'present', 'coach')}
+                    row={row}
+                  />
+                </li>
+              ))}
+            </ul>
+          </section>
         ))}
-      </ul>
+      </div>
 
       {/* §5.7 — "Students enrolled in the group but not expected today sit in a separate
           collapsed section beneath it, and can still be marked." A <details>, so it is
@@ -567,7 +575,10 @@ export function RosterScreen({
         >
           {t(locale, 'attendance.roster.savedImmediately')}
         </p>
-        <p className="text-center text-xs font-medium text-[var(--text-muted)]" data-testid="roster-edit-anytime">
+        <p
+          className="text-center text-xs font-medium text-[var(--text-muted)]"
+          data-testid="roster-edit-anytime"
+        >
           {t(locale, 'attendance.roster.editAnytime')}
         </p>
         {/* **Two buttons, and only these two** (owner, 2026-10-13): "I think the summary
@@ -624,7 +635,9 @@ export function RosterScreen({
           personId={personId}
           clock={clock}
           heading={
-            header ? `${header.groupName} · ${formatTimeInStudioZone(header.startsAt, locale)}` : null
+            header
+              ? `${header.groupName} · ${formatTimeInStudioZone(header.startsAt, locale)}`
+              : null
           }
           onClose={() => setSummaryOpen(false)}
           onReportSomething={async (description) => {
@@ -704,7 +717,7 @@ export function RosterScreen({
    *  of the band — all of them, or only the ones the filter is showing, which is what the
    *  label says it will do. Pressed again, while it is still the last thing that happened,
    *  it takes exactly those rows back to `unmarked` and nothing else. */
-  async function runBulk(): Promise<void> {
+  async function runBulk(rows: RosterRowData[]): Promise<void> {
     if (lastBulk !== null) {
       const undoing = new Set(lastBulk)
       // `mark` clears `lastBulk` itself, which is also what makes the label flip back.
@@ -716,13 +729,12 @@ export function RosterScreen({
     // The same predicate the server applies to `attendance.bulk`: only expected, only
     // unmarked, never over a parent's advance notice. Computed here as well because the
     // undo has to know precisely which rows this press changed.
-    const targets = shown.expected.filter(
-      (row) => row.status === 'unmarked' && !row.has_absence_report,
-    )
+    const targets = rows.filter((row) => row.status === 'unmarked' && !row.has_absence_report)
     if (targets.length === 0) return
     setLastBulk(targets.map((row) => row.student_id))
-    if (needle === '') {
-      // Unfiltered: one queued op over the server's own predicate, exactly as before.
+    if (needle === '' && rows.length === shown.expected.length) {
+      // The whole expected list, unfiltered: one queued op over the server's own
+      // predicate, exactly as before this screen had bands.
       await bulkPresent()
       return
     }

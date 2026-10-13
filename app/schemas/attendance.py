@@ -182,6 +182,11 @@ class RosterEntry(BaseModel):
     #: Here for this one session, with no live enrollment in its group (owner, 2026-10-13).
     #: The staff roster draws such a row with a אורח chip and leaves it out of the
     #: "expected today" count — see `app/services/attendance/roster.py::RosterRowRaw`.
+    #: Listed because this child's PLAN pays for this training, not because they are
+    #: enrolled in its group (owner, 2026-10-13). Only ever true on an `extra` session, and
+    #: always with `expected` false: an optional training a child skipped is not a missed
+    #: one. The staff register draws these under זכאים לאימון הזה.
+    entitled: bool = False
     visiting: bool = False
 
     _validate_flags = field_validator("derived_flags", mode="before")(_flags_are_booleans)

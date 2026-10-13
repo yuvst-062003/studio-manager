@@ -39,6 +39,7 @@ from app.models.health import HealthDeclaration
 from app.models.people import Enrollment, Student
 from app.models.person import Person
 from app.models.schedule import Session as SessionRow
+from app.models.structure import Group
 from app.services.attendance.errors import NotFoundError
 from app.services.people.attendance_pattern import is_expected
 from app.services.people.group_days import studio_weekday
@@ -49,6 +50,15 @@ from app.services.people.naming import format_person_name
 #: made. `frozen` is out for the same reason §5.10 says a frozen student generates nothing:
 #: they are not training.
 LIVE_ENROLLMENT_STATUSES = ("active",)
+
+#: A base group trains twice a week, so a plan of two sessions is already spent on the
+#: child's own group. Three or more is the spare session that an extra training IS -- the
+#: owner's own rule, read off the price list: "the extra is allowed only for the ones who
+#: pay for 3 times and all-include". A plan with NO weekly figure records no cap, which is
+#: what this club's `4-6 אימונים בשבוע` is; `PricePlan.sessions_per_week` is documented as a
+#: label rather than a rule the billing run enforces, and this is the one place that label
+#: decides anything.
+ENTITLED_FROM_SESSIONS_PER_WEEK = 3
 
 
 @dataclass(frozen=True)
@@ -92,6 +102,11 @@ class RosterRowRaw:
     #: `PricePlan.name` via `student.price_plan_id`. `None` when no plan is chosen yet,
     #: same as the belt fields above.
     plan_name: str | None = None
+    #: Listed because the child's PLAN pays for this training, not because they are
+    #: enrolled in its group and not because anybody marked them (owner, 2026-10-13). Only
+    #: ever true on an `extra` session. `expected` stays False -- §5.14's denominator is
+    #: expected sessions, and an optional training a child skipped is not a missed one.
+    entitled: bool = False
     #: Here for this session only, with no live enrollment in its group (owner, 2026-10-13).
     #: A child who comes on a day their own group does not train, or trains an extra
     #: session: the manager marks them present and nothing about their enrollment, plan or
@@ -160,6 +175,33 @@ def build_roster(
 
     enrolled_ids = {student.id for _, student, _ in enrollments}
     visitor_ids = [sid for sid in marks if sid not in enrolled_ids]
+
+    # **An extra session opens pre-filled** (owner, 2026-10-13). Until now an `extra`
+    # group's register was empty by construction -- nobody is enrolled in קרוספיט or
+    # נבחרת, those are trainings a child ATTENDS on top of their group -- so recording an
+    # hour meant typing twenty-four names into a search box one at a time. The list comes
+    # from the price list and nothing else, so a child moved from ×2 to ×3 appears here by
+    # themselves, with no setting to remember.
+    group = session.get(Group, session_row.group_id)
+    entitled = (
+        session.execute(
+            select(Student, Person)
+            .join(Person, Person.id == Student.person_id)
+            .join(PricePlan, PricePlan.id == Student.price_plan_id)
+            .where(
+                Student.status == "active",
+                # Already on the list as an enrolment or as somebody's mark: being
+                # entitled as well must not produce a second row for one child.
+                Student.id.not_in(enrolled_ids | set(marks)),
+                (PricePlan.sessions_per_week.is_(None))
+                | (PricePlan.sessions_per_week >= ENTITLED_FROM_SESSIONS_PER_WEEK),
+            )
+        )
+        .tuples()
+        .all()
+        if group is not None and group.kind == "extra"
+        else []
+    )
     visitors = (
         session.execute(
             select(Student, Person)
@@ -172,10 +214,14 @@ def build_roster(
         else []
     )
 
-    if not enrollments and not visitors:
+    if not enrollments and not visitors and not entitled:
         return session_row, []
 
-    student_ids = [*enrolled_ids, *(student.id for student, _ in visitors)]
+    student_ids = [
+        *enrolled_ids,
+        *(student.id for student, _ in visitors),
+        *(student.id for student, _ in entitled),
+    ]
     reports = {
         row.student_id: row
         for row in session.execute(
@@ -214,6 +260,7 @@ def build_roster(
         for student in (
             *(student for _, student, _ in enrollments),
             *(student for student, _ in visitors),
+            *(student for student, _ in entitled),
         )
         if student.price_plan_id
     }
@@ -224,35 +271,55 @@ def build_roster(
         ).tuples()
     }
 
-    rows = [
-        _row(
-            enrollment=enrollment,
-            student=student,
-            person=person,
-            weekday=weekday,
-            mark=marks.get(student.id),
-            report=reports.get(student.id),
-            confirmed=student.id in confirmations,
-            derived_flags=flags.get(student.id) or {},
-            plan_name=plan_names.get(student.price_plan_id) if student.price_plan_id else None,
-        )
-        for enrollment, student, person in enrollments
-    ] + [
-        # Same projection, no enrollment to read a pattern from — see `RosterRowRaw.visiting`.
-        _row(
-            enrollment=None,
-            student=student,
-            person=person,
-            weekday=weekday,
-            mark=marks.get(student.id),
-            report=reports.get(student.id),
-            confirmed=student.id in confirmations,
-            derived_flags=flags.get(student.id) or {},
-            plan_name=plan_names.get(student.price_plan_id) if student.price_plan_id else None,
-            visiting=True,
-        )
-        for student, person in visitors
-    ]
+    rows = (
+        [
+            _row(
+                enrollment=enrollment,
+                student=student,
+                person=person,
+                weekday=weekday,
+                mark=marks.get(student.id),
+                report=reports.get(student.id),
+                confirmed=student.id in confirmations,
+                derived_flags=flags.get(student.id) or {},
+                plan_name=plan_names.get(student.price_plan_id) if student.price_plan_id else None,
+            )
+            for enrollment, student, person in enrollments
+        ]
+        + [
+            # Same projection, no enrollment to read a pattern from — see `RosterRowRaw.visiting`.
+            _row(
+                enrollment=None,
+                student=student,
+                person=person,
+                weekday=weekday,
+                mark=marks.get(student.id),
+                report=reports.get(student.id),
+                confirmed=student.id in confirmations,
+                derived_flags=flags.get(student.id) or {},
+                plan_name=plan_names.get(student.price_plan_id) if student.price_plan_id else None,
+                visiting=True,
+            )
+            for student, person in visitors
+        ]
+        + [
+            # Listed by their plan, marked by nobody yet. Same projection again, with neither an
+            # enrollment to read a pattern from nor a mark to read a status from.
+            _row(
+                enrollment=None,
+                student=student,
+                person=person,
+                weekday=weekday,
+                mark=None,
+                report=reports.get(student.id),
+                confirmed=student.id in confirmations,
+                derived_flags=flags.get(student.id) or {},
+                plan_name=plan_names.get(student.price_plan_id) if student.price_plan_id else None,
+                entitled=True,
+            )
+            for student, person in entitled
+        ]
+    )
     # Sorted by name so a coach scanning thirty rows reads the same order every session.
     # Not by enrollment date, which is invisible on the mat.
     rows.sort(key=lambda row: row.display_name)
@@ -271,6 +338,7 @@ def _row(
     derived_flags: dict[str, bool],
     plan_name: str | None,
     visiting: bool = False,
+    entitled: bool = False,
 ) -> RosterRowRaw:
     return RosterRowRaw(
         student_id=student.id,
@@ -297,4 +365,5 @@ def _row(
         belt_name=None,
         plan_name=plan_name,
         visiting=visiting,
+        entitled=entitled,
     )

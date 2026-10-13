@@ -69,6 +69,8 @@ export const attendance: Bundle = {
   'roster.filterPlaceholder': 'חיפוש בשם…',
   'roster.noMatches': 'אין חניך בשם הזה ברשימה',
   'roster.bandEnrolled': 'רשומים לקבוצה · {{count}}',
+  'roster.bandEntitled': 'זכאים לאימון הזה · {{count}}',
+  'roster.bandAdded': 'נוספו ידנית · {{count}}',
   'roster.markAllShown': 'סימון המוצגים',
   'roster.undoBulk': 'ביטול הסימון',
   'roster.savedImmediately': 'כל סימון נשמר מיד, גם ללא רשת',

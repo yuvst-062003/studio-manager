@@ -487,7 +487,6 @@ export default function App() {
               />
             ) : (
               <RosterScreen
-                canWritePlan={viewerCanWritePlan}
                 canGrantTrialOverride={viewerIsManager}
                 client={attendanceClient}
                 locale={locale}

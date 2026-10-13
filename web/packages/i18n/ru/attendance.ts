@@ -42,6 +42,8 @@ export const attendance: Bundle = {
   'roster.filterPlaceholder': 'Поиск по имени…',
   'roster.noMatches': 'В списке нет ученика с таким именем',
   'roster.bandEnrolled': 'Записаны в группу · {{count}}',
+  'roster.bandEntitled': 'Имеют право на это занятие · {{count}}',
+  'roster.bandAdded': 'Добавлены вручную · {{count}}',
   'roster.markAllShown': 'Отметить показанных',
   'roster.undoBulk': 'Отменить отметку',
   'roster.savedImmediately': 'Каждая отметка сохраняется сразу, даже без сети',

@@ -137,6 +137,12 @@ export type RosterRow = {
    *  existed still type-checks, and `undefined` means "not a visitor", which is what every
    *  row before this change was. */
   visiting?: boolean
+  /** Listed because this child's PLAN pays for this training (owner, 2026-10-13) — never
+   *  because they are enrolled in its group, and never because anybody marked them. Only
+   *  ever true on an `extra` session (קרוספיט, נבחרת, ג'ודו גילאי 8-12), where the group
+   *  has no enrolment at all and the register used to open empty. Mirrors
+   *  `RosterEntry.entitled`; optional for the same reason the fields above are. */
+  entitled?: boolean
 }
 
 /** Mirrors `app/schemas/schedule.py::SessionOut`, narrowed to what the roster draws.

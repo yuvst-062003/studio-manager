@@ -434,132 +434,77 @@ describe('§6.5 — the blocking stale-queue warning', () => {
   })
 })
 
-// §6.2, decision 16 — the briefing. Written by owner/manager/lead_coach, read by any staff
-// role, and read off the cache rather than fetched: `client.sessionRoster` (`GET
-// /sessions/{id}/attendance`) never carries `plan` at all.
-describe('§6.2 — the session briefing', () => {
-  const cachedSessionWithPlan = (plan: string | null) => ({
-    id: SESSION,
-    group_id: 'group-1',
-    group_name: 'מתחילים',
-    starts_at: '2026-11-03T15:00:00.000Z',
-    ends_at: '2026-11-03T16:00:00.000Z',
-    location_name: 'אולם א׳',
-    status: 'scheduled' as const,
-    attendance_taken: false,
-    plan,
-  })
-
-  it('reads the plan from the cached session, before the roster, with no fetch involved', async () => {
+// §6.2's briefing is NOT here any anymore (owner, 2026-10-13): "the session briefing
+// should not be on the attendance screen but on the schedule screen, under a popup when you
+// press the briefing, and stay on the schedule". This screen is open during the lesson by
+// whoever is running it, often an assistant coach; a plan is written before it by the
+// person answerable for it. `TodayScreen.test.tsx` owns the briefing's behaviour now —
+// reading it, writing it, and the owner/manager/lead-coach gate on the editor.
+describe('§6.2 — the briefing belongs to the schedule', () => {
+  it('draws no briefing and no editor on the register, whatever the cache holds', async () => {
     await writeWindow(store, {
-      server_time: NOW,
-      from_time: NOW,
-      to_time: NOW,
-      sessions: [cachedSessionWithPlan('היום נתרגל השלכות מעמידה')],
-      rosters: { [SESSION]: [row()] },
-    })
+      sessions: [
+        {
+          id: SESSION,
+          group_id: 'group-1',
+          group_name: 'מתחילים',
+          starts_at: '2026-11-03T15:00:00.000Z',
+          ends_at: '2026-11-03T16:00:00.000Z',
+          plan: 'תרגול היום: אחיזות',
+        },
+      ],
+      rosters: {},
+      from_time: '2026-11-03T00:00:00.000Z',
+      to_time: '2026-11-04T00:00:00.000Z',
+      server_time: '2026-11-03T15:00:00.000Z',
+    } as never)
+
     renderScreen()
-    const plan = await screen.findByTestId('session-plan')
-    expect(plan).toHaveTextContent('היום נתרגל השלכות מעמידה')
-    // "at the top, before the roster" — DOCUMENT_POSITION_FOLLOWING means `plan` comes
-    // before the node it is compared against.
-    const list = await screen.findByTestId('roster-list')
-    expect(plan.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-  })
-
-  it('still shows the cached plan when the live roster fetch fails', async () => {
-    // The plan has no live-fetch counterpart at all (§6.2's whole point), so it must not
-    // live inside `sessionRoster`'s success path or its catch branch.
-    await writeWindow(store, {
-      server_time: NOW,
-      from_time: NOW,
-      to_time: NOW,
-      sessions: [cachedSessionWithPlan('תרגול היום: אחיזות')],
-      rosters: { [SESSION]: [row()] },
-    })
-    const client = makeClient([])
-    client.sessionRoster = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
-    renderScreen({ client })
-    expect(await screen.findByTestId('session-plan')).toHaveTextContent('תרגול היום: אחיזות')
-  })
-
-  it('shows an assistant coach the plan and no editor', async () => {
-    await writeWindow(store, {
-      server_time: NOW,
-      from_time: NOW,
-      to_time: NOW,
-      sessions: [cachedSessionWithPlan('תרגול השלכות')],
-      rosters: { [SESSION]: [row()] },
-    })
-    renderScreen({ canWritePlan: false })
-    expect(await screen.findByTestId('session-plan')).toHaveTextContent('תרגול השלכות')
-    expect(screen.queryByTestId('session-plan-edit')).not.toBeInTheDocument()
-  })
-
-  it('renders nothing when there is no plan and the viewer cannot write one', async () => {
-    await writeWindow(store, {
-      server_time: NOW,
-      from_time: NOW,
-      to_time: NOW,
-      sessions: [cachedSessionWithPlan(null)],
-      rosters: { [SESSION]: [row()] },
-    })
-    renderScreen({ canWritePlan: false })
     await screen.findByTestId('roster-list')
-    expect(screen.queryByTestId('session-plan')).not.toBeInTheDocument()
+
+    expect(screen.queryByTestId('session-plan')).toBeNull()
+    expect(screen.queryByTestId('session-plan-edit')).toBeNull()
+  })
+})
+
+// §5.7a — an extra session (קרוספיט, נבחרת, ג'ודו גילאי 8-12) opens pre-filled with the
+// children whose plan pays for it, and a coach's own additions sit in a band of their own.
+// Owner, 2026-10-13: "when a manager enters a session he needs to see all the students of
+// the class and the program… the extra is allowed only for the ones who pay for 3 times
+// and all-include".
+describe('the register bands what it is showing', () => {
+  it('draws the entitled children under their own heading', async () => {
+    renderScreen({
+      client: makeClient([
+        row({ student_id: 'a', display_name: 'זכאי', entitled: true }),
+        row({ student_id: 'b', display_name: 'אורח', visiting: true }),
+      ]),
+    })
+
+    expect(await screen.findByTestId('roster-band-entitled')).toHaveTextContent('זכאים לאימון הזה')
+    expect(screen.getByTestId('roster-band-added')).toHaveTextContent('נוספו ידנית')
+    expect(screen.queryByTestId('roster-band-enrolled')).toBeNull()
   })
 
-  it('offers a coach permitted to write one an "add a briefing" affordance, even with none yet', async () => {
-    await writeWindow(store, {
-      server_time: NOW,
-      from_time: NOW,
-      to_time: NOW,
-      sessions: [cachedSessionWithPlan(null)],
-      rosters: { [SESSION]: [row()] },
-    })
-    renderScreen({ canWritePlan: true })
-    expect(await screen.findByTestId('session-plan-edit')).toHaveTextContent(
-      t('he', 'attendance.briefing.add'),
-    )
+  it('keeps a plain enrolment in the enrolled band, with no entitled band at all', async () => {
+    renderScreen({ client: makeClient([row({ student_id: 'a', display_name: 'רשום' })]) })
+
+    expect(await screen.findByTestId('roster-band-enrolled')).toBeInTheDocument()
+    expect(screen.queryByTestId('roster-band-entitled')).toBeNull()
+    expect(screen.queryByTestId('roster-band-added')).toBeNull()
   })
 
-  it('writes a plan through the API and shows it without a further fetch', async () => {
-    await writeWindow(store, {
-      server_time: NOW,
-      from_time: NOW,
-      to_time: NOW,
-      sessions: [cachedSessionWithPlan(null)],
-      rosters: { [SESSION]: [row()] },
-    })
-    const client = makeClient([row()])
-    renderScreen({ client, canWritePlan: true })
-    await userEvent.click(await screen.findByTestId('session-plan-edit'))
-    await userEvent.type(await screen.findByTestId('session-plan-input'), 'לעבוד על מסירות')
-    await userEvent.click(screen.getByTestId('session-plan-save'))
+  it('marks one band at a time — the shortcut belongs to the set it sits on', async () => {
+    const client = makeClient([
+      row({ student_id: 'a', display_name: 'זכאי', entitled: true }),
+      row({ student_id: 'b', display_name: 'אורח2', visiting: true, status: 'unmarked' }),
+    ])
+    renderScreen({ client })
+    await screen.findByTestId('roster-band-entitled')
 
-    await waitFor(() =>
-      expect(client.addSessionNote).toHaveBeenCalledWith(SESSION, 'לעבוד על מסירות', 'plan'),
-    )
-    expect(await screen.findByTestId('session-plan')).toHaveTextContent('לעבוד על מסירות')
-    expect(screen.queryByTestId('session-plan-editor')).not.toBeInTheDocument()
-  })
+    await userEvent.click(screen.getByTestId('roster-bulk-entitled'))
 
-  it('keeps the editor open and names the problem when the save fails', async () => {
-    await writeWindow(store, {
-      server_time: NOW,
-      from_time: NOW,
-      to_time: NOW,
-      sessions: [cachedSessionWithPlan(null)],
-      rosters: { [SESSION]: [row()] },
-    })
-    const client = makeClient([row()])
-    client.addSessionNote = vi.fn().mockRejectedValue(new Error('403'))
-    renderScreen({ client, canWritePlan: true })
-    await userEvent.click(await screen.findByTestId('session-plan-edit'))
-    await userEvent.type(await screen.findByTestId('session-plan-input'), 'תדריך')
-    await userEvent.click(screen.getByTestId('session-plan-save'))
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(t('he', 'attendance.briefing.saveFailed'))
-    expect(screen.getByTestId('session-plan-editor')).toBeInTheDocument()
+    expect(screen.getByTestId('roster-row-a')).toHaveAttribute('data-status', 'present')
+    expect(screen.getByTestId('roster-row-b')).toHaveAttribute('data-status', 'unmarked')
   })
 })
