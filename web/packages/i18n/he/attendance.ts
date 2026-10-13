@@ -22,6 +22,7 @@ export const attendance: Bundle = {
   'summary.somethingOddAudience': 'נשלח למנהלי המועדון מיד. ההורים לא מקבלים את זה — המנהל מתקשר אליהם.',
   'addToSession.title': 'הוספת חניך לשיעור',
   'addToSession.existing': 'חניך מהמועדון',
+  'addToSession.fromClub': 'הוספת חניך מרשימת החניכים',
   'addToSession.trial': 'שיעור ניסיון',
   'addToSession.existingHint': 'חניך מקבוצה אחרת שהגיע לאימון הזה. הנוכחות נרשמת לשיעור הזה בלבד — הקבוצה, המסלול והחיוב שלו לא משתנים.',
   'addToSession.visiting': 'אורח',
@@ -63,6 +64,14 @@ export const attendance: Bundle = {
   'roster.notExpectedToday': 'לא אמורים להגיע היום',
   'roster.notExpectedHint': 'אפשר לסמן גם אותם — ילד שהגיע ביום נוסף הוא ילד אמיתי',
   'roster.markAllPresent': 'סימון כולם כנוכחים',
+  'roster.back': 'חזרה להיום',
+  'roster.filter': 'חיפוש בשם',
+  'roster.filterPlaceholder': 'חיפוש בשם…',
+  'roster.noMatches': 'אין חניך בשם הזה ברשימה',
+  'roster.bandEnrolled': 'רשומים לקבוצה · {{count}}',
+  'roster.markAllShown': 'סימון המוצגים',
+  'roster.undoBulk': 'ביטול הסימון',
+  'roster.savedImmediately': 'כל סימון נשמר מיד, גם ללא רשת',
   // C3 — the redesign's header counter: "present of total", over the same expected-only
   // denominator the three tiles below use. `{{present}}`/`{{total}}` are both bare digits;
   // the caller wraps the whole resolved string in `font-mono`.

@@ -960,7 +960,11 @@ describe('TodayScreen — the pendingClose card names the act it performs (owner
   })
 })
 
-describe('TodayScreen — the write-up is reachable from the card (owner fix)', () => {
+// The write-up and the item handover became ROWS on the card, and the write-up a popup
+// over the day (owner, 2026-10-13): "the summary should not be there but on the session
+// card, and the item handover should be on the card itself" — "there" being the register,
+// which is open during the lesson by whoever is running it.
+describe('TodayScreen — the session\'s own paperwork lives on its card', () => {
   const ENDED_CLOSED: SessionRow = {
     ...base,
     id: 's-ended-closed',
@@ -970,26 +974,34 @@ describe('TodayScreen — the write-up is reachable from the card (owner fix)', 
     status: 'scheduled',
   }
 
-  it('appears on an ended, already-closed session and points at its summary', async () => {
+  it('opens the write-up as a popup over the day, on an ended session', async () => {
     render(screenFor({ client: stub([ENDED_CLOSED]) }))
-    const link = await screen.findByTestId('session-summary-link')
-    expect(link).toHaveAttribute('href', '#/attendance/s-ended-closed/summary')
+
+    await userEvent.click(await screen.findByTestId('session-summary-open'))
+
+    const sheet = await screen.findByTestId('session-summary-sheet')
+    expect(sheet).toHaveAttribute('role', 'dialog')
   })
 
-  it('appears on an ended, still-open (pendingClose) session too', async () => {
+  it('offers it on an ended, still-open (pendingClose) session too', async () => {
     render(
       screenFor({
         client: stub([{ ...ENDED_CLOSED, id: 's-ended-open', attendance_taken: false }]),
       }),
     )
-    const link = await screen.findByTestId('session-summary-link')
-    expect(link).toHaveAttribute('href', '#/attendance/s-ended-open/summary')
+    expect(await screen.findByTestId('session-summary-open')).toBeInTheDocument()
+  })
+
+  it('carries the item handover beside it, as a row rather than a chip', async () => {
+    render(screenFor({ client: stub([ENDED_CLOSED]) }))
+    const row = await screen.findByTestId('session-handover-open')
+    expect(row).toHaveAttribute('href', '#/attendance/s-ended-closed/handover')
   })
 
   it('does not appear on an upcoming session', async () => {
     render(screenFor({ client: stub([TODAY_SESSION]) }))
     await screen.findByTestId('open-roster')
-    expect(screen.queryByTestId('session-summary-link')).toBeNull()
+    expect(screen.queryByTestId('session-summary-open')).toBeNull()
   })
 
   it('does not appear on a session happening right now', async () => {
@@ -1002,7 +1014,7 @@ describe('TodayScreen — the write-up is reachable from the card (owner fix)', 
     }
     render(screenFor({ client: stub([ACTIVE_NOW]) }))
     await screen.findByTestId('open-roster')
-    expect(screen.queryByTestId('session-summary-link')).toBeNull()
+    expect(screen.queryByTestId('session-summary-open')).toBeNull()
   })
 
   it('does not appear on a cancelled session, even one long past its slot — it never happened', async () => {
@@ -1012,7 +1024,7 @@ describe('TodayScreen — the write-up is reachable from the card (owner fix)', 
       }),
     )
     await screen.findByTestId('session-row')
-    expect(screen.queryByTestId('session-summary-link')).toBeNull()
+    expect(screen.queryByTestId('session-summary-open')).toBeNull()
   })
 })
 

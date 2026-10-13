@@ -23,6 +23,7 @@ function renderSheet(over: Partial<Parameters<typeof AddToSessionSheet>[0]> = {}
     <AddToSessionSheet
       locale="he"
       peopleClient={over.peopleClient ?? client()}
+      mode={over.mode ?? 'existing'}
       onPickStudents={over.onPickStudents ?? onPickStudents}
       onClose={over.onClose ?? vi.fn()}
       alreadyOnRoster={over.alreadyOnRoster ?? new Set()}
@@ -101,13 +102,16 @@ describe('adding somebody to a session', () => {
     expect(screen.getByTestId(`add-to-session-pick-${VISITOR.id}`)).toBeInTheDocument()
   })
 
-  it('carries the trial form on its second tab, where the page used to be', async () => {
+  it('shows the club list and no trial form — the trial is its own popup now', () => {
     renderSheet()
     expect(screen.queryByTestId('trial-in-class')).not.toBeInTheDocument()
+    expect(screen.getByTestId('add-to-session-existing')).toBeInTheDocument()
+  })
 
-    await userEvent.click(screen.getByTestId('add-to-session-tab-trial'))
-
+  it('carries the trial form when it is opened as the trial popup', () => {
+    renderSheet({ mode: 'trial' })
     expect(screen.getByTestId('trial-in-class')).toBeInTheDocument()
+    expect(screen.queryByTestId('add-to-session-existing')).not.toBeInTheDocument()
   })
 
   it('says plainly that a visit changes nothing about the student', () => {
@@ -125,7 +129,7 @@ describe('adding somebody to a session', () => {
 //
 // Logging a trial recorded `attended` on the BOOKING and no attendance row, so the child a
 // coach had just written down did not appear on the roster they were standing in front of.
-describe('a name written into the trial tab', () => {
+describe('a name written into the trial popup', () => {
   it('is marked present on this session, not only booked', async () => {
     const onPickStudents = vi.fn()
     const logTrial = vi.fn(() =>
@@ -142,12 +146,12 @@ describe('a name written into the trial tab', () => {
         onPickStudents={onPickStudents}
         onClose={vi.fn()}
         alreadyOnRoster={new Set()}
+        mode="trial"
         trialGroupId="g-1"
         trialSessionId="s-1"
       />,
     )
 
-    await userEvent.click(screen.getByTestId('add-to-session-tab-trial'))
     await userEvent.type(screen.getByLabelText('שם פרטי'), 'יונתן')
     await userEvent.type(screen.getByLabelText('שם משפחה'), 'לוי')
     await userEvent.type(screen.getByLabelText('הורה'), 'דנה לוי')

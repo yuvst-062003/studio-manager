@@ -139,6 +139,7 @@ import {
   studioDayKey,
   useNetworkMode,
 } from '@studio/core'
+import { apiFetch } from '@studio/core'
 import type { RosterRow } from '@studio/core'
 import { plural, t } from '@studio/i18n'
 import type { Locale } from '@studio/i18n'
@@ -152,6 +153,7 @@ import type { StaffAttendanceClient } from '../attendance/client'
 import { ContactFamiliesButton } from '../contact'
 import type { ContactFamily } from '../contact'
 import { SessionPlanCard } from '../briefing'
+import { SessionSummarySheet } from '../attendance/SessionSummarySheet'
 import './schedule.css'
 
 const DAY_MS = 86_400_000
@@ -1167,6 +1169,12 @@ function SessionBriefingControl({
 }
 
 // Exported (§4.7, checkpoint C11) — see `TimelineDot`'s own note just above for why.
+/** A full-width row on a card: a word, a chevron, and a thumb's worth of height. The
+ *  owner's rule after the first attempt put three 10px chips on every card — "the 3 buttons
+ *  on the session card are small and not good". */
+const SESSION_ROW_CLASS =
+  'flex min-h-11 w-full items-center justify-between gap-2 border-t border-[var(--border)] px-1 text-start text-xs font-bold text-[var(--fg)] transition-colors hover:bg-[var(--surface)]'
+
 export function SessionCard({
   session,
   state,
@@ -1177,6 +1185,7 @@ export function SessionCard({
   canWritePlan,
   saveBriefing,
   chaseFamilies,
+  personId = null,
   onEdit,
 }: {
   session: SessionRow
@@ -1197,6 +1206,9 @@ export function SessionCard({
    *  nothing but the body it collected, never the session id. */
   saveBriefing: (sessionId: string) => (body: string) => Promise<void>
   chaseFamilies: (studentIds: string[]) => () => Promise<ContactFamily[]>
+  /** Who is writing the summary, for `attendance_mark.marked_by_person_id`'s sibling on a
+   *  note. `null` is legal and the sheet handles it — the same prop `RosterScreen` passes. */
+  personId?: string | null
   /**
    * §4.7's edit sheet (checkpoint C11) — `undefined` on every call site in THIS file, so
    * the schedule tab renders exactly as it did before this prop existed. The month
@@ -1206,6 +1218,7 @@ export function SessionCard({
    */
   onEdit?: () => void
 }) {
+  const [summaryOpen, setSummaryOpen] = useState(false)
   const counts = confirmationCounts(roster)
   const notAnsweredIds = (roster ?? [])
     .filter((row) => row.has_confirmation !== true && !row.has_absence_report)
@@ -1507,14 +1520,55 @@ export function SessionCard({
             under the neutral `later` bucket. Any staff may write one (`POST
             /sessions/{id}/notes` is `AnyStaff`) — this is deliberately not `canWritePlan`
             gated, unlike the briefing marker above. */}
-        {sessionHasEnded ? (
-          <a
-            href={`#/attendance/${session.id}/summary`}
-            data-testid="session-summary-link"
-            className="self-center text-[11px] font-bold text-[var(--text-muted)] transition-colors hover:text-[var(--text-secondary)]"
-          >
-            {t(locale, 'attendance.summary.title')}
-          </a>
+        {/* **The session's own paperwork, on the session's own card** (owner, 2026-10-13):
+            "I think the summary should not be there but on the session card, and the item
+            handover should be on the card itself". Both used to sit in the register's
+            footer — the screen a coach has open DURING the lesson, often an assistant
+            coach. They are full rows here, not chips: "the 3 buttons on the session card
+            are small and not good". The summary opens as a popup over the day and closes
+            back onto it; the handover is `11a`'s own screen, unchanged. */}
+        {session.status !== 'cancelled' ? (
+          <div className="flex flex-col">
+            {sessionHasEnded ? (
+              <button
+                type="button"
+                aria-haspopup="dialog"
+                data-testid="session-summary-open"
+                onClick={() => setSummaryOpen(true)}
+                className={SESSION_ROW_CLASS}
+              >
+                <span>{t(locale, 'attendance.summary.title')}</span>
+                <ChevronLeft className="h-4 w-4 text-[var(--text-muted)] rtl:rotate-0 ltr:rotate-180" aria-hidden="true" />
+              </button>
+            ) : null}
+            <a href={`#/attendance/${session.id}/handover`} data-testid="session-handover-open" className={SESSION_ROW_CLASS}>
+              <span>{t(locale, 'billing.product.handOut')}</span>
+              <ChevronLeft className="h-4 w-4 text-[var(--text-muted)] rtl:rotate-0 ltr:rotate-180" aria-hidden="true" />
+            </a>
+          </div>
+        ) : null}
+
+        {summaryOpen ? (
+          <SessionSummarySheet
+            clock={() => today}
+            heading={`${session.group_name} · ${formatTimeInStudioZone(session.starts_at, locale)}`}
+            locale={locale}
+            onClose={() => setSummaryOpen(false)}
+            onReportSomething={async (description) => {
+              // Immediate and online-only, exactly as the register's copy was: a report
+              // about the lesson, with no child named, reaching the managers and no
+              // guardian. A non-2xx must reject so the sheet can say so.
+              const response = await apiFetch(`/api/v1/sessions/${session.id}/injury-reports`, {
+                body: JSON.stringify({ description }),
+                headers: { 'Content-Type': 'application/json' },
+                method: 'POST',
+              })
+              if (!response.ok) throw new Error(`injury report failed: ${response.status}`)
+            }}
+            personId={personId}
+            roster={roster ?? []}
+            sessionId={session.id}
+          />
         ) : null}
       </div>
     </article>

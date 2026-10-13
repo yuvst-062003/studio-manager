@@ -2,7 +2,6 @@
 // render a screen directly, which is exactly the thing a coach cannot do; this renders
 // `App` and navigates by the hash, the way mounted.test.tsx does for lane SCHEDULE.
 import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { memoryStore, setOfflineStore } from '@studio/core'
 import App from '../../App'
@@ -93,19 +92,19 @@ afterEach(() => {
 })
 
 describe('the in-session screens (S2)', () => {
-  it('opens 9g as a popup from the register, where the screen used to be', async () => {
-    // `#/attendance/<id>/summary` was a route until 2026-10-13. It is a dialog over the
-    // register now (owner), so what there is to prove here is that the register's own
-    // button opens it — and that the dead hash falls through to the register rather than
-    // to a blank screen.
-    globalThis.location.hash = '#/attendance/ses-1'
+  it('does not carry 9g any more — the write-up belongs to the session, not the register', async () => {
+    // `#/attendance/<id>/summary` was a route until 2026-10-13, then a dialog over the
+    // register, and now a row on the session's own card (owner: "the summary should not be
+    // there but on the session card"). The register is the screen open DURING the lesson,
+    // often by an assistant coach. What is left to prove here is that it no longer offers
+    // the write-up, and that the dead hash still falls through to the register rather than
+    // to a blank screen — `TodayScreen.test.tsx` proves the card opens the popup.
+    globalThis.location.hash = '#/attendance/ses-1/summary'
     render(<App />)
-    await waitFor(() => expect(screen.getByTestId('session-summary-open')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('roster-screen')).toBeInTheDocument())
 
-    await userEvent.click(screen.getByTestId('session-summary-open'))
-
-    expect(await screen.findByTestId('session-summary-sheet')).toBeInTheDocument()
-    expect(screen.getByTestId('summary-counts')).toBeInTheDocument()
+    expect(screen.queryByTestId('session-summary-open')).toBeNull()
+    expect(screen.queryByTestId('session-summary-sheet')).toBeNull()
   })
 
   it('reaches 11a at #/attendance/<id>/handover', async () => {

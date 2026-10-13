@@ -28,11 +28,16 @@ import type { Locale } from '@studio/i18n'
 import { TrialInClass } from '../people'
 import type { StaffPeopleClient, StudentSummary } from '../people'
 
-type Tab = 'existing' | 'trial'
+/** Which half this popup is. **Not a tab strip any more** (owner, 2026-10-13): "I think
+ *  add trial should be separate from them". Writing down a child the club already has and
+ *  inventing a brand-new one are different acts, reached from two buttons on the register,
+ *  so neither one makes a coach read past the other. */
+type Mode = 'existing' | 'trial'
 
 export function AddToSessionSheet({
   locale,
   peopleClient,
+  mode = 'existing',
   onPickStudents,
   onClose,
   trialGroupId,
@@ -42,6 +47,8 @@ export function AddToSessionSheet({
 }: {
   locale: Locale
   peopleClient: StaffPeopleClient
+  /** Which half to show. The register's two buttons pick it; there is no strip to switch. */
+  mode?: Mode
   /** Mark these students present at the session as visitors. The roster screen owns the
    *  queueing, so this sheet never touches the offline store.
    *
@@ -60,7 +67,6 @@ export function AddToSessionSheet({
   alreadyOnRoster: ReadonlySet<string>
 }) {
   const dialogRef = useModalDialog(true, onClose)
-  const [tab, setTab] = useState<Tab>('existing')
   const [query, setQuery] = useState('')
   const [club, setClub] = useState<StudentSummary[] | null>(null)
   const [failed, setFailed] = useState(false)
@@ -80,6 +86,7 @@ export function AddToSessionSheet({
   // on open, and the typing filters what came back — a club is a few hundred names at most,
   // and a filter that runs on the device answers on the first letter instead of the third.
   useEffect(() => {
+    if (mode !== 'existing') return
     let alive = true
     peopleClient
       .search('')
@@ -88,7 +95,7 @@ export function AddToSessionSheet({
     return () => {
       alive = false
     }
-  }, [peopleClient])
+  }, [peopleClient, mode])
 
   const needle = query.trim().toLowerCase()
   const offered = (club ?? []).filter((student) => !alreadyOnRoster.has(student.id))
@@ -126,7 +133,7 @@ export function AddToSessionSheet({
               <UserPlus className="w-4 h-4" aria-hidden="true" />
             </span>
             <h2 id="add-to-session-title" className="text-sm font-black text-[var(--fg)] truncate">
-              {t(locale, 'attendance.addToSession.title')}
+              {t(locale, mode === 'trial' ? 'attendance.addToSession.trial' : 'attendance.addToSession.fromClub')}
             </h2>
           </div>
           <button
@@ -140,27 +147,7 @@ export function AddToSessionSheet({
           </button>
         </div>
 
-        <div role="tablist" aria-label={t(locale, 'attendance.addToSession.title')} className="flex gap-1.5">
-          {(['existing', 'trial'] as const).map((each) => (
-            <button
-              key={each}
-              type="button"
-              role="tab"
-              aria-selected={tab === each}
-              data-testid={`add-to-session-tab-${each}`}
-              onClick={() => setTab(each)}
-              className={`flex-1 min-h-11 rounded-xl text-xs font-bold transition-colors ${
-                tab === each
-                  ? 'bg-[var(--emphasis)] text-[var(--on-emphasis)]'
-                  : 'bg-[var(--surface)] text-[var(--text-secondary)] border border-[var(--border)]'
-              }`}
-            >
-              {t(locale, `attendance.addToSession.${each}`)}
-            </button>
-          ))}
-        </div>
-
-        {tab === 'existing' ? (
+        {mode === 'existing' ? (
           <div className="space-y-3" data-testid="add-to-session-existing">
             <p className="text-[11px] text-[var(--text-muted)] m-0">
               {t(locale, 'attendance.addToSession.existingHint')}

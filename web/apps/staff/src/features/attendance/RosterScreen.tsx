@@ -30,7 +30,7 @@
 // atomically with the server). A "reset" that marked everyone absent has nothing behind
 // it — no bulk-absent op, no `PendingOpKind` for one — so it is not drawn. Half a pair,
 // deliberately, rather than a button whose tap would silently do nothing.
-import { CheckCheck, ClipboardList, Package, UserPlus } from 'lucide-react'
+import { CheckCheck, ChevronRight, Search, UserPlus } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Alert } from '@studio/ui'
@@ -81,6 +81,10 @@ function withMonoNumerals(text: string): ReactNode {
  *  `לא אמורים להגיע היום` beneath them. The second is collapsed and still markable —
  *  "a child who turns up on an extra day is a real child". */
 type Split = { expected: RosterRowData[]; notExpected: RosterRowData[] }
+
+/** A register shorter than this scrolls to nothing, so a search field over it would be
+ *  furniture. Base groups here run 12-16; the squad sessions are the long ones. */
+const FILTER_FROM = 10
 
 export function RosterScreen({
   sessionId,
@@ -140,6 +144,7 @@ export function RosterScreen({
   const pending = usePendingCount()
   const stale = useStaleQueueWarning(clock)
   const [addOpen, setAddOpen] = useState(false)
+  const [addMode, setAddMode] = useState<'existing' | 'trial'>('existing')
   const [summaryOpen, setSummaryOpen] = useState(false)
 
   useEffect(() => {
@@ -200,6 +205,15 @@ export function RosterScreen({
     }
   }, [sessionId])
 
+  // **A filter over the names already on screen** (owner, 2026-10-13): "it is possible to
+  // have search options at the top, so one does not have to scroll through everybody to
+  // mark a child". Local, over the rows the register already holds — no request, works in
+  // a basement, and answers on the first letter rather than the third.
+  const [query, setQuery] = useState('')
+  // What the last bulk press marked, so the same control can take it back. A bulk write
+  // with no one-tap undo is the part that makes a coach hesitate over the button.
+  const [lastBulk, setLastBulk] = useState<string[] | null>(null)
+
   const split: Split = useMemo(() => {
     const notExpected = new Set(notExpectedIds)
     return {
@@ -207,6 +221,22 @@ export function RosterScreen({
       notExpected: roster.filter((row) => notExpected.has(row.student_id)),
     }
   }, [roster, notExpectedIds])
+
+  const needle = query.trim().toLowerCase()
+  const shown: Split = useMemo(
+    () =>
+      needle === ''
+        ? split
+        : {
+            expected: split.expected.filter((row) =>
+              row.display_name.toLowerCase().includes(needle),
+            ),
+            notExpected: split.notExpected.filter((row) =>
+              row.display_name.toLowerCase().includes(needle),
+            ),
+          },
+    [split, needle],
+  )
 
   // Over the EXPECTED section too, for the same reason as the three counts below: the note
   // sits above that list, and the not-expected rows are inside a `<details>` that is
@@ -233,6 +263,7 @@ export function RosterScreen({
   // Optimistic, unconditionally, and never branching on `mode`: a screen with an online
   // path and an offline path has one path nobody exercises until a coach is in a basement.
   const mark = (row: RosterRowData, next: RosterRowData['status'], source: 'coach') => {
+    setLastBulk(null)
     setRoster((current) =>
       current.map((one) =>
         one.student_id === row.student_id ? { ...one, status: next, source } : one,
@@ -284,6 +315,20 @@ export function RosterScreen({
       className="flex flex-col gap-4 px-4 pt-4"
       data-testid="roster-screen"
     >
+      {/* **A way out** (owner, 2026-10-13): "there is no back button after pressing
+          attendance". There never was one — a coach who opened a register was in a room
+          whose only exits were the browser's own gesture, which a home-screen app does not
+          offer, and the tab bar, which goes somewhere else. Nothing to flush on the way:
+          every tap is already in `pending_ops` by the time it is drawn. */}
+      <a
+        className="inline-flex items-center gap-1.5 self-start text-xs font-bold text-[var(--emphasis)]"
+        data-testid="roster-back"
+        href="#/"
+      >
+        <ChevronRight aria-hidden="true" className="h-3.5 w-3.5 rtl:rotate-0 ltr:rotate-180" />
+        {t(locale, 'attendance.roster.back')}
+      </a>
+
       <header className="flex flex-col gap-3 rounded-3xl border border-[var(--border)] bg-[var(--surface-raised)] p-4 shadow-xs">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -397,18 +442,26 @@ export function RosterScreen({
           roster is read on the mat, and the strip is the button. The rule itself stands
           (`bulkPresent` still skips pre-reported marks) and the dashboard's quick view
           still says so beside its own copy of the button. */}
-      <div className="flex items-center rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-2">
-        <button
-          className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-3.5 py-2.5 text-sm font-bold text-[var(--paid)] shadow-2xs transition-all active:scale-[0.98] hover:bg-[var(--paid-tint)]"
-          onClick={() => {
-            void bulkPresent()
-          }}
-          type="button"
-        >
-          <CheckCheck aria-hidden="true" className="h-3.5 w-3.5" />
-          <span>{t(locale, 'attendance.roster.markAllPresent')}</span>
-        </button>
-      </div>
+      {/* The filter, above the names and below the counts. Shown once the list is long
+          enough for scrolling to be the problem it solves — on a register of six, a search
+          field is furniture. */}
+      {roster.length > FILTER_FROM ? (
+        <label className="relative block" data-testid="roster-filter">
+          <span className="sr-only">{t(locale, 'attendance.roster.filter')}</span>
+          <Search
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-inline-start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]"
+          />
+          <input
+            className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-9 py-2.5 text-sm"
+            data-testid="roster-filter-input"
+            onChange={(event) => setQuery(event.currentTarget.value)}
+            placeholder={t(locale, 'attendance.roster.filterPlaceholder')}
+            type="search"
+            value={query}
+          />
+        </label>
+      ) : null}
 
       {roster.length === 0 ? (
         <p className="text-sm text-[var(--text-muted)]" data-testid="roster-empty">
@@ -423,8 +476,53 @@ export function RosterScreen({
         </p>
       ) : null}
 
+      {/* **The bulk shortcut moves onto the label of what it marks** (owner, 2026-10-13):
+          "the button סימון כולם כנוכחים is not in a good place". It was a full-width bar
+          between the header and the first name — the loudest control on the screen, in the
+          one place the eye lands, pressable before a coach has read a single row, and
+          acting on everybody at once. Here it reads as what it is: a shortcut on a set.
+          With the filter active it marks what is on screen and says so, and the moment it
+          is used it offers the way back. */}
+      {shown.expected.length > 0 ? (
+        <div className="flex items-center justify-between gap-2" data-testid="roster-band-enrolled">
+          <span className="text-[11px] font-semibold text-[var(--text-muted)]">
+            {t(locale, 'attendance.roster.bandEnrolled').replace(
+              '{{count}}',
+              String(shown.expected.length),
+            )}
+          </span>
+          <button
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold transition-all active:scale-95 ${
+              lastBulk
+                ? 'border-[var(--border)] text-[var(--text-muted)]'
+                : 'border-[var(--paid)] text-[var(--paid)]'
+            }`}
+            data-testid="roster-bulk"
+            onClick={() => {
+              void runBulk()
+            }}
+            type="button"
+          >
+            <CheckCheck aria-hidden="true" className="h-3.5 w-3.5" />
+            <span>
+              {lastBulk
+                ? t(locale, 'attendance.roster.undoBulk')
+                : needle === ''
+                  ? t(locale, 'attendance.roster.markAllPresent')
+                  : t(locale, 'attendance.roster.markAllShown')}
+            </span>
+          </button>
+        </div>
+      ) : null}
+
+      {needle !== '' && shown.expected.length === 0 && shown.notExpected.length === 0 ? (
+        <p className="text-sm text-[var(--text-muted)]" data-testid="roster-no-matches">
+          {t(locale, 'attendance.roster.noMatches')}
+        </p>
+      ) : null}
+
       <ul className="flex flex-col gap-2" data-testid="roster-list">
-        {split.expected.map((row) => (
+        {shown.expected.map((row) => (
           <li key={row.student_id}>
             <RosterRow
               locale={locale}
@@ -439,7 +537,7 @@ export function RosterScreen({
       {/* §5.7 — "Students enrolled in the group but not expected today sit in a separate
           collapsed section beneath it, and can still be marked." A <details>, so it is
           collapsed by default, reachable by keyboard, and needs no state of its own. */}
-      {split.notExpected.length > 0 ? (
+      {shown.notExpected.length > 0 ? (
         <details
           className="rounded-2xl border border-[var(--border)] bg-[var(--disabled-surface)] px-3"
           data-testid="roster-not-expected"
@@ -448,7 +546,7 @@ export function RosterScreen({
             {t(locale, 'attendance.roster.notExpectedToday')}
           </summary>
           <ul className="flex flex-col gap-2 pb-3">
-            {split.notExpected.map((row) => (
+            {shown.notExpected.map((row) => (
               <li key={row.student_id}>
                 <RosterRow
                   locale={locale}
@@ -463,49 +561,57 @@ export function RosterScreen({
       ) : null}
 
       <footer className="flex flex-col gap-3 pb-2">
+        <p
+          className="text-center text-xs font-medium text-[var(--text-muted)]"
+          data-testid="roster-saved-immediately"
+        >
+          {t(locale, 'attendance.roster.savedImmediately')}
+        </p>
         <p className="text-center text-xs font-medium text-[var(--text-muted)]" data-testid="roster-edit-anytime">
           {t(locale, 'attendance.roster.editAnytime')}
         </p>
-        {/* S2 — the register's exits. `9g` is the step after taking a register; `11a`
-            and `11b` are in-lesson actions and belong on the session, not on `#/cash`. */}
+        {/* **Two buttons, and only these two** (owner, 2026-10-13): "I think the summary
+            should not be there but on the session card, and the item handover should be on
+            the card itself". Both are things that belong to the SESSION, and the register
+            is the screen open during the lesson by whoever is running it. They live on the
+            day screen now, each as its own popup over it. What is left here is what the
+            register is for: write down somebody who came, or start a trial lesson. */}
         <nav
           aria-label={t(locale, 'attendance.summary.whatNext')}
-          className="grid grid-cols-3 gap-2"
+          className="flex flex-col gap-2"
           data-testid="roster-actions"
         >
-          {/* A popup, not a page (owner, 2026-10-13) — see `SessionSummarySheet` for what
-              the screen behind this used to be and why the roster is not in it. */}
-          <button
-            type="button"
-            aria-haspopup="dialog"
-            data-testid="session-summary-open"
-            onClick={() => setSummaryOpen(true)}
-            className="flex flex-col items-center gap-1 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-2 py-2.5 text-center text-[11px] font-bold text-[var(--text-secondary)] shadow-2xs transition-all active:scale-95 hover:bg-[var(--surface)]"
-          >
-            <ClipboardList aria-hidden="true" className="h-4 w-4 text-[var(--emphasis)]" />
-            {t(locale, 'attendance.summary.title')}
-          </button>
-          <a
-            className="flex flex-col items-center gap-1 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-2 py-2.5 text-center text-[11px] font-bold text-[var(--text-secondary)] shadow-2xs transition-all active:scale-95 hover:bg-[var(--surface)]"
-            href={`#/attendance/${sessionId}/handover`}
-          >
-            <Package aria-hidden="true" className="h-4 w-4 text-[var(--emphasis)]" />
-            {t(locale, 'billing.product.handOut')}
-          </a>
-          {/* A popup, not a page (owner, 2026-10-13) — and it answers the question a coach
-              actually has mid-lesson, which is "who else is on the mat", not "is this child
-              new". See `AddToSessionSheet` for both halves and what a visit means. */}
           {peopleClient ? (
-            <button
-              type="button"
-              aria-haspopup="dialog"
-              data-testid="add-to-session-open"
-              onClick={() => setAddOpen(true)}
-              className="flex flex-col items-center gap-1 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-2 py-2.5 text-center text-[11px] font-bold text-[var(--text-secondary)] shadow-2xs transition-all active:scale-95 hover:bg-[var(--surface)]"
-            >
-              <UserPlus aria-hidden="true" className="h-4 w-4 text-[var(--emphasis)]" />
-              {t(locale, 'people.trial.addDuringClass')}
-            </button>
+            <>
+              <button
+                type="button"
+                aria-haspopup="dialog"
+                data-testid="add-to-session-open"
+                onClick={() => {
+                  setAddMode('existing')
+                  setAddOpen(true)
+                }}
+                className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--emphasis)] px-3 text-sm font-black text-[var(--on-emphasis)] transition-all active:scale-[0.98]"
+              >
+                <UserPlus aria-hidden="true" className="h-4 w-4" />
+                {t(locale, 'attendance.addToSession.fromClub')}
+              </button>
+              {/* §5.4a's trial, beside the register rather than inside the add sheet —
+                  writing down a child who is already in the club and inventing a new one
+                  are different acts, and the owner asked for them to look it. */}
+              <button
+                type="button"
+                aria-haspopup="dialog"
+                data-testid="trial-in-class-open"
+                onClick={() => {
+                  setAddMode('trial')
+                  setAddOpen(true)
+                }}
+                className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-[var(--emphasis)] px-3 text-sm font-bold text-[var(--emphasis)] transition-all active:scale-[0.98]"
+              >
+                {t(locale, 'attendance.addToSession.trial')}
+              </button>
+            </>
           ) : null}
         </nav>
       </footer>
@@ -541,6 +647,7 @@ export function RosterScreen({
           peopleClient={peopleClient}
           alreadyOnRoster={new Set(roster.map((row) => row.student_id))}
           onClose={() => setAddOpen(false)}
+          mode={addMode}
           onPickStudents={(students) => {
             // One queued mark per child, each with its own `client_mark_id` — the batch is
             // a convenience for the coach, not a new kind of write, so the offline queue
@@ -591,6 +698,38 @@ export function RosterScreen({
       deviceMarkedAt: clock(),
       personId,
     })
+  }
+
+  /** The band's shortcut, in both of its states. Pressed once it marks the unmarked rows
+   *  of the band — all of them, or only the ones the filter is showing, which is what the
+   *  label says it will do. Pressed again, while it is still the last thing that happened,
+   *  it takes exactly those rows back to `unmarked` and nothing else. */
+  async function runBulk(): Promise<void> {
+    if (lastBulk !== null) {
+      const undoing = new Set(lastBulk)
+      // `mark` clears `lastBulk` itself, which is also what makes the label flip back.
+      roster
+        .filter((row) => undoing.has(row.student_id))
+        .forEach((row) => mark(row, 'unmarked', 'coach'))
+      return
+    }
+    // The same predicate the server applies to `attendance.bulk`: only expected, only
+    // unmarked, never over a parent's advance notice. Computed here as well because the
+    // undo has to know precisely which rows this press changed.
+    const targets = shown.expected.filter(
+      (row) => row.status === 'unmarked' && !row.has_absence_report,
+    )
+    if (targets.length === 0) return
+    setLastBulk(targets.map((row) => row.student_id))
+    if (needle === '') {
+      // Unfiltered: one queued op over the server's own predicate, exactly as before.
+      await bulkPresent()
+      return
+    }
+    // Filtered: the server has no idea what is on this coach's screen, so the rows go one
+    // by one — the same write a tap on each would have produced.
+    targets.forEach((row) => mark(row, 'present', 'coach'))
+    setLastBulk(targets.map((row) => row.student_id))
   }
 
   async function bulkPresent(): Promise<void> {
