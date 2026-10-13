@@ -435,6 +435,14 @@ export function TodayScreen({
   // fetched again: keyed by session id so each card's counts travel from THIS session's
   // own cached roster, not a shared one.
   const [rosters, setRosters] = useState<Record<string, RosterRow[] | undefined>>({})
+  // **One session open at a time** (owner, 2026-10-13). The first attempt hung the
+  // session's three actions off every card as 10px chips — "the 3 buttons on the session
+  // card are small and not good" — and the answer was not smaller furniture on more cards
+  // but fewer open cards. A coach is in exactly one session at a time, so exactly one card
+  // carries the full width, the primary button and a row per thing that session has; every
+  // other hour of the day is one line. `null` means "whichever the day itself opens on",
+  // computed below rather than written into state by an effect.
+  const [openedByTap, setOpenedByTap] = useState<string | null>(null)
   // §6.2 of the staff app redesign, updated 2026-09-07 — the marker stopped being
   // decoration and became the door onto the briefing, so this now holds the TEXT
   // (nullable), not a boolean: the sheet the marker opens needs something to show, and it
@@ -556,6 +564,28 @@ export function TodayScreen({
     [sessions, events, day],
   )
   const dotStates = useMemo(() => timelineStates(timelineItems, today), [timelineItems, today])
+
+  // The day's own answer to "which one is open": the class happening now, else the next
+  // one, else the first thing on the list. Derived rather than seeded into state by an
+  // effect — the day moves on while the screen is open (`useToday` re-stamps it), and a
+  // card that opened itself at eight in the morning should not still be the open one at
+  // six in the evening unless a coach tapped it.
+  const openId = useMemo(() => {
+    if (openedByTap !== null && timelineItems.some((item) => item.id === openedByTap)) {
+      return openedByTap
+    }
+    // Sessions only: an event draws its own card whatever else is open, and letting one
+    // take the day's open slot would collapse the class a coach came to the screen for.
+    const live = timelineItems.findIndex(
+      (item, index) => item.kind === 'session' && dotStates[index] === 'activeNow',
+    )
+    if (live >= 0) return timelineItems[live]!.id
+    const next = timelineItems.findIndex(
+      (item, index) => item.kind === 'session' && dotStates[index] === 'nextUp',
+    )
+    if (next >= 0) return timelineItems[next]!.id
+    return timelineItems.find((item) => item.kind === 'session')?.id ?? null
+  }, [openedByTap, timelineItems, dotStates])
 
   // Register §4.2 — `_year_covering` (app/services/schedule/service.py) silently skips any
   // occurrence outside every declared training year, so a year-less date and an ordinary
@@ -897,6 +927,9 @@ export function TodayScreen({
               state={dotStates[index]!}
               locale={locale}
               today={today}
+              open={item.id === openId}
+              onOpen={() => setOpenedByTap(item.id)}
+              personId={viewerPersonId ?? null}
               roster={item.kind === 'session' ? rosters[item.id] : undefined}
               briefingText={item.kind === 'session' ? (plans[item.id] ?? null) : null}
               canWritePlan={canWritePlan}
@@ -920,6 +953,9 @@ function TimelineRow({
   canWritePlan,
   saveBriefing,
   chaseFamilies,
+  open,
+  onOpen,
+  personId,
 }: {
   item: TimelineItem
   state: DotState
@@ -930,6 +966,10 @@ function TimelineRow({
   canWritePlan: boolean
   saveBriefing: (sessionId: string) => (body: string) => Promise<void>
   chaseFamilies: (studentIds: string[]) => () => Promise<ContactFamily[]>
+  /** The one card the day is showing in full. Everything else is a line. */
+  open: boolean
+  onOpen: () => void
+  personId: string | null
 }) {
   return (
     <li
@@ -940,17 +980,22 @@ function TimelineRow({
         <TimelineDot state={state} time={formatTimeInStudioZone(item.startsAt, locale)} locale={locale} />
         <div style={cardColumnStyle}>
           {item.kind === 'session' ? (
-            <SessionCard
-              session={item.session}
-              state={state}
-              locale={locale}
-              today={today}
-              roster={roster}
-              briefingText={briefingText}
-              canWritePlan={canWritePlan}
-              saveBriefing={saveBriefing}
-              chaseFamilies={chaseFamilies}
-            />
+            open ? (
+              <SessionCard
+                session={item.session}
+                state={state}
+                locale={locale}
+                today={today}
+                roster={roster}
+                briefingText={briefingText}
+                canWritePlan={canWritePlan}
+                saveBriefing={saveBriefing}
+                chaseFamilies={chaseFamilies}
+                personId={personId}
+              />
+            ) : (
+              <SessionLine session={item.session} locale={locale} today={today} onOpen={onOpen} />
+            )
           ) : (
             <EventCard event={item.event} state={state} locale={locale} />
           )}
@@ -1174,6 +1219,60 @@ function SessionBriefingControl({
  *  on the session card are small and not good". */
 const SESSION_ROW_CLASS =
   'flex min-h-11 w-full items-center justify-between gap-2 border-t border-[var(--border)] px-1 text-start text-xs font-bold text-[var(--fg)] transition-colors hover:bg-[var(--surface)]'
+
+/**
+ * An hour of the day that is not the open one: when, which group, where — and, when the
+ * class is over and nobody took its register, the one thing that is still owed. Tapping it
+ * opens it, which closes whichever card was open before.
+ *
+ * Deliberately NOT a small card with small buttons on it. The owner's verdict on the first
+ * attempt was about exactly that: "the 3 buttons on the session card are small and not
+ * good". A line carries no actions at all; it carries the way to the card that does.
+ */
+function SessionLine({
+  session,
+  locale,
+  today,
+  onOpen,
+}: {
+  session: SessionRow
+  locale: Locale
+  today: string
+  onOpen: () => void
+}) {
+  const ended = session.status !== 'cancelled' && Date.parse(today) >= Date.parse(session.ends_at)
+  return (
+    <button
+      type="button"
+      data-testid={`session-line-${session.id}`}
+      onClick={onOpen}
+      className="flex min-h-12 w-full items-center gap-2.5 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-3 text-start transition-all active:scale-[0.99] hover:bg-[var(--surface)]"
+    >
+      <span className="font-mono text-xs font-bold text-[var(--text-secondary)]">
+        {formatTimeInStudioZone(session.starts_at, locale)}
+      </span>
+      <span className="truncate text-sm font-bold text-[var(--fg)]">
+        <bdi>{session.group_name}</bdi>
+      </span>
+      {ended && !session.attendance_taken ? (
+        <span
+          className="ms-auto shrink-0 rounded-full bg-[var(--pending-tint)] px-2 py-0.5 text-[10px] font-bold text-[var(--pending)]"
+          data-testid={`session-line-owed-${session.id}`}
+        >
+          {t(locale, 'schedule.today.attendanceMissing')}
+        </span>
+      ) : session.location_name ? (
+        <span className="ms-auto shrink-0 truncate text-[11px] text-[var(--text-muted)]">
+          <bdi>{session.location_name}</bdi>
+        </span>
+      ) : null}
+      <ChevronLeft
+        aria-hidden="true"
+        className="h-4 w-4 shrink-0 text-[var(--text-muted)] rtl:rotate-0 ltr:rotate-180"
+      />
+    </button>
+  )
+}
 
 export function SessionCard({
   session,

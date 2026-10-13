@@ -8,6 +8,8 @@ export const schedule: Bundle = {
   'today.sessionCount.one': '1 session',
   'today.backToToday': 'Back to today',
   'today.openRoster': 'Open the register',
+  'today.openOne': 'One session is open at a time — tap an hour to open it',
+  'today.attendanceMissing': 'Attendance not taken',
   'today.closeSession': 'Close the session',
   // Counterpart of he/schedule.ts's fromCache.
   'today.fromCache': 'No connection — this is the list saved on this device. It may be out of date.',

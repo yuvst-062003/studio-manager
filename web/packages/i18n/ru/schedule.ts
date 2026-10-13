@@ -11,6 +11,8 @@ export const schedule: Bundle = {
   'today.sessionCount.one': '1 занятие',
   'today.backToToday': 'Вернуться к сегодня',
   'today.openRoster': 'Открыть перекличку',
+  'today.openOne': 'Открыто одно занятие — нажмите на время, чтобы открыть его',
+  'today.attendanceMissing': 'Посещаемость не отмечена',
   'today.closeSession': 'Закрыть занятие',
   // Counterpart of he/schedule.ts's fromCache.
   'today.fromCache': 'Нет связи — это список, сохранённый на устройстве. Он может быть устаревшим.',

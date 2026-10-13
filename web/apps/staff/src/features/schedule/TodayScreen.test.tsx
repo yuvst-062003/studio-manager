@@ -1129,3 +1129,63 @@ describe('TodayScreen — §6.1s offline promise, kept (2026-09-07)', () => {
   })
 })
 
+
+// **One session open at a time** (owner, 2026-10-13). The first attempt hung the session's
+// three actions off every card as 10px chips; the owner's verdict was "the 3 buttons on the
+// session card are small and not good", and the answer was fewer open cards rather than
+// smaller controls. A coach is in exactly one session at a time.
+describe('TodayScreen — the day holds one open session', () => {
+  const EARLY: SessionRow = {
+    ...base,
+    id: 's-early',
+    group_name: 'קבוצה 1',
+    starts_at: '2026-11-03T08:00:00Z',
+    ends_at: '2026-11-03T09:00:00Z',
+    status: 'scheduled',
+    attendance_taken: true,
+  }
+  const LATER: SessionRow = {
+    ...base,
+    id: 's-later',
+    group_name: 'קרוספיט',
+    starts_at: '2026-11-03T18:00:00Z',
+    ends_at: '2026-11-03T19:00:00Z',
+    status: 'scheduled',
+  }
+
+  it('opens the next session in full and leaves the rest as lines', async () => {
+    render(screenFor({ client: stub([EARLY, TODAY_SESSION, LATER]) }))
+    await screen.findByTestId('open-roster')
+
+    // 15:00Z is the next one up at 12:00Z — it gets the card.
+    expect(screen.getByTestId('session-line-s-early')).toBeInTheDocument()
+    expect(screen.getByTestId('session-line-s-later')).toBeInTheDocument()
+    // Exactly one card, so exactly one primary action on the screen.
+    expect(screen.getAllByTestId('open-roster')).toHaveLength(1)
+  })
+
+  it('opens another hour when it is tapped, and closes the one that was open', async () => {
+    render(screenFor({ client: stub([EARLY, TODAY_SESSION, LATER]) }))
+    await screen.findByTestId('session-line-s-later')
+
+    await userEvent.click(screen.getByTestId('session-line-s-later'))
+
+    expect(screen.getByTestId('open-roster')).toHaveAttribute('href', '#/attendance/s-later')
+    expect(screen.getAllByTestId('open-roster')).toHaveLength(1)
+  })
+
+  it('says on the line when a finished class still owes its register', async () => {
+    render(screenFor({ client: stub([{ ...EARLY, attendance_taken: false }, TODAY_SESSION]) }))
+
+    expect(await screen.findByTestId('session-line-owed-s-early')).toHaveTextContent(
+      t('he', 'schedule.today.attendanceMissing'),
+    )
+  })
+
+  it('leaves a finished class that was marked with nothing owed on its line', async () => {
+    render(screenFor({ client: stub([EARLY, TODAY_SESSION]) }))
+    await screen.findByTestId('session-line-s-early')
+
+    expect(screen.queryByTestId('session-line-owed-s-early')).toBeNull()
+  })
+})

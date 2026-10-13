@@ -23,6 +23,8 @@ export const schedule: Bundle = {
   'today.sessionCount.one': 'שיעור אחד',
   'today.backToToday': 'חזרה להיום',
   'today.openRoster': 'פתיחת נוכחות',
+  'today.openOne': 'שיעור אחד פתוח בכל רגע — לחיצה על שעה פותחת אותה',
+  'today.attendanceMissing': 'נוכחות חסרה',
   // Owner fix (2026-09-07) — the same link as `today.openRoster`, to the same
   // `#/attendance/<id>`, only on a `pendingClose` card: closing a session IS taking its
   // register, so the action's wording should say that rather than "open attendance" on a
