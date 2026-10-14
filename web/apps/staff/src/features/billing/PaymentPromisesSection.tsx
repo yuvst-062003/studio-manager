@@ -26,9 +26,15 @@ const rowStyle: CSSProperties = {
 export function PaymentPromisesSection({
   locale,
   client: injected,
+  heading = true,
 }: {
   locale: Locale
   client?: PromiseClient
+  /** **The money tab draws its own section headers** (2026-10-14), so this one would be
+   *  the same words twice in a row — and its `EmptyState` would be a dashed box the size
+   *  of a card inside a group that is already labelled. `false` renders the rows alone and
+   *  an empty queue as one quiet line, which is the tab's shape everywhere else. */
+  heading?: boolean
 }) {
   const [promises, setPromises] = useState<StaffPromiseRow[] | null>(null)
   const [reloads, setReloads] = useState(0)
@@ -85,11 +91,22 @@ export function PaymentPromisesSection({
       data-testid="staff-payment-promises"
       style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}
     >
-      <div className="studio-page-header">
-        <h2 id="staff-promises-title">{t(locale, 'billing.promise.manager.title')}</h2>
-      </div>
+      {heading ? (
+        <div className="studio-page-header">
+          <h2 id="staff-promises-title">{t(locale, 'billing.promise.manager.title')}</h2>
+        </div>
+      ) : null}
       {promises.length === 0 ? (
-        <EmptyState title={t(locale, 'billing.promise.manager.empty')} />
+        heading ? (
+          <EmptyState title={t(locale, 'billing.promise.manager.empty')} />
+        ) : (
+          <p
+            className="m-0 rounded-2xl border border-[var(--border)] bg-[var(--surface-raised)] px-3 py-3.5 text-center text-xs text-[var(--text-muted)]"
+            data-testid="staff-promises-empty"
+          >
+            {t(locale, 'billing.cash.requests.none')}
+          </p>
+        )
       ) : (
         <Card>
           {promises.map((promise) => (

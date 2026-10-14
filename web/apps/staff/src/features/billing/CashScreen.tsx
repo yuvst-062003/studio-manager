@@ -194,7 +194,7 @@ export function CashScreen({
         <h2 className="m-0 text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
           {t(locale, 'billing.cash.requests.title')}
         </h2>
-        <PaymentPromisesSection locale={locale} />
+        <PaymentPromisesSection heading={false} locale={locale} />
       </section>
 
       <section className="flex flex-col gap-2" data-testid="cash-debts">
