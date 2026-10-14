@@ -239,3 +239,24 @@ describe('picking several children in one trip', () => {
     expect(screen.getByTestId('add-to-session-commit')).toBeDisabled()
   })
 })
+
+// "The text שיעור ניסיון is not clear — change it to adding a student to a trial lesson"
+// (owner, 2026-10-14). The register's two buttons sit one above the other, and a label that
+// names the THING rather than the ACT reads as a filter or a heading beside one that says
+// `הוספת חניך מרשימת החניכים`.
+describe('the trial button says what pressing it does', () => {
+  it('names the act, not the lesson', () => {
+    const label = t('he', 'attendance.addToSession.trial')
+    expect(label).toContain('הוספת חניך')
+    expect(label).toContain('שיעור ניסיון')
+  })
+
+  it('carries the same words on the popup it opens, so the press and the sheet agree', () => {
+    renderSheet({ mode: 'trial' })
+    // The sheet's own title, by the id its dialog is labelled with — the trial form inside
+    // it has headings of its own, which is why this asks for the right one.
+    expect(document.getElementById('add-to-session-title')).toHaveTextContent(
+      t('he', 'attendance.addToSession.trial'),
+    )
+  })
+})

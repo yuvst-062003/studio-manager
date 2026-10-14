@@ -23,7 +23,7 @@ export const attendance: Bundle = {
   'addToSession.title': 'הוספת חניך לשיעור',
   'addToSession.existing': 'חניך מהמועדון',
   'addToSession.fromClub': 'הוספת חניך מרשימת החניכים',
-  'addToSession.trial': 'שיעור ניסיון',
+  'addToSession.trial': 'הוספת חניך לשיעור ניסיון',
   'addToSession.existingHint': 'חניך מקבוצה אחרת שהגיע לאימון הזה. הנוכחות נרשמת לשיעור הזה בלבד — הקבוצה, המסלול והחיוב שלו לא משתנים.',
   'addToSession.visiting': 'אורח',
   'addToSession.commit': 'הוספת {{count}} חניכים',

@@ -9,7 +9,7 @@ export const attendance: Bundle = {
   'addToSession.title': 'Add a student to this session',
   'addToSession.existing': 'From the club',
   'addToSession.fromClub': 'Add a student from the club list',
-  'addToSession.trial': 'Trial lesson',
+  'addToSession.trial': 'Add a student for a trial lesson',
   'addToSession.existingHint': 'A student from another group who came to this session. Attendance is recorded for this session only — their group, plan and billing do not change.',
   'addToSession.visiting': 'Visiting',
   'addToSession.commit': 'Add {{count}} students',

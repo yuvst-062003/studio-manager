@@ -9,7 +9,7 @@ export const attendance: Bundle = {
   'addToSession.title': 'Добавить ученика на это занятие',
   'addToSession.existing': 'Из клуба',
   'addToSession.fromClub': 'Добавить ученика из списка клуба',
-  'addToSession.trial': 'Пробное занятие',
+  'addToSession.trial': 'Добавить ученика на пробное занятие',
   'addToSession.existingHint': 'Ученик из другой группы, пришедший на это занятие. Посещаемость записывается только для него — группа, план и оплата не меняются.',
   'addToSession.visiting': 'Гость',
   'addToSession.commit': 'Добавить учеников: {{count}}',
