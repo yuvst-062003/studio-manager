@@ -191,21 +191,23 @@ export function FinanceSummaryScreen({
         <div className="flex items-center gap-4">
           <svg aria-hidden="true" height="76" viewBox="0 0 42 42" width="76">
             <circle cx="21" cy="21" fill="none" r="16" stroke="var(--disabled-surface)" strokeWidth="6" />
-            <circle
-              cx="21"
-              cy="21"
-              fill="none"
-              r="16"
-              stroke="var(--paid)"
-              strokeDasharray={`${collected} 100`}
-              strokeLinecap="round"
-              strokeWidth="6"
-              transform="rotate(-90 21 21)"
-            />
+            {collected > 0 ? (
+              <circle
+                cx="21"
+                cy="21"
+                fill="none"
+                r="16"
+                stroke="var(--paid)"
+                strokeDasharray={`${collected} 100`}
+                strokeLinecap="round"
+                strokeWidth="6"
+                transform="rotate(-90 21 21)"
+              />
+            ) : null}
           </svg>
           <div className="flex flex-col gap-0.5">
             <span className="font-mono text-2xl font-black text-[var(--fg)]" data-testid="finance-summary-rate">
-              {collected}%
+              {billed === 0 ? '—' : `${collected}%`}
             </span>
             <span className="text-[11px] text-[var(--text-muted)]">
               {t(locale, 'billing.summary.collectionOf')
@@ -227,8 +229,13 @@ export function FinanceSummaryScreen({
         <p className="m-0 text-[11px] text-[var(--text-muted)]">
           {t(locale, 'billing.summary.agingHint')}
         </p>
+        {owed === 0 ? (
+          <p className="m-0 text-xs text-[var(--text-muted)]" data-testid="finance-summary-no-debt">
+            {t(locale, 'billing.cash.debts.clear')}
+          </p>
+        ) : null}
         <ul className="m-0 flex list-none flex-col gap-2 p-0">
-          {aging.map((band) => (
+          {owed === 0 ? null : aging.map((band) => (
             <li key={band.key} className="flex items-center gap-2.5 text-[11px]">
               <span className="w-16 shrink-0 text-[var(--text-secondary)]">
                 {t(locale, `billing.summary.age.${band.key}`)}
