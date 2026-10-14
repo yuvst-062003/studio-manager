@@ -39,6 +39,7 @@ export const billing: Bundle = {
   'method.card': 'כרטיס אשראי',
   'method.standingOrder': 'הוראת קבע',
   'method.standing_order': 'הוראת קבע',
+  'method.upay_card': 'אשראי',
   'method.cash': 'מזומן',
   'method.cheque': 'צ׳קים',
   'method.bankTransfer': 'העברה בנקאית',

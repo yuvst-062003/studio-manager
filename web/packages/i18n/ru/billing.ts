@@ -19,6 +19,7 @@ export const billing: Bundle = {
   'method.card': 'Кредитная карта',
   'method.standingOrder': 'Постоянное поручение',
   'method.standing_order': 'Постоянное поручение',
+  'method.upay_card': 'Карта',
   'method.cash': 'Наличные',
   'method.cheque': 'Чеки',
   'method.bankTransfer': 'Банковский перевод',

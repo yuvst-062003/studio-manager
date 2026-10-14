@@ -163,3 +163,23 @@ describe('debtAging', () => {
     expect(bands.find((band) => band.key === 'fresh')!.agorot).toBe(20000)
   })
 })
+
+// Caught by looking at the deployed page, not by a test: the legend rendered the raw key
+// `billing.method.upay_card`, because `payment.method`'s own vocabulary was only half
+// translated — `method.card` existed, `method.upay_card` did not, and the summary reads the
+// server's word rather than a word of its own.
+describe('every method the server can send has a word in Hebrew', () => {
+  it('names the card, which is the one method this page shows and the tab does not', () => {
+    render(<FinanceSummaryScreen client={makeClient()} clock={() => NOW} locale="he" />)
+    expect(screen.queryByText(/billing\.method\./)).toBeNull()
+  })
+
+  it.each(['cash', 'cheque', 'standing_order', 'bank_transfer', 'upay_card'] as const)(
+    'has a translation for %s',
+    (method) => {
+      const word = t('he', `billing.method.${method}`)
+      expect(word).not.toContain('method.')
+      expect(word.length).toBeGreaterThan(1)
+    },
+  )
+})

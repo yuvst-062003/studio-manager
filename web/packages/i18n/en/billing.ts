@@ -15,6 +15,7 @@ export const billing: Bundle = {
   'method.card': 'Credit card',
   'method.standingOrder': 'Standing order',
   'method.standing_order': 'Standing order',
+  'method.upay_card': 'Card',
   'method.cash': 'Cash',
   'method.cheque': 'Cheques',
   'method.bankTransfer': 'Bank transfer',
