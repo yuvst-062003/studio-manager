@@ -25,6 +25,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy import select
 
+from app.core.auth_context import ManagerOrOwner
 from app.core.tenancy import TenantSessionDep, require_current_studio_id
 from app.models.people import Student
 from app.models.person import Guardian, Person
@@ -92,6 +93,52 @@ def _mine(session: TenantSessionDep, payer_person_id: uuid.UUID) -> list[Payment
         )
         for student_id, first, last, method in rows
     ]
+
+
+@router.get("/payment-methods", response_model=PaymentMethodListOut)
+def payment_methods(
+    _: ManagerOrOwner,
+    session: TenantSessionDep,
+    payer_person_id: uuid.UUID | None = None,
+) -> PaymentMethodListOut:
+    """The same statement of intent, read by the person collecting rather than the family.
+
+    **Why this is a route of its own and not a field on `GET /students`** (2026-10-14): the
+    students list is coach-reachable, and SPEC §13's third invariant keeps every financial
+    field off coach-scoped endpoints -- `tests/invariants/test_03_...` refuses
+    `payment_method` there by name, which is the gate working rather than an obstacle. How a
+    family pays is a manager's business, so it is answered on a `ManagerOrOwner` route.
+
+    The money tab needs it twice. Opening one family's sheet asks with `payer_person_id` and
+    groups that family's open charges by child, because the same family really does pay with
+    cheques for one child and cash for the other. `רישום מרוכז` asks without one and gets the
+    whole studio, so the families on standing order can be pre-ticked at month end instead of
+    being found one at a time.
+    """
+    rows = session.execute(
+        select(Student.id, Person.first_name, Person.last_name, Student.payment_method)
+        .join(Person, Person.id == Student.person_id)
+        .where(Student.status == "active")
+        .order_by(Person.first_name, Person.last_name)
+    )
+    if payer_person_id is not None:
+        rows = session.execute(
+            select(Student.id, Person.first_name, Person.last_name, Student.payment_method)
+            .join(Person, Person.id == Student.person_id)
+            .join(Guardian, Guardian.student_id == Student.id)
+            .where(Student.status == "active", Guardian.person_id == payer_person_id)
+            .order_by(Person.first_name, Person.last_name)
+        )
+    return PaymentMethodListOut(
+        items=[
+            PaymentMethodOut(
+                student_id=student_id,
+                student_name=f"{first} {last}".strip(),
+                method=method,
+            )
+            for student_id, first, last, method in rows.all()
+        ]
+    )
 
 
 @router.get("/me/payment-methods", response_model=PaymentMethodListOut)

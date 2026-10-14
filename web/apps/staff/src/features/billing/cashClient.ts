@@ -42,12 +42,25 @@ export type RecordedPayment = {
   received_at: string
 }
 
+/** How one child pays, from the manager-only `GET /payment-methods`. Not from
+ *  `GET /students`: that list is coach-reachable and SPEC §13's third invariant keeps every
+ *  financial field off it — the first attempt put it there and the invariant refused it. */
+export type StudentMethod = {
+  student_id: string
+  student_name: string
+  method: string | null
+}
+
 export type CashClient = {
   /** Every open charge in the club. Paged through to the end: a club is tens of families,
    *  and a manager at a door needs the family in front of them to be on the list. */
   openCharges(): Promise<OpenCharge[]>
   /** The studio's payments, newest first, for this month's total. */
   payments(): Promise<RecordedPayment[]>
+  /** How each child pays. With a payer, only that family's children — which is what the
+   *  family sheet needs to group a family's charges by child. Without one, the whole club,
+   *  which is what `רישום מרוכז` needs to pre-tick everybody on a method. */
+  methods(payerPersonId?: string): Promise<StudentMethod[]>
   /** §5.10's manual payment — the same act as a bank transfer or a הוראת קבע marked by
    *  hand, which our provider cannot create and the app has always recorded this way.
    *  Naming the charges allocates to exactly those. */
@@ -56,7 +69,10 @@ export type CashClient = {
     amountAgorot: number
     chargeIds: string[]
     receivedAt: string
-    method?: 'cash' | 'cheque'
+    method?: 'cash' | 'cheque' | 'standing_order'
+    /** Idempotency key. A batch retried after a half-finished run must not pay twice for
+     *  the families that already went through. */
+    key?: string
   }): Promise<void>
 }
 
@@ -87,10 +103,21 @@ export function makeCashClient(fetcher: Fetcher = apiFetch): CashClient {
   return {
     openCharges: () => readAll<OpenCharge>(fetcher, `/api/v1/charges?status=open&limit=${PAGE}`),
     payments: () => readAll<RecordedPayment>(fetcher, `/api/v1/payments?limit=${PAGE}`),
-    async recordCash({ payerPersonId, amountAgorot, chargeIds, receivedAt, method = 'cash' }) {
+    async methods(payerPersonId) {
+      const url = payerPersonId
+        ? `/api/v1/payment-methods?payer_person_id=${encodeURIComponent(payerPersonId)}`
+        : '/api/v1/payment-methods'
+      const response = await fetcher(url)
+      if (!response.ok) throw new Error(String(response.status))
+      return ((await response.json()) as { items: StudentMethod[] }).items
+    },
+    async recordCash({ payerPersonId, amountAgorot, chargeIds, receivedAt, method = 'cash', key }) {
       const response = await fetcher('/api/v1/payments', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(key ? { 'Idempotency-Key': key } : {}),
+        },
         body: JSON.stringify({
           payer_person_id: payerPersonId,
           method,

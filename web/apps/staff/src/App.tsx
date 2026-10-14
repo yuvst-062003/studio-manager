@@ -54,6 +54,7 @@ import {
 // a hash a coach can actually reach.
 import { HandOverSection } from './features/billing/HandOverSection'
 import { CashScreen } from './features/billing/CashScreen'
+import { FinanceSummaryScreen } from './features/billing/FinanceSummaryScreen'
 import { StudentCardRoute } from './features/people/StudentCardRoute'
 import { useQueueFlusher } from './features/attendance/useQueueFlusher'
 import { registerHealthSections } from './features/health'
@@ -253,6 +254,10 @@ export default function App() {
   // subscription serves both lanes' routes.
   const onStudents = hash === '#/students'
   const onCash = hash === '#/cash'
+  // §5.10's month-shaped read (owner, 2026-10-14: "it should be a page from finance to
+  // press"). Behind the money tab rather than beside it: the tab is the evening's work,
+  // this is the question asked once a month.
+  const onCashSummary = hash === '#/cash/summary'
   // §16's privacy queue. Manager-gated below with `#/cash`: a coach
   // reading it would get an empty list — the endpoint scopes a non-manager to their OWN
   // subjects — and an empty list on a screen titled "requests in this club" reads as
@@ -306,7 +311,7 @@ export default function App() {
   // current on a screen that tab does not lead to is a lie told to a screen reader.
   const activeTab: StaffTab | null = onAccount
     ? 'account'
-    : onCash
+    : onCash || onCashSummary
       ? 'cash'
       : onTasks
         ? 'tasks'
@@ -544,7 +549,7 @@ export default function App() {
             />
           ) : session.access.staff &&
             !viewerIsManager &&
-            (onCash || onPrivacy) ? (
+            (onCash || onCashSummary || onPrivacy) ? (
             // S10 — restricted, said out loud. The gate used to fall through to the
             // date-picker screen, which made the app look broken rather than reserved.
             <EmptyState
@@ -559,6 +564,8 @@ export default function App() {
             // the names on the debt rows; without it a household renders by its children's
             // names rather than as an empty row.
             <CashScreen locale={locale} peopleClient={peopleClient} />
+          ) : session.access.staff && viewerIsManager && onCashSummary ? (
+            <FinanceSummaryScreen locale={locale} />
                     ) : session.access.staff && viewerIsManager && onPrivacy ? (
             <PrivacyOperatorScreen client={privacyClient} locale={locale} />
           ) : session.access.staff && onStudents ? (

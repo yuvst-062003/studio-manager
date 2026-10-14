@@ -81,13 +81,19 @@ export function householdsFrom(
   return households.sort((a, b) => b.owedAgorot - a.owedAgorot)
 }
 
-/** What came in this month, in notes and cheques. The one number a manager wants at the
- *  end of an evening, summed on the device from rows already read — a card payment is
- *  somebody else's arithmetic and is deliberately not in it. */
-export function cashThisMonth(
+/** The methods that reach this club BY HAND (owner, 2026-10-14): "recording a payment is
+ *  only cash or cheques and also standing order, because credit card you see in the app".
+ *  A card payment records itself through uPay's notification, and the server refuses it on
+ *  the manual route — `ManualPaymentIn` accepts every method except `upay_card`. */
+export const COLLECTED_BY_HAND = ['cash', 'cheque', 'standing_order'] as const
+
+/** What came in during the month `when` falls in, by hand. The one number a manager wants
+ *  at the end of an evening, summed on the device from rows already read; card income is
+ *  real income and is counted on `סיכום כספי`, which says total and splits it by method. */
+export function collectedInMonth(
   payments: readonly RecordedPaymentLike[],
   now: Date,
-  methods: readonly string[] = ['cash', 'cheque'],
+  methods: readonly string[] = COLLECTED_BY_HAND,
 ): number {
   const year = now.getFullYear()
   const month = now.getMonth()
@@ -101,3 +107,8 @@ export function cashThisMonth(
 }
 
 type RecordedPaymentLike = { method: string; amount_agorot: number; received_at: string }
+
+
+/** The name this had before standing orders joined it (2026-10-14). Kept so the first
+ *  tests written against it still say what they meant. */
+export const cashThisMonth = collectedInMonth

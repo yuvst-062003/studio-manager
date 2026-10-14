@@ -12391,6 +12391,11 @@
             "title": "Display Name",
             "type": "string"
           },
+          "entitled": {
+            "default": false,
+            "title": "Entitled",
+            "type": "boolean"
+          },
           "has_absence_report": {
             "default": false,
             "title": "Has Absence Report",
@@ -24913,6 +24918,57 @@
           }
         },
         "summary": "Payment Complete",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/payment-methods": {
+      "get": {
+        "description": "The same statement of intent, read by the person collecting rather than the family.\n\n**Why this is a route of its own and not a field on `GET /students`** (2026-10-14): the\nstudents list is coach-reachable, and SPEC §13's third invariant keeps every financial\nfield off coach-scoped endpoints -- `tests/invariants/test_03_...` refuses\n`payment_method` there by name, which is the gate working rather than an obstacle. How a\nfamily pays is a manager's business, so it is answered on a `ManagerOrOwner` route.\n\nThe money tab needs it twice. Opening one family's sheet asks with `payer_person_id` and\ngroups that family's open charges by child, because the same family really does pay with\ncheques for one child and cash for the other. `רישום מרוכז` asks without one and gets the\nwhole studio, so the families on standing order can be pre-ticked at month end instead of\nbeing found one at a time.",
+        "operationId": "payment_methods_api_v1_payment_methods_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "payer_person_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Payer Person Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentMethodListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Payment Methods",
         "tags": [
           "billing"
         ]

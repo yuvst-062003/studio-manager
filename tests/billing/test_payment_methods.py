@@ -185,3 +185,72 @@ def test_the_batch_is_applied_whole_or_not_at_all(
         select(Student.payment_method).where(Student.id == a_two_child_family.student_ids[0])
     ).scalar_one()
     assert stored is None
+
+
+# -- the manager's half (2026-10-14) -----------------------------------------------
+#
+# Owner: "the same family paid with cheques for one child and cash for the other", and
+# "I want to mark for several families at once". Both need the method read by the person
+# COLLECTING rather than by the family, which `/me/payment-methods` cannot answer.
+#
+# Deliberately NOT a field on `GET /students`: that list is coach-reachable and SPEC §13's
+# third invariant refuses financial fields there by name. The first attempt added it and
+# `tests/invariants/test_03_...` rejected it, which is the gate working.
+
+
+def test_a_manager_reads_how_one_family_pays(
+    client, app_session, studio, a_two_child_family, as_manager
+):
+    """One family, two children, two methods — exactly the case the money tab splits on."""
+    first, second = a_two_child_family.student_ids
+    app_session.get(Student, first).payment_method = "cheque"
+    app_session.get(Student, second).payment_method = "cash"
+    app_session.commit()
+
+    response = client.get(
+        f"/api/v1/payment-methods?payer_person_id={a_two_child_family.payer_person_id}",
+        headers=as_manager.headers,
+    )
+
+    assert response.status_code == 200, response.text
+    methods = {item["student_id"]: item["method"] for item in response.json()["items"]}
+    assert methods[str(first)] == "cheque"
+    assert methods[str(second)] == "cash"
+
+
+def test_a_manager_reads_the_whole_club_for_the_month_end_batch(
+    client, app_session, studio, a_two_child_family, as_manager
+):
+    """`רישום מרוכז` picks a method and pre-ticks everybody on it, so it asks for the
+    studio rather than for one payer."""
+    first, _ = a_two_child_family.student_ids
+    app_session.get(Student, first).payment_method = "standing_order"
+    app_session.commit()
+
+    response = client.get("/api/v1/payment-methods", headers=as_manager.headers)
+
+    assert response.status_code == 200, response.text
+    items = response.json()["items"]
+    assert len(items) >= 2
+    assert any(item["student_id"] == str(first) and item["method"] == "standing_order" for item in items)
+
+
+def test_a_child_nobody_asked_about_has_no_method_rather_than_a_guess(
+    client, app_session, studio, a_two_child_family, as_manager
+):
+    first, _ = a_two_child_family.student_ids
+    app_session.get(Student, first).payment_method = None
+    app_session.commit()
+
+    response = client.get("/api/v1/payment-methods", headers=as_manager.headers)
+
+    row = next(item for item in response.json()["items"] if item["student_id"] == str(first))
+    assert row["method"] is None
+
+
+def test_a_coach_is_refused_how_the_club_pays(
+    client, a_two_child_family, as_assistant_coach
+):
+    """§13 invariant 3's reasoning, enforced at the door rather than by shape."""
+    response = client.get("/api/v1/payment-methods", headers=as_assistant_coach.headers)
+    assert response.status_code == 403, response.text

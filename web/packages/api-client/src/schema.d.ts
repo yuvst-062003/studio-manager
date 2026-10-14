@@ -3088,6 +3088,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/payment-methods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Payment Methods
+         * @description The same statement of intent, read by the person collecting rather than the family.
+         *
+         *     **Why this is a route of its own and not a field on `GET /students`** (2026-10-14): the
+         *     students list is coach-reachable, and SPEC §13's third invariant keeps every financial
+         *     field off coach-scoped endpoints -- `tests/invariants/test_03_...` refuses
+         *     `payment_method` there by name, which is the gate working rather than an obstacle. How a
+         *     family pays is a manager's business, so it is answered on a `ManagerOrOwner` route.
+         *
+         *     The money tab needs it twice. Opening one family's sheet asks with `payer_person_id` and
+         *     groups that family's open charges by child, because the same family really does pay with
+         *     cheques for one child and cash for the other. `רישום מרוכז` asks without one and gets the
+         *     whole studio, so the families on standing order can be pre-ticked at month end instead of
+         *     being found one at a time.
+         */
+        get: operations["payment_methods_api_v1_payment_methods_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/payment-orders": {
         parameters: {
             query?: never;
@@ -11868,6 +11900,11 @@ export interface components {
             /** Display Name */
             display_name: string;
             /**
+             * Entitled
+             * @default false
+             */
+            entitled: boolean;
+            /**
              * Has Absence Report
              * @default false
              */
@@ -18639,6 +18676,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaymentCompleteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    payment_methods_api_v1_payment_methods_get: {
+        parameters: {
+            query?: {
+                payer_person_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentMethodListOut"];
                 };
             };
             /** @description Validation Error */
